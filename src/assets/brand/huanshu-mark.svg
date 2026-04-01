@@ -1,0 +1,27 @@
+<svg width="256" height="256" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cool" x1="14" y1="20" x2="44" y2="42" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#70E1F7" />
+      <stop offset="1" stop-color="#2090C9" />
+    </linearGradient>
+    <linearGradient id="warm" x1="18" y1="15" x2="51" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD992" />
+      <stop offset="1" stop-color="#F0A63F" />
+    </linearGradient>
+    <linearGradient id="sheet" x1="16" y1="16" x2="48" y2="42" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF7E9" />
+      <stop offset="1" stop-color="#F7E4C4" />
+    </linearGradient>
+  </defs>
+  <rect x="9" y="18" width="34" height="23" rx="7" transform="rotate(-11 9 18)" fill="url(#cool)" opacity="0.3" />
+  <rect x="19" y="12" width="33" height="23" rx="7" transform="rotate(8 19 12)" fill="url(#warm)" opacity="0.4" />
+  <rect x="14" y="17" width="36" height="25" rx="8" transform="rotate(-3 14 17)" fill="url(#sheet)" />
+  <rect x="14" y="17" width="36" height="25" rx="8" transform="rotate(-3 14 17)" stroke="#15324E" stroke-opacity="0.12" />
+  <rect x="24" y="19.5" width="15" height="15" rx="4" transform="rotate(45 24 19.5)" stroke="#163C63" stroke-width="2.6" />
+  <circle cx="31.5" cy="27" r="3.2" fill="#F4B24B" />
+  <path d="M45 11.5V24.5" stroke="#59D1F2" stroke-width="2" stroke-linecap="round" />
+  <path d="M38.5 18H51.5" stroke="#59D1F2" stroke-width="2" stroke-linecap="round" />
+  <path d="M40.5 13.5L49.5 22.5" stroke="#59D1F2" stroke-width="2" stroke-linecap="round" />
+  <path d="M40.5 22.5L49.5 13.5" stroke="#59D1F2" stroke-width="2" stroke-linecap="round" />
+  <circle cx="45" cy="18" r="1.5" fill="#59D1F2" />
+</svg>

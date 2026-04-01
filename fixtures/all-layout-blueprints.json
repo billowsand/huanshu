@@ -1,0 +1,493 @@
+[
+  {
+    "kind": "cover",
+    "title": "Auto Slidev Layout Blueprint Test Deck",
+    "subtitle": "覆盖当前项目全部布局类型的测试数据",
+    "badges": ["layout-regression", "db-fixture", "visual-check"]
+  },
+  {
+    "kind": "overview",
+    "section": "00",
+    "title": "布局测试总览",
+    "note": "用于快速验证每种布局在编辑器、演示页和 JSON 面板中的渲染是否正常。",
+    "overview_items": [
+      {
+        "number": "01",
+        "title": "基础封面/概览",
+        "desc": "检查标题、徽标、总览列表和页首间距。"
+      },
+      {
+        "number": "02",
+        "title": "信息型内容布局",
+        "desc": "覆盖 feature grid、section list、center grid、outcome grid。"
+      },
+      {
+        "number": "03",
+        "title": "结构型内容布局",
+        "desc": "覆盖 split layers、step flow、process、timeline。"
+      },
+      {
+        "number": "04",
+        "title": "对比与分析布局",
+        "desc": "覆盖 spotlight、focus example、compare、swot。"
+      }
+    ]
+  },
+  {
+    "kind": "feature_grid",
+    "section": "01",
+    "title": "Feature Grid: 四卡片信息密度测试",
+    "subtitle": "验证 4 列紧凑模式、图标、结论和底部标签",
+    "note": "这页适合检查卡片头部、正文、列表项和 `note` 区域的层级表现。",
+    "cards": [
+      {
+        "title": "输入约束",
+        "tone": "blue",
+        "icon": "i-carbon:data-base",
+        "subtitle": "结构完整性",
+        "body": "要求 blueprint 字段命名稳定，空数组和可选字段都能被前端安全处理。",
+        "items": ["字段命名一致", "数组类型稳定", "空值可回退"],
+        "conclusion": "先保证 schema 稳定，再测样式",
+        "footer_tag": "Schema",
+        "footer_tone": "blue"
+      },
+      {
+        "title": "视觉密度",
+        "tone": "green",
+        "icon": "i-carbon:chart-relationship",
+        "subtitle": "紧凑布局",
+        "body": "四列时需要验证标题长度、段落换行和卡片高度是否一致。",
+        "items": ["标题不顶边", "长文本可换行", "高度尽量齐平"],
+        "conclusion": "四列是最容易暴露布局抖动的场景",
+        "footer_tag": "Density",
+        "footer_tone": "green"
+      },
+      {
+        "title": "可读性",
+        "tone": "amber",
+        "icon": "i-carbon:view",
+        "subtitle": "层级对比",
+        "body": "需要区分主标题、副标题、正文、列表与结论区域的视觉优先级。",
+        "items": ["标题对比明确", "正文行高稳定", "强调区块不抢主标题"],
+        "conclusion": "优先检查小屏或缩放场景",
+        "footer_tag": "Readability",
+        "footer_tone": "amber"
+      },
+      {
+        "title": "异常承载",
+        "tone": "red",
+        "icon": "i-carbon:warning-alt",
+        "subtitle": "边界情况",
+        "body": "本卡片模拟风险提示、较长文字和视觉强调区域同时出现。",
+        "items": ["支持长句", "支持风险提醒", "支持卡片底部状态位"],
+        "risk": "若这里溢出，通常意味着卡片内边距或字体比例需要调整",
+        "conclusion": "边界内容比正常内容更能发现问题",
+        "footer_tag": "Edge Case",
+        "footer_tone": "red"
+      }
+    ]
+  },
+  {
+    "kind": "spotlight",
+    "title": "Spotlight: 主视觉 + 侧栏信息测试",
+    "label": "重点页",
+    "label_tone": "blue",
+    "placeholder": "此处故意不放图片，用于测试占位视觉",
+    "side_width": "w-80",
+    "panels": [
+      {
+        "title": "默认信息块",
+        "icon": "i-carbon:idea",
+        "tone": "blue",
+        "body": "侧栏第一块测试常规正文与列表组合。",
+        "items": ["一段正文", "多条 checklist", "默认边框风格"],
+        "highlight": "适合验证高亮标题和正文间距"
+      },
+      {
+        "title": "流程块",
+        "kind": "flow",
+        "icon": "i-carbon:flow-stream",
+        "tone": "green",
+        "items": ["采集输入", "归一化结构", "渲染预览", "回写数据库"]
+      },
+      {
+        "title": "矩阵块",
+        "kind": "matrix",
+        "icon": "i-carbon:category",
+        "tone": "amber",
+        "items": [
+          "标题区",
+          "内容区",
+          "装饰区",
+          "辅助区",
+          "强调区",
+          "容错区",
+          "对比区",
+          "最终检查"
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "split_layers",
+    "section": "02",
+    "title": "Split Layers: 左侧说明 + 右侧层级结构",
+    "subtitle": "验证双栏、层级箭头和 footer",
+    "footer": "从下到上表示抽象层级递增；用于观察层卡配色、间距和对齐。",
+    "left_items": [
+      {
+        "icon": "i-carbon:document",
+        "title": "内容层",
+        "body": "最终由 blueprint 驱动，负责标题、正文、列表和结论等内容承载。"
+      },
+      {
+        "icon": "i-carbon:template",
+        "title": "布局层",
+        "body": "根据 `kind` 选择对应组件，把同一份数据映射成不同页面结构。"
+      },
+      {
+        "icon": "i-carbon:paint-brush",
+        "title": "主题层",
+        "body": "控制 tone、卡片玻璃感、边框和强调色，方便做统一回归检查。"
+      }
+    ],
+    "layers": [
+      { "title": "视觉表现层", "meta": "Vue Components", "tone": "red" },
+      { "title": "数据映射层", "meta": "SlideRenderer", "tone": "amber" },
+      { "title": "结构协议层", "meta": "SlideBlueprint", "tone": "green" },
+      { "title": "持久化层", "meta": "SQLite projects.blueprints", "tone": "blue" }
+    ]
+  },
+  {
+    "kind": "section_list",
+    "section": "03",
+    "title": "Section List: 顺序型清单测试",
+    "subtitle": "验证 4 项列表、step 字段和长文本换行",
+    "list_items": [
+      {
+        "step": "01",
+        "icon": "i-carbon:search",
+        "title": "识别布局",
+        "body": "先按组件目录确认项目里真正存在的布局种类，而不是只看生成 prompt。"
+      },
+      {
+        "step": "02",
+        "icon": "i-carbon:data-base",
+        "title": "构造字段",
+        "body": "根据类型定义补齐各布局核心字段，避免“能显示但不具代表性”的测试数据。"
+      },
+      {
+        "step": "03",
+        "icon": "i-carbon:store",
+        "title": "写入数据库",
+        "body": "把完整 JSON 数组放入 `projects.blueprints` 字段，供编辑器和演示页直接读取。"
+      },
+      {
+        "step": "04",
+        "icon": "i-carbon:checkmark-outline",
+        "title": "逐页检查",
+        "body": "重点观察溢出、裁切、动画起点、标题层级、卡片高度和极端文案承载。"
+      }
+    ]
+  },
+  {
+    "kind": "focus_example",
+    "section": "04",
+    "title": "Focus Example: 论点 + 示例 + 排序测试",
+    "subtitle": "验证左侧 point 卡片、右侧示例说明和 ranking 列表",
+    "example_title": "测试思路示例",
+    "example_body": "如果一个布局在“正常文案”下看起来都没问题，不代表它在<strong>长标题、长列表、强调态</strong>下也没问题。更有效的测试方式是刻意把信息密度做出差异，再观察组件是否稳住。",
+    "points": [
+      {
+        "icon": "i-carbon:target",
+        "title": "先测结构稳定性",
+        "body": "确认字段缺省时页面不会崩，字段齐全时页面不会错位。"
+      },
+      {
+        "icon": "i-carbon:demo",
+        "title": "再测视觉边界",
+        "body": "用长句、较多 bullet、不同 tone 和较满内容去压布局。"
+      },
+      {
+        "icon": "i-carbon:renew",
+        "title": "最后做回归复用",
+        "body": "同一套 blueprint 固定后，后续改主题或改组件都能重复对比。"
+      }
+    ],
+    "ranking": [
+      { "index": "1", "label": "结构正确", "meta": "字段映射无误" },
+      { "index": "2", "label": "布局稳定", "meta": "不溢出不塌陷" },
+      { "index": "3", "label": "视觉清晰", "meta": "层级和强调合理" },
+      { "index": "4", "label": "动画顺滑", "meta": "进入效果不突兀", "muted": true }
+    ]
+  },
+  {
+    "kind": "outcome_grid",
+    "section": "05",
+    "title": "Outcome Grid: 结果型卡片测试",
+    "subtitle": "验证并列成果表达、卡片结论和页尾 note",
+    "note": "这类布局适合测试相同卡片骨架在不同文本长度下的稳定性。",
+    "cards": [
+      {
+        "title": "可直接入库",
+        "tone": "blue",
+        "icon": "i-carbon:save",
+        "body": "整组蓝图数据可以直接写入 `projects.blueprints` 字段。",
+        "conclusion": "无需再手工拼装"
+      },
+      {
+        "title": "覆盖全部布局",
+        "tone": "green",
+        "icon": "i-carbon:events",
+        "body": "每种 `kind` 至少一页，便于做一轮完整视觉冒烟测试。",
+        "conclusion": "避免漏测单一布局"
+      },
+      {
+        "title": "包含边界内容",
+        "tone": "amber",
+        "icon": "i-carbon:overflow-menu-horizontal",
+        "body": "部分页面故意使用较长标题和较多项内容，用来放大样式问题。",
+        "conclusion": "更容易暴露问题"
+      }
+    ]
+  },
+  {
+    "kind": "center_grid",
+    "badge": "SUMMARY",
+    "title": "Center Grid: 中心结论 + 支撑点测试",
+    "accent": "用于测试中心主旨文案、对称分布卡片与底部 footer 的组合表现。",
+    "footer": "观察 4 宫格在标题较长时是否仍能保持平衡。",
+    "center_items": [
+      {
+        "title": "布局覆盖",
+        "desc": "一份 fixture 覆盖所有组件入口。",
+        "icon": "i-carbon:app",
+        "tone": "blue"
+      },
+      {
+        "title": "字段覆盖",
+        "desc": "尽量把常用可选字段都跑到。",
+        "icon": "i-carbon:json",
+        "tone": "green"
+      },
+      {
+        "title": "边界覆盖",
+        "desc": "长文案、多个 item、不同 tone 同时验证。",
+        "icon": "i-carbon:boundary",
+        "tone": "amber"
+      },
+      {
+        "title": "回归覆盖",
+        "desc": "后续改主题或改组件后可反复重放。",
+        "icon": "i-carbon:repeat",
+        "tone": "red"
+      }
+    ]
+  },
+  {
+    "kind": "timeline",
+    "section": "06",
+    "title": "Timeline: 时序布局测试",
+    "subtitle": "验证日期、事件卡、图标和 footer",
+    "footer": "时间线适合测试连续事件卡的间距、文本高度和图标对齐。",
+    "timeline_events": [
+      {
+        "date": "2026-03-30 09:00",
+        "title": "扫描布局组件",
+        "body": "确认项目实际支持的布局类型与字段映射关系。",
+        "tone": "blue",
+        "icon": "i-carbon:search"
+      },
+      {
+        "date": "2026-03-30 09:20",
+        "title": "整理结构定义",
+        "body": "对齐 TypeScript 与 Rust 中的 `SlideBlueprint` 和子类型。",
+        "tone": "green",
+        "icon": "i-carbon:code"
+      },
+      {
+        "date": "2026-03-30 09:40",
+        "title": "生成测试蓝图",
+        "body": "按每种布局特征编写代表性 JSON 数据，兼顾正常态与边界态。",
+        "tone": "amber",
+        "icon": "i-carbon:assemble"
+      },
+      {
+        "date": "2026-03-30 10:00",
+        "title": "写入数据库并回归",
+        "body": "在编辑器中逐页确认是否存在溢出、截断、错位或动画异常。",
+        "tone": "red",
+        "icon": "i-carbon:checkmark"
+      }
+    ]
+  },
+  {
+    "kind": "step_flow",
+    "section": "07",
+    "title": "Step Flow: 线性步骤测试",
+    "subtitle": "验证水平流向、步骤数和 footer",
+    "direction": "horizontal",
+    "footer": "如果需要额外测试纵向流，可把 `direction` 改成 `vertical` 再回归一次。",
+    "steps": [
+      {
+        "title": "读取项目布局",
+        "body": "识别真实的组件入口和 kind 枚举。",
+        "icon": "i-carbon:folder-details",
+        "tone": "blue"
+      },
+      {
+        "title": "准备测试字段",
+        "body": "让每页都带上最有代表性的结构。",
+        "icon": "i-carbon:data-check",
+        "tone": "green"
+      },
+      {
+        "title": "生成蓝图 JSON",
+        "body": "输出可直接保存到数据库的数组。",
+        "icon": "i-carbon:generate-pdf",
+        "tone": "amber"
+      },
+      {
+        "title": "逐页查看效果",
+        "body": "观察每个布局是否存在显示异常。",
+        "icon": "i-carbon:play-outline",
+        "tone": "red"
+      }
+    ]
+  },
+  {
+    "kind": "process",
+    "section": "08",
+    "title": "Process: 分阶段流程测试",
+    "subtitle": "验证 phase 组块、内嵌 steps 和高亮信息",
+    "footer": "适合检查 phase 卡片高度、自适应内容和多层信息表达。",
+    "phases": [
+      {
+        "phase": "Phase 1",
+        "title": "结构识别",
+        "icon": "i-carbon:inspect",
+        "tone": "blue",
+        "steps": [
+          { "label": "读取类型定义", "desc": "确认字段名称和默认值策略" },
+          { "label": "读取组件映射", "desc": "确认每种 kind 对应的展示组件" }
+        ],
+        "highlight": "先保证数据形状正确"
+      },
+      {
+        "phase": "Phase 2",
+        "title": "内容构造",
+        "icon": "i-carbon:edit",
+        "tone": "green",
+        "steps": [
+          { "label": "填充代表性标题" },
+          { "label": "加入长短混合文案" },
+          { "label": "补充 tone 与 icon" }
+        ],
+        "highlight": "让正常态和边界态同时存在"
+      },
+      {
+        "phase": "Phase 3",
+        "title": "回归验证",
+        "icon": "i-carbon:task-complete",
+        "tone": "amber",
+        "steps": [
+          { "label": "保存到数据库" },
+          { "label": "打开编辑器/演示页" },
+          { "label": "逐页截图或人工检查" }
+        ],
+        "highlight": "把问题收敛到具体布局"
+      }
+    ]
+  },
+  {
+    "kind": "compare",
+    "section": "09",
+    "title": "Compare: 双侧对比布局测试",
+    "subtitle": "验证左右面板、highlight 项、模式分隔和 footer",
+    "footer": "当前示例使用 `pros-cons` 模式；也可以改成 `side-by-side` 或 `versus` 做额外回归。",
+    "compare_data": {
+      "mode": "pros-cons",
+      "left": {
+        "title": "使用固定 fixture 的优点",
+        "tone": "green",
+        "icon": "i-carbon:thumbs-up",
+        "items": [
+          { "label": "回归稳定", "desc": "每次对比的是同一组输入", "highlight": true },
+          { "label": "覆盖全面", "desc": "每种布局都有代表页" },
+          { "label": "问题可复现", "desc": "样式问题不会因随机内容漂移" }
+        ],
+        "conclusion": "适合主题调整、组件重构后的快速回归"
+      },
+      "right": {
+        "title": "仅靠随机生成的缺点",
+        "tone": "red",
+        "icon": "i-carbon:warning",
+        "items": [
+          { "label": "输入不稳定", "desc": "每次内容密度不同，难以横向比较", "highlight": true },
+          { "label": "容易漏测", "desc": "某些布局可能这次根本没被选中" },
+          { "label": "难以归因", "desc": "发现问题后不容易精确复现到同一页" }
+        ],
+        "conclusion": "随机内容适合探索，固定 fixture 更适合回归"
+      }
+    }
+  },
+  {
+    "kind": "swot",
+    "section": "10",
+    "title": "SWOT: 四象限分析布局测试",
+    "subtitle": "验证 2x2 卡片网格、角标、条目列表和 strategy",
+    "swot_data": {
+      "quadrants": [
+        {
+          "key": "strengths",
+          "title": "Strengths",
+          "tone": "green",
+          "icon": "i-carbon:checkmark-filled",
+          "items": [
+            "一份数据即可覆盖所有布局入口",
+            "字段结构明确，便于定位问题",
+            "适合重复执行视觉回归"
+          ],
+          "summary": "优势在于稳定和全面。"
+        },
+        {
+          "key": "weaknesses",
+          "title": "Weaknesses",
+          "tone": "red",
+          "icon": "i-carbon:close-filled",
+          "items": [
+            "不能替代真实业务数据",
+            "无法覆盖所有极端国际化文本",
+            "部分动画问题仍需人工观察"
+          ],
+          "summary": "弱点在于场景有限。"
+        },
+        {
+          "key": "opportunities",
+          "title": "Opportunities",
+          "tone": "blue",
+          "icon": "i-carbon:growth",
+          "items": [
+            "后续可追加移动端和长文案专项 fixture",
+            "可加入图片资源页测试 asset 路径",
+            "可配合截图做自动化比对"
+          ],
+          "summary": "可继续扩展为更系统的回归集。"
+        },
+        {
+          "key": "threats",
+          "title": "Threats",
+          "tone": "amber",
+          "icon": "i-carbon:warning-alt",
+          "items": [
+            "组件改版后字段语义若变化，旧 fixture 可能失真",
+            "主题变量变化会带来新的视觉耦合问题",
+            "数据库中若混入旧数据，测试结果可能被干扰"
+          ],
+          "summary": "风险主要来自演进过程中的协议漂移。"
+        }
+      ],
+      "strategy": "建议把这份 fixture 固定为基线数据，每次布局或主题调整后先重放一遍，再决定是否需要更细的专项测试。"
+    }
+  }
+]

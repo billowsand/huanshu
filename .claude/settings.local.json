@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo build:*)",
+      "Bash(cat /mnt/f/auto-slidev/composables/*.ts)",
+      "Bash(cargo check:*)",
+      "Bash(find /mnt/f/auto-slidev/src-tauri/ -name *.ico -o -name *.png -o -name *.icns)",
+      "Bash(find /mnt/f/auto-slidev -maxdepth 2 -name *.png)",
+      "Bash(find /mnt/f/auto-slidev/studio -name *.vue -o -name *.tsx -o -name *.ts)",
+      "Bash(pnpm run:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(python3 -c \"import json,sys; c=json.load\\(sys.stdin\\); print\\(json.dumps\\(c.get\\(''''build'''',{}\\), indent=2\\)\\)\")",
+      "Bash(python3 -c \"import json,sys; c=json.load\\(sys.stdin\\); print\\(json.dumps\\(c.get\\(''''scripts'''',{}\\), indent=2\\)\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)",
+      "Bash(wait)"
+    ]
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true,
+    "context7@claude-plugins-official": true
+  }
+}

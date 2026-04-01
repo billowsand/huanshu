@@ -1,0 +1,1007 @@
+/* .slidev-code {
+  font-size: 1em !important;
+  line-height: 1.4em !important;
+} */
+:root {
+  --titlebar-height: 36px;
+  --slidev-code-padding: 8px 10px;
+  --slidev-code-background: #16161690 !important;
+  --font-sans: 'MiSans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', 'MiSans', 'Fira Code', 'Cascadia Code', monospace;
+  --type-title: 2rem;
+  --type-title-line: 1.18;
+  --type-subtitle: 1.0625rem;
+  --type-body: 1.125rem;
+  --type-body-tight: 1.0625rem;
+  --type-meta: 1rem;
+  --type-caption: 0.9375rem;
+  --type-body-strong: 1.1875rem;
+  --type-note: 1rem;
+  --type-cover-title: 3.25rem;
+  --type-cover-subtitle: 1.375rem;
+  --type-cover-en: 0.875rem;
+
+  --type-icon-xs: 0.875rem;
+  --type-icon-sm: 1rem;
+  --type-icon-md: 1.125rem;
+  --type-icon-lg: 1.25rem;
+  --type-icon-xl: 1.5rem;
+  --type-icon-2xl: 1.75rem;
+  --type-icon-hero: 3.75rem;
+
+  --type-grid-header-normal: 1.125rem;
+  --type-grid-header-compact: 1rem;
+  --type-grid-header-mini: 0.9375rem;
+  --type-grid-body-normal: 1rem;
+  --type-grid-body-compact: 0.9375rem;
+  --type-grid-body-mini: 0.875rem;
+  --type-grid-icon-normal: 1.25rem;
+  --type-grid-icon-compact: 1.125rem;
+  --type-grid-icon-mini: 1rem;
+  --type-grid-number-normal: 1.5rem;
+  --type-grid-number-compact: 1.25rem;
+  --type-grid-number-mini: 1.125rem;
+
+  --type-outcome-icon-normal: 2.25rem;
+  --type-outcome-icon-compact: 1.875rem;
+  --type-outcome-icon-mini: 1.5rem;
+  --type-outcome-body-normal: 1rem;
+  --type-outcome-body-compact: 0.9375rem;
+  --type-outcome-body-mini: 0.875rem;
+}
+
+html,
+body,
+#app {
+  font-family: var(--font-sans);
+}
+
+body {
+  margin: 0;
+}
+
+.font-mono,
+[font-mono] {
+  font-family: var(--font-mono) !important;
+}
+
+.slide-text-body-strong {
+  font-size: var(--type-body-strong);
+}
+
+.slide-text-note {
+  font-size: var(--type-note);
+}
+
+.slide-text-meta {
+  font-size: var(--type-meta);
+}
+
+.slide-text-caption {
+  font-size: var(--type-caption);
+}
+
+.slide-icon-xs {
+  font-size: var(--type-icon-xs);
+}
+
+.slide-icon-sm {
+  font-size: var(--type-icon-sm);
+}
+
+.slide-icon-md {
+  font-size: var(--type-icon-md);
+}
+
+.slide-icon-lg {
+  font-size: var(--type-icon-lg);
+}
+
+.slide-icon-xl {
+  font-size: var(--type-icon-xl);
+}
+
+.slide-icon-2xl {
+  font-size: var(--type-icon-2xl);
+}
+
+.slide-icon-hero {
+  font-size: var(--type-icon-hero);
+}
+
+/* ============================================================
+   SLIDE TITLE SYSTEM
+   Standardized title styling for all slide types
+   ============================================================ */
+
+/* Slide wrapper for presentation mode - ensures proper positioning */
+.pres-slide,
+.slidev-slide {
+  position: relative;
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+}
+
+/* Default h1 in slides */
+.slidev-slide h1,
+.slide-title {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: var(--type-title-line);
+  margin: 0;
+}
+
+/* Content slide title */
+.slidev-slide .content-slide h1,
+.content-slide .slide-title {
+  font-size: var(--type-title);
+}
+
+/* Default slide title size */
+.slide-title {
+  font-size: var(--type-title);
+}
+
+/* Large section title */
+.slide-section-title {
+  font-size: var(--type-title);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Dense layouts now use the same title scale for consistency */
+.slide-compact-title {
+  font-size: var(--type-title);
+  font-weight: 700;
+}
+
+/* Standard title area spacing */
+.slide-header {
+  margin-bottom: 1rem;
+}
+
+.slide-subtitle,
+.tag-pill,
+.tool-badge {
+  font-size: var(--type-subtitle);
+  font-weight: 600;
+}
+
+.slide-body {
+  font-size: var(--type-body);
+  line-height: 1.55;
+}
+
+.slide-body-tight {
+  font-size: var(--type-body-tight);
+  line-height: 1.5;
+}
+
+.slide-meta {
+  font-size: var(--type-meta);
+  line-height: 1.45;
+}
+
+.slide-caption {
+  font-size: var(--type-caption);
+  line-height: 1.4;
+}
+
+/* Title underline divider - standard pattern */
+.slide-title-divider {
+  height: 2px;
+  margin-top: 0.6rem;
+  background: linear-gradient(90deg, var(--primary), transparent);
+  border-radius: 1px;
+  opacity: 0.5;
+}
+
+/* Light divider for cards/sections */
+.slide-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 1rem 0;
+}
+
+/* Cover slide special title */
+.cover-title {
+  font-family: var(--font-sans);
+  font-size: var(--type-cover-title);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.cover-subtitle {
+  font-size: var(--type-cover-subtitle);
+  font-weight: 400;
+  color: var(--primary);
+  opacity: 0.85;
+  margin-top: 0.75rem;
+}
+
+.cover-en-title {
+  font-size: var(--type-cover-en);
+  font-family: var(--font-mono);
+  opacity: 0.35;
+  margin-top: 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+h6 {
+  text-transform: initial !important;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+}
+
+.dark #slide-content {
+  background-color: black !important;
+}
+
+/* Transitions */
+.slidev-vclick-target {
+  transition:
+    opacity 500ms ease,
+    filter 200ms ease,
+    color 300ms ease;
+}
+
+.slidev-vclick-hidden {
+  opacity: 0;
+  pointer-events: none;
+  filter: blur(3px);
+}
+
+.fade-out-leave-active {
+  transition:
+    opacity calc(var(--slidev-transition-duration) * 0.6) ease-out,
+    filter 200ms ease;
+}
+
+.fade-out-enter-active {
+  transition:
+    opacity calc(var(--slidev-transition-duration) * 0.8) ease-in,
+    filter 200ms ease;
+  transition-delay: calc(var(--slidev-transition-duration) * 0.6);
+}
+
+.fade-out-enter-from,
+.fade-out-leave-to {
+  opacity: 0;
+  filter: blur(5px);
+}
+
+.slidev-code .line {
+  transition: opacity 200ms ease;
+}
+
+iframe {
+  background: black;
+}
+
+/* ---- */
+
+@keyframes balance-shake {
+  0% {
+    transform: rotate(13deg);
+  }
+  50% {
+    transform: rotate(20deg);
+  }
+  100% {
+    transform: rotate(13deg);
+  }
+}
+
+@keyframes balance-move-left {
+  0% {
+    transform: translate(0, -27px);
+  }
+  50% {
+    transform: translate(3px, -40px);
+  }
+  100% {
+    transform: translate(0, -27px);
+  }
+}
+
+@keyframes balance-move-right {
+  0% {
+    transform: translate(-7px, 25px);
+  }
+  50% {
+    transform: translate(-12px, 38px);
+  }
+  100% {
+    transform: translate(-7px, 25px);
+  }
+}
+
+.animate-balance-shake {
+  transform: rotate(13deg);
+  animation: balance-shake 3s infinite;
+  animation-delay: 1s;
+  animation-timing-function: ease;
+}
+
+.animate-balance-move-left {
+  transform: translate(0, -27px);
+  animation: balance-move-left 3s infinite;
+  animation-delay: 1s;
+  animation-timing-function: ease;
+}
+
+.animate-balance-move-right {
+  transform: translate(-7px, 25px);
+  animation: balance-move-right 3s infinite;
+  animation-delay: 1s;
+  animation-timing-function: ease;
+}
+
+.slidev-code {
+  backdrop-filter: blur(10px);
+  border: 1px solid #eee1;
+}
+
+.rough-annotation > path[stroke-width='2'] {
+  stroke-width: calc(2px * var(--slidev-slide-scale));
+}
+
+/* Magic Links */
+.markdown-magic-link {
+  display: inline-flex;
+  align-items: center;
+  transform: translateY(6px);
+  line-height: 100%;
+  color: #fffc;
+  --uno: gap-1 transition rounded px1 py1 mx--0.5 important-border-0
+    font-condensed;
+}
+
+.markdown-magic-link:hover {
+  background: #8883;
+}
+
+.markdown-magic-link-image {
+  display: inline-block;
+  height: 1.2em;
+  width: 1.2em;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-radius: 2px;
+}
+
+.markdown-magic-link.markdown-magic-link-github-at {
+  transform: translateY(6px);
+  --uno: pl-0 py-0 pr2 uppercase text-sm gap-1.2 rounded-full;
+}
+
+.markdown-magic-link.markdown-magic-link-github-at .markdown-magic-link-image {
+  height: 1.6em;
+  width: 1.6em;
+  border-radius: 50%;
+}
+
+.footnotes-sep {
+  display: none;
+}
+
+/* 脚注 */
+.footnotes > .footnotes-list {
+  margin-top: 12px;
+  opacity: 0.9;
+  font-size: 12px;
+  /* 确保脚注上的返回链接符号 ↩ 不会被 body 的 Emoji 字体覆盖渲染为 ↩️ */
+  font-family: var(--font-sans);
+}
+
+.footnotes > .footnotes-list p {
+  margin: 0;
+}
+
+
+/* ============================================================
+   THEME VARIABLES
+   5 themes: dark-yellow | dark-blue | light-blue | light-chatgpt | light-claude
+   Switched via: document.documentElement.setAttribute('data-theme', id)
+   ============================================================ */
+
+/* ── 1. Dark Yellow — "Tactical Intelligence"
+        Obsidian navy + warm amber gold. Dense, authoritative.       */
+:root,
+[data-theme="dark-yellow"] {
+  /* canvas */
+  --bg:            #09090f;
+  --bg-gradient:   radial-gradient(ellipse at 20% 30%, rgba(125,85,10,0.18) 0%, transparent 60%), #09090f;
+  --glow:          rgba(125,85,10,0.18);
+
+  /* text */
+  --text:          #f5edda;
+  --text-muted:    rgba(245,237,218,0.6);
+
+  /* brand */
+  --primary:        #f59e0b;
+  --primary-light:  #fcd34d;
+  --primary-bg:     rgba(245,158,11,0.12);
+  --primary-border: rgba(245,158,11,0.28);
+
+  /* glass surfaces */
+  --glass:         rgba(255,255,255,0.035);
+  --glass-border:  rgba(255,255,255,0.075);
+
+  /* section watermark */
+  --section-num-stroke: rgba(245,158,11,0.12);
+
+  /* semantic: success – emerald */
+  --success:        #10b981;
+  --success-light:  #34d399;
+  --success-contrast: #f8fffc;
+  --success-bg:     rgba(16,185,129,0.1);
+  --success-border: rgba(16,185,129,0.25);
+
+  /* semantic: info – soft indigo-violet (distinct from amber) */
+  --info:        #818cf8;
+  --info-light:  #a5b4fc;
+  --info-contrast: #f8faff;
+  --info-bg:     rgba(129,140,248,0.1);
+  --info-border: rgba(129,140,248,0.25);
+
+  /* semantic: warning – amber = brand (intentional) */
+  --warning:        #f59e0b;
+  --warning-light:  #fcd34d;
+  --warning-contrast: #fffaf0;
+  --warning-bg:     rgba(245,158,11,0.12);
+  --warning-border: rgba(245,158,11,0.28);
+
+  /* semantic: danger – rose */
+  --danger:        #f43f5e;
+  --danger-light:  #fb7185;
+  --danger-contrast: #fff5f7;
+  --danger-bg:     rgba(244,63,94,0.1);
+  --danger-border: rgba(244,63,94,0.25);
+}
+
+/* ── 2. Dark Blue — "Deep Tech"
+        Midnight navy + electric sky-blue. Cool, focused, systemic. */
+[data-theme="dark-blue"] {
+  --bg:            #060d1a;
+  --bg-gradient:   radial-gradient(ellipse at 75% 25%, rgba(14,60,160,0.22) 0%, transparent 60%), #060d1a;
+  --glow:          rgba(14,60,160,0.22);
+
+  --text:          #dce8f5;
+  --text-muted:    rgba(220,232,245,0.6);
+
+  --primary:        #38bdf8;
+  --primary-light:  #7dd3fc;
+  --primary-bg:     rgba(56,189,248,0.1);
+  --primary-border: rgba(56,189,248,0.25);
+
+  --glass:         rgba(56,189,248,0.04);
+  --glass-border:  rgba(56,189,248,0.1);
+
+  --section-num-stroke: rgba(56,189,248,0.12);
+
+  --success:        #34d399;
+  --success-light:  #6ee7b7;
+  --success-contrast: #f2fffb;
+  --success-bg:     rgba(52,211,153,0.1);
+  --success-border: rgba(52,211,153,0.25);
+
+  --info:        #38bdf8;
+  --info-light:  #7dd3fc;
+  --info-contrast: #f4fbff;
+  --info-bg:     rgba(56,189,248,0.1);
+  --info-border: rgba(56,189,248,0.25);
+
+  /* proper amber warning — stands out against blue */
+  --warning:        #fbbf24;
+  --warning-light:  #fde68a;
+  --warning-contrast: #fffdf5;
+  --warning-bg:     rgba(251,191,36,0.1);
+  --warning-border: rgba(251,191,36,0.28);
+
+  --danger:        #fb7185;
+  --danger-light:  #fda4af;
+  --danger-contrast: #fff5f7;
+  --danger-bg:     rgba(251,113,133,0.1);
+  --danger-border: rgba(251,113,133,0.25);
+}
+
+/* ── 3. Light Blue — "Blueprint"
+        Crisp white-blue canvas + strong cobalt. Architectural clarity. */
+[data-theme="light-blue"] {
+  --bg:            #eef5ff;
+  --bg-gradient:   radial-gradient(ellipse at 20% 30%, rgba(29,78,216,0.07) 0%, transparent 60%), #eef5ff;
+  --glow:          rgba(29,78,216,0.07);
+
+  --text:          #0d2454;
+  --text-muted:    rgba(13,36,84,0.64);
+
+  --primary:        #1d4ed8;
+  --primary-light:  #1e40af;
+  --primary-bg:     rgba(29,78,216,0.07);
+  --primary-border: rgba(29,78,216,0.2);
+
+  --glass:         rgba(255,255,255,0.72);
+  --glass-border:  rgba(29,78,216,0.12);
+
+  --section-num-stroke: rgba(29,78,216,0.1);
+
+  --success:        #047857;
+  --success-light:  #065f46;
+  --success-contrast: #f0fdf4;
+  --success-bg:     rgba(4,120,87,0.07);
+  --success-border: rgba(4,120,87,0.2);
+
+  --info:        #1d4ed8;
+  --info-light:  #1e40af;
+  --info-contrast: #eff6ff;
+  --info-bg:     rgba(29,78,216,0.07);
+  --info-border: rgba(29,78,216,0.2);
+
+  --warning:        #92400e;
+  --warning-light:  #7c2d12;
+  --warning-contrast: #fff7ed;
+  --warning-bg:     rgba(146,64,14,0.07);
+  --warning-border: rgba(146,64,14,0.2);
+
+  --danger:        #991b1b;
+  --danger-light:  #7f1d1d;
+  --danger-contrast: #fef2f2;
+  --danger-bg:     rgba(153,27,27,0.07);
+  --danger-border: rgba(153,27,27,0.2);
+}
+
+/* ── 4. Light ChatGPT — "Clean Lab"
+        Pure white + emerald. Minimal, precise, scientific.           */
+[data-theme="light-chatgpt"] {
+  --bg:            #fafafa;
+  --bg-gradient:   radial-gradient(ellipse at 50% 20%, rgba(5,150,105,0.06) 0%, transparent 55%), #fafafa;
+  --glow:          rgba(5,150,105,0.06);
+
+  --text:          #111827;
+  --text-muted:    rgba(17,24,39,0.64);
+
+  --primary:        #059669;
+  --primary-light:  #047857;
+  --primary-bg:     rgba(5,150,105,0.07);
+  --primary-border: rgba(5,150,105,0.2);
+
+  --glass:         rgba(255,255,255,0.88);
+  --glass-border:  rgba(0,0,0,0.07);
+
+  --section-num-stroke: rgba(5,150,105,0.1);
+
+  --success:        #059669;
+  --success-light:  #047857;
+  --success-contrast: #ecfdf5;
+  --success-bg:     rgba(5,150,105,0.07);
+  --success-border: rgba(5,150,105,0.2);
+
+  /* cobalt blue for info — clearly distinct from green */
+  --info:        #1d4ed8;
+  --info-light:  #1e40af;
+  --info-contrast: #eff6ff;
+  --info-bg:     rgba(29,78,216,0.07);
+  --info-border: rgba(29,78,216,0.2);
+
+  --warning:        #92400e;
+  --warning-light:  #7c2d12;
+  --warning-contrast: #fff7ed;
+  --warning-bg:     rgba(146,64,14,0.07);
+  --warning-border: rgba(146,64,14,0.2);
+
+  --danger:        #991b1b;
+  --danger-light:  #7f1d1d;
+  --danger-contrast: #fef2f2;
+  --danger-bg:     rgba(153,27,27,0.07);
+  --danger-border: rgba(153,27,27,0.2);
+}
+
+/* ── 5. Light Claude — "Warm Scholar"
+        Antique cream + copper-terracotta. Scholarly, warm, humanistic. */
+[data-theme="light-claude"] {
+  --bg:            #faf7f2;
+  --bg-gradient:   radial-gradient(ellipse at 30% 20%, rgba(181,96,26,0.07) 0%, transparent 55%), #faf7f2;
+  --glow:          rgba(181,96,26,0.07);
+
+  --text:          #231a0f;
+  --text-muted:    rgba(35,26,15,0.64);
+
+  --primary:        #b5601a;
+  --primary-light:  #9a4d14;
+  --primary-bg:     rgba(181,96,26,0.1);
+  --primary-border: rgba(181,96,26,0.22);
+
+  --glass:         rgba(255,249,240,0.82);
+  --glass-border:  rgba(181,96,26,0.1);
+
+  --section-num-stroke: rgba(181,96,26,0.1);
+
+  /* sage green success */
+  --success:        #276749;
+  --success-light:  #1f5138;
+  --success-contrast: #f0fdf4;
+  --success-bg:     rgba(39,103,73,0.08);
+  --success-border: rgba(39,103,73,0.2);
+
+  /* muted slate-blue info */
+  --info:        #2e5fa3;
+  --info-light:  #244b80;
+  --info-contrast: #eff6ff;
+  --info-bg:     rgba(46,95,163,0.08);
+  --info-border: rgba(46,95,163,0.2);
+
+  /* copper warning = primary */
+  --warning:        #b5601a;
+  --warning-light:  #9a4d14;
+  --warning-contrast: #fff7ed;
+  --warning-bg:     rgba(181,96,26,0.1);
+  --warning-border: rgba(181,96,26,0.22);
+
+  --danger:        #9b1c1c;
+  --danger-light:  #7f1d1d;
+  --danger-contrast: #fef2f2;
+  --danger-bg:     rgba(155,28,28,0.08);
+  --danger-border: rgba(155,28,28,0.2);
+}
+
+
+/* ============================================================
+   BASE
+   ============================================================ */
+
+[data-theme] {
+  color: var(--text);
+}
+
+
+/* ============================================================
+   UTILITY CLASSES — referenced in slides.md, do not rename
+   ============================================================ */
+
+/* Primary-tinted pill (category labels) */
+.amber-badge {
+  background: linear-gradient(135deg, var(--primary-bg), transparent);
+  border: 1px solid var(--primary-border);
+  color: var(--primary-light);
+}
+
+/* Large watermark section number (absolute positioned) */
+.section-num {
+  font-size: 7rem;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--section-num-stroke);
+  line-height: 1;
+  position: absolute;
+  right: 2rem;
+  top: 1rem;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Frosted glass surface */
+.glass-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--glass) 96%, rgba(255,255,255,0.02)), color-mix(in srgb, var(--glass) 72%, transparent)),
+    linear-gradient(135deg, rgba(255,255,255,0.08), transparent 42%);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 92%, rgba(255,255,255,0.08));
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 12px 32px rgba(0,0,0,0.08);
+}
+
+/* Card header with left accent stripe */
+.amber-header {
+  background: linear-gradient(90deg, var(--primary-bg), transparent);
+  border-left: 3px solid var(--primary);
+}
+
+/* Small rounded label pill */
+.tag-pill {
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-size: var(--type-subtitle);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+/* Horizontal gradient rule */
+.divider-amber {
+  height: 1px;
+  background: linear-gradient(90deg, var(--primary), transparent);
+}
+
+/* Inline tool/section label */
+.tool-badge {
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-border);
+  border-radius: 8px;
+  padding: 2px 10px;
+  font-size: var(--type-subtitle);
+  color: var(--primary-light);
+  font-weight: 600;
+}
+
+
+/* ============================================================
+   SEMANTIC COLOR UTILITIES
+   ============================================================ */
+
+.text-primary       { color: var(--primary); }
+.text-primary-light { color: var(--primary-light); }
+.text-text          { color: var(--text); }
+.text-text-muted    { color: var(--text-muted); }
+.text-success       { color: var(--success); }
+.text-success-light { color: var(--success-light); }
+.text-info          { color: var(--info); }
+.text-info-light    { color: var(--info-light); }
+.text-warning       { color: var(--warning); }
+.text-warning-light { color: var(--warning-light); }
+.text-danger        { color: var(--danger); }
+.text-danger-light  { color: var(--danger-light); }
+
+.bg-primary-bg         { background: var(--primary-bg); }
+.bg-glass              { background: var(--glass); }
+.border-primary-border { border-color: var(--primary-border); }
+.border-glass-border   { border-color: var(--glass-border); }
+
+
+/* ============================================================
+   STUDIO UI DESIGN SYSTEM
+   CSS variables for the app shell. Synced to slide data-theme.
+   ============================================================ */
+
+/* ── Default / dark-yellow ─────────────────────────────────── */
+:root,
+[data-theme="dark-yellow"] {
+  --studio-bg:            #0b0c11;
+  --studio-panel:         #111318;
+  --studio-panel-2:       #16181f;
+  --studio-surface:       #1c1f2b;
+  --studio-border:        rgba(255,255,255,0.07);
+  --studio-border-hover:  rgba(255,255,255,0.14);
+
+  --studio-text:          #e0e2ec;
+  --studio-muted:         rgba(224,226,236,0.38);
+
+  --studio-primary:        #f59e0b;
+  --studio-primary-light:  #fcd34d;
+  --studio-primary-contrast: #140d02;
+  --studio-primary-bg:     rgba(245,158,11,0.10);
+  --studio-primary-border: rgba(245,158,11,0.28);
+
+  --studio-success:        #10b981;
+  --studio-success-bg:     rgba(16,185,129,0.10);
+  --studio-error:          #f43f5e;
+  --studio-error-bg:       rgba(244,63,94,0.10);
+  --studio-error-border:   rgba(244,63,94,0.28);
+}
+
+/* ── dark-blue ─────────────────────────────────────────────── */
+[data-theme="dark-blue"] {
+  --studio-bg:            #070c17;
+  --studio-panel:         #0d1422;
+  --studio-panel-2:       #11192c;
+  --studio-surface:       #172036;
+  --studio-border:        rgba(56,189,248,0.09);
+  --studio-border-hover:  rgba(56,189,248,0.20);
+
+  --studio-text:          #d4e8f8;
+  --studio-muted:         rgba(212,232,248,0.38);
+
+  --studio-primary:        #38bdf8;
+  --studio-primary-light:  #7dd3fc;
+  --studio-primary-contrast: #031521;
+  --studio-primary-bg:     rgba(56,189,248,0.10);
+  --studio-primary-border: rgba(56,189,248,0.28);
+
+  --studio-success:        #34d399;
+  --studio-success-bg:     rgba(52,211,153,0.10);
+  --studio-error:          #fb7185;
+  --studio-error-bg:       rgba(251,113,133,0.10);
+  --studio-error-border:   rgba(251,113,133,0.28);
+}
+
+/* ── light-blue ────────────────────────────────────────────── */
+[data-theme="light-blue"] {
+  --studio-bg:            #eef4ff;
+  --studio-panel:         #ffffff;
+  --studio-panel-2:       #f4f8ff;
+  --studio-surface:       #e8effe;
+  --studio-border:        rgba(29,78,216,0.10);
+  --studio-border-hover:  rgba(29,78,216,0.22);
+
+  --studio-text:          #0d2454;
+  --studio-muted:         rgba(13,36,84,0.44);
+
+  --studio-primary:        #1d4ed8;
+  --studio-primary-light:  #1e40af;
+  --studio-primary-contrast: #ffffff;
+  --studio-primary-bg:     rgba(29,78,216,0.07);
+  --studio-primary-border: rgba(29,78,216,0.22);
+
+  --studio-success:        #047857;
+  --studio-success-bg:     rgba(4,120,87,0.08);
+  --studio-error:          #991b1b;
+  --studio-error-bg:       rgba(153,27,27,0.08);
+  --studio-error-border:   rgba(153,27,27,0.22);
+}
+
+/* ── light-chatgpt ─────────────────────────────────────────── */
+[data-theme="light-chatgpt"] {
+  --studio-bg:            #f5f5f5;
+  --studio-panel:         #ffffff;
+  --studio-panel-2:       #f2f2f2;
+  --studio-surface:       #ebebeb;
+  --studio-border:        rgba(0,0,0,0.08);
+  --studio-border-hover:  rgba(0,0,0,0.16);
+
+  --studio-text:          #111827;
+  --studio-muted:         rgba(17,24,39,0.42);
+
+  --studio-primary:        #059669;
+  --studio-primary-light:  #047857;
+  --studio-primary-contrast: #ffffff;
+  --studio-primary-bg:     rgba(5,150,105,0.08);
+  --studio-primary-border: rgba(5,150,105,0.22);
+
+  --studio-success:        #059669;
+  --studio-success-bg:     rgba(5,150,105,0.08);
+  --studio-error:          #991b1b;
+  --studio-error-bg:       rgba(153,27,27,0.08);
+  --studio-error-border:   rgba(153,27,27,0.22);
+}
+
+/* ── light-claude ──────────────────────────────────────────── */
+[data-theme="light-claude"] {
+  --studio-bg:            #f2ece0;
+  --studio-panel:         #fdf8f0;
+  --studio-panel-2:       #f5ede0;
+  --studio-surface:       #ede3d4;
+  --studio-border:        rgba(181,96,26,0.12);
+  --studio-border-hover:  rgba(181,96,26,0.24);
+
+  --studio-text:          #231a0f;
+  --studio-muted:         rgba(35,26,15,0.42);
+
+  --studio-primary:        #b5601a;
+  --studio-primary-light:  #9a4d14;
+  --studio-primary-contrast: #ffffff;
+  --studio-primary-bg:     rgba(181,96,26,0.10);
+  --studio-primary-border: rgba(181,96,26,0.24);
+
+  --studio-success:        #276749;
+  --studio-success-bg:     rgba(39,103,73,0.08);
+  --studio-error:          #9b1c1c;
+  --studio-error-bg:       rgba(155,28,28,0.08);
+  --studio-error-border:   rgba(155,28,28,0.22);
+}
+
+
+/* ============================================================
+   GLOBAL FORM ELEMENTS
+   ============================================================ */
+
+input,
+textarea,
+select {
+  background: var(--studio-surface);
+  border: 1px solid var(--studio-border);
+  border-radius: 6px;
+  color: var(--studio-text);
+  font-size: 0.8125rem;
+  padding: 0.4rem 0.625rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  font-family: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--studio-muted);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--studio-primary-border);
+  box-shadow: 0 0 0 3px var(--studio-primary-bg);
+}
+
+select option {
+  background: var(--studio-panel);
+  color: var(--studio-text);
+}
+
+
+/* ============================================================
+   GLOBAL BUTTON SYSTEM
+   ============================================================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 6px;
+  border: 1px solid var(--studio-border);
+  background: var(--studio-surface);
+  color: var(--studio-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  line-height: 1.4;
+  text-decoration: none;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--studio-border-hover);
+  background: var(--studio-panel-2);
+}
+
+.btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+/* Primary: filled accent button */
+.btn-primary {
+  background: var(--studio-primary);
+  border-color: var(--studio-primary);
+  color: var(--studio-primary-contrast, #000);
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--studio-primary-light);
+  border-color: var(--studio-primary-light);
+  filter: brightness(1.05);
+}
+
+/* Ghost: transparent, shows on hover */
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--studio-muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--studio-surface);
+  border-color: var(--studio-border);
+  color: var(--studio-text);
+}
+
+
+/* ============================================================
+   SCROLLBAR STYLING
+   ============================================================ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--studio-surface) transparent;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--studio-surface);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--studio-border-hover);
+}

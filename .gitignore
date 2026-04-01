@@ -1,0 +1,7 @@
+node_modules/
+dist
+target
+.slidev-gen-debug
+dist-studio/
+dist-viewer/
+src-tauri/target/
