@@ -806,3 +806,60 @@ pub async fn ensure_icon_embeddings(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn recommend_icons_for_query(
+    query: String,
+    limit: Option<usize>,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<Vec<String>, String> {
+    let query = query.trim();
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let max = limit.unwrap_or(6).clamp(1, 12);
+
+    let (settings, project_dir, db) = {
+        let st = state.lock().unwrap();
+        (
+            st.settings.clone(),
+            st.project_dir.clone(),
+            std::sync::Arc::clone(&st.db),
+        )
+    };
+
+    let config = GenerationConfig::from_settings(&settings, project_dir);
+
+    let icon_index = {
+        let conn = db.lock().unwrap();
+        IconIndex::load_with_cache(&config.project_dir, &config.embedding_model, &*conn)
+            .map_err(|e| e.to_string())?
+    };
+
+    if icon_index.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    if icon_index.is_embedded() {
+        let client = LmStudioClient::new(&config.lmstudio_base_url).with_api_key(&config.api_key);
+        if let Ok(embeddings) = client.embed(&config.embedding_model, &[query.to_string()]).await {
+            if let Some(query_emb) = embeddings.first() {
+                let semantic = icon_index
+                    .semantic_search_with_emb(query_emb, max)
+                    .into_iter()
+                    .map(|(_, icon)| icon.full_name)
+                    .collect::<Vec<_>>();
+                if !semantic.is_empty() {
+                    return Ok(semantic);
+                }
+            }
+        }
+    }
+
+    Ok(icon_index
+        .top_candidates(&format!("carbon {query}"), max)
+        .into_iter()
+        .map(|icon| icon.full_name)
+        .collect())
+}

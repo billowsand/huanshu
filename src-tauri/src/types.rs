@@ -135,10 +135,18 @@ impl SlideBlueprint {
             .chain(self.list_items.iter().filter_map(|x| x.icon.as_deref()))
             .chain(self.points.iter().filter_map(|x| x.icon.as_deref()))
             .chain(self.center_items.iter().filter_map(|x| x.icon.as_deref()))
+            .chain(self.steps.iter().filter_map(|x| x.icon.as_deref()))
+            .chain(self.phases.iter().filter_map(|x| x.icon.as_deref()))
             .chain(
                 self.timeline_events
                     .iter()
                     .filter_map(|x| x.icon.as_deref()),
+            )
+            .chain(
+                self.compare_data
+                    .iter()
+                    .flat_map(|data| [&data.left, &data.right])
+                    .filter_map(|side| side.icon.as_deref()),
             )
             .chain(
                 self.swot_data

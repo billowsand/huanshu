@@ -435,10 +435,19 @@ export function useSlideEditor(options: {
   }
 
   function initEditorSlide(slide: SlideBlueprint) {
-    jsonText.value = JSON.stringify(filterSlideJson(slide), null, 2)
-    liveSlide.value = JSON.parse(JSON.stringify(slide)) as SlideBlueprint
+    const cloned = deepClone(slide)
+    jsonText.value = JSON.stringify(filterSlideJson(cloned), null, 2)
+    liveSlide.value = cloned
     jsonError.value = ''
     hasUnsavedChanges.value = false
+  }
+
+  function replaceEditorDraft(slide: SlideBlueprint, markUnsaved = true) {
+    const cloned = deepClone(slide)
+    liveSlide.value = cloned
+    jsonText.value = JSON.stringify(filterSlideJson(cloned), null, 2)
+    jsonError.value = ''
+    hasUnsavedChanges.value = markUnsaved
   }
 
   function updateEditorScale() {
@@ -492,7 +501,12 @@ export function useSlideEditor(options: {
   }
 
   function formatEditorJson() {
-    try { jsonText.value = JSON.stringify(JSON.parse(jsonText.value), null, 2); jsonError.value = '' } catch { /* keep */ }
+    try {
+      const parsed = JSON.parse(jsonText.value) as SlideBlueprint
+      replaceEditorDraft(parsed, true)
+    } catch {
+      /* keep */
+    }
   }
 
   async function applyEditorChanges() {
@@ -586,6 +600,7 @@ export function useSlideEditor(options: {
     editorPreviewSlide,
     editorStageW,
     editorStageH,
+    replaceEditorDraft,
     onEditorJsonInput,
     onEditorJsonKeydown,
     formatEditorJson,

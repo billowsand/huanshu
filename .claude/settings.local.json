@@ -14,7 +14,9 @@
       "Bash(python3 -c \"import json,sys; c=json.load\\(sys.stdin\\); print\\(json.dumps\\(c.get\\(''''scripts'''',{}\\), indent=2\\)\\)\")",
       "Bash(npx tsc:*)",
       "Bash(npx vite:*)",
-      "Bash(wait)"
+      "Bash(wait)",
+      "mcp__zread__read_file",
+      "mcp__zread__get_repo_structure"
     ]
   },
   "enabledPlugins": {

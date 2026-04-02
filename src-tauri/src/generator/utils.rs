@@ -51,13 +51,16 @@ pub fn parse_json_with_extraction<T: for<'de> Deserialize<'de>>(raw: &str) -> Re
 
 fn truncate_for_display(s: &str, max_len: usize) -> String {
     let trimmed = s.trim();
-    if trimmed.len() <= max_len {
+    let total_chars = trimmed.chars().count();
+    if total_chars <= max_len {
         return trimmed.to_string();
     }
+
+    let truncated: String = trimmed.chars().take(max_len).collect();
     format!(
         "{}... [truncated, {} chars total]",
-        &trimmed[..max_len],
-        trimmed.len()
+        truncated,
+        total_chars
     )
 }
 

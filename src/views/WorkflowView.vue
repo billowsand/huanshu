@@ -374,6 +374,7 @@ onMounted(() => {
         :editor-stage-w="slideEditor.editorStageW.value"
         :editor-stage-h="slideEditor.editorStageH.value"
         :json-textarea-ref="slideEditor.jsonTextareaRef.value"
+        @replace-draft="slideEditor.replaceEditorDraft"
         @json-textarea-ref="slideEditor.jsonTextareaRef.value = $event"
         @preview-area-ref="slideEditor.previewArea.value = $event"
         @format-json="slideEditor.formatEditorJson"
@@ -1932,6 +1933,120 @@ onMounted(() => {
   border: none !important;
 }
 
+.ej-qf-textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+  padding-top: 0.35rem !important;
+  border: 1px solid var(--studio-border) !important;
+  border-radius: 6px !important;
+  background: var(--studio-panel) !important;
+  padding-left: 0.55rem !important;
+  padding-right: 0.55rem !important;
+}
+
+.ej-structured-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.ej-struct-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--studio-border);
+  border-radius: 6px;
+  background: var(--studio-surface);
+}
+
+.ej-struct-field--wide {
+  grid-column: 1 / -1;
+}
+
+.ej-list-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.ej-card-block,
+.ej-nested-card,
+.ej-icon-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--studio-border);
+  border-radius: 8px;
+  background: var(--studio-panel-2);
+}
+
+.ej-nested-card {
+  background: var(--studio-surface);
+}
+
+.ej-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ej-card-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--studio-text);
+}
+
+.ej-inline-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--studio-border);
+  border-radius: 6px;
+  background: var(--studio-surface);
+}
+
+.ej-bool-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.25rem;
+  font-size: 0.72rem;
+  color: var(--studio-text);
+}
+
+.ej-icon-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ej-icon-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--studio-border);
+  background: var(--studio-surface);
+  color: var(--studio-text);
+  font-size: 0.65rem;
+}
+
+.ej-icon-chip-preview {
+  font-size: 0.9rem;
+  color: var(--studio-primary);
+}
+
+.ej-media-actions {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
 /* ── JSON editor wrap with gutter ── */
 .ej-wrap {
   flex: 1;
@@ -2081,6 +2196,12 @@ onMounted(() => {
   font-family: var(--font-mono);
   min-width: 42px;
   flex-shrink: 0;
+}
+
+@media (max-width: 1280px) {
+  .ej-structured-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .ej-tone-chip {

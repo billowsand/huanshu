@@ -231,6 +231,7 @@ pub fn run() {
             commands::generate::get_generation_logs,
             commands::generate::repair_slide,
             commands::generate::ensure_icon_embeddings,
+            commands::generate::recommend_icons_for_query,
             commands::settings::get_settings,
             commands::settings::save_settings,
             commands::settings::list_models,
