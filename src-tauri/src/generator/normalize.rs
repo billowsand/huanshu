@@ -250,7 +250,7 @@ pub async fn repair_until_valid(
 /// kind are guaranteed by the `apply_component_defaults` call in the caller; this
 /// function only pre-fills the five kinds it can meaningfully populate from
 /// key_points (SectionIntro, FeatureGrid, OutcomeGrid, SectionList, StepFlow).
-fn make_fallback_slide(page: &PagePlan, layout: Option<&LayoutPlan>) -> SlideBlueprint {
+pub fn make_fallback_slide(page: &PagePlan, layout: Option<&LayoutPlan>) -> SlideBlueprint {
     use crate::generator::planning::safe_fallback_kind;
     // Deliberately ignore the layout plan's kind — it's the one that failed.
     let _ = layout;
@@ -1045,4 +1045,157 @@ pub fn infer_layers_from_split_slide(slide: &SlideBlueprint) -> Vec<LayerItem> {
             }
         })
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Per-page normalize + repair (for the concurrent per-page pipeline)
+// ---------------------------------------------------------------------------
+
+/// Normalize a single blueprint (CPU-only passes + icon fix).
+pub async fn normalize_one_blueprint(
+    slide: &mut SlideBlueprint,
+    client: &LmStudioClient,
+    embedding_model: &str,
+    icon_index: &IconIndex,
+    asset_paths: &HashSet<String>,
+) -> Result<()> {
+    normalize_lengths(slide);
+    normalize_tones(slide);
+    repair_assets(slide, asset_paths);
+    apply_component_defaults(slide);
+    // Fix invalid icons for this single slide
+    crate::generator::icons::fix_invalid_icons(
+        std::slice::from_mut(slide),
+        client,
+        embedding_model,
+        icon_index,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Validate and repair a single slide until it passes or all rounds are exhausted.
+pub async fn repair_one_slide(
+    client: &LmStudioClient,
+    config: &GenerationConfig,
+    doc: &ParsedDocument,
+    page_plan: &PagePlan,
+    layout_plan: &LayoutPlan,
+    mut slide: SlideBlueprint,
+    icon_index: &IconIndex,
+    asset_paths: &HashSet<String>,
+    debug_dir: &Path,
+    slide_idx: usize,
+) -> Result<SlideBlueprint> {
+    use crate::generator::utils::blueprint_schema_hint;
+
+    let max_rounds = config.repair_rounds.max(3);
+
+    for round in 0..max_rounds {
+        let issues = validate_blueprints(
+            std::slice::from_ref(&slide),
+            icon_index,
+            asset_paths,
+        );
+        if issues.is_empty() {
+            return Ok(slide);
+        }
+
+        let is_last_round = round == max_rounds - 1;
+
+        if is_last_round {
+            // Final round: switch kind deterministically and regenerate
+            use crate::generator::planning::pick_different_kind;
+            let new_kind = pick_different_kind(page_plan, &slide.kind);
+            eprintln!(
+                "repair_one_slide: slide {} switching {:?} → {:?}",
+                slide_idx + 1, slide.kind, new_kind
+            );
+
+            let mut new_layout = layout_plan.clone();
+            new_layout.kind = new_kind.clone();
+            let extra_context = format!(
+                "Previous attempt used component kind '{:?}' and failed validation:\n{}\nDo NOT use '{:?}' again.",
+                slide.kind,
+                issues.iter().map(|i| i.message.as_str()).collect::<Vec<_>>().join("\n"),
+                slide.kind,
+            );
+
+            let prev_kind_str = format!("{:?}", slide.kind);
+            let error_msgs: Vec<String> = issues.iter().map(|i| i.message.clone()).collect();
+            let mut slides_vec = vec![slide.clone()];
+            match crate::generator::slides::regenerate_slides_at(
+                client,
+                config,
+                doc,
+                std::slice::from_ref(page_plan),
+                std::slice::from_ref(&new_layout),
+                &mut slides_vec,
+                &[(0, prev_kind_str, error_msgs)],
+                icon_index,
+                asset_paths,
+                debug_dir,
+                round,
+            )
+            .await
+            {
+                Ok(()) => {
+                    slide = slides_vec.into_iter().next().unwrap_or_else(|| make_fallback_slide(page_plan, Some(layout_plan)));
+                }
+                Err(e) => eprintln!("repair_one_slide regen failed for slide {}: {e}", slide_idx + 1),
+            }
+        } else {
+            // Standard LLM repair round
+            let schema = blueprint_schema_hint(&slide.kind);
+            let failing_items = vec![serde_json::json!({
+                "slide_index": 1,
+                "page_plan": page_plan,
+                "layout_plan": layout_plan,
+                "page_id": page_plan.page_id,
+                "current_slide": slide.clone(),
+                "component_schema": schema,
+            })];
+
+            let system = "You repair an invalid Slidev slide blueprint. Fix only what is necessary to satisfy validation while preserving the content intent. Return strict JSON. IMPORTANT: all icon fields must use the i-carbon: prefix (e.g. \"i-carbon:chart-line\"). Never use i-mdi:, i-fa:, or any other prefix.";
+            let user = format!(
+                "Document title: {}\n\nFailing slide with its plan and schema:\n{}\n\nValidation issues:\n{}\n\nReturn ONLY the corrected slide as JSON: {{\"slides\": [<corrected blueprint>]}}.",
+                doc.title,
+                serde_json::to_string_pretty(&failing_items).unwrap_or_default(),
+                format_issue_block("issues", &issues),
+            );
+            let debug_prefix = format!("04-repair-slide{}-r{}", slide_idx + 1, round + 1);
+            let _ = write_debug(debug_dir, &format!("{debug_prefix}.system.txt"), system);
+            let _ = write_debug(debug_dir, &format!("{debug_prefix}.user.txt"), &user);
+
+            match client.generate_text(&config.model, system, &user).await {
+                Ok(raw) => {
+                    let _ = write_debug(debug_dir, &format!("{debug_prefix}.raw.txt"), &raw);
+                    if let Ok(resp) = crate::generator::utils::parse_json_with_extraction::<RepairResponse>(&raw) {
+                        if let Some(repaired) = resp.slides.into_iter().next() {
+                            slide = repaired;
+                        }
+                    }
+                }
+                Err(e) => eprintln!("repair_one_slide LLM failed for slide {}: {e}", slide_idx + 1),
+            }
+        }
+
+        // Re-normalize after repair
+        normalize_one_blueprint(&mut slide, client, &config.embedding_model, icon_index, asset_paths).await?;
+    }
+
+    // All rounds exhausted: try deterministic fallback
+    let issues = validate_blueprints(std::slice::from_ref(&slide), icon_index, asset_paths);
+    if !issues.is_empty() {
+        eprintln!(
+            "repair_one_slide: slide {} still invalid after {} rounds; using fallback",
+            slide_idx + 1, max_rounds
+        );
+        slide = make_fallback_slide(page_plan, Some(layout_plan));
+        apply_component_defaults(&mut slide);
+        normalize_lengths(&mut slide);
+        normalize_tones(&mut slide);
+    }
+
+    Ok(slide)
 }

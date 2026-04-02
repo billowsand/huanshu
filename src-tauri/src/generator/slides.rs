@@ -323,3 +323,154 @@ pub async fn regenerate_slides_at(
     }
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Single-page pipeline (for the concurrent per-page architecture)
+// ---------------------------------------------------------------------------
+
+/// Per-page pipeline stage labels, emitted as events to the frontend.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PageStage {
+    Pending,
+    Planning,
+    Layout,
+    Content,
+    Normalizing,
+    Validating,
+    Done,
+    Error,
+}
+
+/// Run the full pipeline for a single page:
+/// enrich → layout → content → normalize → validate + repair
+///
+/// This is the core function of the per-page concurrent architecture.
+/// Each page runs independently; the `used_layouts` parameter carries
+/// information about already-completed pages for layout diversity.
+pub async fn generate_single_page_pipeline(
+    client: &LmStudioClient,
+    config: &GenerationConfig,
+    doc: &ParsedDocument,
+    base_page_plan: PagePlan,
+    slide_index: usize,
+    total_slides: usize,
+    used_layouts_shared: std::sync::Arc<tokio::sync::Mutex<Vec<(usize, String)>>>,
+    icon_index: &IconIndex,
+    asset_paths: &HashSet<String>,
+    debug_dir: &Path,
+    on_stage: std::sync::Arc<dyn Fn(usize, PageStage, Option<&str>) + Send + Sync>,
+) -> Result<(SlideBlueprint, LayoutPlan)> {
+    let page_id = base_page_plan.page_id.clone();
+
+    // Stage 1: Enrich page plan
+    on_stage(slide_index, PageStage::Planning, Some("丰富页面规划"));
+    let page_plan = crate::generator::planning::enrich_one_page_plan(
+        client,
+        config,
+        doc,
+        &base_page_plan,
+        asset_paths,
+        debug_dir,
+    )
+    .await;
+
+    // Stage 2: Layout selection
+    on_stage(slide_index, PageStage::Layout, Some("选择布局模板"));
+    // Snapshot layouts right before selection (not at task spawn time)
+    let layouts_snapshot = used_layouts_shared.lock().await.clone();
+    let layout_plan = crate::generator::planning::layout_one_page(
+        client,
+        config,
+        &page_plan,
+        &layouts_snapshot,
+        debug_dir,
+    )
+    .await;
+    // Register the chosen layout immediately for diversity tracking
+    {
+        let mut layouts = used_layouts_shared.lock().await;
+        layouts.push((slide_index, format!("{:?}", layout_plan.kind)));
+    }
+
+    // Stage 3: Content generation
+    on_stage(
+        slide_index,
+        PageStage::Content,
+        Some("生成页面内容"),
+    );
+
+    let display_index =
+        crate::generator::utils::parse_page_display_index(&page_id).unwrap_or(slide_index + 1);
+    let prefix = format!(
+        "03-slide-{:02}-{}",
+        display_index,
+        crate::generator::utils::sanitize_filename(&page_id)
+    );
+
+    let candidates = {
+        let sem_cands = crate::generator::icons::precompute_semantic_candidates(
+            client,
+            &config.embedding_model,
+            icon_index,
+            std::slice::from_ref(&page_plan),
+            std::slice::from_ref(&layout_plan),
+        )
+        .await
+        .unwrap_or_else(|_| vec![Vec::new()]);
+        let sem = sem_cands.into_iter().next().unwrap_or_default();
+        if sem.is_empty() {
+            crate::generator::icons::collect_icon_candidates(icon_index, &page_plan, &layout_plan)
+        } else {
+            sem
+        }
+    };
+
+    let schema_hint = crate::generator::utils::blueprint_schema_hint(&layout_plan.kind);
+    let asset_list = crate::generator::utils::sorted_assets(asset_paths);
+
+    let mut slide = generate_one_slide(
+        client.clone(),
+        config.model.clone(),
+        doc.title.clone(),
+        page_plan.clone(),
+        layout_plan.clone(),
+        asset_list,
+        candidates,
+        schema_hint,
+        debug_dir.to_path_buf(),
+        prefix,
+        slide_index,
+    )
+    .await?;
+
+    // Stage 4: Normalize
+    on_stage(slide_index, PageStage::Normalizing, Some("规范化修复"));
+    crate::generator::normalize::normalize_one_blueprint(
+        &mut slide,
+        client,
+        &config.embedding_model,
+        icon_index,
+        asset_paths,
+    )
+    .await?;
+
+    // Stage 5: Validate + repair
+    on_stage(slide_index, PageStage::Validating, Some("校验与修复"));
+    let slide = crate::generator::normalize::repair_one_slide(
+        client,
+        config,
+        doc,
+        &page_plan,
+        &layout_plan,
+        slide,
+        icon_index,
+        asset_paths,
+        debug_dir,
+        slide_index,
+    )
+    .await?;
+
+    on_stage(slide_index, PageStage::Done, None);
+    Ok((slide, layout_plan))
+}

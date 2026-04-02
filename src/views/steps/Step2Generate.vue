@@ -45,6 +45,7 @@ const props = defineProps<{
   mediaMap: Record<string, string>
   logs: GenerationLogEntry[]
   selectedSlideIndex: number | null
+  pageStatuses: Map<number, { stage: string, message?: string }>
 }>()
 
 const emit = defineEmits<{
@@ -87,16 +88,14 @@ const KIND_LABELS: Record<string, string> = {
 }
 
 const PIPELINE_NODE_STAGES = [
-  { key: 'init', label: '连接验证' },
-  { key: 'clean', label: '文档清理' },
+  { key: 'init', label: '初始化' },
   { key: 'page_plan', label: '规划页面' },
-  { key: 'layout_plan', label: '布局排版' },
-  { key: 'content', label: '内容生成' },
-  { key: 'normalize', label: '规范修复' },
-  { key: 'validate', label: '最终校验' },
+  { key: 'generating', label: '并发生成' },
 ]
 
-const PIPELINE_STAGE_ORDER = ['start', 'init', 'clean', 'page_plan', 'layout_plan', 'content', 'normalize', 'validate', 'done']
+const PIPELINE_STAGE_ORDER = ['start', 'init', 'page_plan', 'generating', 'assembling', 'done']
+
+const PAGE_PIPELINE_STAGES = ['planning', 'layout', 'content', 'normalizing', 'validating', 'done']
 
 function detailText(value: unknown): string {
   if (value === null || value === undefined)
@@ -250,44 +249,83 @@ function logStageLabel(stage: string): string {
 }
 
 function slideStatus(item: SlideProgressItem): { tone: string, label: string } {
-  if (props.stage === 'error')
+  if (props.stage === 'error') {
+    // Check if this specific page had an error
+    const ps = props.pageStatuses.get(item.index)
+    if (ps?.stage === 'error')
+      return { tone: 'error', label: '生成失败' }
+    if (item.blueprint)
+      return { tone: 'done', label: '已完成' }
     return { tone: 'error', label: '生成中断' }
+  }
+
+  // Use per-page status from gen:page_status events
+  const ps = props.pageStatuses.get(item.index)
+  if (ps) {
+    const stageLabelMap: Record<string, string> = {
+      planning: '页面规划中',
+      layout: '布局排版中',
+      content: '内容生成中',
+      normalizing: '规范修复中',
+      validating: '校验修复中',
+      done: '已完成',
+      error: '生成失败',
+      pending: '等待开始',
+    }
+    const toneMap: Record<string, string> = {
+      planning: 'active',
+      layout: 'active',
+      content: 'active',
+      normalizing: 'active',
+      validating: 'active',
+      done: 'done',
+      error: 'error',
+      pending: 'pending',
+    }
+    return {
+      tone: toneMap[ps.stage] ?? 'active',
+      label: stageLabelMap[ps.stage] ?? ps.stage,
+    }
+  }
+
+  // Fallback for backward compatibility (no page_status events)
   if (props.stage === 'done' && item.blueprint)
     return { tone: 'done', label: '已完成' }
-  if (item.blueprint && ['normalize', 'validate'].includes(props.stage))
-    return { tone: 'active', label: props.stage === 'normalize' ? '规范修复中' : '校验中' }
   if (item.blueprint)
     return { tone: 'done', label: '内容已生成' }
-  if (item.layoutPlan && PIPELINE_STAGE_ORDER.indexOf(props.stage) >= PIPELINE_STAGE_ORDER.indexOf('content'))
-    return { tone: 'active', label: '内容生成中' }
-  if (item.layoutPlan)
-    return { tone: 'done', label: '布局已确定' }
-  if (item.pagePlan && PIPELINE_STAGE_ORDER.indexOf(props.stage) >= PIPELINE_STAGE_ORDER.indexOf('layout_plan'))
-    return { tone: 'active', label: '等待布局' }
-  if (item.pagePlan)
-    return { tone: 'done', label: '规划完成' }
+  if (props.stage === 'generating')
+    return { tone: 'active', label: '生成中' }
   if (props.stage === 'page_plan')
     return { tone: 'active', label: '规划中' }
   return { tone: 'pending', label: '等待开始' }
 }
 
-function stageStepState(item: SlideProgressItem, key: 'page_plan' | 'layout_plan' | 'content'): 'done' | 'active' | 'pending' {
-  if (key === 'page_plan') {
-    if (item.pagePlan)
-      return 'done'
-    return props.stage === 'page_plan' ? 'active' : 'pending'
-  }
-  if (key === 'layout_plan') {
-    if (item.layoutPlan)
-      return 'done'
-    if (item.pagePlan && ['layout_plan', 'content', 'normalize', 'validate', 'done'].includes(props.stage))
-      return 'active'
+function stageStepState(item: SlideProgressItem, key: 'planning' | 'layout' | 'content' | 'normalizing' | 'validating'): 'done' | 'active' | 'pending' {
+  // Use per-page status from gen:page_status events
+  const ps = props.pageStatuses.get(item.index)
+  if (ps) {
+    const stageOrder = ['planning', 'layout', 'content', 'normalizing', 'validating', 'done']
+    const keyIdx = stageOrder.indexOf(key)
+    const psIdx = stageOrder.indexOf(ps.stage)
+    if (ps.stage === 'error' || ps.stage === 'pending') return 'pending'
+    if (psIdx >= stageOrder.indexOf('done')) return 'done'
+    if (psIdx > keyIdx) return 'done'
+    if (psIdx === keyIdx) return 'active'
     return 'pending'
   }
-  if (item.blueprint)
-    return 'done'
-  if (item.layoutPlan && ['content', 'normalize', 'validate'].includes(props.stage))
-    return 'active'
+
+  // Fallback for backward compatibility
+  if (key === 'planning') {
+    if (item.pagePlan) return 'done'
+    return props.stage === 'page_plan' ? 'active' : 'pending'
+  }
+  if (key === 'layout') {
+    if (item.layoutPlan) return 'done'
+    if (item.pagePlan) return 'active'
+    return 'pending'
+  }
+  if (item.blueprint) return 'done'
+  if (item.layoutPlan && props.stage === 'generating') return 'active'
   return 'pending'
 }
 
@@ -379,28 +417,16 @@ function selectedDebugText(key: string): string {
             </div>
 
             <div class="spc-steps">
-              <span class="spc-step" :class="`is-${stageStepState(item, 'page_plan')}`">规划</span>
-              <span class="spc-step" :class="`is-${stageStepState(item, 'layout_plan')}`">布局</span>
+              <span class="spc-step" :class="`is-${stageStepState(item, 'planning')}`">规划</span>
+              <span class="spc-step" :class="`is-${stageStepState(item, 'layout')}`">布局</span>
               <span class="spc-step" :class="`is-${stageStepState(item, 'content')}`">内容</span>
+              <span class="spc-step" :class="`is-${stageStepState(item, 'normalizing')}`">规范</span>
+              <span class="spc-step" :class="`is-${stageStepState(item, 'validating')}`">校验</span>
             </div>
 
             <div class="spc-summary">
-              <div class="spc-section">
-                <div class="spc-label">规划要点</div>
-                <ul v-if="item.pagePlan?.key_points?.length" class="spc-points">
-                  <li v-for="point in item.pagePlan.key_points.slice(0, 3)" :key="point">{{ point }}</li>
-                </ul>
-                <p v-else class="spc-placeholder">等待页面规划结果</p>
-              </div>
-
-              <div class="spc-section">
-                <div class="spc-label">布局方案</div>
-                <template v-if="item.layoutPlan">
-                  <div class="spc-layout-kind">{{ kindLabel(item.layoutPlan.kind) }}</div>
-                  <p class="spc-layout-reason">{{ item.layoutPlan.reason || '布局已确定，等待内容生成。' }}</p>
-                </template>
-                <p v-else class="spc-placeholder">等待布局排版结果</p>
-              </div>
+              <span v-if="item.layoutPlan" class="spc-layout-tag">{{ kindLabel(item.layoutPlan.kind) }}</span>
+              <span v-else class="spc-layout-tag spc-layout-tag--pending">等待布局排版结果</span>
             </div>
 
             <div class="spc-preview">
@@ -565,6 +591,7 @@ function selectedDebugText(key: string): string {
   padding: 1rem;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-auto-rows: 1fr;
   gap: 1rem;
   overflow: auto;
 }
@@ -598,6 +625,8 @@ function selectedDebugText(key: string): string {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+  height: 100%;
+  min-height: 330px;
   cursor: pointer;
   transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
 }
@@ -639,12 +668,20 @@ function selectedDebugText(key: string): string {
 
 .spc-top {
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
 }
 
 .spc-num {
   font-size: 0.76rem;
   color: var(--studio-muted);
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.spc-head {
+  min-width: 0;
+  flex: 1;
 }
 
 .spc-title {
@@ -654,6 +691,8 @@ function selectedDebugText(key: string): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .spc-status,
@@ -665,6 +704,10 @@ function selectedDebugText(key: string): string {
   padding: 0.22rem 0.55rem;
   font-size: 0.72rem;
   white-space: nowrap;
+}
+
+.spc-status {
+  flex-shrink: 0;
 }
 
 .spc-status--done,
@@ -723,7 +766,13 @@ function selectedDebugText(key: string): string {
   gap: 0.9rem;
 }
 
-.spc-section,
+.spc-summary {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .sdp-section {
   border: 1px solid var(--studio-border);
   border-radius: 12px;
@@ -750,13 +799,29 @@ function selectedDebugText(key: string): string {
   line-height: 1.45;
 }
 
-.spc-layout-kind {
-  font-size: 0.86rem;
-  font-weight: 600;
-  margin-bottom: 0.3rem;
+.spc-layout-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.24);
+  background: rgba(59, 130, 246, 0.1);
+  color: #93c5fd;
+  padding: 0.24rem 0.65rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.spc-layout-reason,
+.spc-layout-tag--pending {
+  border-color: var(--studio-border);
+  background: rgba(255,255,255,0.03);
+  color: var(--studio-muted);
+}
+
 .spc-placeholder,
 .sdp-text,
 .sdp-note,
@@ -773,6 +838,7 @@ function selectedDebugText(key: string): string {
   border: 1px solid var(--studio-border);
   background: #0b1020;
   min-height: 140px;
+  margin-top: auto;
 }
 
 .spc-preview-frame {

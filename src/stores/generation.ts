@@ -9,14 +9,21 @@ export type GenStage =
   | 'idle'
   | 'start'
   | 'init'
-  | 'clean'
   | 'page_plan'
-  | 'layout_plan'
-  | 'content'
-  | 'normalize'
+  | 'generating'
+  | 'assembling'
   | 'validate'
   | 'done'
   | 'error'
+
+export type PageStage = 'pending' | 'planning' | 'layout' | 'content' | 'normalizing' | 'validating' | 'done' | 'error'
+
+export interface PageStatusEvent {
+  slide_index: number
+  stage: PageStage
+  message?: string
+  blueprint?: unknown
+}
 
 export interface GenEvent {
   stage: GenStage
@@ -57,12 +64,10 @@ const STAGE_LABELS: Record<string, string> = {
   idle: '等待',
   start: '初始化',
   init: '验证连接',
-  clean: '清理文档',
   page_plan: '规划页面',
-  layout_plan: '选择布局',
-  content: '生成内容',
-  normalize: '规范化',
-  validate: '最终校验',
+  generating: '生成中',
+  assembling: '组装中',
+  validate: '校验中',
   done: '完成',
   error: '出错',
 }
@@ -77,6 +82,7 @@ export const useGenerationStore = defineStore('generation', () => {
   const lastError = ref('')
   const logs = ref<GenerationLogEntry[]>([])
   const currentRun = ref<GenerationRun | null>(null)
+  const pageStatuses = ref<Map<number, { stage: PageStage, message?: string }>>(new Map())
 
   const stageLabel = computed(() => STAGE_LABELS[stage.value] ?? stage.value)
   const slideCount = computed(() => blueprints.value.length)
@@ -85,6 +91,7 @@ export const useGenerationStore = defineStore('generation', () => {
   let unlistenSlide: (() => void) | null = null
   let unlistenLog: (() => void) | null = null
   let unlistenError: (() => void) | null = null
+  let unlistenPageStatus: (() => void) | null = null
 
   async function startListening() {
     unlistenProgress = await listen<GenEvent>('gen:progress', (e) => {
@@ -114,16 +121,34 @@ export const useGenerationStore = defineStore('generation', () => {
       }
     })
 
+    /** Ensure the blueprints array is large enough for index-based insertion */
+    function ensureBlueprintSlot(idx: number) {
+      while (blueprints.value.length <= idx) {
+        blueprints.value.push(null as unknown as SlideBlueprint)
+      }
+    }
+
     unlistenSlide = await listen<GenEvent>('gen:slide_ready', (e) => {
       const ev = e.payload
       if (ev.slide_index !== undefined && ev.blueprint) {
         const idx = ev.slide_index
-        // Update or append
-        if (blueprints.value.length <= idx) {
-          blueprints.value.push(ev.blueprint as SlideBlueprint)
-        } else {
-          blueprints.value[idx] = ev.blueprint as SlideBlueprint
-        }
+        ensureBlueprintSlot(idx)
+        blueprints.value[idx] = ev.blueprint as SlideBlueprint
+        completedSlides.value.add(idx)
+      }
+    })
+
+    unlistenPageStatus = await listen<PageStatusEvent>('gen:page_status', (e) => {
+      const ev = e.payload
+      pageStatuses.value.set(ev.slide_index, {
+        stage: ev.stage,
+        message: ev.message ?? undefined,
+      })
+      // Also update blueprints if a blueprint is provided
+      if (ev.blueprint) {
+        const idx = ev.slide_index
+        ensureBlueprintSlot(idx)
+        blueprints.value[idx] = ev.blueprint as SlideBlueprint
         completedSlides.value.add(idx)
       }
     })
@@ -141,10 +166,12 @@ export const useGenerationStore = defineStore('generation', () => {
     unlistenSlide?.()
     unlistenLog?.()
     unlistenError?.()
+    unlistenPageStatus?.()
     unlistenProgress = null
     unlistenSlide = null
     unlistenLog = null
     unlistenError = null
+    unlistenPageStatus = null
   }
 
   async function generate(mdContent: string, frontmatterTitle?: string, granularity?: string) {
@@ -197,6 +224,7 @@ export const useGenerationStore = defineStore('generation', () => {
     lastError.value = ''
     logs.value = []
     currentRun.value = null
+    pageStatuses.value = new Map()
   }
 
   function loadFromJson(json: string) {
@@ -224,6 +252,7 @@ export const useGenerationStore = defineStore('generation', () => {
   return {
     stage, message, progress, blueprints, completedSlides,
     running, lastError, logs, currentRun, stageLabel, slideCount,
+    pageStatuses,
     generate, repairSlide, reset, loadFromJson, loadLatestRun,
   }
 })

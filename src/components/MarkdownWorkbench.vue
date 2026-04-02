@@ -21,6 +21,8 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 const props = defineProps<{
   modelValue: string
   placeholder?: string
+  granularity?: 'auto' | 'h2' | 'h3'
+  detectedGranularity?: 'h2' | 'h3'
 }>()
 
 const emit = defineEmits<{
@@ -42,11 +44,61 @@ const md = new MarkdownIt({
   typographer: true,
 })
 
-const renderedPreview = computed(() => {
+type PreviewSlide = {
+  number: number
+  html: string
+}
+
+function renderSlide(raw: string) {
+  const trimmed = raw.trim()
+  if (!trimmed)
+    return '<div class="md-preview-empty">预览区将实时显示 Markdown 渲染效果</div>'
+  return md.render(trimmed)
+}
+
+function splitSlides(raw: string, granularity: 'h2' | 'h3') {
+  const lines = raw.split(/\r?\n/)
+  const slides: string[] = []
+  let current: string[] = []
+
+  const flush = () => {
+    const chunk = current.join('\n').trim()
+    if (chunk)
+      slides.push(chunk)
+    current = []
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    const isH2 = /^##\s+[^#]/.test(trimmed)
+    const isH3 = /^###\s+[^#]/.test(trimmed)
+    const shouldSplit = granularity === 'h2' ? isH2 : (isH2 || isH3)
+
+    if (shouldSplit && current.join('\n').trim()) {
+      flush()
+    }
+
+    current.push(line)
+  }
+
+  flush()
+  return slides
+}
+
+const previewSlides = computed<PreviewSlide[]>(() => {
   const raw = props.modelValue?.trim()
   if (!raw)
-    return '<div class="md-preview-empty">预览区将实时显示 Markdown 渲染效果</div>'
-  return md.render(raw)
+    return [{ number: 1, html: renderSlide('') }]
+
+  const resolved = props.granularity === 'auto'
+    ? (props.detectedGranularity ?? 'h3')
+    : (props.granularity ?? 'h3')
+
+  const chunks = splitSlides(raw, resolved)
+  return chunks.map((chunk, index) => ({
+    number: index + 1,
+    html: renderSlide(chunk),
+  }))
 })
 
 const editorTheme = EditorView.theme({
@@ -270,7 +322,16 @@ onBeforeUnmount(() => {
           预览
         </div>
         <div ref="previewScroll" class="md-preview-scroll">
-          <div class="md-preview" v-html="renderedPreview" />
+          <div class="md-preview-stack">
+            <article
+              v-for="slide in previewSlides"
+              :key="slide.number"
+              class="md-preview-slide"
+            >
+              <div class="md-preview-slide-no">P{{ slide.number }}</div>
+              <div class="md-preview" v-html="slide.html" />
+            </article>
+          </div>
         </div>
       </section>
     </div>
@@ -365,8 +426,42 @@ onBeforeUnmount(() => {
   overflow-y: auto;
 }
 
+.md-preview-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 16px 14px 24px;
+}
+
+.md-preview-slide {
+  position: relative;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015));
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.03),
+    0 10px 30px rgba(0,0,0,0.12);
+  overflow: hidden;
+}
+
+.md-preview-slide-no {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 1;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  background: rgba(7, 11, 20, 0.55);
+  color: rgba(255,255,255,0.68);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
 .md-preview {
-  padding: 16px 18px 24px;
+  padding: 18px 18px 24px;
   line-height: 1.8;
   color: var(--studio-text);
   font-size: 0.875rem;

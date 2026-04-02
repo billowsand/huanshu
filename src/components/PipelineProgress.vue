@@ -12,12 +12,11 @@ const props = defineProps<{
 }>()
 
 const stages: { key: GenStage; label: string; icon: string }[] = [
-  { key: 'clean',       label: '清理文档',   icon: 'i-carbon:document' },
-  { key: 'page_plan',   label: '规划页面',   icon: 'i-carbon:list-boxes' },
-  { key: 'layout_plan', label: '选择布局',   icon: 'i-carbon:grid' },
-  { key: 'content',     label: '生成内容',   icon: 'i-carbon:magic-wand' },
-  { key: 'normalize',   label: '规范化',     icon: 'i-carbon:settings-adjust' },
-  { key: 'done',        label: '完成',       icon: 'i-carbon:checkmark-filled' },
+  { key: 'init',       label: '初始化',     icon: 'i-carbon:settings' },
+  { key: 'page_plan',  label: '规划页面',   icon: 'i-carbon:list-boxes' },
+  { key: 'generating', label: '并发生成',   icon: 'i-carbon:magic-wand' },
+  { key: 'assembling', label: '组装',       icon: 'i-carbon:assembly' },
+  { key: 'done',       label: '完成',       icon: 'i-carbon:checkmark-filled' },
 ]
 
 const stageOrder = stages.map(s => s.key)
@@ -65,7 +64,7 @@ function stageStatus(key: GenStage) {
       <span v-else-if="stage === 'done'" class="i-carbon:checkmark-filled" style="color:var(--studio-success)" />
       <span v-else-if="stage === 'error'" class="i-carbon:warning-filled" style="color:var(--studio-error)" />
       <span class="msg-text">{{ message || (running ? '处理中...' : '') }}</span>
-      <span v-if="stage === 'content' && slideCount > 0" class="slide-badge">{{ slideCount }} 张</span>
+      <span v-if="stage === 'generating' && slideCount > 0" class="slide-badge">{{ slideCount }} 张</span>
     </div>
   </div>
 </template>

@@ -469,6 +469,8 @@ async function optimizeMarkdown() {
         <MarkdownWorkbench
           v-model="mdContent"
           class="prepare-editor"
+          :granularity="granularity"
+          :detected-granularity="detectedGranularityLocal"
           placeholder="粘贴 Markdown 内容，或拖拽 .md 文件到此处...
 
 # 演示标题

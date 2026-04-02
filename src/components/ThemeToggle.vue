@@ -14,6 +14,7 @@ const currentTheme = ref('dark-yellow')
 function setTheme(themeId: string) {
   currentTheme.value = themeId
   document.documentElement.setAttribute('data-theme', themeId)
+  localStorage.setItem('app-theme', themeId)
 }
 
 onMounted(() => {

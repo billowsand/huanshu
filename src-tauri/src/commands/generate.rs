@@ -20,6 +20,16 @@ pub struct GenerationEvent {
     pub blueprint: Option<SlideBlueprint>,
 }
 
+/// Per-page status event for the concurrent pipeline
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct PageStatusEvent {
+    pub slide_index: usize,
+    pub stage: String,
+    pub message: Option<String>,
+    pub blueprint: Option<SlideBlueprint>,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GenerationLogEvent {
     pub id: i64,
@@ -481,6 +491,7 @@ async fn run_pipeline(
     run_id: i64,
 ) -> anyhow::Result<Vec<SlideBlueprint>> {
     use crate::generator::planning;
+    use crate::generator::slides::{generate_single_page_pipeline, PageStage};
     use crate::icon::IconIndex;
     use crate::input::parse_markdown;
     use crate::lmstudio::LmStudioClient;
@@ -544,174 +555,222 @@ async fn run_pipeline(
         false,
     );
 
-    // Stage 1: Page plan (deterministic — derived from document heading structure)
+    // Phase 1: Derive page plans deterministically
     emit_progress(&app, &db, run_id, "page_plan", "从文档结构推导页面...", 0.15);
-    let page_plans = planning::run_page_plan(&client, config, &doc, &asset_paths, &config.debug_dir, config.granularity).await?;
-    emit_progress(&app, &db, run_id, "page_plan", format!("推导了 {} 个页面", page_plans.len()).as_str(), 0.25);
+    let page_plans = planning::derive_page_plans(&doc, config.granularity);
+    if page_plans.is_empty() {
+        return Err(anyhow::anyhow!("page derivation produced no pages — check that the document has content"));
+    }
+    emit_progress(&app, &db, run_id, "page_plan", format!("推导了 {} 个页面", page_plans.len()).as_str(), 0.2);
     record_log(
         &app,
         &db,
         run_id,
         None,
         "page_plan",
-        "prompt_io",
+        "status",
         "页面规划",
-        &format!("产出 {} 个页面规划", page_plans.len()),
+        &format!("确定性推导 {} 个页面", page_plans.len()),
         json!({
-            "system_prompt": read_optional_text(&config.debug_dir.join("01-page-plan.system.txt")),
-            "user_prompt": read_optional_text(&config.debug_dir.join("01-page-plan.user.txt")),
-            "raw_output": read_optional_text(&config.debug_dir.join("01-page-plan.raw.txt")),
-            "parsed_output": read_optional_text(&config.debug_dir.join("01-page-plan.parsed.json")),
-            "input_hash": read_optional_text(&config.debug_dir.join("01-page-plan.input-hash.txt")),
             "page_plans": page_plans,
         }),
         true,
     );
 
-    // Stage 2: Layout plan
-    emit_progress(&app, &db, run_id, "layout_plan", "选择布局模板...", 0.3);
-    let layout_plans = planning::run_layout_plan(&client, config, &page_plans, &config.debug_dir).await?;
-    emit_progress(&app, &db, run_id, "layout_plan", "布局规划完成", 0.45);
-    record_log(
-        &app,
-        &db,
-        run_id,
-        None,
-        "layout_plan",
-        "prompt_io",
-        "布局规划",
-        "记录布局选择阶段的提示词、模型输出与最终布局方案",
-        json!({
-            "system_prompt": read_optional_text(&config.debug_dir.join("02-layout-plan.system.txt")),
-            "user_prompt": read_optional_text(&config.debug_dir.join("02-layout-plan.user.txt")),
-            "raw_output": read_optional_text(&config.debug_dir.join("02-layout-plan.raw.txt")),
-            "parsed_output": read_optional_text(&config.debug_dir.join("02-layout-plan.parsed.json")),
-            "final_output": read_optional_text(&config.debug_dir.join("02-layout-plan.final.parsed.json")),
-            "audit": read_optional_text(&config.debug_dir.join("02-layout-plan.audit.txt")),
-            "repair_prompt": read_optional_text(&config.debug_dir.join("02-layout-plan.repair.user.txt")),
-            "repair_output": read_optional_text(&config.debug_dir.join("02-layout-plan.repair.raw.txt")),
-            "layout_plans": layout_plans,
-        }),
-        true,
-    );
-
-    // Stage 3: Content generation (slide blueprints)
-    // Note: precompute_semantic_candidates is called inside generate_content_slides_with_progress
-    // and covers icon pre-selection in one batch embedding call.
-    emit_progress(&app, &db, run_id, "content", "预选图标候选集（语义匹配）...", 0.47);
-    emit_progress(&app, &db, run_id, "content", "生成幻灯片内容...", 0.5);
-    let app_ref = app.clone();
-    let db_ref = db.clone();
-    let debug_dir = config.debug_dir.clone();
-    let page_plans_for_logs = page_plans.clone();
-    let layout_plans_for_logs = layout_plans.clone();
+    // Phase 2: Per-page concurrent pipeline
     let total = page_plans.len();
-    let mut slides = crate::generator::slides::generate_content_slides_with_progress(
+    emit_progress(&app, &db, run_id, "generating", format!("并发生成 {total} 张幻灯片...").as_str(), 0.2);
+
+    let blueprints_arc = std::sync::Arc::new(tokio::sync::Mutex::new(vec![None::<SlideBlueprint>; total]));
+    let used_layouts_arc: std::sync::Arc<tokio::sync::Mutex<Vec<(usize, String)>>> =
+        std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new()));
+    let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(config.concurrency.max(1)));
+    let completed_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0usize));
+    let failed_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0usize));
+
+    let mut handles = Vec::with_capacity(total);
+
+    for (idx, page_plan) in page_plans.iter().enumerate() {
+        let app_clone = app.clone();
+        let db_clone = db.clone();
+        let client_clone = client.clone();
+        let config_clone = config.clone();
+        let doc_clone = doc.clone();
+        let page_plan_owned = page_plan.clone();
+        let icon_index_clone = icon_index.clone();
+        let asset_paths_clone = asset_paths.clone();
+        let debug_dir_owned = config.debug_dir.clone();
+        let blueprints_ref = blueprints_arc.clone();
+        let used_layouts_ref = used_layouts_arc.clone();
+        let sem_clone = sem.clone();
+        let completed_ref = completed_count.clone();
+        let failed_ref = failed_count.clone();
+
+        let handle = tokio::task::spawn(async move {
+            let _permit = sem_clone.acquire().await.unwrap();
+
+            // Emit page status event
+            let emit_stage_app = app_clone.clone();
+            let emit_stage_idx = idx;
+            let on_stage_cb: std::sync::Arc<dyn Fn(usize, PageStage, Option<&str>) + Send + Sync> =
+                std::sync::Arc::new(move |_slide_idx: usize, stage: PageStage, msg: Option<&str>| {
+                    let stage_str = match stage {
+                        PageStage::Planning => "planning",
+                        PageStage::Layout => "layout",
+                        PageStage::Content => "content",
+                        PageStage::Normalizing => "normalizing",
+                        PageStage::Validating => "validating",
+                        PageStage::Done => "done",
+                        PageStage::Error => "error",
+                        PageStage::Pending => "pending",
+                    };
+                    let _ = emit_stage_app.emit("gen:page_status", PageStatusEvent {
+                        slide_index: emit_stage_idx,
+                        stage: stage_str.to_string(),
+                        message: msg.map(str::to_string),
+                        blueprint: None,
+                    });
+                });
+
+            match crate::generator::slides::generate_single_page_pipeline(
+                &client_clone,
+                &config_clone,
+                &doc_clone,
+                page_plan_owned.clone(),
+                idx,
+                total,
+                used_layouts_ref.clone(),
+                &icon_index_clone,
+                &asset_paths_clone,
+                &debug_dir_owned,
+                on_stage_cb,
+            )
+            .await
+            {
+                Ok((blueprint, layout_plan)) => {
+                    let kind_str = format!("{:?}", layout_plan.kind);
+                    let title_str = page_plan_owned.page_title.clone();
+                    // Store the result
+                    {
+                        let mut bp = blueprints_ref.lock().await;
+                        bp[idx] = Some(blueprint.clone());
+                    }
+                    // Emit gen:page_status with blueprint for the frontend
+                    let _ = app_clone.emit("gen:page_status", PageStatusEvent {
+                        slide_index: idx,
+                        stage: "done".to_string(),
+                        message: Some(format!("幻灯片 {}/{} 完成", idx + 1, total)),
+                        blueprint: Some(blueprint.clone()),
+                    });
+                    // Also emit gen:slide_ready for backward compatibility
+                    let done_count = completed_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                    let _ = app_clone.emit(
+                        "gen:slide_ready",
+                        GenerationEvent {
+                            stage: "content".to_string(),
+                            message: format!("幻灯片 {}/{} 完成", idx + 1, total),
+                            progress: Some(0.2 + 0.65 * done_count as f32 / total as f32),
+                            slide_index: Some(idx),
+                            blueprint: Some(blueprint),
+                        },
+                    );
+                    record_log(
+                        &app_clone,
+                        &db_clone,
+                        run_id,
+                        Some(idx as i32),
+                        "content",
+                        "slide",
+                        &format!("幻灯片 {}/{}", idx + 1, total),
+                        &format!("{} · {}", title_str, kind_str),
+                        json!({
+                            "page_plan": page_plan_owned,
+                            "layout_plan": layout_plan,
+                        }),
+                        true,
+                    );
+                }
+                Err(e) => {
+                    failed_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    eprintln!("page {} pipeline failed: {e}", idx + 1);
+                    let _ = app_clone.emit("gen:page_status", PageStatusEvent {
+                        slide_index: idx,
+                        stage: "error".to_string(),
+                        message: Some(format!("幻灯片 {} 生成失败: {e}", idx + 1)),
+                        blueprint: None,
+                    });
+                }
+            }
+        });
+
+        handles.push(handle);
+    }
+
+    // Wait for all pages, counting panics/cancellations as failures too
+    for handle in handles {
+        match handle.await {
+            Ok(()) => {} // task completed (success or failure already counted inside)
+            Err(e) => {
+                // JoinError: task panicked or was cancelled
+                failed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                eprintln!("page task panicked or was cancelled: {e}");
+            }
+        }
+    }
+
+    let failed = failed_count.load(std::sync::atomic::Ordering::Relaxed);
+    if failed > 0 {
+        let msg = format!("有 {failed}/{total} 张幻灯片生成失败，将使用简化兜底页替代");
+        eprintln!("WARNING: {msg}");
+        record_log(
+            &app,
+            &db,
+            run_id,
+            None,
+            "generating",
+            "warning",
+            "部分页面失败",
+            &msg,
+            json!({ "failed": failed, "total": total }),
+            true,
+        );
+    }
+
+    // Collect results, fill gaps with fallback slides
+    let mut content_slides: Vec<SlideBlueprint> = {
+        let bp = blueprints_arc.lock().await;
+        page_plans
+            .iter()
+            .enumerate()
+            .map(|(idx, page)| {
+                bp.get(idx)
+                    .cloned()
+                    .flatten()
+                    .unwrap_or_else(|| {
+                        eprintln!("slide {} missing, using fallback", idx + 1);
+                        crate::generator::normalize::make_fallback_slide(page, None)
+                    })
+            })
+            .collect()
+    };
+
+    // Ensure fallback slides have all required fields filled (e.g. OutcomeGrid
+    // needs icon/tag/top_bar_class on each card).  Slides already normalized by
+    // the per-page pipeline are not harmed by a second pass.
+    for slide in content_slides.iter_mut() {
+        crate::generator::normalize::apply_component_defaults(slide);
+        crate::generator::normalize::normalize_lengths(slide);
+        crate::generator::normalize::normalize_tones(slide);
+    }
+
+    // Phase 3: Assemble (cover + overview + content + closing)
+    emit_progress(&app, &db, run_id, "assembling", "组装封面与目录...", 0.9);
+    let final_slides = planning::assemble_slides(
         &client,
         config,
         &doc,
         &page_plans,
-        &layout_plans,
-        &icon_index,
-        &asset_paths,
-        &config.debug_dir,
-        config.concurrency,
-        move |idx, blueprint| {
-            let blueprint_for_event = blueprint.clone();
-            let page = &page_plans_for_logs[idx];
-            let layout = &layout_plans_for_logs[idx];
-            let prefix = format!(
-                "03-slide-{:02}-{}",
-                crate::generator::utils::parse_page_display_index(&page.page_id).unwrap_or(idx + 1),
-                crate::generator::utils::sanitize_filename(&page.page_id)
-            );
-            let _ = app_ref.emit(
-                "gen:slide_ready",
-                GenerationEvent {
-                    stage: "content".to_string(),
-                    message: format!("幻灯片 {}/{} 完成", idx + 1, total),
-                    progress: Some(0.5 + 0.35 * (idx + 1) as f32 / total as f32),
-                    slide_index: Some(idx),
-                    blueprint: Some(blueprint_for_event),
-                },
-            );
-            record_log(
-                &app_ref,
-                &db_ref,
-                run_id,
-                Some(idx as i32),
-                "content",
-                "slide",
-                &format!("幻灯片 {}/{}", idx + 1, total),
-                &format!(
-                    "{} · {}",
-                    page.page_title,
-                    serde_json::to_string(&layout.kind).unwrap_or_default()
-                ),
-                json!({
-                    "page_plan": page,
-                    "layout_plan": layout,
-                    "system_prompt": read_optional_text(&debug_dir.join(format!("{prefix}.system.txt"))),
-                    "user_prompt": read_optional_text(&debug_dir.join(format!("{prefix}.user.txt"))),
-                    "raw_output": read_optional_text(&debug_dir.join(format!("{prefix}.raw.txt"))),
-                    "parsed_output": read_optional_text(&debug_dir.join(format!("{prefix}.parsed.json"))),
-                    "blueprint": blueprint,
-                }),
-                true,
-            );
-        },
-    )
-    .await?;
-
-    // Stage 4: Normalize + repair
-    emit_progress(&app, &db, run_id, "normalize", "规范化与修复...", 0.85);
-    crate::generator::normalize::normalize_blueprints(
-        &mut slides,
-        &client,
-        &config.embedding_model,
-        &icon_index,
-        &asset_paths,
-    )
-    .await?;
-
-    slides = crate::generator::normalize::repair_until_valid(
-        &client,
-        config,
-        &doc,
-        &page_plans,
-        &layout_plans,
-        slides,
-        &icon_index,
-        &asset_paths,
-        &config.debug_dir,
-    )
-    .await?;
-    record_log(
-        &app,
-        &db,
-        run_id,
-        None,
-        "normalize",
-        "repair",
-        "规范化与修复",
-        "记录修复阶段的重要提示词与结果",
-        json!({
-            "system_prompt": read_optional_text(&config.debug_dir.join("04-repair.system.txt")),
-            "user_prompt": read_optional_text(&config.debug_dir.join("04-repair.user.txt")),
-            "raw_output": read_optional_text(&config.debug_dir.join("04-repair.raw.txt")),
-            "parsed_output": read_optional_text(&config.debug_dir.join("04-repair.parsed.json")),
-            "normalized_slides": slides,
-        }),
-        true,
-    );
-
-    // Assemble final slide list (prepend cover/overview)
-    let final_slides = crate::generator::planning::assemble_slides(
-        &client,
-        config,
-        &doc,
-        &page_plans,
-        slides,
+        content_slides,
         &config.model,
     )
     .await;

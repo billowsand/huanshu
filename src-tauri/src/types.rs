@@ -356,6 +356,21 @@ pub struct LayoutPlanResponse {
     pub pages: Vec<LayoutPlan>,
 }
 
+/// Top-K ranked layout candidates returned by the LLM for diversity-aware selection.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LayoutCandidateResponse {
+    pub candidates: Vec<LayoutCandidate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LayoutCandidate {
+    pub kind: SlideKind,
+    #[serde(default)]
+    pub score: u8,
+    #[serde(default)]
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlueprintWrapper {
     pub slide: SlideBlueprint,

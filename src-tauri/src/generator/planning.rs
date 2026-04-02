@@ -105,7 +105,7 @@ pub async fn run_layout_plan(
 
 /// Deterministic page derivation from document structure.
 /// No LLM call — page count is fully determined by heading hierarchy.
-fn derive_page_plans(doc: &ParsedDocument, granularity: HeadingLevel) -> Vec<PagePlan> {
+pub fn derive_page_plans(doc: &ParsedDocument, granularity: HeadingLevel) -> Vec<PagePlan> {
     let mut pages = Vec::new();
     let mut global_idx: usize = 1;
 
@@ -269,7 +269,7 @@ fn merge_page_signal_patches(
     Ok(merged)
 }
 
-fn merge_page_signal_patch(
+pub fn merge_page_signal_patch(
     base: &PagePlan,
     patch: &PageSignalPatch,
     asset_paths: &HashSet<String>,
@@ -1214,6 +1214,216 @@ async fn generate_overview_section_descs(
         .into_iter()
         .map(|item| item.desc)
         .collect::<Vec<_>>())
+}
+
+// ---------------------------------------------------------------------------
+// Per-page planning functions (for the concurrent per-page pipeline)
+// ---------------------------------------------------------------------------
+
+/// Enrich a single page plan via LLM. Falls back to the base plan on failure.
+pub async fn enrich_one_page_plan(
+    client: &LmStudioClient,
+    config: &GenerationConfig,
+    doc: &ParsedDocument,
+    base_plan: &PagePlan,
+    asset_paths: &HashSet<String>,
+    debug_dir: &Path,
+) -> PagePlan {
+    let idx = base_plan.page_id.parse::<usize>().unwrap_or(0);
+    let prefix = format!("01-page-{:02}-enrich", idx);
+
+    let system = "You enrich a deterministic slide page plan for a Chinese Slidev deck. Return strict JSON only.";
+    let user = format!(
+        "Document title: {}\n\nPage plan to enrich:\n{}\n\nAvailable image assets:\n{}\n\nEnrich only these fields:\n- objective: one concise Chinese sentence describing the communication goal.\n- key_points: 1-6 short Chinese bullet-like points capturing the page's actual content.\n- takeaway: optional one-line takeaway in Chinese.\n- content_shape: one of overview, summary, comparison, architecture, timeline, workflow, matrix.\n- layout_intent: short English phrase describing the ideal visual arrangement.\n- visual_need: one of text_only, image_optional, image_required.\n- object_count: one of single, pair, multi.\n- argument_mode: one of parallel, sequential, layered, summary, evidence, causal, warning.\n- density: one of low, medium, high.\n- preferred_assets: zero to two items chosen only from the available asset list.\n\nRules:\n- Preserve page_id exactly.\n- Use the page's source_excerpt and headings as the primary evidence.\n- key_points must be faithful to the source and not generic filler.\n- If no asset is truly relevant, return an empty preferred_assets array.\n- Do not invent asset paths.\n\nReturn JSON: {{\"pages\": [{{...}}]}}",
+        doc.title,
+        serde_json::to_string_pretty(base_plan).unwrap_or_default(),
+        serde_json::to_string_pretty(&sorted_assets(asset_paths)).unwrap_or_default(),
+    );
+
+    let _ = write_debug(debug_dir, &format!("{prefix}.system.txt"), system);
+    let _ = write_debug(debug_dir, &format!("{prefix}.user.txt"), &user);
+
+    match client.generate_text(&config.model, system, &user).await {
+        Ok(raw) => {
+            let _ = write_debug(debug_dir, &format!("{prefix}.raw.txt"), &raw);
+            match crate::generator::utils::parse_json_with_extraction::<PageSignalResponse>(&raw) {
+                Ok(resp) => {
+                    let _ = write_debug(debug_dir, &format!("{prefix}.parsed.json"), &serde_json::to_string_pretty(&resp).unwrap_or_default());
+                    if let Some(patch) = resp.pages.into_iter().next() {
+                        return merge_page_signal_patch(base_plan, &patch, asset_paths);
+                    }
+                }
+                Err(e) => eprintln!("parse error enriching page {}: {e}", base_plan.page_id),
+            }
+        }
+        Err(e) => eprintln!("LLM error enriching page {}: {e}", base_plan.page_id),
+    }
+
+    base_plan.clone()
+}
+
+/// Choose a layout kind for a single page via LLM, with deterministic fallback.
+/// `used_layouts` contains (slide_index, kind_label) of already-generated pages
+/// to help the LLM maintain deck variety.
+pub async fn layout_one_page(
+    client: &LmStudioClient,
+    config: &GenerationConfig,
+    page_plan: &PagePlan,
+    used_layouts: &[(usize, String)],
+    debug_dir: &Path,
+) -> LayoutPlan {
+    let idx = page_plan.page_id.parse::<usize>().unwrap_or(0);
+    let prefix = format!("02-layout-{:02}", idx);
+
+    let diversity_hint = build_diversity_hint(used_layouts);
+
+    let system = "You choose the best Slidev component kinds for a single slide page. Use only: section_intro, feature_grid, spotlight, split_layers, section_list, focus_example, outcome_grid, center_grid, timeline, step_flow, process, compare, issue_stack, swot, infographic. Return strict JSON.";
+    let user = format!(
+        "Page plan:\n{}{}\n\nRank 2-3 suitable component kinds for this page, ordered by fitness.\n\nRules:\n- section_intro: only for section_summary pages that preview sub-topics.\n- feature_grid: 3+ parallel items of equal weight.\n- spotlight: single-object focus with image.\n- split_layers: layered/architectural content.\n- section_list: strict order-dependent steps.\n- focus_example: central thesis + example.\n- outcome_grid: 2-4 parallel deliverables/results.\n- center_grid: compact closing summary or goal.\n- timeline: chronological events with dates.\n- step_flow: 2-4 step linear process.\n- process: 5+ steps grouped into phases.\n- compare: EXACTLY two alternatives.\n- swot: four-quadrant matrix.\n- infographic: rich data visualization (sparingly).\n\nHard constraints:\n- step_flow when key_points <= 4; process when >= 5.\n- compare ONLY for exactly two alternatives.\n- swot ONLY for four-quadrant matrices.\n- infographic at most 1-2 per deck.\n\nReturn JSON:\n{{\"candidates\": [{{\"kind\": \"...\", \"score\": 1-10, \"reason\": \"...\"}}, ...]}}",
+        serde_json::to_string_pretty(page_plan).unwrap_or_default(),
+        diversity_hint,
+    );
+
+    let _ = write_debug(debug_dir, &format!("{prefix}.system.txt"), system);
+    let _ = write_debug(debug_dir, &format!("{prefix}.user.txt"), &user);
+
+    match client.generate_text(&config.model, system, &user).await {
+        Ok(raw) => {
+            let _ = write_debug(debug_dir, &format!("{prefix}.raw.txt"), &raw);
+            match crate::generator::utils::parse_json_with_extraction::<crate::types::LayoutCandidateResponse>(&raw) {
+                Ok(resp) => {
+                    let _ = write_debug(debug_dir, &format!("{prefix}.parsed.json"), &serde_json::to_string_pretty(&resp).unwrap_or_default());
+                    if !resp.candidates.is_empty() {
+                        let chosen = select_layout_with_diversity(&resp.candidates, used_layouts);
+                        return LayoutPlan {
+                            page_id: page_plan.page_id.clone(),
+                            kind: if page_plan.page_role.as_deref() == Some("section_summary") {
+                                SlideKind::SectionIntro
+                            } else {
+                                chosen.kind.clone()
+                            },
+                            title: page_plan.page_title.clone(),
+                            subtitle: None,
+                            section_label: None,
+                            reason: chosen.reason.clone(),
+                        };
+                    }
+                }
+                Err(e) => eprintln!("parse error layout candidates page {}: {e}", page_plan.page_id),
+            }
+        }
+        Err(e) => eprintln!("LLM error layout page {}: {e}", page_plan.page_id),
+    }
+
+    // Deterministic fallback
+    let kind = safe_fallback_kind(page_plan);
+    LayoutPlan {
+        page_id: page_plan.page_id.clone(),
+        kind,
+        title: page_plan.page_title.clone(),
+        subtitle: None,
+        section_label: None,
+        reason: "deterministic fallback (LLM layout failed)".to_string(),
+    }
+}
+
+/// Build a diversity hint string describing already-used layouts and overuse warnings.
+fn build_diversity_hint(used_layouts: &[(usize, String)]) -> String {
+    if used_layouts.is_empty() {
+        return String::new();
+    }
+    let kind_counts: std::collections::BTreeMap<&str, usize> = {
+        let mut m = std::collections::BTreeMap::new();
+        for (_, k) in used_layouts {
+            *m.entry(k.as_str()).or_insert(0) += 1;
+        }
+        m
+    };
+    let total = used_layouts.len();
+    let overused: Vec<String> = kind_counts
+        .iter()
+        .filter(|(_, &count)| count as f32 / total as f32 > 0.5)
+        .map(|(kind, count)| format!("{} ({}/{})", kind, count, total))
+        .collect();
+    if overused.is_empty() {
+        format!(
+            "\n\nPreviously used layouts ({} pages generated so far): {}",
+            total,
+            used_layouts
+                .iter()
+                .map(|(i, k)| format!("#{}: {}", i + 1, k))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    } else {
+        format!(
+            "\n\nIMPORTANT diversity constraint — previously used layouts: {}\nThese layouts are over-represented (>{:.0}%). Prefer NOT using: {}.\nRank alternative layout types higher to ensure visual variety.",
+            used_layouts
+                .iter()
+                .map(|(i, k)| format!("#{}: {}", i + 1, k))
+                .collect::<Vec<_>>()
+                .join(", "),
+            50.0,
+            overused.join(", ")
+        )
+    }
+}
+
+/// Select the best layout candidate from an LLM-ordered list, trading off score
+/// against already-used layout diversity.
+///
+/// Logic:
+/// 1. Compute usage ratio for each candidate's kind from `used_layouts`.
+/// 2. Adjust the candidate's effective score: subtract a penalty proportional to
+///    how over-used that kind already is.
+/// 3. If the top candidate is over-used and the second candidate's raw score is
+///    within 2 points, prefer the less-used one (diversity trade-off).
+/// 4. Otherwise pick the highest effective score.
+fn select_layout_with_diversity<'a>(
+    candidates: &'a [crate::types::LayoutCandidate],
+    used_layouts: &[(usize, String)],
+) -> &'a crate::types::LayoutCandidate {
+    if candidates.len() == 1 || used_layouts.is_empty() {
+        return candidates.first().expect("candidates must be non-empty");
+    }
+
+    let total = used_layouts.len() as f32;
+    let kind_count = |kind: &SlideKind| -> f32 {
+        let kind_str = format!("{:?}", kind);
+        used_layouts
+            .iter()
+            .filter(|(_, k)| k == &kind_str)
+            .count() as f32
+    };
+
+    // Sort candidates by (raw_score - diversity_penalty), descending.
+    // penalty = 3 * (usage_ratio). So a kind used 50%+ gets -1.5 penalty.
+    let mut ranked: Vec<(usize, f32)> = candidates
+        .iter()
+        .enumerate()
+        .map(|(i, c)| {
+            let raw = c.score as f32;
+            let ratio = kind_count(&c.kind) / total;
+            let penalty = 3.0 * ratio;
+            (i, raw - penalty)
+        })
+        .collect();
+    ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    // If the top choice has a high usage ratio and a close second exists,
+    // prefer the less-used second choice for diversity.
+    let best_idx = ranked[0].0;
+    let best_ratio = kind_count(&candidates[best_idx].kind) / total;
+    if best_ratio > 0.3 && ranked.len() >= 2 {
+        let second_idx = ranked[1].0;
+        let best_raw = candidates[best_idx].score as f32;
+        let second_raw = candidates[second_idx].score as f32;
+        if best_raw - second_raw <= 2.0 {
+            return &candidates[second_idx];
+        }
+    }
+
+    &candidates[best_idx]
 }
 
 fn fallback_overview_section_desc(section: &Section, page_plans: &[PagePlan]) -> String {

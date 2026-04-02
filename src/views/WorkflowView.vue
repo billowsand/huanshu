@@ -461,6 +461,7 @@ onMounted(() => {
         :media-map="mediaLib.mediaMap.value"
         :logs="gen.logs"
         :selected-slide-index="selectedSlideIndex"
+        :page-statuses="gen.pageStatuses"
         @update:selected-slide-index="selectedSlideIndex = $event"
         @go-to-step-3="currentStep = 3"
         @go-to-step-1="currentStep = 1"
