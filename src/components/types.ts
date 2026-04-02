@@ -18,6 +18,7 @@ export type SlideKind =
   | 'compare'
   | 'issue_stack'
   | 'swot'
+  | 'infographic'
 
 export interface OverviewItem {
   number: string
@@ -174,4 +175,5 @@ export interface SlideBlueprint {
   direction?: string
   compare_data?: CompareData
   swot_data?: SwotData
+  infographic_syntax?: string
 }

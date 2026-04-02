@@ -432,7 +432,8 @@ pub fn normalize_blueprint_value(value: &mut Value, expected_kind: &SlideKind) {
         | SlideKind::Compare
         | SlideKind::Cover
         | SlideKind::Closing
-        | SlideKind::Overview => {}
+        | SlideKind::Overview
+        | SlideKind::Infographic => {}
     }
 }
 
@@ -544,6 +545,7 @@ fn normalize_kind_name(kind: &str) -> String {
             "issue_stack"
         }
         "swot" => "swot",
+        "infographic" => "infographic",
         // Common hallucinated kinds → nearest valid equivalent
         "checklist" | "check_list" => "section_list",
         "matrix" => "center_grid",
@@ -964,6 +966,7 @@ pub fn slide_kind_name(kind: &SlideKind) -> &'static str {
         SlideKind::Compare => "compare",
         SlideKind::IssueStack => "issue_stack",
         SlideKind::Swot => "swot",
+        SlideKind::Infographic => "infographic",
     }
 }
 
@@ -1222,6 +1225,15 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         }
         SlideKind::Cover | SlideKind::Closing | SlideKind::Overview => {
             r#"{"kind": "feature_grid"}"#
+        }
+        SlideKind::Infographic => {
+            r#"{
+  "kind": "infographic",
+  "section": "01",
+  "title": "...",
+  "subtitle": "...",
+  "infographic_syntax": "infographic list-row-simple-horizontal-arrow\ndata\n  lists\n    - label 要点1\n      desc 描述1\n    - label 要点2\n      desc 描述2\n    - label 要点3\n      desc 描述3"
+}"#
         }
     }
 }

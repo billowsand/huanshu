@@ -238,6 +238,11 @@ pub fn validate_blueprints(
                 }
             }
         }
+        if slide.kind == SlideKind::Infographic {
+            if slide.infographic_syntax.as_ref().is_none_or(|s| s.trim().is_empty()) {
+                issues.push(issue(idx, "infographic slide requires infographic_syntax"));
+            }
+        }
         // Validate tone values across all tone-bearing fields
         for (field, tone) in collect_tones(slide) {
             if !matches!(tone.as_str(), "amber" | "blue" | "green" | "red") {

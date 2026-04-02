@@ -23,6 +23,7 @@ export const KIND_META: Record<SlideKind, KindMeta> = {
   compare:      { label: '对比',    icon: 'i-carbon:compare',       desc: '左右双栏对比分析' },
   issue_stack:  { label: '问题堆叠', icon: 'i-carbon:warning-alt',  desc: '纵向堆叠的问题/挑战说明卡片' },
   swot:         { label: 'SWOT',   icon: 'i-carbon:analytics',     desc: '四象限战略分析矩阵' },
+  infographic:  { label: '信息图',  icon: 'i-carbon:chart-treemap',  desc: '基于 AntV Infographic 的数据可视化信息图' },
 }
 
 export const ALL_KINDS = Object.keys(KIND_META) as SlideKind[]
@@ -45,6 +46,7 @@ export const KIND_FIELDS: Record<SlideKind, string[]> = {
   compare:      ['kind', 'section', 'title', 'subtitle', 'compare_data', 'footer'],
   issue_stack:  ['kind', 'section', 'title', 'subtitle', 'cards', 'footer'],
   swot:         ['kind', 'section', 'title', 'subtitle', 'swot_data'],
+  infographic:  ['kind', 'section', 'title', 'subtitle', 'infographic_syntax', 'footer'],
 }
 
 export const KIND_DEFAULTS: Record<SlideKind, Partial<SlideBlueprint>> = {
@@ -368,6 +370,13 @@ export const KIND_DEFAULTS: Record<SlideKind, Partial<SlideBlueprint>> = {
       ],
       strategy: '建议采用"试点先行 + 能力沉淀"策略，先快速证明价值，再逐步扩展。',
     },
+  },
+  infographic: {
+    section: '13',
+    title: '关键数据一览',
+    subtitle: '用可视化方式呈现核心信息。',
+    infographic_syntax: 'infographic list-grid-3-col\ndata\n  lists\n    - label 核心指标\n      desc 关键数据描述\n    - label 增长趋势\n      desc 趋势描述\n    - label 关键发现\n      desc 发现描述',
+    footer: '信息图模板可替换为其他内置模板。',
   },
 }
 

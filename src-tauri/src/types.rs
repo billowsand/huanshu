@@ -58,6 +58,7 @@ pub enum SlideKind {
     Compare,
     IssueStack,
     Swot,
+    Infographic,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,6 +124,8 @@ pub struct SlideBlueprint {
     pub compare_data: Option<CompareData>,
     #[serde(default)]
     pub swot_data: Option<SwotData>,
+    #[serde(default)]
+    pub infographic_syntax: Option<String>,
 }
 
 impl SlideBlueprint {
