@@ -407,7 +407,7 @@ iframe {
 
 /* ============================================================
    THEME VARIABLES
-   5 themes: dark-yellow | dark-blue | light-blue | light-chatgpt | light-claude
+   6 themes: dark-yellow | dark-blue | dark-glass-blue | light-blue | light-chatgpt | light-claude
    Switched via: document.documentElement.setAttribute('data-theme', id)
    ============================================================ */
 
@@ -433,6 +433,15 @@ iframe {
   /* glass surfaces */
   --glass:         rgba(255,255,255,0.035);
   --glass-border:  rgba(255,255,255,0.075);
+  --glass-highlight: rgba(255,255,255,0.08);
+  --glass-sheen: rgba(255,255,255,0.08);
+  --glass-blur: 16px;
+  --glass-saturate: 120%;
+  --glass-shadow: 0 12px 32px rgba(0,0,0,0.08);
+  --glass-shadow-strong: 0 20px 48px rgba(0,0,0,0.12);
+  --shell-frame: linear-gradient(180deg, color-mix(in srgb, var(--glass) 32%, transparent), transparent 18%);
+  --shell-frame-border: rgba(255,255,255,0.06);
+  --shell-frame-shadow: 0 10px 28px rgba(0,0,0,0.1);
 
   /* section watermark */
   --section-num-stroke: rgba(245,158,11,0.12);
@@ -483,6 +492,15 @@ iframe {
 
   --glass:         rgba(56,189,248,0.04);
   --glass-border:  rgba(56,189,248,0.1);
+  --glass-highlight: rgba(255,255,255,0.08);
+  --glass-sheen: rgba(125,211,252,0.08);
+  --glass-blur: 16px;
+  --glass-saturate: 124%;
+  --glass-shadow: 0 14px 36px rgba(2,12,32,0.22);
+  --glass-shadow-strong: 0 22px 56px rgba(2,12,32,0.3);
+  --shell-frame: linear-gradient(180deg, color-mix(in srgb, var(--glass) 38%, transparent), transparent 18%);
+  --shell-frame-border: rgba(125,211,252,0.08);
+  --shell-frame-shadow: 0 14px 34px rgba(2,12,32,0.22);
 
   --section-num-stroke: rgba(56,189,248,0.12);
 
@@ -512,7 +530,67 @@ iframe {
   --danger-border: rgba(251,113,133,0.25);
 }
 
-/* ── 3. Light Blue — "Blueprint"
+/* ── 3. Dark Glass Blue — "Ice Curtain"
+       Deep navy gradient + high-frost glass. Structured, luminous, infographic-first. */
+[data-theme="dark-glass-blue"] {
+  --bg:            #06101c;
+  --bg-gradient:
+    radial-gradient(circle at 14% 18%, rgba(70,130,255,0.18) 0%, transparent 34%),
+    radial-gradient(circle at 82% 22%, rgba(56,189,248,0.16) 0%, transparent 30%),
+    radial-gradient(circle at 52% 100%, rgba(37,99,235,0.18) 0%, transparent 42%),
+    linear-gradient(180deg, #06101c 0%, #0a1930 55%, #102745 100%);
+  --glow:          rgba(110,180,255,0.2);
+
+  --text:          #f7fbff;
+  --text-muted:    rgba(183,201,224,0.72);
+
+  --primary:        #67c9ff;
+  --primary-light:  #a5e3ff;
+  --primary-bg:     rgba(103,201,255,0.18);
+  --primary-border: rgba(146,220,255,0.34);
+
+  --glass:         rgba(18,34,58,0.34);
+  --glass-border:  rgba(193,225,255,0.18);
+  --glass-highlight: rgba(255,255,255,0.18);
+  --glass-sheen: rgba(125,211,252,0.14);
+  --glass-blur: 22px;
+  --glass-saturate: 155%;
+  --glass-shadow: 0 18px 48px rgba(3,10,25,0.28);
+  --glass-shadow-strong: 0 28px 72px rgba(3,10,25,0.38);
+  --shell-frame:
+    linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02) 18%, transparent 30%),
+    linear-gradient(135deg, rgba(125,211,252,0.1), transparent 38%);
+  --shell-frame-border: rgba(193,225,255,0.16);
+  --shell-frame-shadow: 0 20px 56px rgba(3,10,25,0.28);
+
+  --section-num-stroke: rgba(165,227,255,0.18);
+
+  --success:        #4ade80;
+  --success-light:  #86efac;
+  --success-contrast: #f2fff7;
+  --success-bg:     rgba(74,222,128,0.14);
+  --success-border: rgba(110,231,183,0.3);
+
+  --info:           #67c9ff;
+  --info-light:     #a5e3ff;
+  --info-contrast:  #f4fbff;
+  --info-bg:        rgba(103,201,255,0.15);
+  --info-border:    rgba(146,220,255,0.3);
+
+  --warning:        #fbbf24;
+  --warning-light:  #fde68a;
+  --warning-contrast: #fffdf5;
+  --warning-bg:     rgba(251,191,36,0.14);
+  --warning-border: rgba(253,224,71,0.3);
+
+  --danger:         #fb7185;
+  --danger-light:   #fda4af;
+  --danger-contrast: #fff5f7;
+  --danger-bg:      rgba(251,113,133,0.15);
+  --danger-border:  rgba(253,164,175,0.3);
+}
+
+/* ── 4. Light Blue — "Blueprint"
         Crisp white-blue canvas + strong cobalt. Architectural clarity. */
 [data-theme="light-blue"] {
   --bg:            #eef5ff;
@@ -529,6 +607,15 @@ iframe {
 
   --glass:         rgba(255,255,255,0.72);
   --glass-border:  rgba(29,78,216,0.12);
+  --glass-highlight: rgba(255,255,255,0.44);
+  --glass-sheen: rgba(255,255,255,0.2);
+  --glass-blur: 16px;
+  --glass-saturate: 120%;
+  --glass-shadow: 0 12px 32px rgba(29,78,216,0.08);
+  --glass-shadow-strong: 0 18px 40px rgba(29,78,216,0.12);
+  --shell-frame: linear-gradient(180deg, color-mix(in srgb, var(--glass) 42%, transparent), transparent 18%);
+  --shell-frame-border: rgba(29,78,216,0.08);
+  --shell-frame-shadow: 0 10px 28px rgba(29,78,216,0.08);
 
   --section-num-stroke: rgba(29,78,216,0.1);
 
@@ -557,7 +644,7 @@ iframe {
   --danger-border: rgba(153,27,27,0.2);
 }
 
-/* ── 4. Light ChatGPT — "Clean Lab"
+/* ── 5. Light ChatGPT — "Clean Lab"
         Pure white + emerald. Minimal, precise, scientific.           */
 [data-theme="light-chatgpt"] {
   --bg:            #fafafa;
@@ -574,6 +661,15 @@ iframe {
 
   --glass:         rgba(255,255,255,0.88);
   --glass-border:  rgba(0,0,0,0.07);
+  --glass-highlight: rgba(255,255,255,0.54);
+  --glass-sheen: rgba(255,255,255,0.26);
+  --glass-blur: 16px;
+  --glass-saturate: 118%;
+  --glass-shadow: 0 12px 32px rgba(0,0,0,0.06);
+  --glass-shadow-strong: 0 18px 40px rgba(0,0,0,0.1);
+  --shell-frame: linear-gradient(180deg, color-mix(in srgb, var(--glass) 42%, transparent), transparent 18%);
+  --shell-frame-border: rgba(0,0,0,0.05);
+  --shell-frame-shadow: 0 10px 28px rgba(0,0,0,0.06);
 
   --section-num-stroke: rgba(5,150,105,0.1);
 
@@ -603,7 +699,7 @@ iframe {
   --danger-border: rgba(153,27,27,0.2);
 }
 
-/* ── 5. Light Claude — "Warm Scholar"
+/* ── 6. Light Claude — "Warm Scholar"
         Antique cream + copper-terracotta. Scholarly, warm, humanistic. */
 [data-theme="light-claude"] {
   --bg:            #faf7f2;
@@ -620,6 +716,15 @@ iframe {
 
   --glass:         rgba(255,249,240,0.82);
   --glass-border:  rgba(181,96,26,0.1);
+  --glass-highlight: rgba(255,255,255,0.38);
+  --glass-sheen: rgba(255,244,230,0.2);
+  --glass-blur: 16px;
+  --glass-saturate: 118%;
+  --glass-shadow: 0 12px 32px rgba(88,52,20,0.08);
+  --glass-shadow-strong: 0 18px 40px rgba(88,52,20,0.12);
+  --shell-frame: linear-gradient(180deg, color-mix(in srgb, var(--glass) 40%, transparent), transparent 18%);
+  --shell-frame-border: rgba(181,96,26,0.07);
+  --shell-frame-shadow: 0 10px 28px rgba(88,52,20,0.08);
 
   --section-num-stroke: rgba(181,96,26,0.1);
 
@@ -690,15 +795,16 @@ iframe {
 /* Frosted glass surface */
 .glass-card {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--glass) 96%, rgba(255,255,255,0.02)), color-mix(in srgb, var(--glass) 72%, transparent)),
-    linear-gradient(135deg, rgba(255,255,255,0.08), transparent 42%);
-  backdrop-filter: blur(16px) saturate(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(120%);
+    linear-gradient(180deg, color-mix(in srgb, var(--glass) 98%, rgba(255,255,255,0.03)), color-mix(in srgb, var(--glass) 78%, transparent)),
+    linear-gradient(135deg, var(--glass-sheen), transparent 42%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   border: 1px solid color-mix(in srgb, var(--glass-border) 92%, rgba(255,255,255,0.08));
   border-radius: 12px;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    0 12px 32px rgba(0,0,0,0.08);
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 rgba(255,255,255,0.03),
+    var(--glass-shadow);
 }
 
 /* Card header with left accent stripe */
@@ -811,6 +917,31 @@ iframe {
   --studio-error:          #fb7185;
   --studio-error-bg:       rgba(251,113,133,0.10);
   --studio-error-border:   rgba(251,113,133,0.28);
+}
+
+/* ── dark-glass-blue ───────────────────────────────────────── */
+[data-theme="dark-glass-blue"] {
+  --studio-bg:            #07101d;
+  --studio-panel:         rgba(10,19,34,0.96);
+  --studio-panel-2:       rgba(14,25,45,0.96);
+  --studio-surface:       rgba(20,35,60,0.9);
+  --studio-border:        rgba(165,227,255,0.14);
+  --studio-border-hover:  rgba(165,227,255,0.28);
+
+  --studio-text:          #eaf6ff;
+  --studio-muted:         rgba(210,232,250,0.42);
+
+  --studio-primary:        #67c9ff;
+  --studio-primary-light:  #a5e3ff;
+  --studio-primary-contrast: #03131f;
+  --studio-primary-bg:     rgba(103,201,255,0.16);
+  --studio-primary-border: rgba(146,220,255,0.34);
+
+  --studio-success:        #4ade80;
+  --studio-success-bg:     rgba(74,222,128,0.12);
+  --studio-error:          #fb7185;
+  --studio-error-bg:       rgba(251,113,133,0.12);
+  --studio-error-border:   rgba(253,164,175,0.32);
 }
 
 /* ── light-blue ────────────────────────────────────────────── */

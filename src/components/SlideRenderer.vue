@@ -410,7 +410,9 @@ const slideProps = computed(() => {
   padding: 30px 36px 32px;
   border-radius: 20px;
   box-sizing: border-box;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--glass) 32%, transparent), transparent 18%);
+  background: var(--shell-frame, linear-gradient(180deg, color-mix(in srgb, var(--glass) 32%, transparent), transparent 18%));
+  border: 1px solid var(--shell-frame-border, transparent);
+  box-shadow: var(--shell-frame-shadow, none);
   overflow: hidden;
 }
 </style>

@@ -4,6 +4,7 @@ import { onMounted, ref } from 'vue'
 const themes = [
   { id: 'dark-yellow',   name: '暗·琥珀', bg: '#0b0c11', accent: '#f59e0b' },
   { id: 'dark-blue',     name: '暗·深海', bg: '#070c17', accent: '#38bdf8' },
+  { id: 'dark-glass-blue', name: '暗·冰幕', bg: 'linear-gradient(135deg, #06101c, #123055)', accent: '#a5e3ff' },
   { id: 'light-blue',    name: '亮·蓝图', bg: '#eef4ff', accent: '#1d4ed8' },
   { id: 'light-chatgpt', name: '亮·翠绿', bg: '#f5f5f5', accent: '#059669' },
   { id: 'light-claude',  name: '亮·暖铜', bg: '#f2ece0', accent: '#b5601a' },
