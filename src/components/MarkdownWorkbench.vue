@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { EditorState } from '@codemirror/state'
 import {
@@ -28,8 +28,12 @@ const emit = defineEmits<{
 }>()
 
 const editorHost = ref<HTMLElement | null>(null)
+const previewScroll = ref<HTMLElement | null>(null)
 const mobileMode = ref<'edit' | 'preview'>('edit')
 let view: EditorView | null = null
+let syncingFromEditor = false
+let syncingFromPreview = false
+let syncReleaseTimer: ReturnType<typeof setTimeout> | null = null
 
 const md = new MarkdownIt({
   html: false,
@@ -147,6 +151,51 @@ function buildState(content: string) {
   })
 }
 
+function getScrollRatio(el: HTMLElement) {
+  const maxScroll = el.scrollHeight - el.clientHeight
+  if (maxScroll <= 0) return 0
+  return el.scrollTop / maxScroll
+}
+
+function applyScrollRatio(el: HTMLElement, ratio: number) {
+  const maxScroll = el.scrollHeight - el.clientHeight
+  if (maxScroll <= 0) {
+    el.scrollTop = 0
+    return
+  }
+  el.scrollTop = Math.max(0, Math.min(maxScroll, ratio * maxScroll))
+}
+
+function releaseSyncLock(source: 'editor' | 'preview') {
+  if (syncReleaseTimer) clearTimeout(syncReleaseTimer)
+  syncReleaseTimer = setTimeout(() => {
+    if (source === 'editor') syncingFromEditor = false
+    else syncingFromPreview = false
+  }, 80)
+}
+
+function syncPreviewToEditor() {
+  if (!view || !previewScroll.value || syncingFromEditor) return
+  syncingFromPreview = true
+  applyScrollRatio(view.scrollDOM, getScrollRatio(previewScroll.value))
+  releaseSyncLock('preview')
+}
+
+function syncEditorToPreview() {
+  if (!view || !previewScroll.value || syncingFromPreview) return
+  syncingFromEditor = true
+  applyScrollRatio(previewScroll.value, getScrollRatio(view.scrollDOM))
+  releaseSyncLock('editor')
+}
+
+function handleEditorScroll() {
+  syncEditorToPreview()
+}
+
+function handlePreviewScroll() {
+  syncPreviewToEditor()
+}
+
 onMounted(() => {
   if (!editorHost.value)
     return
@@ -154,11 +203,13 @@ onMounted(() => {
     state: buildState(props.modelValue),
     parent: editorHost.value,
   })
+  view.scrollDOM.addEventListener('scroll', handleEditorScroll, { passive: true })
+  previewScroll.value?.addEventListener('scroll', handlePreviewScroll, { passive: true })
 })
 
 watch(
   () => props.modelValue,
-  (next) => {
+  async (next) => {
     if (!view)
       return
     const current = view.state.doc.toString()
@@ -167,10 +218,17 @@ watch(
     view.dispatch({
       changes: { from: 0, to: current.length, insert: next },
     })
+    await nextTick()
+    syncEditorToPreview()
   },
 )
 
 onBeforeUnmount(() => {
+  if (syncReleaseTimer) clearTimeout(syncReleaseTimer)
+  if (view) {
+    view.scrollDOM.removeEventListener('scroll', handleEditorScroll)
+  }
+  previewScroll.value?.removeEventListener('scroll', handlePreviewScroll)
   view?.destroy()
   view = null
 })
@@ -211,7 +269,7 @@ onBeforeUnmount(() => {
           <span class="i-carbon:view" style="font-size:0.7rem;opacity:0.6" />
           预览
         </div>
-        <div class="md-preview-scroll">
+        <div ref="previewScroll" class="md-preview-scroll">
           <div class="md-preview" v-html="renderedPreview" />
         </div>
       </section>

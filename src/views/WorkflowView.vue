@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
 import { useGenerationStore } from '../stores/generation'
@@ -37,6 +37,12 @@ const mdFilename = ref('')
 const mdContent = ref('')
 const selectedSlideIndex = ref<number | null>(null)
 const presenting = ref(false)
+const draftSaveState = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
+const draftSaveError = ref('')
+const step1Bootstrapped = ref(false)
+
+const STEP1_META_KEY = 'auto-slidev:step1-meta'
+let step1AutosaveTimer: ReturnType<typeof setTimeout> | null = null
 
 const step1State = ref({
   mdContent: '',
@@ -52,6 +58,10 @@ async function ensureProjectForMedia() {
   projectId.value = await projects.create(name, mdContent.value || '')
   const p = await projects.open(projectId.value)
   project.value = p
+  persistStep1Meta(projectId.value, step1State.value)
+  if (!route.params.id || Number(route.params.id) !== projectId.value) {
+    router.replace(`/project/${projectId.value}`)
+  }
 }
 
 const mediaLib = useMediaLibrary({
@@ -91,6 +101,7 @@ onMounted(async () => {
         projectName: p.name,
         granularity: 'auto',
       }
+      loadStep1Meta(id)
       if (p.blueprints_json) {
         gen.loadFromJson(p.blueprints_json)
       } else {
@@ -108,6 +119,11 @@ onMounted(async () => {
     gen.reset()
     currentStep.value = 1
   }
+  step1Bootstrapped.value = true
+})
+
+onBeforeUnmount(() => {
+  if (step1AutosaveTimer) clearTimeout(step1AutosaveTimer)
 })
 
 // Auto-advance after generation completes
@@ -137,15 +153,112 @@ watch(
   { immediate: true },
 )
 
+function step1MetaStorageKey(id: number) {
+  return `${STEP1_META_KEY}:${id}`
+}
+
+function persistStep1Meta(id: number, val: typeof step1State.value) {
+  localStorage.setItem(step1MetaStorageKey(id), JSON.stringify({
+    mdFilename: val.mdFilename,
+    granularity: val.granularity,
+  }))
+}
+
+function loadStep1Meta(id: number) {
+  const raw = localStorage.getItem(step1MetaStorageKey(id))
+  if (!raw) return
+  try {
+    const parsed = JSON.parse(raw) as Partial<Pick<typeof step1State.value, 'mdFilename' | 'granularity'>>
+    step1State.value = {
+      ...step1State.value,
+      mdFilename: typeof parsed.mdFilename === 'string' ? parsed.mdFilename : step1State.value.mdFilename,
+      granularity: parsed.granularity === 'auto' || parsed.granularity === 'h2' || parsed.granularity === 'h3'
+        ? parsed.granularity
+        : step1State.value.granularity,
+    }
+  } catch {
+    localStorage.removeItem(step1MetaStorageKey(id))
+  }
+}
+
+function hasMeaningfulStep1Draft() {
+  return Boolean(
+    step1State.value.mdContent.trim()
+    || step1State.value.projectName.trim()
+    || step1State.value.mdFilename.trim(),
+  )
+}
+
+function getDraftProjectName() {
+  return step1State.value.projectName.trim()
+    || step1State.value.mdFilename.trim().replace(/\.[^.]+$/, '')
+    || '未命名演示'
+}
+
+async function saveStep1Draft() {
+  if (loading.value || !step1Bootstrapped.value) return
+  if (!projectId.value && !hasMeaningfulStep1Draft()) {
+    draftSaveState.value = 'idle'
+    draftSaveError.value = ''
+    return
+  }
+
+  const draftName = getDraftProjectName()
+  draftSaveState.value = 'saving'
+  draftSaveError.value = ''
+
+  try {
+    if (!projectId.value) {
+      const createdId = await projects.create(draftName, step1State.value.mdContent)
+      projectId.value = createdId
+      project.value = await projects.open(createdId)
+      if (!route.params.id || Number(route.params.id) !== createdId) {
+        router.replace(`/project/${createdId}`)
+      }
+    } else {
+      await projects.updateContent(projectId.value, draftName, step1State.value.mdContent)
+    }
+
+    if (projectId.value) {
+      persistStep1Meta(projectId.value, step1State.value)
+    }
+
+    projectName.value = draftName
+    if (project.value) {
+      project.value.name = draftName
+      project.value.md_content = step1State.value.mdContent
+    }
+
+    draftSaveState.value = 'saved'
+  } catch (e: unknown) {
+    draftSaveState.value = 'error'
+    draftSaveError.value = String(e)
+  }
+}
+
+watch(
+  step1State,
+  () => {
+    if (step1AutosaveTimer) clearTimeout(step1AutosaveTimer)
+    if (!step1Bootstrapped.value) return
+    step1AutosaveTimer = setTimeout(() => {
+      saveStep1Draft().catch((e) => {
+        draftSaveState.value = 'error'
+        draftSaveError.value = String(e)
+      })
+    }, 800)
+  },
+  { deep: true },
+)
+
 async function onStep1StartGenerate() {
   if (!mdContent.value.trim() || !projectName.value.trim()) return
-  currentStep.value = 2
-
-  if (!projectId.value) {
-    projectId.value = await projects.create(projectName.value, mdContent.value)
-  } else {
-    await projects.updateContent(projectId.value, projectName.value, mdContent.value)
+  if (step1AutosaveTimer) {
+    clearTimeout(step1AutosaveTimer)
+    step1AutosaveTimer = null
   }
+  await saveStep1Draft()
+  currentStep.value = 2
 
   await gen.generate(
     mdContent.value,
@@ -325,6 +438,8 @@ onMounted(() => {
         :can-generate="canGenerate"
         :media-items="mediaLib.mediaItems.value"
         :media-drop-over="mediaLib.mediaDropOver.value"
+        :draft-save-state="draftSaveState"
+        :draft-save-error="draftSaveError"
         @update:detected-granularity="detectedGranularity = $event"
         @start-generate="onStep1StartGenerate"
         @media-drop-over="mediaLib.mediaDropOver.value = $event"

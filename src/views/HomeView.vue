@@ -12,6 +12,7 @@ import BrandMark from "../components/BrandMark.vue";
 const router = useRouter();
 const projects = useProjectsStore();
 const confirmDelete = ref<number | null>(null);
+const pendingDeleteId = ref<number | null>(null);
 const exportingId = ref<number | null>(null);
 const importing = ref(false);
 const showThemePicker = ref(false);
@@ -21,16 +22,19 @@ onMounted(async () => {
     invoke("ensure_icon_embeddings").catch(() => {});
 });
 
-async function handleDelete(id: number) {
-    if (confirmDelete.value === id) {
-        await projects.remove(id);
-        confirmDelete.value = null;
-    } else {
-        confirmDelete.value = id;
-        setTimeout(() => {
-            confirmDelete.value = null;
-        }, 3000);
+function handleDelete(id: number) {
+    pendingDeleteId.value = id;
+}
+
+async function confirmDeleteProject() {
+    if (pendingDeleteId.value !== null) {
+        await projects.remove(pendingDeleteId.value);
+        pendingDeleteId.value = null;
     }
+}
+
+function cancelDelete() {
+    pendingDeleteId.value = null;
 }
 
 async function handleExport(id: number) {
@@ -224,12 +228,7 @@ async function handleImport() {
                         </button>
                         <button
                             class="btn btn-ghost icon-btn"
-                            :class="{ danger: confirmDelete === p.id }"
-                            :title="
-                                confirmDelete === p.id
-                                    ? '再次点击确认删除'
-                                    : '删除'
-                            "
+                            title="删除"
                             @click="handleDelete(p.id)"
                         >
                             <span class="i-carbon:trash-can" />
@@ -238,6 +237,25 @@ async function handleImport() {
                 </div>
             </div>
         </div>
+
+        <!-- 删除确认对话框 -->
+        <Teleport to="body">
+            <Transition name="modal">
+                <div v-if="pendingDeleteId !== null" class="modal-overlay" @click.self="cancelDelete">
+                    <div class="modal-box">
+                        <div class="modal-icon">
+                            <span class="i-carbon:warning" />
+                        </div>
+                        <h3 class="modal-title">确认删除</h3>
+                        <p class="modal-desc">删除后无法恢复，确定要删除这个项目吗？</p>
+                        <div class="modal-actions">
+                            <button class="btn btn-ghost" @click="cancelDelete">取消</button>
+                            <button class="btn btn-danger" @click="confirmDeleteProject">删除</button>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
     </div>
 </template>
 
@@ -642,5 +660,83 @@ async function handleImport() {
     to {
         transform: rotate(360deg);
     }
+}
+
+/* ── 删除确认对话框 ─────────────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-box {
+    background: var(--studio-panel);
+    border: 1px solid var(--studio-border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    width: 320px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.modal-icon {
+    font-size: 2.5rem;
+    color: var(--studio-error);
+    margin-bottom: 0.75rem;
+}
+
+.modal-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--studio-text);
+    margin: 0 0 0.5rem;
+}
+
+.modal-desc {
+    font-size: 0.85rem;
+    color: var(--studio-muted);
+    margin: 0 0 1.25rem;
+    line-height: 1.5;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+}
+
+.btn-danger {
+    background: var(--studio-error-bg);
+    color: var(--studio-error);
+    border: 1px solid var(--studio-error-border);
+}
+
+.btn-danger:hover {
+    background: var(--studio-error);
+    color: #fff;
+}
+
+/* 弹窗动画 */
+.modal-enter-active,
+.modal-leave-active {
+    transition: opacity 0.2s ease;
+}
+.modal-enter-active .modal-box,
+.modal-leave-active .modal-box {
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.modal-enter-from,
+.modal-leave-to {
+    opacity: 0;
+}
+.modal-enter-from .modal-box,
+.modal-leave-to .modal-box {
+    transform: scale(0.92);
+    opacity: 0;
 }
 </style>

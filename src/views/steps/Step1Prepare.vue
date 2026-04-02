@@ -17,6 +17,8 @@ const props = defineProps<{
   canGenerate: boolean
   mediaItems: MediaItem[]
   mediaDropOver: boolean
+  draftSaveState: 'idle' | 'saving' | 'saved' | 'error'
+  draftSaveError: string
 }>()
 
 const emit = defineEmits<{
@@ -66,6 +68,13 @@ const MEDIA_EXTS = [...MEDIA_EXTS_IMG, ...MEDIA_EXTS_VID]
 const isDragOver = ref(false)
 const optimizing = ref(false)
 const optimizeError = ref('')
+
+const draftStatusText = computed(() => {
+  if (props.draftSaveState === 'saving') return '草稿保存中...'
+  if (props.draftSaveState === 'saved') return '草稿已保存'
+  if (props.draftSaveState === 'error') return '草稿保存失败'
+  return ''
+})
 
 function countExactHeadings(raw: string, level: 2 | 3) {
   return raw
@@ -376,6 +385,7 @@ async function optimizeMarkdown() {
           <span class="i-carbon:document" />
           {{ modelValue.mdFilename }}
         </span>
+        <span v-if="draftStatusText" class="char-pill">{{ draftStatusText }}</span>
         <span class="char-pill">{{ mdContent.length }} 字</span>
         <button
           class="btn btn-ghost upload-btn"
@@ -437,6 +447,7 @@ async function optimizeMarkdown() {
       >
         `####` 1. 2.
       </button>
+      <span v-if="draftSaveState === 'error' && draftSaveError" class="prepare-inline-error">{{ draftSaveError }}</span>
       <span v-if="optimizeError" class="prepare-inline-error">{{ optimizeError }}</span>
     </div>
 
