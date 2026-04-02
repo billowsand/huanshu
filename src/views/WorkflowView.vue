@@ -1791,9 +1791,11 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.75rem;
   gap: 0.6rem;
+  min-height: 0;
 }
 
 .edit-head-pos {
@@ -1816,8 +1818,14 @@ onMounted(() => {
 }
 
 .ej-field-group--grow {
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
+}
+
+.ej-save-btn {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
 }
 
 .ej-label {
