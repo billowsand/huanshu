@@ -1,3 +1,4 @@
+use crate::crypto::{CryptoService, validate_password_strength};
 use crate::db::{self, MediaAsset};
 use crate::types::AppGlobalSettings;
 use crate::AppState;
@@ -296,7 +297,19 @@ struct KeynnManifest {
 pub fn export_project(
     project_id: i64,
     state: State<'_, Mutex<AppState>>,
+    encrypted: Option<bool>,
+    password: Option<String>,
 ) -> Result<Vec<u8>, String> {
+    let do_encrypt = encrypted.unwrap_or(false);
+    
+    let pwd = if do_encrypt {
+        let p = password.ok_or("Password required for encrypted export")?;
+        validate_password_strength(&p)?;
+        p
+    } else {
+        String::new()
+    };
+
     let state = state.lock().unwrap();
     let db = state.db.lock().unwrap();
 
@@ -365,18 +378,31 @@ pub fn export_project(
 
     zip.finish().map_err(|e| e.to_string())?;
 
-    Ok(zip_data)
+    if do_encrypt {
+        let original_name = format!("{}.keynn", project.name.replace(" ", "_"));
+        CryptoService::encrypt(&zip_data, &pwd, &original_name)
+    } else {
+        Ok(zip_data)
+    }
 }
 
 #[tauri::command]
 pub fn import_project(
     zip_data: Vec<u8>,
     state: State<'_, Mutex<AppState>>,
+    password: Option<String>,
 ) -> Result<i64, String> {
+    let data = if CryptoService::is_encrypted(&zip_data) {
+        let pwd = password.ok_or("Password required for encrypted file")?;
+        CryptoService::decrypt(&zip_data, &pwd)?
+    } else {
+        zip_data
+    };
+
     let state = state.lock().unwrap();
     let db = state.db.lock().unwrap();
 
-    let cursor = std::io::Cursor::new(zip_data);
+    let cursor = std::io::Cursor::new(data);
     let mut archive = ZipArchive::new(cursor).map_err(|e| e.to_string())?;
 
     let _manifest: KeynnManifest = {
@@ -515,4 +541,9 @@ pub fn import_project(
         .map_err(|e| e.to_string())?;
 
     Ok(project_id)
+}
+
+#[tauri::command]
+pub fn is_encrypted_file(data: Vec<u8>) -> bool {
+    CryptoService::is_encrypted(&data)
 }

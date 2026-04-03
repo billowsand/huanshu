@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod crypto;
 mod db;
 mod embedded_icons;
 mod generator;
@@ -255,6 +256,7 @@ pub fn run() {
             commands::storage::update_media_caption,
             commands::storage::export_project,
             commands::storage::import_project,
+            commands::storage::is_encrypted_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

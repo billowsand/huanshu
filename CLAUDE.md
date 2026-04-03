@@ -73,3 +73,48 @@
 1. **生成时**：planning.rs 的提示词会根据比例告诉 LLM 调整布局（如 FeatureGrid 用更多列）
 2. **normalize 时**：`apply_component_defaults` 根据比例调整各项数量限制（如 `cards.truncate(4 * cols_multiplier)`）
 3. **播放时**：PresentationOverlay 计算 `stretchScale = { scaleX: vw/slideW, scaleY: vh/slideH }`，对幻灯片进行非等比缩放到全屏
+
+
+## 加密导出/导入功能 (.keynn)
+
+### 功能说明
+- 导出时可选择加密，勾选后需设置密码
+- 导入时自动检测文件是否加密，如加密则提示输入密码
+- 使用 AES-256-GCM + Argon2id 加密，密码强度需至少8字符且包含大小写字母和数字
+
+### 加密文件格式
+加密后的 .keynn 文件结构：
+```
+header.json (非加密，可读)
+├── magic: "KNN2"
+├── version: "2"
+├── algorithm: "AES-256-GCM"
+├── kdf: "Argon2id"
+├── salt: "<base64 16字节>"
+├── nonce: "<base64 12字节>"
+└── test_ciphertext: "<加密的验证数据>"
+payload.bin (加密的原始 ZIP 内容)
+```
+
+### 相关文件
+
+#### 后端 (Rust)
+| 文件 | 改动 |
+|------|------|
+| `src-tauri/Cargo.toml` | 新增 `aes-gcm`, `argon2`, `rand`, `base64` 依赖 |
+| `src-tauri/src/crypto.rs` | 新增加密解密模块 `CryptoService` |
+| `src-tauri/src/commands/storage.rs` | `export_project` 增加 `encrypted` 和 `password` 参数，`import_project` 增加 `password` 参数 |
+| `src-tauri/src/lib.rs` | 注册 `crypto` 模块和 `is_encrypted_file` 命令 |
+
+#### 前端 (TypeScript/Vue)
+| 文件 | 改动 |
+|------|------|
+| `src/components/PasswordDialog.vue` | 新增密码输入对话框组件（支持加密/解密模式、密码强度指示器） |
+| `src/views/HomeView.vue` | 导出按钮增加加密选项弹出层，导入时自动检测加密状态 |
+| `src/stores/projects.ts` | 无需改动（密码参数直接透传给 Tauri 命令） |
+
+### 实现要点
+1. **加密时**：先创建标准 .keynn ZIP，然后用 Argon2id 从密码派生 32 字节密钥，再用 AES-256-GCM 加密
+2. **验证机制**：header 中包含用同一密钥加密的测试字符串，解密时先验证测试字符串是否正确
+3. **自动检测**：导入时调用 `is_encrypted_file` 判断是否需要密码
+4. **密码强度**：必须包含大小写字母和数字，最少 8 字符

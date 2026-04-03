@@ -2,12 +2,14 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { invoke } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
+import { save, open } from "@tauri-apps/plugin-dialog";
+import { writeFile, readFile } from "@tauri-apps/plugin-fs";
 import { useProjectsStore } from "../stores/projects";
 import SkeletonCard from "../components/SkeletonCard.vue";
 import ThemeToggle from "../components/ThemeToggle.vue";
 import BrandMark from "../components/BrandMark.vue";
+import ExportDialog from "../components/ExportDialog.vue";
+import PasswordDialog from "../components/PasswordDialog.vue";
 
 const router = useRouter();
 const projects = useProjectsStore();
@@ -16,6 +18,14 @@ const pendingDeleteId = ref<number | null>(null);
 const exportingId = ref<number | null>(null);
 const importing = ref(false);
 const showThemePicker = ref(false);
+
+const showExportDialog = ref(false);
+const showPasswordDialog = ref(false);
+const passwordDialogMode = ref<'encrypt' | 'decrypt'>('encrypt');
+const passwordDialogProject = ref<string>('');
+const pendingExportId = ref<number | null>(null);
+const pendingImportData = ref<Uint8Array | null>(null);
+const importError = ref<string>('');
 
 onMounted(async () => {
     projects.refresh();
@@ -40,10 +50,36 @@ function cancelDelete() {
 async function handleExport(id: number) {
     const p = projects.list.find((proj) => proj.id === id);
     if (!p) return;
+
+    pendingExportId.value = id;
+    passwordDialogProject.value = p.name;
+    showExportDialog.value = true;
+}
+
+function closeExportDialog() {
+    showExportDialog.value = false;
+    pendingExportId.value = null;
+    passwordDialogProject.value = "";
+}
+
+async function handleExportSubmit(password: string | null) {
+    const id = pendingExportId.value;
+    if (id === null) return;
+
+    showExportDialog.value = false;
+    await doExport(id, password);
+}
+
+async function doExport(id: number, password: string | null) {
+    const p = projects.list.find((proj) => proj.id === id);
+    if (!p) return;
+
     exportingId.value = id;
     try {
         const zipData = await invoke<number[]>("export_project", {
             projectId: id,
+            encrypted: password !== null,
+            password: password,
         });
         const bytes = new Uint8Array(zipData);
         const filename = `${p.name}.keynn`;
@@ -58,26 +94,60 @@ async function handleExport(id: number) {
         console.error("Export failed:", e);
     } finally {
         exportingId.value = null;
+        pendingExportId.value = null;
+        passwordDialogProject.value = "";
     }
 }
 
 async function handleImport() {
-    const { open } = await import("@tauri-apps/plugin-dialog");
     const selected = await open({
         filters: [{ name: "Keynn Archive", extensions: ["keynn"] }],
     });
     if (!selected) return;
     importing.value = true;
     try {
-        const { readFile } = await import("@tauri-apps/plugin-fs");
         const bytes = await readFile(selected as string);
         const uint8 = new Uint8Array(bytes);
-        await invoke<number>("import_project", { zipData: Array.from(uint8) });
-        await projects.refresh();
+        
+        const isEncrypted = await invoke<boolean>("is_encrypted_file", {
+            data: Array.from(uint8)
+        });
+        
+        if (isEncrypted) {
+            pendingImportData.value = uint8;
+            passwordDialogMode.value = 'decrypt';
+            importError.value = '';
+            showPasswordDialog.value = true;
+        } else {
+            await invoke<number>("import_project", { 
+                zipData: Array.from(uint8),
+                password: null,
+            });
+            await projects.refresh();
+        }
     } catch (e) {
         console.error("Import failed:", e);
     } finally {
         importing.value = false;
+    }
+}
+
+async function handlePasswordSubmit(password: string) {
+    if (passwordDialogMode.value === 'decrypt' && pendingImportData.value !== null) {
+        importError.value = '';
+        try {
+            await invoke<number>("import_project", { 
+                zipData: Array.from(pendingImportData.value),
+                password: password,
+            });
+            await projects.refresh();
+            showPasswordDialog.value = false;
+            pendingImportData.value = null;
+            importError.value = '';
+        } catch (e: any) {
+            console.error("Import failed:", e);
+            importError.value = e?.toString() || '解密失败，密码可能不正确';
+        }
     }
 }
 </script>
@@ -259,6 +329,22 @@ async function handleImport() {
                 </div>
             </Transition>
         </Teleport>
+
+        <ExportDialog
+            :visible="showExportDialog"
+            :project-name="passwordDialogProject"
+            @close="closeExportDialog"
+            @submit="handleExportSubmit"
+        />
+
+        <PasswordDialog
+            :visible="showPasswordDialog"
+            :mode="passwordDialogMode"
+            :project-name="passwordDialogProject"
+            :external-error="importError"
+            @close="showPasswordDialog = false"
+            @submit="handlePasswordSubmit"
+        />
     </div>
 </template>
 
