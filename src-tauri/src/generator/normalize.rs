@@ -180,6 +180,7 @@ pub async fn repair_until_valid(
             &config.embedding_model,
             icon_index,
             asset_paths,
+            config.aspect_ratio,
         )
         .await?;
     }
@@ -215,7 +216,7 @@ pub async fn repair_until_valid(
         for idx in still_failing {
             if let Some(page) = page_plans.get(idx) {
                 let layout = layout_plans.get(idx);
-                let fallback = make_fallback_slide(page, layout);
+                let fallback = make_fallback_slide(page, layout, config.aspect_ratio);
                 if let Some(slot) = slides.get_mut(idx) {
                     *slot = fallback;
                 }
@@ -250,7 +251,7 @@ pub async fn repair_until_valid(
 /// kind are guaranteed by the `apply_component_defaults` call in the caller; this
 /// function only pre-fills the five kinds it can meaningfully populate from
 /// key_points (SectionIntro, FeatureGrid, OutcomeGrid, SectionList, StepFlow).
-pub fn make_fallback_slide(page: &PagePlan, layout: Option<&LayoutPlan>) -> SlideBlueprint {
+pub fn make_fallback_slide(page: &PagePlan, layout: Option<&LayoutPlan>, aspect_ratio: AspectRatio) -> SlideBlueprint {
     use crate::generator::planning::safe_fallback_kind;
     // Deliberately ignore the layout plan's kind — it's the one that failed.
     let _ = layout;
@@ -292,6 +293,7 @@ pub fn make_fallback_slide(page: &PagePlan, layout: Option<&LayoutPlan>) -> Slid
 
     SlideBlueprint {
         kind: kind.clone(),
+        aspect_ratio: Some(aspect_ratio),
         section: Some(page.page_id.clone()),
         title: page.page_title.clone(),
         subtitle: None,
@@ -354,9 +356,11 @@ pub async fn normalize_blueprints(
     embedding_model: &str,
     icon_index: &IconIndex,
     asset_paths: &HashSet<String>,
+    aspect_ratio: AspectRatio,
 ) -> Result<()> {
     // CPU-only passes first
     for slide in slides.iter_mut() {
+        slide.aspect_ratio = Some(aspect_ratio);
         normalize_lengths(slide);
         normalize_tones(slide);
         repair_assets(slide, asset_paths);
@@ -545,9 +549,16 @@ pub fn repair_assets(slide: &mut SlideBlueprint, asset_paths: &HashSet<String>) 
 }
 
 pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
+    let cols_multiplier = match slide.aspect_ratio {
+        Some(AspectRatio::Ratio16x9) => 1,
+        Some(AspectRatio::Ratio32x9) => 2,  // 4 * 2 = 8 cols max
+        Some(AspectRatio::Ratio48x9) => 3,  // 4 * 3 = 12 cols max
+        None => 1,
+    };
+
     match slide.kind {
         SlideKind::SectionIntro => {
-            slide.cards.truncate(4);
+            slide.cards.truncate(4 * cols_multiplier);
             while slide.cards.len() < 2 {
                 let idx = slide.cards.len() + 1;
                 slide.cards.push(GridCard {
@@ -603,7 +614,7 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
             }
         }
         SlideKind::FeatureGrid => {
-            slide.cards.truncate(4);
+            slide.cards.truncate(4 * cols_multiplier);
             if slide.cards.len() < 2 {
                 slide.cards.push(GridCard {
                     title: "补充要点".to_string(),
@@ -737,7 +748,7 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
             }
         }
         SlideKind::CenterGrid => {
-            slide.center_items.truncate(4);
+            slide.center_items.truncate(4 * cols_multiplier);
             if slide.center_items.is_empty() {
                 slide.center_items.push(CenterItem {
                     title: "关键结论".to_string(),
@@ -748,7 +759,7 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
             }
         }
         SlideKind::OutcomeGrid => {
-            slide.cards.truncate(4);
+            slide.cards.truncate(4 * cols_multiplier);
             if slide.cards.is_empty() {
                 slide.cards.push(GridCard {
                     title: "补充成果".to_string(),
@@ -1058,7 +1069,9 @@ pub async fn normalize_one_blueprint(
     embedding_model: &str,
     icon_index: &IconIndex,
     asset_paths: &HashSet<String>,
+    aspect_ratio: AspectRatio,
 ) -> Result<()> {
+    slide.aspect_ratio = Some(aspect_ratio);
     normalize_lengths(slide);
     normalize_tones(slide);
     repair_assets(slide, asset_paths);
@@ -1140,7 +1153,7 @@ pub async fn repair_one_slide(
             .await
             {
                 Ok(()) => {
-                    slide = slides_vec.into_iter().next().unwrap_or_else(|| make_fallback_slide(page_plan, Some(layout_plan)));
+                    slide = slides_vec.into_iter().next().unwrap_or_else(|| make_fallback_slide(page_plan, Some(layout_plan), config.aspect_ratio));
                 }
                 Err(e) => eprintln!("repair_one_slide regen failed for slide {}: {e}", slide_idx + 1),
             }
@@ -1181,7 +1194,7 @@ pub async fn repair_one_slide(
         }
 
         // Re-normalize after repair
-        normalize_one_blueprint(&mut slide, client, &config.embedding_model, icon_index, asset_paths).await?;
+        normalize_one_blueprint(&mut slide, client, &config.embedding_model, icon_index, asset_paths, config.aspect_ratio).await?;
     }
 
     // All rounds exhausted: try deterministic fallback
@@ -1191,7 +1204,7 @@ pub async fn repair_one_slide(
             "repair_one_slide: slide {} still invalid after {} rounds; using fallback",
             slide_idx + 1, max_rounds
         );
-        slide = make_fallback_slide(page_plan, Some(layout_plan));
+        slide = make_fallback_slide(page_plan, Some(layout_plan), config.aspect_ratio);
         apply_component_defaults(&mut slide);
         normalize_lengths(&mut slide);
         normalize_tones(&mut slide);

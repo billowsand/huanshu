@@ -245,7 +245,11 @@ pub async fn generate_slides(
     md_content: String,
     frontmatter_title: Option<String>,
     granularity: Option<String>,
+    aspect_ratio: Option<crate::types::AspectRatio>,
 ) -> Result<usize, String> {
+    // Default to 16:9 if not specified
+    let resolved_aspect_ratio = aspect_ratio.unwrap_or(crate::types::AspectRatio::Ratio16x9);
+
     // Get config from state
     let (settings, project_dir, active_project_id, db) = {
         let st = state.lock().unwrap();
@@ -272,7 +276,7 @@ pub async fn generate_slides(
         _ => crate::input::detect_granularity(&md_content),
     };
 
-    let mut config = GenerationConfig::from_settings(&settings, project_dir);
+    let mut config = GenerationConfig::from_settings(&settings, project_dir, resolved_aspect_ratio);
     config.frontmatter_title = frontmatter_title;
     config.granularity = resolved_granularity;
     let run_id = {
@@ -434,16 +438,28 @@ pub async fn repair_slide(
     index: usize,
     feedback: String,
 ) -> Result<SlideBlueprint, String> {
-    let (settings, project_dir, blueprints) = {
+    let (settings, project_dir, blueprints, active_project_id, db) = {
         let st = state.lock().unwrap();
         (
             st.settings.clone(),
             st.project_dir.clone(),
             st.blueprints.clone(),
+            st.active_project_id,
+            std::sync::Arc::clone(&st.db),
         )
     };
 
-    let config = GenerationConfig::from_settings(&settings, project_dir.clone());
+    // Use the project's selected aspect ratio (from DB), falling back to
+    // the blueprint's own ratio, then 16:9.  This ensures a repaired slide
+    // matches the project's current setting even if the blueprint is stale.
+    let aspect_ratio = active_project_id
+        .and_then(|pid| {
+            let db_lock = db.lock().unwrap();
+            crate::db::get_project(&*db_lock, pid).ok().and_then(|p| p.aspect_ratio)
+        })
+        .or_else(|| blueprints.get(index).and_then(|bp| bp.aspect_ratio))
+        .unwrap_or(crate::types::AspectRatio::Ratio16x9);
+    let config = GenerationConfig::from_settings(&settings, project_dir.clone(), aspect_ratio);
     let blueprint = blueprints
         .get(index)
         .ok_or_else(|| format!("slide index {index} out of range"))?
@@ -748,7 +764,7 @@ async fn run_pipeline(
                     .flatten()
                     .unwrap_or_else(|| {
                         eprintln!("slide {} missing, using fallback", idx + 1);
-                        crate::generator::normalize::make_fallback_slide(page, None)
+                        crate::generator::normalize::make_fallback_slide(page, None, config.aspect_ratio)
                     })
             })
             .collect()
@@ -843,7 +859,7 @@ pub async fn ensure_icon_embeddings(
         )
     };
 
-    let config = GenerationConfig::from_settings(&settings, project_dir);
+    let config = GenerationConfig::from_settings(&settings, project_dir, crate::types::AspectRatio::Ratio16x9);
 
     let client = LmStudioClient::new(&config.lmstudio_base_url)
         .with_api_key(&config.api_key);
@@ -888,7 +904,7 @@ pub async fn recommend_icons_for_query(
         )
     };
 
-    let config = GenerationConfig::from_settings(&settings, project_dir);
+    let config = GenerationConfig::from_settings(&settings, project_dir, crate::types::AspectRatio::Ratio16x9);
 
     let icon_index = {
         let conn = db.lock().unwrap();

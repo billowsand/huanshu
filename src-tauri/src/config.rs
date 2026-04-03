@@ -49,10 +49,16 @@ pub struct GenerationConfig {
     pub debug_dir: PathBuf,
     /// Heading level used as the granularity boundary for slide splitting
     pub granularity: HeadingLevel,
+    /// Target aspect ratio for the generated slides
+    pub aspect_ratio: crate::types::AspectRatio,
 }
 
 impl GenerationConfig {
-    pub fn from_settings(settings: &LlmSettings, project_dir: PathBuf) -> Self {
+    pub fn from_settings(
+        settings: &LlmSettings,
+        project_dir: PathBuf,
+        aspect_ratio: crate::types::AspectRatio,
+    ) -> Self {
         let debug_dir = project_dir.join(".slidev-gen-debug");
         Self {
             lmstudio_base_url: settings.base_url.clone(),
@@ -68,6 +74,7 @@ impl GenerationConfig {
             project_dir,
             debug_dir,
             granularity: HeadingLevel::H3,
+            aspect_ratio,
         }
     }
 }

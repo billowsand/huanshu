@@ -15,15 +15,40 @@ const props = defineProps<{
     items?: string[]
   }>
   note?: string
+  aspect_ratio?: 'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9'
 }>()
 
-const previewCards = computed(() => props.cards.slice(0, 4))
+const cardLimit = computed(() => {
+  return props.aspect_ratio === 'ratio_48x9' ? 12
+    : props.aspect_ratio === 'ratio_32x9' ? 8
+    : 4
+})
+
+const previewCards = computed(() => props.cards.slice(0, cardLimit.value))
+
+const gridCols = computed(() => {
+  if (props.aspect_ratio === 'ratio_48x9') return 'minmax(0, 0.2fr) minmax(0, 2fr)'
+  if (props.aspect_ratio === 'ratio_32x9') return 'minmax(0, 0.25fr) minmax(0, 1.5fr)'
+  return 'minmax(0, 0.95fr) minmax(0, 1.25fr)'
+})
+
+const cardGridCols = computed(() => {
+  if (props.aspect_ratio === 'ratio_48x9') return 'repeat(4, minmax(0, 1fr))'
+  if (props.aspect_ratio === 'ratio_32x9') return 'repeat(3, minmax(0, 1fr))'
+  return 'repeat(2, minmax(0, 1fr))'
+})
+
+const cardGridGap = computed(() => {
+  if (props.aspect_ratio === 'ratio_48x9') return '1.4rem'
+  if (props.aspect_ratio === 'ratio_32x9') return '1.2rem'
+  return '1rem'
+})
 </script>
 
 <template>
   <div v-if="section" class="section-num">{{ section }}</div>
 
-  <div class="section-intro" relative z-10>
+  <div class="section-intro" relative z-10 :style="{ gridTemplateColumns: gridCols }">
     <div class="section-intro__lead glass-card">
       <TagBadge v-if="badge" inline color="green">{{ badge }}</TagBadge>
 
@@ -42,7 +67,7 @@ const previewCards = computed(() => props.cards.slice(0, 4))
       <p v-if="note" class="slide-meta section-intro__note" v-html="note" />
     </div>
 
-    <div class="section-intro__grid">
+    <div class="section-intro__grid" :style="{ gridTemplateColumns: cardGridCols, gap: cardGridGap }">
       <GlassCard
         v-for="(card, idx) in previewCards"
         :key="card.title"

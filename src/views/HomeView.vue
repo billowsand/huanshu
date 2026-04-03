@@ -200,6 +200,9 @@ async function handleImport() {
                     <div class="card-body">
                         <div class="card-name">{{ p.name }}</div>
                         <div class="card-meta">
+                            <span class="badge ratio-badge" v-if="p.aspect_ratio && p.aspect_ratio !== 'ratio_16x9'">{{
+                                p.aspect_ratio === 'ratio_32x9' ? '32:9' : '48:9'
+                            }}</span>
                             <span class="badge"
                                 >{{ p.slide_count }} 张幻灯片</span
                             >
@@ -619,6 +622,12 @@ async function handleImport() {
     border-radius: 10px;
     padding: 0.05rem 0.45rem;
     font-weight: 600;
+}
+
+.ratio-badge {
+    background: rgba(255, 170, 50, 0.12);
+    border-color: rgba(255, 170, 50, 0.25);
+    color: #e6a030;
 }
 
 .card-date {

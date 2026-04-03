@@ -421,6 +421,7 @@ const props = defineProps<{
   editorPreviewSlide: SlideBlueprint | null
   editorStageW: number
   editorStageH: number
+  currentSlideDims: { w: number, h: number }
   jsonTextareaRef: HTMLTextAreaElement | null
 }>()
 
@@ -762,7 +763,7 @@ function handleTextareaKeydown(event: KeyboardEvent) {
           >
             <div
               class="edit-preview-canvas"
-              :style="{ transform: `scale(${previewScale})`, transformOrigin: 'top left', width: '1280px', height: '720px' }"
+              :style="{ transform: `scale(${previewScale})`, transformOrigin: 'top left', width: currentSlideDims.w + 'px', height: currentSlideDims.h + 'px' }"
             >
               <SlideRenderer :slide="(editorPreviewSlide as any)" :slide-index="activeSlide" :media-map="mediaMap" />
             </div>

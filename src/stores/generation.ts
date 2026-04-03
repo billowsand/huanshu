@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import type { SlideBlueprint } from '../components/types'
-export type { SlideBlueprint } from '../components/types'
+import type { SlideBlueprint, AspectRatio } from '../components/types'
+export type { SlideBlueprint, AspectRatio } from '../components/types'
 
 export type GenStage =
   | 'idle'
@@ -174,7 +174,7 @@ export const useGenerationStore = defineStore('generation', () => {
     unlistenPageStatus = null
   }
 
-  async function generate(mdContent: string, frontmatterTitle?: string, granularity?: string) {
+  async function generate(mdContent: string, frontmatterTitle?: string, granularity?: string, aspectRatio?: AspectRatio) {
     running.value = true
     lastError.value = ''
     blueprints.value = []
@@ -191,6 +191,7 @@ export const useGenerationStore = defineStore('generation', () => {
         mdContent,
         frontmatterTitle: frontmatterTitle ?? null,
         granularity: granularity ?? null,
+        aspectRatio: aspectRatio ?? null,
       })
       // After generation, load final blueprints
       const final = await invoke<SlideBlueprint[]>('get_blueprints')

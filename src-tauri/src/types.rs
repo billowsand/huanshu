@@ -16,6 +16,46 @@ pub struct SlideSpec {
     pub component: String,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AspectRatio {
+    #[serde(rename = "ratio_16x9")]
+    Ratio16x9,
+    #[serde(rename = "ratio_32x9")]
+    Ratio32x9,
+    #[serde(rename = "ratio_48x9")]
+    Ratio48x9,
+}
+
+impl AspectRatio {
+    pub fn width(self) -> u32 {
+        match self {
+            AspectRatio::Ratio16x9 => 1280,
+            AspectRatio::Ratio32x9 => 2560,
+            AspectRatio::Ratio48x9 => 3840,
+        }
+    }
+
+    pub fn height(self) -> u32 {
+        720
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            AspectRatio::Ratio16x9 => "16:9 (1280×720)",
+            AspectRatio::Ratio32x9 => "32:9 (2560×720)",
+            AspectRatio::Ratio48x9 => "48:9 (3840×720)",
+        }
+    }
+
+    pub fn cols_for_grid(self, base_cols: u32) -> u32 {
+        match self {
+            AspectRatio::Ratio16x9 => base_cols,
+            AspectRatio::Ratio32x9 => base_cols * 2,
+            AspectRatio::Ratio48x9 => base_cols * 3,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppGlobalSettings {
     pub data_dir: String,
@@ -64,6 +104,7 @@ pub enum SlideKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlideBlueprint {
     pub kind: SlideKind,
+    pub aspect_ratio: Option<AspectRatio>,
     pub section: Option<String>,
     pub title: String,
     #[serde(default)]

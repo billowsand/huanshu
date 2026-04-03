@@ -33,6 +33,7 @@ const editingName = ref(false)
 const newName = ref('')
 const granularity = ref<'auto' | 'h2' | 'h3'>('auto')
 const detectedGranularity = ref<'h2' | 'h3'>('h3')
+const aspectRatio = ref<'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9'>('ratio_16x9')
 const mdFilename = ref('')
 const mdContent = ref('')
 const selectedSlideIndex = ref<number | null>(null)
@@ -49,6 +50,7 @@ const step1State = ref({
   mdFilename: '',
   projectName: '',
   granularity: 'auto' as 'auto' | 'h2' | 'h3',
+  aspectRatio: 'ratio_16x9' as 'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9',
 })
 
 // ── Media library ──────────────────────────────────────────────────────────────
@@ -100,6 +102,7 @@ onMounted(async () => {
         mdFilename: '',
         projectName: p.name,
         granularity: 'auto',
+        aspectRatio: p.aspect_ratio ?? 'ratio_16x9',
       }
       loadStep1Meta(id)
       if (p.blueprints_json) {
@@ -140,6 +143,7 @@ function onStep1UpdateModelValue(val: typeof step1State.value) {
   mdFilename.value = val.mdFilename
   projectName.value = val.projectName
   granularity.value = val.granularity
+  aspectRatio.value = val.aspectRatio
 }
 
 watch(
@@ -149,6 +153,7 @@ watch(
     mdFilename.value = val.mdFilename
     projectName.value = val.projectName
     granularity.value = val.granularity
+    aspectRatio.value = val.aspectRatio
   },
   { immediate: true },
 )
@@ -161,20 +166,27 @@ function persistStep1Meta(id: number, val: typeof step1State.value) {
   localStorage.setItem(step1MetaStorageKey(id), JSON.stringify({
     mdFilename: val.mdFilename,
     granularity: val.granularity,
+    aspectRatio: val.aspectRatio,
   }))
+  if (id) {
+    projects.updateAspectRatio(id, val.aspectRatio).catch(() => {})
+  }
 }
 
 function loadStep1Meta(id: number) {
   const raw = localStorage.getItem(step1MetaStorageKey(id))
   if (!raw) return
   try {
-    const parsed = JSON.parse(raw) as Partial<Pick<typeof step1State.value, 'mdFilename' | 'granularity'>>
+    const parsed = JSON.parse(raw) as Partial<Pick<typeof step1State.value, 'mdFilename' | 'granularity' | 'aspectRatio'>>
     step1State.value = {
       ...step1State.value,
       mdFilename: typeof parsed.mdFilename === 'string' ? parsed.mdFilename : step1State.value.mdFilename,
       granularity: parsed.granularity === 'auto' || parsed.granularity === 'h2' || parsed.granularity === 'h3'
         ? parsed.granularity
         : step1State.value.granularity,
+      aspectRatio: parsed.aspectRatio === 'ratio_16x9' || parsed.aspectRatio === 'ratio_32x9' || parsed.aspectRatio === 'ratio_48x9'
+        ? parsed.aspectRatio
+        : step1State.value.aspectRatio,
     }
   } catch {
     localStorage.removeItem(step1MetaStorageKey(id))
@@ -264,6 +276,7 @@ async function onStep1StartGenerate() {
     mdContent.value,
     projectName.value,
     granularity.value === 'auto' ? undefined : granularity.value,
+    aspectRatio.value,
   )
 
   if (gen.stage === 'done' && gen.blueprints.length > 0 && projectId.value) {
@@ -489,6 +502,7 @@ onMounted(() => {
         :editor-preview-slide="slideEditor.editorPreviewSlide.value"
         :editor-stage-w="slideEditor.editorStageW.value"
         :editor-stage-h="slideEditor.editorStageH.value"
+        :current-slide-dims="slideEditor.currentSlideDims.value"
         :json-textarea-ref="slideEditor.jsonTextareaRef.value"
         @replace-draft="slideEditor.replaceEditorDraft"
         @json-textarea-ref="slideEditor.jsonTextareaRef.value = $event"
@@ -1060,6 +1074,48 @@ onMounted(() => {
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
+}
+
+/* Aspect ratio chooser */
+.aspect-ratio-stack {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+}
+
+.aspect-ratio-choice {
+  flex: 1;
+  padding: 0.6rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--studio-border);
+  background: var(--studio-surface);
+  color: var(--studio-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.aspect-ratio-choice:hover {
+  background: var(--studio-hover);
+  transform: translateY(-1px);
+}
+
+.aspect-ratio-choice.active {
+  background: var(--studio-primary-bg);
+  border-color: var(--studio-primary-border);
+}
+
+.aspect-ratio-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.aspect-ratio-desc {
+  font-size: 0.65rem;
+  color: var(--studio-muted);
 }
 
 /* Media library */
@@ -2544,6 +2600,9 @@ onMounted(() => {
 .presentation-overlay {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
   background:
     radial-gradient(circle at top, color-mix(in srgb, var(--studio-primary) 12%, transparent), transparent 34%),
     linear-gradient(180deg, color-mix(in srgb, var(--studio-panel) 74%, transparent), transparent 22%),
@@ -2552,6 +2611,25 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   color: var(--studio-text);
+  box-sizing: border-box;
+}
+
+.presentation-overlay:fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  max-width: none;
+  max-height: none;
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--studio-primary) 12%, transparent), transparent 34%),
+    linear-gradient(180deg, color-mix(in srgb, var(--studio-panel) 74%, transparent), transparent 22%),
+    var(--studio-bg);
+}
+
+.presentation-overlay:fullscreen::backdrop {
+  background: var(--studio-bg);
 }
 
 .shortcut-hint {

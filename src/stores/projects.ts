@@ -7,6 +7,7 @@ export interface ProjectSummary {
   id: number
   name: string
   slide_count: number
+  aspect_ratio?: 'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9'
   created_at: number
   updated_at: number
 }
@@ -16,6 +17,7 @@ export interface Project {
   name: string
   md_content: string
   blueprints_json: string
+  aspect_ratio?: 'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9'
   created_at: number
   updated_at: number
 }
@@ -56,6 +58,14 @@ export const useProjectsStore = defineStore('projects', () => {
     await refresh()
   }
 
+  async function updateAspectRatio(id: number, aspectRatio: 'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9') {
+    await invoke('update_project_aspect_ratio', { id, aspectRatio })
+  }
+
+  async function getAspectRatio(id: number): Promise<'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9' | null> {
+    return invoke('get_project_aspect_ratio', { id })
+  }
+
   async function remove(id: number) {
     await invoke('delete_project', { id })
     await refresh()
@@ -68,5 +78,5 @@ export const useProjectsStore = defineStore('projects', () => {
     })
   }
 
-  return { list, loading, refresh, create, open, saveBlueprints, updateContent, remove, formatDate }
+  return { list, loading, refresh, create, open, saveBlueprints, updateContent, updateAspectRatio, getAspectRatio, remove, formatDate }
 })

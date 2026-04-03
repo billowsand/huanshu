@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
 
-defineProps<{
+const props = defineProps<{
   section: string
   title: string
   subtitle?: string
@@ -17,7 +18,20 @@ defineProps<{
     tone?: Tone
   }>
   footer?: string
+  aspect_ratio?: 'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9'
 }>()
+
+const gridCols = computed(() => {
+  if (props.aspect_ratio === 'ratio_48x9') return '1fr 4fr'
+  if (props.aspect_ratio === 'ratio_32x9') return '1fr 3fr'
+  return '1fr 1fr'
+})
+
+const gridGap = computed(() => {
+  if (props.aspect_ratio === 'ratio_48x9') return '1.5rem'
+  if (props.aspect_ratio === 'ratio_32x9') return '1.35rem'
+  return '1.25rem'
+})
 </script>
 
 <template>
@@ -30,7 +44,7 @@ defineProps<{
     </div>
     <TagBadge v-if="subtitle" inline class="mt-3">{{ subtitle }}</TagBadge>
 
-    <div grid grid-cols-2 gap-5 mt-3 class="flex-1 items-stretch">
+    <div :style="{ display: 'grid', gridTemplateColumns: gridCols, gap: gridGap }" mt-3 class="flex-1 items-stretch">
       <div flex flex-col gap-3>
           <GlassCard
             v-for="item in leftItems"

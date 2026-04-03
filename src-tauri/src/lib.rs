@@ -243,6 +243,8 @@ pub fn run() {
             commands::projects::delete_project,
             commands::projects::open_project,
             commands::projects::set_active_project,
+            commands::projects::update_project_aspect_ratio,
+            commands::projects::get_project_aspect_ratio,
             commands::storage::get_app_settings,
             commands::storage::save_app_settings,
             commands::storage::is_first_run,

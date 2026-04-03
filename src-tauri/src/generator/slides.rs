@@ -452,6 +452,7 @@ pub async fn generate_single_page_pipeline(
         &config.embedding_model,
         icon_index,
         asset_paths,
+        config.aspect_ratio,
     )
     .await?;
 

@@ -118,8 +118,8 @@ body {
 .pres-slide,
 .slidev-slide {
   position: relative;
-  width: 1280px;
-  height: 720px;
+  width: var(--slide-width, 1280px);
+  height: var(--slide-height, 720px);
   overflow: hidden;
 }
 

@@ -209,13 +209,14 @@ const slideProps = computed(() => {
         subtitle: s.subtitle ?? '',
         cards: s.cards ?? [],
         note: s.note ?? '',
+        aspect_ratio: s.aspect_ratio,
       }
     case 'feature_grid':
       return {
         section: s.section ?? '',
         title: s.title,
         subtitle: s.subtitle ?? '',
-        cols: Math.min(4, (s.cards ?? []).length) || 1,
+        cols: Math.min((s.aspect_ratio === 'ratio_48x9' ? 12 : s.aspect_ratio === 'ratio_32x9' ? 8 : 4), (s.cards ?? []).length) || 1,
         cards: s.cards ?? [],
         note: s.note ?? '',
       }
@@ -238,6 +239,7 @@ const slideProps = computed(() => {
         leftItems: s.left_items ?? [],
         layers: s.layers ?? [],
         footer: s.footer ?? '',
+        aspect_ratio: s.aspect_ratio,
       }
     case 'section_list':
       return {
@@ -269,7 +271,7 @@ const slideProps = computed(() => {
         badge: s.badge ?? '总结',
         title: s.title,
         accent: s.accent ?? '',
-        cols: Math.min(4, (s.center_items ?? []).length) || 1,
+        cols: Math.min((s.aspect_ratio === 'ratio_48x9' ? 12 : s.aspect_ratio === 'ratio_32x9' ? 8 : 4), (s.center_items ?? []).length) || 1,
         items: s.center_items ?? [],
         footer: s.footer ?? '',
       }

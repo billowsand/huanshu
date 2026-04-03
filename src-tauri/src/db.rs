@@ -3,11 +3,14 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+use crate::types::AspectRatio;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectSummary {
     pub id: i64,
     pub name: String,
     pub slide_count: usize,
+    pub aspect_ratio: Option<AspectRatio>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -19,6 +22,7 @@ pub struct Project {
     pub md_content: String,
     pub blueprints_json: String,
     pub media_root: Option<String>,
+    pub aspect_ratio: Option<AspectRatio>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -135,7 +139,11 @@ fn migrate(conn: &Connection) -> Result<()> {
     )?;
 
     let _ = conn.execute("ALTER TABLE projects ADD COLUMN media_root TEXT", []);
-    let _ = conn.execute("ALTER TABLE generation_logs ADD COLUMN slide_index INTEGER", []);
+    let _ = conn.execute(
+        "ALTER TABLE generation_logs ADD COLUMN slide_index INTEGER",
+        [],
+    );
+    let _ = conn.execute("ALTER TABLE projects ADD COLUMN aspect_ratio TEXT", []);
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY,
@@ -171,7 +179,7 @@ fn now_ts() -> i64 {
 
 pub fn list_projects(conn: &Connection) -> Result<Vec<ProjectSummary>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, blueprints, created_at, updated_at
+        "SELECT id, name, blueprints, aspect_ratio, created_at, updated_at
          FROM projects ORDER BY updated_at DESC",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -180,12 +188,16 @@ pub fn list_projects(conn: &Connection) -> Result<Vec<ProjectSummary>> {
             .ok()
             .and_then(|v| v.as_array().map(|a| a.len()))
             .unwrap_or(0);
+        let aspect_ratio_str: Option<String> = row.get(3)?;
+        let aspect_ratio =
+            aspect_ratio_str.and_then(|s| serde_json::from_str::<AspectRatio>(&s).ok());
         Ok(ProjectSummary {
             id: row.get(0)?,
             name: row.get(1)?,
             slide_count,
-            created_at: row.get(3)?,
-            updated_at: row.get(4)?,
+            aspect_ratio,
+            created_at: row.get(4)?,
+            updated_at: row.get(5)?,
         })
     })?;
     Ok(rows.filter_map(|r| r.ok()).collect())
@@ -193,18 +205,22 @@ pub fn list_projects(conn: &Connection) -> Result<Vec<ProjectSummary>> {
 
 pub fn get_project(conn: &Connection, id: i64) -> Result<Project> {
     let p = conn.query_row(
-        "SELECT id, name, md_content, blueprints, media_root, created_at, updated_at
+        "SELECT id, name, md_content, blueprints, media_root, aspect_ratio, created_at, updated_at
          FROM projects WHERE id = ?1",
         params![id],
         |row| {
+            let aspect_ratio_str: Option<String> = row.get(5)?;
+            let aspect_ratio =
+                aspect_ratio_str.and_then(|s| serde_json::from_str::<AspectRatio>(&s).ok());
             Ok(Project {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 md_content: row.get(2)?,
                 blueprints_json: row.get(3)?,
                 media_root: row.get(4)?,
-                created_at: row.get(5)?,
-                updated_at: row.get(6)?,
+                aspect_ratio,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
             })
         },
     )?;
@@ -250,21 +266,38 @@ pub fn update_project_media_root(conn: &Connection, id: i64, media_root: &str) -
     Ok(())
 }
 
+pub fn update_project_aspect_ratio(
+    conn: &Connection,
+    id: i64,
+    aspect_ratio: AspectRatio,
+) -> Result<()> {
+    let ratio_json = serde_json::to_string(&aspect_ratio).map_err(|e| anyhow::anyhow!("{e}"))?;
+    conn.execute(
+        "UPDATE projects SET aspect_ratio=?1, updated_at=?2 WHERE id=?3",
+        params![ratio_json, now_ts(), id],
+    )?;
+    Ok(())
+}
+
 pub fn get_project_by_name(conn: &Connection, name: &str) -> Result<Option<Project>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, md_content, blueprints, media_root, created_at, updated_at
+        "SELECT id, name, md_content, blueprints, media_root, aspect_ratio, created_at, updated_at
          FROM projects WHERE name = ?1 LIMIT 1",
     )?;
     let mut rows = stmt.query(params![name])?;
     if let Some(row) = rows.next()? {
+        let aspect_ratio_str: Option<String> = row.get(5)?;
+        let aspect_ratio =
+            aspect_ratio_str.and_then(|s| serde_json::from_str::<AspectRatio>(&s).ok());
         Ok(Some(Project {
             id: row.get(0)?,
             name: row.get(1)?,
             md_content: row.get(2)?,
             blueprints_json: row.get(3)?,
             media_root: row.get(4)?,
-            created_at: row.get(5)?,
-            updated_at: row.get(6)?,
+            aspect_ratio,
+            created_at: row.get(6)?,
+            updated_at: row.get(7)?,
         }))
     } else {
         Ok(None)

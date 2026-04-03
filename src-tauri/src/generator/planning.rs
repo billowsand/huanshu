@@ -585,6 +585,18 @@ async fn generate_layout_plans(
         "Page plans:\n{}\n\nAssign each page the component kind that best fits its communication goal.\n\nSECTION SUMMARY PAGES (page_role=section_summary):\nThese pages introduce a section by previewing its sub-topics (key_points = list of sub-topic titles).\n- Always use section_intro for pure section-opening overview pages.\n- section_intro is a chapter-opening preview layout, not a closing summary.\n- Do NOT use any other kind for section_summary pages.\n\nCONTENT PAGES (page_role=content or unset):\n- section_intro: use only for pure section-opening overview pages that preview upcoming sub-topics. Do not use for normal content pages or closing summary pages.\n- feature_grid: 3 or more genuinely parallel items of equal weight (categories, capabilities, tools, data sources, parallel recommendations). Items must be interchangeable in order and independently meaningful. Do NOT use as a catch-all. Do NOT use when the page contrasts exactly two alternatives.\n- spotlight: page focuses on one specific tool, dataset, product, or example; object_count=single; visual_need is image_required or image_optional. Best when a single subject deserves dedicated visual treatment.\n- split_layers: page has a layered or architectural structure with a left explanation panel and a right stacked-layer diagram; argument_mode=layered or content_shape=architecture.\n- section_list: use only when the reading order is essential; strict procedures, operational steps, or warning sequences where step 1/2/3 order materially changes meaning. Do not use for parallel items.\n- focus_example: page has a central thesis or claim with supporting points on the left and a concrete example, analogy, case study, or ranking on the right. Good for concept + illustration, principle + application, or problem + evidence pages.\n- outcome_grid: page presents 2-4 parallel deliverables, results, or assets; argument_mode=summary or evidence.\n- center_grid: compact closing summary or goal statement; argument_mode=summary and density=low.\n- timeline: page presents a chronological sequence of events, milestones, or historical evolution; content_shape=timeline or argument_mode=sequential with 3-6 dated events. Use when dates or time periods are the primary organizing dimension.\n- step_flow: page presents a simple linear process with 2-4 sequential steps where each step leads directly to the next. Use when key_points count is 4 or fewer and the content does not group steps into named phases or stages.\n- process: page presents a multi-phase workflow where steps are grouped into 2-4 named phases (for example planning -> execution -> evaluation). Use when key_points count is 5 or more, or when the content explicitly mentions phases, stages, or grouped activities.\n- compare: page contrasts EXACTLY TWO options, approaches, or scenarios (for example pros/cons, before/after, baseline/alternative, option A vs option B). Use when content_shape=comparison. Do NOT use for three or more parallel items; use feature_grid instead.\n- swot: page is a four-quadrant strategic analysis with strengths, weaknesses, opportunities, and threats, or another explicit internal-vs-external plus positive-vs-negative matrix. Use when content_shape=matrix and the page naturally has four balanced factors.\n- infographic: use when the page content is best expressed as a rich data visualization, structured diagram, or visual flow chart that goes beyond what text-based components can convey. Good for: statistics/data-heavy content, flow diagrams, hierarchical relationships, radial/mind-map style content, word clouds, structured comparisons with visual elements. The LLM will generate infographic syntax text that renders as SVG. Do NOT use for: simple text lists (use section_list), basic parallel items (use feature_grid), or pure text summaries.\n\nHard constraints:\n- Use timeline only when the content is genuinely chronological with distinct time points.\n- Use section_list only if reordering the items would change the meaning.\n- Use step_flow when key_points <= 4 and no phase grouping is implied; use process when key_points >= 5 or phases are explicit.\n- Use compare ONLY when the page explicitly contrasts exactly two alternatives; three or more parallel items must use feature_grid.\n- Use swot only for an actual four-quadrant matrix; do not use it for generic 4-item lists.\n- Use infographic sparingly — at most 1-2 per deck — for pages where visual data representation adds clear value over text layouts.\n- Do not use spotlight for multi-object pages.\n- Do not use split_layers unless truly layered/architectural.\n- Do not use center_grid unless the page is a compact central statement or goal.\n- feature_grid is not appropriate for single-object showcase pages; use spotlight instead.\nReturn JSON: {{\"pages\": [...]}}",
         serde_json::to_string_pretty(page_plans).unwrap_or_default(),
     );
+
+    let aspect_ratio_hint = match config.aspect_ratio {
+        crate::types::AspectRatio::Ratio16x9 => "",
+        crate::types::AspectRatio::Ratio32x9 => {
+            "\n\nWIDE FORMAT GUIDANCE (32:9 aspect ratio):\n- feature_grid: use 6-8 columns instead of 4 columns to make use of horizontal space\n- timeline: spread events with wider horizontal spacing, events may span 1.5-2x the normal width\n- split_layers: left panel narrower (25%), right layer diagram wider (75%)\n- center_grid: use 6 columns instead of 4\n- outcome_grid: use 4-6 columns for parallel items\n- All horizontal padding and gaps should be increased by 50%"
+        }
+        crate::types::AspectRatio::Ratio48x9 => {
+            "\n\nULTRA-WIDE FORMAT GUIDANCE (48:9 aspect ratio):\n- feature_grid: use 8-12 columns to make full use of panoramic width\n- timeline: events spread across the full width, consider double-row timeline\n- split_layers: left panel very narrow (20%), right layer diagram extremely wide (80%)\n- center_grid: use 8 columns\n- outcome_grid: use 6-8 columns\n- All horizontal padding and gaps should be doubled"
+        }
+    };
+    let user = format!("{}{}", user, aspect_ratio_hint);
+
     write_debug(debug_dir, "02-layout-plan.system.txt", system)?;
     write_debug(debug_dir, "02-layout-plan.user.txt", &user)?;
     let raw = client.generate_text(&config.model, system, &user).await?;
@@ -994,6 +1006,7 @@ pub async fn assemble_slides(
     let mut slides = Vec::with_capacity(content_slides.len() + 3);
     slides.push(SlideBlueprint {
         kind: SlideKind::Cover,
+        aspect_ratio: Some(config.aspect_ratio),
         section: None,
         title: doc.title.clone(),
         subtitle: Some(format!("由 {} 分阶段生成", model)),
@@ -1029,7 +1042,7 @@ pub async fn assemble_slides(
     });
     slides.push(make_overview_slide(client, config, doc, page_plans).await);
     slides.append(&mut content_slides);
-    slides.push(make_closing_slide(model));
+    slides.push(make_closing_slide(model, config.aspect_ratio));
     slides
 }
 
@@ -1074,6 +1087,7 @@ pub async fn make_overview_slide(
 
     SlideBlueprint {
         kind: SlideKind::Overview,
+        aspect_ratio: Some(config.aspect_ratio),
         section: Some("00".to_string()),
         title: "提纲总览".to_string(),
         subtitle: None,
@@ -1109,9 +1123,10 @@ pub async fn make_overview_slide(
     }
 }
 
-pub fn make_closing_slide(model: &str) -> SlideBlueprint {
+pub fn make_closing_slide(model: &str, aspect_ratio: AspectRatio) -> SlideBlueprint {
     SlideBlueprint {
         kind: SlideKind::Closing,
+        aspect_ratio: Some(aspect_ratio),
         section: None,
         title: "感谢聆听".to_string(),
         subtitle: Some("敬请批评指正".to_string()),

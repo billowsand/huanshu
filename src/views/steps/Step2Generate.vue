@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import SlideRenderer from '../../components/SlideRenderer.vue'
-import type { SlideBlueprint } from '../../components/types'
+import type { SlideBlueprint, AspectRatio } from '../../components/types'
+import { ASPECT_DIMENSIONS } from '../../components/types'
 import type { GenerationLogEntry } from '../../stores/generation'
 
 type PagePlan = {
@@ -141,6 +142,21 @@ function extractLayoutPlanFromLog(log: GenerationLogEntry | null): LayoutPlan | 
     return null
   return detail.layout_plan as LayoutPlan
 }
+
+const slideAspectRatio = computed<AspectRatio>(() => {
+  return props.blueprints[0]?.aspect_ratio ?? 'ratio_16x9'
+})
+const slideDims = computed(() => ASPECT_DIMENSIONS[slideAspectRatio.value])
+const previewScale = computed(() => {
+  if (slideAspectRatio.value === 'ratio_48x9') return 0.067
+  if (slideAspectRatio.value === 'ratio_32x9') return 0.1
+  return 0.2
+})
+const detailPreviewScale = computed(() => {
+  if (slideAspectRatio.value === 'ratio_48x9') return 0.105
+  if (slideAspectRatio.value === 'ratio_32x9') return 0.158
+  return 0.315
+})
 
 const pagePlans = computed(() => extractArrayDetail<PagePlan>('page_plans'))
 const layoutPlans = computed(() => extractArrayDetail<LayoutPlan>('layout_plans'))
@@ -431,7 +447,7 @@ function selectedDebugText(key: string): string {
 
             <div class="spc-preview">
               <div v-if="item.blueprint" class="spc-preview-frame">
-                <div class="spc-preview-canvas">
+                <div class="spc-preview-canvas" :style="{ width: slideDims.w + 'px', height: slideDims.h + 'px', transform: `scale(${previewScale})` }">
                   <SlideRenderer :slide="item.blueprint" :slide-index="item.index" :media-map="props.mediaMap" />
                 </div>
               </div>
@@ -463,7 +479,7 @@ function selectedDebugText(key: string): string {
 
           <div class="sdp-preview-shell">
             <div v-if="selectedSlide.blueprint" class="sdp-preview-stage">
-              <div class="sdp-preview-canvas">
+              <div class="sdp-preview-canvas" :style="{ width: slideDims.w + 'px', height: slideDims.h + 'px', transform: `scale(${detailPreviewScale})` }">
                 <SlideRenderer :slide="selectedSlide.blueprint" :slide-index="selectedSlide.index" :media-map="props.mediaMap" />
               </div>
             </div>

@@ -1,5 +1,5 @@
 use crate::db::{self, Project, ProjectSummary};
-use crate::types::SlideBlueprint;
+use crate::types::{AspectRatio, SlideBlueprint};
 use crate::AppState;
 use std::fs;
 use std::path::PathBuf;
@@ -111,4 +111,26 @@ pub fn set_active_project(state: State<'_, Mutex<AppState>>, id: i64) -> Result<
     let mut st = state.lock().unwrap();
     st.active_project_id = Some(id);
     Ok(())
+}
+
+#[tauri::command]
+pub fn update_project_aspect_ratio(
+    state: State<'_, Mutex<AppState>>,
+    id: i64,
+    aspect_ratio: AspectRatio,
+) -> Result<(), String> {
+    let st = state.lock().unwrap();
+    let db = st.db.lock().unwrap();
+    db::update_project_aspect_ratio(&*db, id, aspect_ratio).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_project_aspect_ratio(
+    state: State<'_, Mutex<AppState>>,
+    id: i64,
+) -> Result<Option<AspectRatio>, String> {
+    let st = state.lock().unwrap();
+    let db = st.db.lock().unwrap();
+    let project = db::get_project(&*db, id).map_err(|e| e.to_string())?;
+    Ok(project.aspect_ratio)
 }

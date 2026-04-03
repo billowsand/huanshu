@@ -5,3 +5,4 @@ target
 dist-studio/
 dist-viewer/
 src-tauri/target/
+example

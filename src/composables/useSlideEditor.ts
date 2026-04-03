@@ -1,5 +1,6 @@
 import { ref, computed, watch, nextTick } from 'vue'
-import type { SlideBlueprint, SlideKind } from '../components/types'
+import type { SlideBlueprint, SlideKind, AspectRatio } from '../components/types'
+import { ASPECT_DIMENSIONS } from '../components/types'
 import { useProjectsStore } from '../stores/projects'
 import { useGenerationStore } from '../stores/generation'
 
@@ -463,7 +464,12 @@ export function useSlideEditor(options: {
     if (!previewArea.value) return
     const w = previewArea.value.clientWidth - 32
     const h = previewArea.value.clientHeight - 32
-    if (w > 0 && h > 0) previewScale.value = Math.min(w / 1280, h / 720)
+    if (w > 0 && h > 0) {
+      const bp = editorPreviewSlide.value
+      const ratio = bp?.aspect_ratio ?? 'ratio_16x9'
+      const dims = ASPECT_DIMENSIONS[ratio]
+      previewScale.value = Math.min(w / dims.w, h / dims.h)
+    }
   }
 
   watch(previewArea, (el) => {
@@ -591,8 +597,13 @@ export function useSlideEditor(options: {
   const editorPreviewSlide = computed(() =>
     liveSlide.value ?? (options.blueprints()[options.activeSlide()] as unknown as SlideBlueprint ?? null)
   )
-  const editorStageW = computed(() => Math.round(1280 * previewScale.value))
-  const editorStageH = computed(() => Math.round(720 * previewScale.value))
+  const currentSlideDims = computed(() => {
+    const bp = editorPreviewSlide.value
+    const ratio = bp?.aspect_ratio ?? 'ratio_16x9'
+    return ASPECT_DIMENSIONS[ratio]
+  })
+  const editorStageW = computed(() => Math.round(currentSlideDims.value.w * previewScale.value))
+  const editorStageH = computed(() => Math.round(currentSlideDims.value.h * previewScale.value))
 
   return {
     jsonText,
@@ -609,6 +620,7 @@ export function useSlideEditor(options: {
     editorPreviewSlide,
     editorStageW,
     editorStageH,
+    currentSlideDims,
     replaceEditorDraft,
     onEditorJsonInput,
     onEditorJsonKeydown,

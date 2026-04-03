@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import SlideRenderer from '../components/SlideRenderer.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
-import type { SlideBlueprint } from '../components/types'
+import type { SlideBlueprint, AspectRatio } from '../components/types'
+import { ASPECT_DIMENSIONS } from '../components/types'
 
 const props = defineProps<{
   blueprints: SlideBlueprint[]
@@ -14,17 +16,36 @@ const emit = defineEmits<{
   'exit': []
 }>()
 
-const SLIDE_W = 1280
-const SLIDE_H = 720
-
+const appWindow = getCurrentWindow()
 const presenting = ref(true)
 const presentSlide = ref(0)
 const showShortcuts = ref(false)
 const isFullscreen = ref(false)
 const showOverview = ref(false)
-const presSlideScale = ref(1)
 const presOverlayRef = ref<HTMLElement | null>(null)
+const viewportWidth = ref(window.innerWidth)
+const viewportHeight = ref(window.innerHeight)
 let shortcutTimer: ReturnType<typeof setTimeout> | null = null
+let resizeObserver: ResizeObserver | null = null
+
+
+const currentAspectRatio = computed<AspectRatio>(() => {
+  return props.blueprints[presentSlide.value]?.aspect_ratio ?? 'ratio_16x9'
+})
+
+const slideDimensions = computed(() => {
+  return ASPECT_DIMENSIONS[currentAspectRatio.value]
+})
+
+const uniformScale = computed(() => {
+  const padH = isFullscreen.value ? 0 : 96
+  const padV = isFullscreen.value ? 0 : 88
+  const vw = Math.max(viewportWidth.value - padH, 1)
+  const vh = Math.max(viewportHeight.value - padV, 1)
+  const sx = vw / slideDimensions.value.w
+  const sy = vh / slideDimensions.value.h
+  return Math.min(sx, sy)
+})
 
 watch(
   () => props.initialSlide,
@@ -36,30 +57,39 @@ watch(
   { immediate: true },
 )
 
-function calcPresScale() {
-  const isFS = !!document.fullscreenElement
-  const padH = isFS ? 0 : 96
-  const padV = isFS ? 0 : 88
-  const vw = window.innerWidth  - padH
-  const vh = window.innerHeight - padV
-  presSlideScale.value = Math.min(vw / SLIDE_W, vh / SLIDE_H)
+function updateViewport() {
+  const el = presOverlayRef.value
+  if (el) {
+    viewportWidth.value = Math.round(el.clientWidth || window.innerWidth)
+    viewportHeight.value = Math.round(el.clientHeight || window.innerHeight)
+    return
+  }
+  viewportWidth.value = window.innerWidth
+  viewportHeight.value = window.innerHeight
 }
 
-watchEffect(() => {
-  calcPresScale()
-})
+async function enterWindowFullscreen() {
+  // Window-level fullscreen removed — using DOM fullscreen only
+}
+
+async function exitWindowFullscreen() {
+  // Window-level fullscreen removed
+}
 
 async function toggleFullscreen() {
-  if (!document.fullscreenElement) {
+  if (!isFullscreen.value) {
     await presOverlayRef.value?.requestFullscreen().catch(() => {})
+    isFullscreen.value = true
   } else {
     await document.exitFullscreen().catch(() => {})
+    isFullscreen.value = false
   }
+  updateViewport()
 }
 
-function onFullscreenChange() {
+async function onFullscreenChange() {
   isFullscreen.value = !!document.fullscreenElement
-  calcPresScale()
+  updateViewport()
 }
 
 function presNext() {
@@ -127,6 +157,7 @@ function handlePresKey(e: KeyboardEvent) {
 }
 
 onMounted(async () => {
+  updateViewport()
   showShortcuts.value = true
   if (shortcutTimer) clearTimeout(shortcutTimer)
   shortcutTimer = setTimeout(() => { showShortcuts.value = false }, 3000)
@@ -134,15 +165,24 @@ onMounted(async () => {
   try {
     await presOverlayRef.value?.requestFullscreen()
   } catch { /* user may deny — gracefully continue windowed */ }
+  isFullscreen.value = !!document.fullscreenElement
+  if (presOverlayRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      updateViewport()
+    })
+    resizeObserver.observe(presOverlayRef.value)
+  }
   window.addEventListener('keydown', handlePresKey)
-  window.addEventListener('resize', calcPresScale)
+  window.addEventListener('resize', updateViewport)
   document.addEventListener('fullscreenchange', onFullscreenChange)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handlePresKey)
-  window.removeEventListener('resize', calcPresScale)
+  window.removeEventListener('resize', updateViewport)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
+  resizeObserver?.disconnect()
+  resizeObserver = null
   if (shortcutTimer) clearTimeout(shortcutTimer)
 })
 </script>
@@ -168,13 +208,18 @@ onBeforeUnmount(() => {
       <div
         class="pres-slide-wrapper"
         :style="{
-          width:  `${SLIDE_W * presSlideScale}px`,
-          height: `${SLIDE_H * presSlideScale}px`,
+          width:  `${slideDimensions.w * uniformScale}px`,
+          height: `${slideDimensions.h * uniformScale}px`,
         }"
       >
         <div
           class="pres-slide"
-          :style="{ transform: `scale(${presSlideScale})`, transformOrigin: 'top left' }"
+          :style="{
+            width: `${slideDimensions.w}px`,
+            height: `${slideDimensions.h}px`,
+            transform: `scale(${uniformScale})`,
+            transformOrigin: 'top left',
+          }"
         >
           <SlideRenderer v-if="blueprints[presentSlide]" :slide="(blueprints[presentSlide] as unknown as SlideBlueprint)" :slide-index="presentSlide" :media-map="mediaMap" />
         </div>

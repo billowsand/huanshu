@@ -12,6 +12,7 @@ const props = defineProps<{
     mdFilename: string
     projectName: string
     granularity: 'auto' | 'h2' | 'h3'
+    aspectRatio: 'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9'
   }
   detectedGranularity: 'h2' | 'h3'
   canGenerate: boolean
@@ -55,11 +56,21 @@ const granularity = computed({
   get: () => props.modelValue.granularity,
   set: (v) => setStepModel({ granularity: v }),
 })
+const aspectRatio = computed({
+  get: () => props.modelValue.aspectRatio,
+  set: (v) => setStepModel({ aspectRatio: v }),
+})
 
 const GRANULARITY_LABELS: Record<string, string> = {
   h2: '按二级标题',
   h3: '按三级标题',
 }
+
+const ASPECT_RATIO_OPTIONS: { value: 'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9', label: string, desc: string }[] = [
+  { value: 'ratio_16x9', label: '16:9', desc: '标准宽屏' },
+  { value: 'ratio_32x9', label: '32:9', desc: '超宽屏幕' },
+  { value: 'ratio_48x9', label: '48:9', desc: '全景屏幕' },
+]
 
 const MEDIA_EXTS_IMG = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']
 const MEDIA_EXTS_VID = ['mp4', 'webm', 'mov']
@@ -517,6 +528,28 @@ async function optimizeMarkdown() {
           </div>
           <div class="sidebar-note">
             二级标题 {{ h2Count }} 个，三级标题 {{ h3Count }} 个
+          </div>
+        </div>
+
+        <!-- Aspect Ratio card -->
+        <div class="sidebar-card">
+          <div class="sidebar-card-hd">
+            <span class="field-label">幻灯片比例</span>
+          </div>
+          <div class="aspect-ratio-stack">
+            <button
+              v-for="opt in ASPECT_RATIO_OPTIONS"
+              :key="opt.value"
+              class="aspect-ratio-choice"
+              :class="{ active: aspectRatio === opt.value }"
+              @click="aspectRatio = opt.value"
+            >
+              <div class="aspect-ratio-label">{{ opt.label }}</div>
+              <div class="aspect-ratio-desc">{{ opt.desc }}</div>
+            </button>
+          </div>
+          <div class="sidebar-note">
+            32:9 / 48:9 在 16:9 屏幕上播放时会横向压缩
           </div>
         </div>
 
