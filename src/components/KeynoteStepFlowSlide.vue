@@ -50,8 +50,9 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
           v-for="(step, idx) in steps"
           :key="step.title"
           flex flex-col items-center
+          class="sf-step-animated"
           style="position: relative; z-index: 2; padding: 0 0.5rem"
-          :style="{ width: stepWidth }"
+          :style="{ width: stepWidth, animationDelay: `${idx * 90 + 100}ms` }"
         >
           <div
             class="sf-hnode"
@@ -165,6 +166,24 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
 </template>
 
 <style scoped>
+/* Horizontal step entrance */
+.sf-step-animated {
+  opacity: 0;
+  animation: sf-step-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes sf-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* Horizontal node */
 .sf-hnode {
   position: relative;

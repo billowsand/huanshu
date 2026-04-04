@@ -178,11 +178,21 @@ pub fn audit_layout_plans(page_plans: &[PagePlan], layouts: &[LayoutPlan]) -> Ve
             }
             SlideKind::IssueStack => {
                 let title = page.page_title.as_str();
+                let excerpt = page.source_excerpt.as_deref().unwrap_or("");
                 let looks_like_problem_page = title.contains("问题")
                     || title.contains("挑战")
                     || title.contains("难点")
                     || title.contains("障碍")
-                    || title.contains("风险");
+                    || title.contains("风险")
+                    || title.contains("痛点")
+                    || title.contains("缺陷")
+                    || title.contains("不足")
+                    || argument_mode == "warning"
+                    || argument_mode == "causal"
+                    || excerpt.contains("问题")
+                    || excerpt.contains("挑战")
+                    || excerpt.contains("风险")
+                    || excerpt.contains("痛点");
                 if !looks_like_problem_page || !(2..=4).contains(&key_count) {
                     issues.push(format!(
                         "page {} uses issue_stack but does not look like a 2-4 item challenge/problem page",

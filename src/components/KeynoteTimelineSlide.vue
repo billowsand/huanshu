@@ -180,6 +180,13 @@ defineProps<{
     transparent
   );
   opacity: 0.5;
+  transform-origin: left center;
+  animation: axis-draw 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes axis-draw {
+  from { transform: scaleX(0); opacity: 0; }
+  to   { transform: scaleX(1); opacity: 0.5; }
 }
 
 .tl-events {

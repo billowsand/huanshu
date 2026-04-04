@@ -27,6 +27,15 @@ const viewportHeight = ref(window.innerHeight)
 let shortcutTimer: ReturnType<typeof setTimeout> | null = null
 let resizeObserver: ResizeObserver | null = null
 
+// Slide transition direction
+const transitionDirection = ref<'forward' | 'backward' | 'jump'>('forward')
+const slideTransitionName = computed(() => `slide-${transitionDirection.value}`)
+
+// Touch handling
+let touchStartX = 0
+let touchStartY = 0
+let didSwipe = false
+
 
 const currentAspectRatio = computed<AspectRatio>(() => {
   return props.blueprints[presentSlide.value]?.aspect_ratio ?? 'ratio_16x9'
@@ -124,11 +133,17 @@ async function onFullscreenChange() {
 }
 
 function presNext() {
-  if (presentSlide.value < props.blueprints.length - 1) presentSlide.value++
+  if (presentSlide.value < props.blueprints.length - 1) {
+    transitionDirection.value = 'forward'
+    presentSlide.value++
+  }
 }
 
 function presPrev() {
-  if (presentSlide.value > 0) presentSlide.value--
+  if (presentSlide.value > 0) {
+    transitionDirection.value = 'backward'
+    presentSlide.value--
+  }
 }
 
 function toggleOverview() {
@@ -140,8 +155,31 @@ function toggleStretchMode() {
 }
 
 function selectSlide(idx: number) {
+  transitionDirection.value = 'jump'
   presentSlide.value = idx
   showOverview.value = false
+}
+
+function handleStageClick() {
+  if (showOverview.value) return
+  if (didSwipe) { didSwipe = false; return }
+  presNext()
+}
+
+function handleTouchStart(e: TouchEvent) {
+  touchStartX = e.touches[0].clientX
+  touchStartY = e.touches[0].clientY
+  didSwipe = false
+}
+
+function handleTouchEnd(e: TouchEvent) {
+  const dx = e.changedTouches[0].clientX - touchStartX
+  const dy = e.changedTouches[0].clientY - touchStartY
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+    didSwipe = true
+    if (dx < 0) presNext()
+    else presPrev()
+  }
 }
 
 async function exitPresentation() {
@@ -187,9 +225,11 @@ function handlePresKey(e: KeyboardEvent) {
       if (!showOverview.value) toggleStretchMode()
       break
     case 'Home':
+      transitionDirection.value = 'jump'
       presentSlide.value = 0
       break
     case 'End':
+      transitionDirection.value = 'jump'
       presentSlide.value = props.blueprints.length - 1
       break
   }
@@ -243,26 +283,30 @@ onBeforeUnmount(() => {
     <div v-if="!showOverview" class="pres-nav pres-prev" @click="presPrev"><span class="i-carbon:chevron-left" /></div>
     <div v-if="!showOverview" class="pres-nav pres-next" @click="presNext"><span class="i-carbon:chevron-right" /></div>
 
-    <!-- Slide stage: click to advance -->
-    <div v-if="!showOverview" class="pres-stage" @click="presNext">
+    <!-- Slide stage: click/swipe to advance -->
+    <div v-if="!showOverview" class="pres-stage" @click="handleStageClick" @touchstart="handleTouchStart" @touchend="handleTouchEnd">
       <div
-        class="pres-slide-wrapper"
+        class="pres-transition-container"
         :style="{
           width: `${stageSize.width}px`,
           height: `${stageSize.height}px`,
         }"
       >
-        <div
-          class="pres-slide"
-          :style="{
-            width: `${slideDimensions.w}px`,
-            height: `${slideDimensions.h}px`,
-            transform: slideTransform,
-            transformOrigin: 'top left',
-          }"
-        >
-          <SlideRenderer v-if="blueprints[presentSlide]" :slide="(blueprints[presentSlide] as unknown as SlideBlueprint)" :slide-index="presentSlide" :media-map="mediaMap" />
-        </div>
+        <Transition :name="slideTransitionName">
+          <div :key="presentSlide" class="pres-slide-wrapper">
+            <div
+              class="pres-slide"
+              :style="{
+                width: `${slideDimensions.w}px`,
+                height: `${slideDimensions.h}px`,
+                transform: slideTransform,
+                transformOrigin: 'top left',
+              }"
+            >
+              <SlideRenderer v-if="blueprints[presentSlide]" :slide="(blueprints[presentSlide] as unknown as SlideBlueprint)" :slide-index="presentSlide" :media-map="mediaMap" />
+            </div>
+          </div>
+        </Transition>
       </div>
     </div>
 
@@ -294,7 +338,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- Bottom controls bar -->
-    <div class="pres-controls" @click.stop>
+    <div class="pres-controls" :class="{ 'pres-controls--floating': isFullscreen }" @click.stop>
       <!-- Filmstrip -->
       <div class="pres-filmstrip">
         <div
@@ -303,7 +347,7 @@ onBeforeUnmount(() => {
           class="filmstrip-item"
           :class="{ active: idx === presentSlide }"
           :title="`${idx + 1}. ${bp.title}`"
-          @click="presentSlide = idx"
+          @click="selectSlide(idx)"
         >
           <span class="filmstrip-num">{{ idx + 1 }}</span>
         </div>

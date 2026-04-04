@@ -1,5 +1,5 @@
 use crate::icon::IconIndex;
-use crate::types::{SlideBlueprint, SlideKind};
+use crate::types::{AspectRatio, SlideBlueprint, SlideKind};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
@@ -15,6 +15,14 @@ pub fn validate_blueprints(
 ) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
     for (idx, slide) in blueprints.iter().enumerate() {
+        // Scale card/item count limits by aspect ratio so wide-format slides can
+        // hold more columns (8 for 32:9, 12 for 48:9) without failing validation.
+        let cols_multiplier: usize = match slide.aspect_ratio {
+            Some(AspectRatio::Ratio32x9) => 2,
+            Some(AspectRatio::Ratio48x9) => 3,
+            _ => 1,
+        };
+
         if slide.title.trim().is_empty() {
             issues.push(issue(idx, "title is empty"));
         }
@@ -127,17 +135,26 @@ pub fn validate_blueprints(
         if slide.kind == SlideKind::SectionList && slide.list_items.is_empty() {
             issues.push(issue(idx, "section list requires list_items"));
         }
-        if slide.kind == SlideKind::FeatureGrid && slide.cards.len() > 4 {
+        if slide.kind == SlideKind::FeatureGrid && slide.cards.len() > 4 * cols_multiplier {
             issues.push(issue(
                 idx,
-                "feature grid supports at most 4 cards for this theme",
+                format!(
+                    "feature grid supports at most {} cards for this aspect ratio",
+                    4 * cols_multiplier
+                ),
             ));
         }
         if slide.kind == SlideKind::IssueStack && slide.cards.len() > 4 {
             issues.push(issue(idx, "issue stack supports at most 4 cards"));
         }
-        if slide.kind == SlideKind::SectionIntro && slide.cards.len() > 4 {
-            issues.push(issue(idx, "section intro supports at most 4 cards"));
+        if slide.kind == SlideKind::SectionIntro && slide.cards.len() > 4 * cols_multiplier {
+            issues.push(issue(
+                idx,
+                format!(
+                    "section intro supports at most {} cards for this aspect ratio",
+                    4 * cols_multiplier
+                ),
+            ));
         }
         if slide.kind == SlideKind::SectionList && slide.list_items.len() > 4 {
             issues.push(issue(
@@ -145,8 +162,14 @@ pub fn validate_blueprints(
                 "section list supports at most 4 items for readability",
             ));
         }
-        if slide.kind == SlideKind::CenterGrid && slide.center_items.len() > 4 {
-            issues.push(issue(idx, "center grid supports at most 4 items"));
+        if slide.kind == SlideKind::CenterGrid && slide.center_items.len() > 4 * cols_multiplier {
+            issues.push(issue(
+                idx,
+                format!(
+                    "center grid supports at most {} items for this aspect ratio",
+                    4 * cols_multiplier
+                ),
+            ));
         }
         if slide.kind == SlideKind::CenterGrid && slide.center_items.is_empty() {
             issues.push(issue(idx, "center grid requires center_items"));

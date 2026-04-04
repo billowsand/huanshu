@@ -2824,13 +2824,79 @@ kbd {
   color: var(--studio-text);
 }
 
-.pres-slide-wrapper {
+/* Transition container — frames the slide, clips the directional slide transitions */
+.pres-transition-container {
   position: relative;
-  border-radius: 20px;
   overflow: hidden;
+  border-radius: 20px;
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--studio-border-hover) 85%, transparent),
     0 26px 80px color-mix(in srgb, var(--studio-bg) 42%, transparent);
+}
+
+.pres-slide-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ─── Slide page transitions ─── */
+
+/* Shared active state: stack absolutely, GPU-accelerated */
+.slide-forward-enter-active,
+.slide-forward-leave-active,
+.slide-backward-enter-active,
+.slide-backward-leave-active {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.48s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              opacity 0.48s ease;
+  will-change: transform, opacity;
+}
+.slide-jump-enter-active,
+.slide-jump-leave-active {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              opacity 0.35s ease;
+  will-change: transform, opacity;
+}
+
+/* Forward: new slide slides in from the right */
+.slide-forward-enter-from {
+  transform: translateX(100%);
+  opacity: 0.9;
+}
+.slide-forward-enter-to  { transform: translateX(0); opacity: 1; }
+.slide-forward-leave-from { transform: translateX(0); opacity: 1; }
+.slide-forward-leave-to  {
+  transform: translateX(-22%);
+  opacity: 0;
+}
+
+/* Backward: new slide slides in from the left */
+.slide-backward-enter-from {
+  transform: translateX(-100%);
+  opacity: 0.9;
+}
+.slide-backward-enter-to  { transform: translateX(0); opacity: 1; }
+.slide-backward-leave-from { transform: translateX(0); opacity: 1; }
+.slide-backward-leave-to  {
+  transform: translateX(22%);
+  opacity: 0;
+}
+
+/* Jump (filmstrip / overview): fade + subtle zoom */
+.slide-jump-enter-from {
+  opacity: 0;
+  transform: scale(0.97);
+}
+.slide-jump-enter-to  { opacity: 1; transform: scale(1); }
+.slide-jump-leave-from { opacity: 1; transform: scale(1); }
+.slide-jump-leave-to  {
+  opacity: 0;
+  transform: scale(1.02);
 }
 
 .pres-slide {
@@ -2916,6 +2982,28 @@ kbd {
   height: 100%;
   background: var(--studio-primary);
   transition: width 0.2s ease;
+}
+
+/* ─── Fullscreen floating controls ─── */
+/* Controls float as a semi-transparent overlay at the bottom, hidden until hovered */
+.pres-controls--floating {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: color-mix(in srgb, var(--studio-bg) 72%, transparent) !important;
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border-top: 1px solid color-mix(in srgb, var(--studio-border) 45%, transparent) !important;
+  box-shadow: 0 -8px 32px color-mix(in srgb, var(--studio-bg) 30%, transparent) !important;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease !important;
+  z-index: 30;
+}
+.pres-controls--floating:hover {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .pres-theme-toggle {

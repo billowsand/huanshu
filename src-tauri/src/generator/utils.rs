@@ -866,7 +866,7 @@ fn normalize_timeline_slide(slide: &mut Map<String, Value>) {
             slide.insert("timeline_events".to_string(), events);
         }
     }
-    let tones = ["amber", "blue", "green", "red", "teal", "indigo"];
+    let tones = ["amber", "blue", "green", "red", "amber", "blue"];
     if let Some(events) = slide
         .get_mut("timeline_events")
         .and_then(Value::as_array_mut)

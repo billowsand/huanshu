@@ -44,10 +44,11 @@ defineProps<{
       :style="{ gridTemplateColumns: `repeat(${phases.length}, minmax(0, 1fr))` }"
     >
       <div
-        v-for="phase in phases"
+        v-for="(phase, phaseIdx) in phases"
         :key="phase.phase"
-        class="phase-col"
+        class="phase-col phase-col-animated"
         flex flex-col
+        :style="{ animationDelay: `${phaseIdx * 80 + 100}ms` }"
       >
         <GlassCard
           padding="px-4 py-3"
@@ -199,6 +200,23 @@ defineProps<{
 .phase-col {
   min-width: 0;
   gap: 0.75rem;
+}
+
+.phase-col-animated {
+  opacity: 0;
+  animation: phase-col-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes phase-col-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .phase-head {

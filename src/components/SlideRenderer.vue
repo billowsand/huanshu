@@ -381,6 +381,7 @@ const slideProps = computed(() => {
   height: var(--ambient-primary-height);
   background: color-mix(in srgb, var(--primary) 16%, transparent);
   opacity: var(--ambient-primary-opacity);
+  animation: ambient-drift-a 14s ease-in-out infinite alternate;
 }
 
 .slide-shell__ambient--right {
@@ -392,6 +393,7 @@ const slideProps = computed(() => {
   height: var(--ambient-secondary-height);
   background: color-mix(in srgb, var(--info) 14%, transparent);
   opacity: var(--ambient-secondary-opacity);
+  animation: ambient-drift-b 18s ease-in-out infinite alternate;
 }
 
 .slide-shell__ambient--bottom {
@@ -403,6 +405,20 @@ const slideProps = computed(() => {
   height: var(--ambient-tertiary-height);
   background: color-mix(in srgb, var(--primary-light) 12%, transparent);
   opacity: var(--ambient-tertiary-opacity);
+  animation: ambient-drift-c 22s ease-in-out infinite alternate;
+}
+
+@keyframes ambient-drift-a {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(22px, -18px) scale(1.1); }
+}
+@keyframes ambient-drift-b {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-20px, 14px) scale(0.92); }
+}
+@keyframes ambient-drift-c {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(16px, -12px) scale(1.06); }
 }
 
 .slide-shell__frame {
