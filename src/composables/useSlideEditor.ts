@@ -43,7 +43,7 @@ export const KIND_FIELDS: Record<SlideKind, string[]> = {
   center_grid:  ['kind', 'badge', 'title', 'accent', 'center_items', 'footer'],
   timeline:     ['kind', 'section', 'title', 'subtitle', 'timeline_events', 'footer'],
   step_flow:    ['kind', 'section', 'title', 'subtitle', 'direction', 'steps', 'footer'],
-  process:      ['kind', 'section', 'title', 'subtitle', 'phases', 'footer'],
+  process:      ['kind', 'section', 'title', 'subtitle', 'summary', 'phases', 'footer'],
   compare:      ['kind', 'section', 'title', 'subtitle', 'compare_data', 'footer'],
   issue_stack:  ['kind', 'section', 'title', 'subtitle', 'cards', 'footer'],
   swot:         ['kind', 'section', 'title', 'subtitle', 'swot_data'],
@@ -383,7 +383,7 @@ export const KIND_DEFAULTS: Record<SlideKind, Partial<SlideBlueprint>> = {
 
 const SHARED_TEMPLATE_FIELDS: (keyof SlideBlueprint)[] = [
   'section', 'title', 'subtitle', 'badge', 'accent', 'note', 'label', 'label_tone',
-  'image', 'images', 'placeholder', 'side_width', 'badges', 'footer',
+  'image', 'images', 'placeholder', 'side_width', 'badges', 'footer', 'aspect_ratio',
 ]
 
 export function useSlideEditor(options: {

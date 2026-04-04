@@ -86,35 +86,34 @@ defineProps<{
             <span>关键动作</span>
             <span>{{ phase.steps.length.toString().padStart(2, '0') }}</span>
           </div>
-
           <div class="phase-steps" flex-1 flex flex-col>
-          <div
-            v-for="(step, sIdx) in phase.steps"
-            :key="step.label"
-            class="step-row"
-          >
             <div
-              class="step-dot"
-              flex-shrink-0
-              :style="{
-                background: `linear-gradient(180deg, color-mix(in srgb, ${toneVars(phase.tone).solid} 84%, var(--bg)), color-mix(in srgb, ${toneVars(phase.tone).solid} 58%, var(--bg)))`,
-                borderColor: toneVars(phase.tone).border,
-                color: toneVars(phase.tone).contrast,
-              }"
-            >{{ sIdx + 1 }}</div>
-            <div class="step-copy" flex-1>
-              <div class="step-label">{{ step.label }}</div>
-              <div v-if="step.desc" class="step-desc">
-                {{ step.desc }}
+              v-for="(step, sIdx) in phase.steps"
+              :key="step.label"
+              class="step-row"
+            >
+              <div
+                class="step-dot"
+                flex-shrink-0
+                :style="{
+                  background: `linear-gradient(180deg, color-mix(in srgb, ${toneVars(phase.tone).solid} 84%, var(--bg)), color-mix(in srgb, ${toneVars(phase.tone).solid} 58%, var(--bg)))`,
+                  borderColor: toneVars(phase.tone).border,
+                  color: toneVars(phase.tone).contrast,
+                }"
+              >{{ sIdx + 1 }}</div>
+              <div class="step-copy" flex-1>
+                <div class="step-label">{{ step.label }}</div>
+                <div v-if="step.desc" class="step-desc">
+                  {{ step.desc }}
+                </div>
               </div>
-            </div>
 
-            <div
-              v-if="sIdx < phase.steps.length - 1"
-              class="step-conn"
-              :style="{ background: toneVars(phase.tone).solid }"
-            />
-          </div>
+              <div
+                v-if="sIdx < phase.steps.length - 1"
+                class="step-conn"
+                :style="{ background: toneVars(phase.tone).solid }"
+              />
+            </div>
           </div>
         </div>
 

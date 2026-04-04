@@ -185,6 +185,7 @@ defineProps<{
 .tl-events {
   min-height: 320px;
   align-items: stretch;
+  width: 100%;
 }
 
 .tl-col {

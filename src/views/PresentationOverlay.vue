@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import SlideRenderer from '../components/SlideRenderer.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import type { SlideBlueprint, AspectRatio } from '../components/types'
@@ -16,12 +15,12 @@ const emit = defineEmits<{
   'exit': []
 }>()
 
-const appWindow = getCurrentWindow()
 const presenting = ref(true)
 const presentSlide = ref(0)
 const showShortcuts = ref(false)
 const isFullscreen = ref(false)
 const showOverview = ref(false)
+const stretchToFill = ref(true)
 const presOverlayRef = ref<HTMLElement | null>(null)
 const viewportWidth = ref(window.innerWidth)
 const viewportHeight = ref(window.innerHeight)
@@ -37,14 +36,46 @@ const slideDimensions = computed(() => {
   return ASPECT_DIMENSIONS[currentAspectRatio.value]
 })
 
-const uniformScale = computed(() => {
+const stretchedViewport = computed(() => {
   const padH = isFullscreen.value ? 0 : 96
   const padV = isFullscreen.value ? 0 : 88
-  const vw = Math.max(viewportWidth.value - padH, 1)
-  const vh = Math.max(viewportHeight.value - padV, 1)
-  const sx = vw / slideDimensions.value.w
-  const sy = vh / slideDimensions.value.h
-  return Math.min(sx, sy)
+  return {
+    width: Math.max(viewportWidth.value - padH, 1),
+    height: Math.max(viewportHeight.value - padV, 1),
+  }
+})
+
+const stretchScale = computed(() => {
+  return {
+    scaleX: stretchedViewport.value.width / slideDimensions.value.w,
+    scaleY: stretchedViewport.value.height / slideDimensions.value.h,
+  }
+})
+
+const uniformScale = computed(() => {
+  return Math.min(stretchScale.value.scaleX, stretchScale.value.scaleY)
+})
+
+const stageSize = computed(() => {
+  if (stretchToFill.value) {
+    return {
+      width: stretchedViewport.value.width,
+      height: stretchedViewport.value.height,
+    }
+  }
+
+  return {
+    width: slideDimensions.value.w * uniformScale.value,
+    height: slideDimensions.value.h * uniformScale.value,
+  }
+})
+
+const slideTransform = computed(() => {
+  if (stretchToFill.value) {
+    return `scale(${stretchScale.value.scaleX}, ${stretchScale.value.scaleY})`
+  }
+
+  return `scale(${uniformScale.value})`
 })
 
 watch(
@@ -104,6 +135,10 @@ function toggleOverview() {
   showOverview.value = !showOverview.value
 }
 
+function toggleStretchMode() {
+  stretchToFill.value = !stretchToFill.value
+}
+
 function selectSlide(idx: number) {
   presentSlide.value = idx
   showOverview.value = false
@@ -146,6 +181,10 @@ function handlePresKey(e: KeyboardEvent) {
     case 'f':
     case 'F':
       toggleFullscreen()
+      break
+    case 's':
+    case 'S':
+      if (!showOverview.value) toggleStretchMode()
       break
     case 'Home':
       presentSlide.value = 0
@@ -195,6 +234,7 @@ onBeforeUnmount(() => {
         <div class="shortcut-item"><kbd>←</kbd><kbd>→</kbd> 翻页</div>
         <div class="shortcut-item"><kbd>O</kbd> 全览</div>
         <div class="shortcut-item"><kbd>F</kbd> 全屏</div>
+        <div class="shortcut-item"><kbd>S</kbd> 拉伸</div>
         <div class="shortcut-item"><kbd>Esc</kbd> 退出</div>
       </div>
     </Transition>
@@ -208,8 +248,8 @@ onBeforeUnmount(() => {
       <div
         class="pres-slide-wrapper"
         :style="{
-          width:  `${slideDimensions.w * uniformScale}px`,
-          height: `${slideDimensions.h * uniformScale}px`,
+          width: `${stageSize.width}px`,
+          height: `${stageSize.height}px`,
         }"
       >
         <div
@@ -217,7 +257,7 @@ onBeforeUnmount(() => {
           :style="{
             width: `${slideDimensions.w}px`,
             height: `${slideDimensions.h}px`,
-            transform: `scale(${uniformScale})`,
+            transform: slideTransform,
             transformOrigin: 'top left',
           }"
         >
@@ -286,6 +326,10 @@ onBeforeUnmount(() => {
 
         <button class="btn pres-ctrl-btn" :title="showOverview ? '关闭全览 (O)' : '打开全览 (O)'" @click="toggleOverview">
           <span class="i-carbon:app-switcher" />
+        </button>
+
+        <button class="btn pres-ctrl-btn" :title="stretchToFill ? '切换为等比显示 (S)' : '切换为拉伸铺满 (S)'" @click="toggleStretchMode">
+          <span :class="stretchToFill ? 'i-carbon:fit-to-screen' : 'i-carbon:crop'" />
         </button>
 
         <button class="btn pres-ctrl-btn" :title="isFullscreen ? '退出全屏' : '全屏'" @click="toggleFullscreen">

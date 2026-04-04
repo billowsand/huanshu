@@ -35,8 +35,6 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
     <!-- ─── Horizontal Flow ─── -->
     <div v-if="!isVertical" flex-1 flex flex-col justify-center>
       <div relative flex justify-around items-start>
-
-        <!-- Ambient track line (always visible) -->
         <div
           absolute rounded-full
           :style="{
@@ -48,7 +46,6 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
             opacity: 0.45,
           }"
         />
-
         <div
           v-for="(step, idx) in steps"
           :key="step.title"
@@ -56,7 +53,6 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
           style="position: relative; z-index: 2; padding: 0 0.5rem"
           :style="{ width: stepWidth }"
         >
-          <!-- Circular icon node -->
           <div
             class="sf-hnode"
             :style="{
@@ -70,14 +66,11 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
               class="slide-icon-xl"
               :style="{ color: toneVars(step.tone || 'blue').text }"
             />
-            <!-- Step number badge -->
             <span
               class="sf-num"
               :style="{ background: toneVars(step.tone || 'blue').solid }"
             >{{ idx + 1 }}</span>
           </div>
-
-          <!-- Content card -->
           <GlassCard
             padding="px-3 py-2"
             class="sf-hcard mt-4"

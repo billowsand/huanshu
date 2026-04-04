@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import SlideRenderer from '../../components/SlideRenderer.vue'
 import type { SlideBlueprint, AspectRatio } from '../../components/types'
 import { ASPECT_DIMENSIONS } from '../../components/types'
@@ -88,15 +88,25 @@ const KIND_LABELS: Record<string, string> = {
   swot: 'SWOT',
 }
 
-const PIPELINE_NODE_STAGES = [
-  { key: 'init', label: '初始化' },
-  { key: 'page_plan', label: '规划页面' },
-  { key: 'generating', label: '并发生成' },
+type PageStageKey = 'pending' | 'planning' | 'layout' | 'content' | 'normalizing' | 'validating' | 'done' | 'error'
+
+const PAGE_STAGE_META: Array<{ key: PageStageKey, label: string }> = [
+  { key: 'planning', label: '页面规划' },
+  { key: 'layout', label: '布局排版' },
+  { key: 'content', label: '内容生成' },
+  { key: 'normalizing', label: '规范修复' },
+  { key: 'validating', label: '校验修复' },
 ]
 
-const PIPELINE_STAGE_ORDER = ['start', 'init', 'page_plan', 'generating', 'assembling', 'done']
-
-const PAGE_PIPELINE_STAGES = ['planning', 'layout', 'content', 'normalizing', 'validating', 'done']
+const PAGE_STAGE_PROGRESS_ORDER: PageStageKey[] = [
+  'pending',
+  'planning',
+  'layout',
+  'content',
+  'normalizing',
+  'validating',
+  'done',
+]
 
 function detailText(value: unknown): string {
   if (value === null || value === undefined)
@@ -175,33 +185,6 @@ const importantLogCount = computed(() => props.logs.filter(log => log.important)
 const promptLogCount = computed(() => props.logs.filter(log => ['input', 'prompt_io', 'slide', 'repair'].includes(log.kind)).length)
 const recentLogs = computed(() => props.logs.slice(-10).reverse())
 
-const pipelineStages = computed(() => {
-  const cur = props.stage
-  const curIdx = PIPELINE_STAGE_ORDER.indexOf(cur)
-  return PIPELINE_NODE_STAGES.map((s) => {
-    const sIdx = PIPELINE_STAGE_ORDER.indexOf(s.key)
-    let status: 'done' | 'active' | 'error' | 'pending'
-    if (cur === 'error') {
-      const lastLog = [...props.logs].reverse().find(l => l.stage !== 'error' && PIPELINE_STAGE_ORDER.indexOf(l.stage) > 0)
-      const errIdx = PIPELINE_STAGE_ORDER.indexOf(lastLog?.stage ?? 'init')
-      if (sIdx < errIdx)
-        status = 'done'
-      else if (sIdx === errIdx)
-        status = 'error'
-      else
-        status = 'pending'
-    } else {
-      if (sIdx < curIdx)
-        status = 'done'
-      else if (sIdx === curIdx)
-        status = 'active'
-      else
-        status = 'pending'
-    }
-    return { ...s, status }
-  })
-})
-
 const slideItems = computed<SlideProgressItem[]>(() => {
   const total = Math.max(
     pagePlans.value.length,
@@ -254,10 +237,70 @@ function selectSlide(index: number) {
   emit('update:selectedSlideIndex', index)
 }
 
+function moveSelectedSlide(delta: -1 | 1) {
+  if (!slideItems.value.length)
+    return
+  const currentIndex = props.selectedSlideIndex ?? preferredSlideIndex() ?? 0
+  const nextIndex = Math.min(Math.max(currentIndex + delta, 0), slideItems.value.length - 1)
+  if (nextIndex !== currentIndex)
+    selectSlide(nextIndex)
+}
+
+function shouldIgnoreKeydown(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement))
+    return false
+  if (target.isContentEditable)
+    return true
+  const tagName = target.tagName
+  return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT'
+}
+
+function handleStepKeydown(event: KeyboardEvent) {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+    return
+  if (shouldIgnoreKeydown(event.target))
+    return
+
+  if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    moveSelectedSlide(-1)
+  } else if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    moveSelectedSlide(1)
+  }
+}
+
 function kindLabel(kind?: string | null): string {
   if (!kind)
     return '待定'
   return KIND_LABELS[kind] ?? kind
+}
+
+function resolvePageStage(item: SlideProgressItem): PageStageKey {
+  if (props.stage === 'error') {
+    const ps = props.pageStatuses.get(item.index)
+    if (ps?.stage === 'error')
+      return 'error'
+    if (item.blueprint)
+      return 'done'
+    return 'pending'
+  }
+
+  const ps = props.pageStatuses.get(item.index)
+  if (ps?.stage) {
+    if (['planning', 'layout', 'content', 'normalizing', 'validating', 'done', 'error', 'pending'].includes(ps.stage))
+      return ps.stage as PageStageKey
+  }
+
+  if (item.blueprint)
+    return 'done'
+  if (item.layoutPlan)
+    return props.stage === 'generating' ? 'content' : 'layout'
+  if (item.pagePlan)
+    return 'layout'
+  if (props.stage === 'page_plan')
+    return 'planning'
+  return 'pending'
 }
 
 function logStageLabel(stage: string): string {
@@ -345,12 +388,68 @@ function stageStepState(item: SlideProgressItem, key: 'planning' | 'layout' | 'c
   return 'pending'
 }
 
+const progressSummary = computed(() => {
+  const counts: Record<PageStageKey, number> = {
+    pending: 0,
+    planning: 0,
+    layout: 0,
+    content: 0,
+    normalizing: 0,
+    validating: 0,
+    done: 0,
+    error: 0,
+  }
+
+  for (const item of slideItems.value) {
+    counts[resolvePageStage(item)] += 1
+  }
+
+  const total = slideItems.value.length
+  const done = counts.done
+  const error = counts.error
+  const active = counts.planning + counts.layout + counts.content + counts.normalizing + counts.validating
+  const pending = counts.pending
+  const percent = total > 0 ? Math.round((done / total) * 100) : 0
+  const stageRank = Object.fromEntries(PAGE_STAGE_PROGRESS_ORDER.map((key, index) => [key, index])) as Record<PageStageKey, number>
+  const effectiveStages = slideItems.value.map(item => resolvePageStage(item) === 'error' ? 'pending' : resolvePageStage(item))
+
+  return {
+    total,
+    done,
+    error,
+    active,
+    pending,
+    percent,
+    doneWidth: total > 0 ? `${(done / total) * 100}%` : '0%',
+    errorWidth: total > 0 ? `${(error / total) * 100}%` : '0%',
+    activeWidth: total > 0 ? `${(active / total) * 100}%` : '0%',
+    stageCards: PAGE_STAGE_META.map(stage => ({
+      ...stage,
+      reached: effectiveStages.filter(current => stageRank[current] >= stageRank[stage.key]).length,
+      percent: total > 0
+        ? Math.round((effectiveStages.filter(current => stageRank[current] >= stageRank[stage.key]).length / total) * 100)
+        : 0,
+      width: total > 0
+        ? `${(effectiveStages.filter(current => stageRank[current] >= stageRank[stage.key]).length / total) * 100}%`
+        : '0%',
+    })),
+  }
+})
+
 function selectedDebugText(key: string): string {
   const detail = selectedSlide.value?.contentLog?.detail
   if (!isRecord(detail))
     return ''
   return detailText(detail[key])
 }
+
+onMounted(() => {
+  window.addEventListener('keydown', handleStepKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleStepKeydown)
+})
 </script>
 
 <template>
@@ -384,18 +483,34 @@ function selectedDebugText(key: string): string {
       </div>
     </div>
 
-    <div class="gen-stage-track">
-      <template v-for="(stg, i) in pipelineStages" :key="stg.key">
-        <div class="gen-stage-node" :class="stg.status">
-          <div class="gsn-dot">
-            <span v-if="stg.status === 'done'" class="i-carbon:checkmark gsn-icon" />
-            <span v-else-if="stg.status === 'error'" class="i-carbon:close gsn-icon" />
-            <span v-else-if="stg.status === 'active'" class="gsn-spin" />
+    <div class="gen-progress-overview">
+      <div class="gpo-summary">
+        <div class="gpo-main">
+          <div class="gpo-title">整体进度</div>
+          <div class="gpo-meta">
+            已完成 {{ progressSummary.done }} / {{ progressSummary.total }}
+            <span v-if="progressSummary.error > 0">· 失败 {{ progressSummary.error }}</span>
+            <span v-else-if="progressSummary.active > 0">· 进行中 {{ progressSummary.active }}</span>
+            <span v-else-if="progressSummary.pending > 0">· 待开始 {{ progressSummary.pending }}</span>
           </div>
-          <span class="gsn-label">{{ stg.label }}</span>
         </div>
-        <div v-if="i < pipelineStages.length - 1" class="gsn-connector" :class="{ done: stg.status === 'done' }" />
-      </template>
+        <div class="gpo-percent">{{ progressSummary.percent }}%</div>
+      </div>
+      <div class="gpo-bar" aria-hidden="true">
+        <span class="gpo-bar-segment is-done" :style="{ width: progressSummary.doneWidth }" />
+        <span class="gpo-bar-segment is-active" :style="{ width: progressSummary.activeWidth }" />
+        <span class="gpo-bar-segment is-error" :style="{ width: progressSummary.errorWidth }" />
+      </div>
+      <div class="gpo-stage-grid">
+        <div v-for="stage in progressSummary.stageCards" :key="stage.key" class="gpo-stage-card" :class="`is-${stage.key}`">
+          <div class="gpo-stage-count">{{ stage.percent }}%</div>
+          <div class="gpo-stage-label">{{ stage.label }}</div>
+          <div class="gpo-stage-meta">{{ stage.reached }} / {{ progressSummary.total }}</div>
+          <div class="gpo-stage-bar" aria-hidden="true">
+            <span class="gpo-stage-bar-fill" :style="{ width: stage.width }" />
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="slides-workbench">
@@ -446,7 +561,11 @@ function selectedDebugText(key: string): string {
             </div>
 
             <div class="spc-preview">
-              <div v-if="item.blueprint" class="spc-preview-frame">
+              <div
+                v-if="item.blueprint"
+                class="spc-preview-frame"
+                :style="{ aspectRatio: `${slideDims.w} / ${slideDims.h}` }"
+              >
                 <div class="spc-preview-canvas" :style="{ width: slideDims.w + 'px', height: slideDims.h + 'px', transform: `scale(${previewScale})` }">
                   <SlideRenderer :slide="item.blueprint" :slide-index="item.index" :media-map="props.mediaMap" />
                 </div>
@@ -478,7 +597,11 @@ function selectedDebugText(key: string): string {
           </div>
 
           <div class="sdp-preview-shell">
-            <div v-if="selectedSlide.blueprint" class="sdp-preview-stage">
+            <div
+              v-if="selectedSlide.blueprint"
+              class="sdp-preview-stage"
+              :style="{ aspectRatio: `${slideDims.w} / ${slideDims.h}` }"
+            >
               <div class="sdp-preview-canvas" :style="{ width: slideDims.w + 'px', height: slideDims.h + 'px', transform: `scale(${detailPreviewScale})` }">
                 <SlideRenderer :slide="selectedSlide.blueprint" :slide-index="selectedSlide.index" :media-map="props.mediaMap" />
               </div>
@@ -574,6 +697,139 @@ function selectedDebugText(key: string): string {
 </template>
 
 <style scoped>
+.gen-progress-overview {
+  border: 1px solid var(--studio-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)),
+    var(--studio-surface);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.gpo-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.gpo-main {
+  min-width: 0;
+}
+
+.gpo-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.gpo-meta {
+  margin-top: 0.28rem;
+  font-size: 0.8rem;
+  color: var(--studio-muted);
+}
+
+.gpo-percent {
+  flex-shrink: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.gpo-bar {
+  margin-top: 0.9rem;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.06);
+  display: flex;
+}
+
+.gpo-bar-segment {
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.gpo-bar-segment.is-done {
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.92), rgba(52, 211, 153, 0.92));
+}
+
+.gpo-bar-segment.is-active {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.92), rgba(96, 165, 250, 0.92));
+}
+
+.gpo-bar-segment.is-error {
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.92), rgba(248, 113, 113, 0.92));
+}
+
+.gpo-stage-grid {
+  margin-top: 0.95rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.gpo-stage-card {
+  border: 1px solid var(--studio-border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.02);
+  padding: 0.8rem 0.9rem;
+}
+
+.gpo-stage-card.is-planning {
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.gpo-stage-card.is-layout {
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.gpo-stage-card.is-content {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.gpo-stage-card.is-normalizing {
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.gpo-stage-card.is-validating {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.gpo-stage-count {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.gpo-stage-label {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--studio-muted);
+}
+
+.gpo-stage-meta {
+  margin-top: 0.18rem;
+  font-size: 0.72rem;
+  color: var(--studio-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.gpo-stage-bar {
+  margin-top: 0.55rem;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.08);
+}
+
+.gpo-stage-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: rgba(255,255,255,0.72);
+}
+
 .slides-workbench {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(340px, 0.9fr);
@@ -607,9 +863,9 @@ function selectedDebugText(key: string): string {
   padding: 1rem;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  grid-auto-rows: 1fr;
   gap: 1rem;
   overflow: auto;
+  align-items: start;
 }
 
 .slides-empty,
@@ -641,8 +897,6 @@ function selectedDebugText(key: string): string {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  height: 100%;
-  min-height: 330px;
   cursor: pointer;
   transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
 }
@@ -849,18 +1103,15 @@ function selectedDebugText(key: string): string {
 }
 
 .spc-preview {
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--studio-border);
-  background: #0b1020;
-  min-height: 140px;
-  margin-top: auto;
+  margin-top: 0.2rem;
 }
 
 .spc-preview-frame {
-  height: 100%;
-  aspect-ratio: 16 / 9;
+  width: 100%;
   overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--studio-border);
+  background: #0b1020;
 }
 
 .spc-preview-canvas {
@@ -881,6 +1132,9 @@ function selectedDebugText(key: string): string {
   color: #94a3b8;
   padding: 1rem;
   text-align: center;
+  border-radius: 12px;
+  border: 1px solid var(--studio-border);
+  background: #0b1020;
 }
 
 .spc-preview-placeholder span,
@@ -929,7 +1183,6 @@ function selectedDebugText(key: string): string {
 
 .sdp-preview-stage {
   width: 100%;
-  aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 14px;
   border: 1px solid var(--studio-border);
@@ -1004,6 +1257,10 @@ function selectedDebugText(key: string): string {
 }
 
 @media (max-width: 1200px) {
+  .gpo-stage-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .slides-workbench {
     grid-template-columns: 1fr;
   }
@@ -1014,6 +1271,15 @@ function selectedDebugText(key: string): string {
 }
 
 @media (max-width: 720px) {
+  .gpo-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .gpo-stage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .slides-grid {
     grid-template-columns: 1fr;
     padding: 0.75rem;

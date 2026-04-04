@@ -297,6 +297,7 @@ const slideProps = computed(() => {
         section: s.section ?? '',
         title: s.title,
         subtitle: s.subtitle ?? '',
+        summary: s.summary ?? '',
         phases: s.phases ?? [],
         footer: s.footer ?? '',
       }

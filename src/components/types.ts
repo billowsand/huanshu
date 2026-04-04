@@ -21,7 +21,6 @@ export type SlideKind =
   | 'infographic'
 
 export type AspectRatio = 'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9'
-
 export const ASPECT_DIMENSIONS: Record<AspectRatio, { w: number, h: number }> = {
   ratio_16x9: { w: 1280, h: 720 },
   ratio_32x9: { w: 2560, h: 720 },
@@ -159,6 +158,7 @@ export interface SlideBlueprint {
   badge?: string
   accent?: string
   note?: string
+  summary?: string
   label?: string
   label_tone?: string
   image?: string

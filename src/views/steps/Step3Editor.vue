@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import SlideRenderer from '../../components/SlideRenderer.vue'
 import { ALL_KINDS, KIND_FIELDS, KIND_META } from '../../composables/useSlideEditor'
@@ -685,6 +685,38 @@ function applySuggestedIcon(basePath: string, icon: string) {
   updatePath(`${basePath}.icon`, icon)
 }
 
+function setActiveSlide(index: number) {
+  if (index < 0 || index >= props.slideCount || index === props.activeSlide)
+    return
+  emit('update:activeSlide', index)
+}
+
+function shouldIgnoreEditorKeydown(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement))
+    return false
+  if (target.isContentEditable)
+    return true
+  const tagName = target.tagName
+  return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT'
+}
+
+function handleEditorArrowKeydown(event: KeyboardEvent) {
+  if (props.showKindPicker)
+    return
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+    return
+  if (shouldIgnoreEditorKeydown(event.target))
+    return
+
+  if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    setActiveSlide(props.activeSlide - 1)
+  } else if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    setActiveSlide(props.activeSlide + 1)
+  }
+}
+
 function handleTextareaKeydown(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key === 's') {
     event.preventDefault()
@@ -693,6 +725,14 @@ function handleTextareaKeydown(event: KeyboardEvent) {
   }
   emit('textarea-keydown', event)
 }
+
+onMounted(() => {
+  window.addEventListener('keydown', handleEditorArrowKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleEditorArrowKeydown)
+})
 </script>
 
 <template>
