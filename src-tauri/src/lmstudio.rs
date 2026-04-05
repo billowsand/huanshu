@@ -53,6 +53,7 @@ impl LmStudioClient {
             "model": model,
             "temperature": 0.2,
             "response_format": { "type": "text" },
+            "chat_template_kwargs": { "enable_thinking": false },
             "messages": [
                 { "role": "system", "content": system },
                 { "role": "user", "content": user }
@@ -123,6 +124,7 @@ impl LmStudioClient {
         let payload = json!({
             "model": model,
             "temperature": 0.3,
+            "chat_template_kwargs": { "enable_thinking": false },
             "messages": [
                 {
                     "role": "user",
