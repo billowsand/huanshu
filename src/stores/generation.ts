@@ -82,6 +82,7 @@ export const useGenerationStore = defineStore('generation', () => {
   const lastError = ref('')
   const logs = ref<GenerationLogEntry[]>([])
   const currentRun = ref<GenerationRun | null>(null)
+  const activeProjectId = ref<number | null>(null)
   const pageStatuses = ref<Map<number, { stage: PageStage, message?: string }>>(new Map())
 
   const stageLabel = computed(() => STAGE_LABELS[stage.value] ?? stage.value)
@@ -94,10 +95,21 @@ export const useGenerationStore = defineStore('generation', () => {
   let unlistenPageStatus: (() => void) | null = null
 
   async function startListening() {
+    if (unlistenProgress || unlistenSlide || unlistenLog || unlistenError || unlistenPageStatus)
+      return
+
     unlistenProgress = await listen<GenEvent>('gen:progress', (e) => {
       const ev = e.payload
       stage.value = ev.stage as GenStage
       message.value = ev.message
+      if (currentRun.value) {
+        currentRun.value = {
+          ...currentRun.value,
+          status: ev.stage === 'done' ? 'done' : 'running',
+          current_stage: ev.stage,
+          updated_at: Math.floor(Date.now() / 1000),
+        }
+      }
       if (ev.progress !== undefined && ev.progress !== null) {
         progress.value = ev.progress
       }
@@ -109,6 +121,7 @@ export const useGenerationStore = defineStore('generation', () => {
       if (!currentRun.value || currentRun.value.id !== ev.run_id) {
         currentRun.value = {
           id: ev.run_id,
+          project_id: activeProjectId.value,
           status: 'running',
           current_stage: ev.stage,
           source_markdown: '',
@@ -117,6 +130,13 @@ export const useGenerationStore = defineStore('generation', () => {
           created_at: ev.created_at,
           updated_at: ev.created_at,
           finished_at: null,
+        }
+      } else {
+        currentRun.value = {
+          ...currentRun.value,
+          status: 'running',
+          current_stage: ev.stage,
+          updated_at: ev.created_at,
         }
       }
     })
@@ -158,6 +178,14 @@ export const useGenerationStore = defineStore('generation', () => {
       message.value = e.payload.message
       lastError.value = e.payload.message
       running.value = false
+      if (currentRun.value) {
+        currentRun.value = {
+          ...currentRun.value,
+          status: 'error',
+          current_stage: 'error',
+          updated_at: Math.floor(Date.now() / 1000),
+        }
+      }
     })
   }
 
@@ -174,14 +202,17 @@ export const useGenerationStore = defineStore('generation', () => {
     unlistenPageStatus = null
   }
 
-  async function generate(mdContent: string, frontmatterTitle?: string, granularity?: string, aspectRatio?: AspectRatio) {
+  async function generate(mdContent: string, frontmatterTitle?: string, granularity?: string, aspectRatio?: AspectRatio, projectId?: number | null) {
     running.value = true
     lastError.value = ''
     blueprints.value = []
     completedSlides.value = new Set()
     logs.value = []
     currentRun.value = null
+    activeProjectId.value = projectId ?? null
+    pageStatuses.value = new Map()
     stage.value = 'start'
+    message.value = ''
     progress.value = 0
 
     await startListening()
@@ -216,6 +247,7 @@ export const useGenerationStore = defineStore('generation', () => {
   }
 
   function reset() {
+    stopListening()
     stage.value = 'idle'
     message.value = ''
     progress.value = 0
@@ -225,6 +257,7 @@ export const useGenerationStore = defineStore('generation', () => {
     lastError.value = ''
     logs.value = []
     currentRun.value = null
+    activeProjectId.value = null
     pageStatuses.value = new Map()
   }
 
@@ -241,19 +274,34 @@ export const useGenerationStore = defineStore('generation', () => {
   }
 
   async function loadLatestRun(projectId: number) {
+    activeProjectId.value = projectId
     const run = await invoke<GenerationRun | null>('get_latest_generation_run', { projectId })
     currentRun.value = run
     if (!run) {
       logs.value = []
-      return
+      return null
     }
     logs.value = await invoke<GenerationLogEntry[]>('get_generation_logs', { runId: run.id })
+    if (run.status === 'running') {
+      running.value = true
+      stage.value = (run.current_stage as GenStage) ?? 'start'
+      message.value = message.value || '正在恢复生成进度...'
+      await startListening()
+    } else if (!running.value) {
+      running.value = false
+      if (run.status === 'error') {
+        stage.value = 'error'
+      } else if (run.status === 'done' && blueprints.value.length > 0) {
+        stage.value = 'done'
+      }
+    }
+    return run
   }
 
   return {
     stage, message, progress, blueprints, completedSlides,
     running, lastError, logs, currentRun, stageLabel, slideCount,
-    pageStatuses,
+    activeProjectId, pageStatuses,
     generate, repairSlide, reset, loadFromJson, loadLatestRun,
   }
 })

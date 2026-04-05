@@ -105,14 +105,18 @@ onMounted(async () => {
         aspectRatio: p.aspect_ratio ?? 'ratio_16x9',
       }
       loadStep1Meta(id)
-      if (p.blueprints_json) {
-        gen.loadFromJson(p.blueprints_json)
-      } else {
-        gen.reset()
+      const latestRun = await gen.loadLatestRun(id)
+      const hasActiveGeneration = latestRun?.status === 'running'
+      if (!hasActiveGeneration) {
+        if (p.blueprints_json) {
+          gen.loadFromJson(p.blueprints_json)
+        } else {
+          gen.reset()
+        }
+        await gen.loadLatestRun(id)
       }
-      await gen.loadLatestRun(id)
       await mediaLib.loadProjectMedia()
-      currentStep.value = gen.blueprints.length > 0 ? 3 : 1
+      currentStep.value = hasActiveGeneration ? 2 : gen.blueprints.length > 0 ? 3 : 1
     } catch (e: unknown) {
       loadError.value = String(e)
     } finally {
@@ -270,6 +274,7 @@ async function onStep1StartGenerate() {
     step1AutosaveTimer = null
   }
   await saveStep1Draft()
+  selectedSlideIndex.value = null
   currentStep.value = 2
 
   await gen.generate(
@@ -277,6 +282,7 @@ async function onStep1StartGenerate() {
     projectName.value,
     granularity.value === 'auto' ? undefined : granularity.value,
     aspectRatio.value,
+    projectId.value,
   )
 
   if (gen.stage === 'done' && gen.blueprints.length > 0 && projectId.value) {

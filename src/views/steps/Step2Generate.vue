@@ -190,6 +190,7 @@ const slideItems = computed<SlideProgressItem[]>(() => {
     pagePlans.value.length,
     layoutPlans.value.length,
     contentLogBySlideIndex.value.size,
+    props.pageStatuses.size,
     props.blueprints.length,
     props.slideCount,
   )

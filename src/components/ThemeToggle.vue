@@ -8,6 +8,7 @@ const themes = [
   { id: 'light-blue',    name: '亮·蓝图', bg: '#eef4ff', accent: '#1d4ed8' },
   { id: 'light-chatgpt', name: '亮·翠绿', bg: '#f5f5f5', accent: '#059669' },
   { id: 'light-claude',  name: '亮·暖铜', bg: '#f2ece0', accent: '#b5601a' },
+  { id: 'light-gugong',  name: '亮·朱金', bg: '#F9F0DC', accent: '#C0411A' },
 ]
 
 const currentTheme = ref('dark-yellow')

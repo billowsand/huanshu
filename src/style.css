@@ -407,7 +407,7 @@ iframe {
 
 /* ============================================================
    THEME VARIABLES
-   6 themes: dark-yellow | dark-blue | dark-glass-blue | light-blue | light-chatgpt | light-claude
+   7 themes: dark-yellow | dark-blue | dark-glass-blue | light-blue | light-chatgpt | light-claude | light-gugong
    Switched via: document.documentElement.setAttribute('data-theme', id)
    ============================================================ */
 
@@ -756,6 +756,74 @@ iframe {
   --danger-border: rgba(155,28,28,0.2);
 }
 
+/* ── 7. Light Forbidden City — "故宫·朱金"
+        Vermillion red + imperial gold on white jade marble.
+        Regal, ceremonial warmth — the Forbidden City at dawn.    */
+[data-theme="light-gugong"] {
+  /* canvas — 白玉台基 white jade marble base */
+  --bg:            #F9F0DC;
+  --bg-gradient:
+    radial-gradient(ellipse at 15% 20%, rgba(212,148,10,0.16) 0%, transparent 52%),
+    radial-gradient(ellipse at 78% 78%, rgba(192,65,26,0.08) 0%, transparent 46%),
+    radial-gradient(ellipse at 50% 5%,  rgba(220,170,20,0.10) 0%, transparent 38%),
+    #F9F0DC;
+  --glow:          rgba(212,148,10,0.14);
+
+  /* text — 深墨 deep ink with warm undertone */
+  --text:          #1C0A04;
+  --text-muted:    rgba(28,10,4,0.62);
+
+  /* brand — 朱红 vermillion (the iconic Forbidden City red) */
+  --primary:        #C0411A;
+  --primary-light:  #9E3313;
+  --primary-bg:     rgba(192,65,26,0.09);
+  --primary-border: rgba(192,65,26,0.22);
+
+  /* glass — 暖玉 warm ivory */
+  --glass:         rgba(255,244,220,0.80);
+  --glass-border:  rgba(192,65,26,0.15);
+  --glass-highlight: rgba(255,252,240,0.46);
+  --glass-sheen: rgba(255,238,195,0.24);
+  --glass-blur: 16px;
+  --glass-saturate: 122%;
+  --glass-shadow: 0 12px 32px rgba(90,35,10,0.09);
+  --glass-shadow-strong: 0 18px 40px rgba(90,35,10,0.15);
+  --shell-frame: linear-gradient(180deg, color-mix(in srgb, var(--glass) 44%, transparent), transparent 20%);
+  --shell-frame-border: rgba(192,65,26,0.08);
+  --shell-frame-shadow: 0 10px 28px rgba(90,35,10,0.08);
+
+  /* section watermark */
+  --section-num-stroke: rgba(192,65,26,0.10);
+
+  /* 松花绿 pine flower green — 碧玉 jade */
+  --success:        #2D7A4F;
+  --success-light:  #236040;
+  --success-contrast: #f0fdf6;
+  --success-bg:     rgba(45,122,79,0.08);
+  --success-border: rgba(45,122,79,0.2);
+
+  /* 石青 stone blue — 青金石 lapis lazuli */
+  --info:        #2A5C8E;
+  --info-light:  #204A72;
+  --info-contrast: #eff6ff;
+  --info-bg:     rgba(42,92,142,0.08);
+  --info-border: rgba(42,92,142,0.2);
+
+  /* 藤黄 vine yellow — 帝王金 imperial gold */
+  --warning:        #B8860B;
+  --warning-light:  #9A7009;
+  --warning-contrast: #fffbeb;
+  --warning-bg:     rgba(184,134,11,0.09);
+  --warning-border: rgba(184,134,11,0.22);
+
+  /* 丹朱 cinnabar — deeper vermillion */
+  --danger:        #9B1C1C;
+  --danger-light:  #7F1D1D;
+  --danger-contrast: #fef2f2;
+  --danger-bg:     rgba(155,28,28,0.08);
+  --danger-border: rgba(155,28,28,0.2);
+}
+
 
 /* ============================================================
    BASE
@@ -1015,6 +1083,31 @@ iframe {
   --studio-success:        #276749;
   --studio-success-bg:     rgba(39,103,73,0.08);
   --studio-error:          #9b1c1c;
+  --studio-error-bg:       rgba(155,28,28,0.08);
+  --studio-error-border:   rgba(155,28,28,0.22);
+}
+
+/* ── light-gugong ──────────────────────────────────────────── */
+[data-theme="light-gugong"] {
+  --studio-bg:            #F2E6CA;
+  --studio-panel:         #FBF3E4;
+  --studio-panel-2:       #EDE0C2;
+  --studio-surface:       #E4D4A8;
+  --studio-border:        rgba(192,65,26,0.13);
+  --studio-border-hover:  rgba(192,65,26,0.28);
+
+  --studio-text:          #1C0A04;
+  --studio-muted:         rgba(28,10,4,0.42);
+
+  --studio-primary:        #C0411A;
+  --studio-primary-light:  #9E3313;
+  --studio-primary-contrast: #ffffff;
+  --studio-primary-bg:     rgba(192,65,26,0.10);
+  --studio-primary-border: rgba(192,65,26,0.28);
+
+  --studio-success:        #2D7A4F;
+  --studio-success-bg:     rgba(45,122,79,0.09);
+  --studio-error:          #9B1C1C;
   --studio-error-bg:       rgba(155,28,28,0.08);
   --studio-error-border:   rgba(155,28,28,0.22);
 }
