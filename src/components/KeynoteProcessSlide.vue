@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
 
-defineProps<{
+const props = defineProps<{
   section?: string
   title: string
   subtitle?: string
@@ -20,12 +21,31 @@ defineProps<{
   }>
   footer?: string
 }>()
+
+const maxStepCount = computed(() =>
+  Math.max(0, ...(props.phases ?? []).map(phase => phase.steps?.length ?? 0)),
+)
+
+const maxDescLength = computed(() =>
+  Math.max(
+    0,
+    ...(props.phases ?? []).flatMap(phase => (phase.steps ?? []).map(step => step.desc?.trim().length ?? 0)),
+  ),
+)
+
+const processDensityClass = computed(() => {
+  if (maxStepCount.value >= 4 || maxDescLength.value >= 42)
+    return 'process-slide--dense'
+  if (maxStepCount.value >= 3 || maxDescLength.value >= 24)
+    return 'process-slide--compact'
+  return ''
+})
 </script>
 
 <template>
   <div v-if="section" class="section-num">{{ section }}</div>
 
-  <div class="process-slide" relative z-10 flex flex-col h-full>
+  <div class="process-slide" :class="processDensityClass" relative z-10 flex flex-col h-full>
     <div class="slide-header process-header">
       <h1 class="slide-title slide-compact-title">{{ title }}</h1>
       <div class="slide-title-divider" />
@@ -155,6 +175,14 @@ defineProps<{
   gap: 1rem;
 }
 
+.process-slide--compact {
+  gap: 0.82rem;
+}
+
+.process-slide--dense {
+  gap: 0.68rem;
+}
+
 .process-header {
   margin-bottom: 0;
 }
@@ -202,6 +230,14 @@ defineProps<{
   gap: 0.75rem;
 }
 
+.process-slide--compact .phase-col {
+  gap: 0.62rem;
+}
+
+.process-slide--dense .phase-col {
+  gap: 0.5rem;
+}
+
 .phase-col-animated {
   opacity: 0;
   animation: phase-col-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -223,6 +259,14 @@ defineProps<{
   position: relative;
   min-height: 106px;
   overflow: hidden;
+}
+
+.process-slide--compact .phase-head {
+  min-height: 96px;
+}
+
+.process-slide--dense .phase-head {
+  min-height: 88px;
 }
 
 .phase-head::after {
@@ -270,6 +314,17 @@ defineProps<{
   line-height: 1.15;
 }
 
+.process-slide--compact .phase-head__title {
+  margin-top: 0.58rem;
+  font-size: calc(var(--type-body-strong) * 0.96);
+}
+
+.process-slide--dense .phase-head__title {
+  margin-top: 0.48rem;
+  font-size: calc(var(--type-body-strong) * 0.9);
+  line-height: 1.12;
+}
+
 .phase-head__subtitle {
   margin-top: 0.4rem;
   max-width: 80%;
@@ -278,11 +333,25 @@ defineProps<{
   line-height: 1.45;
 }
 
+.process-slide--compact .phase-head__subtitle,
+.process-slide--dense .phase-head__subtitle {
+  margin-top: 0.28rem;
+  line-height: 1.35;
+}
+
 .phase-steps-wrap {
   position: relative;
   min-height: 0;
   padding: 0.95rem 0.95rem 0.85rem;
   overflow: hidden;
+}
+
+.process-slide--compact .phase-steps-wrap {
+  padding: 0.82rem 0.82rem 0.72rem;
+}
+
+.process-slide--dense .phase-steps-wrap {
+  padding: 0.72rem 0.72rem 0.62rem;
 }
 
 .phase-steps-wrap__glow {
@@ -309,6 +378,10 @@ defineProps<{
   text-transform: uppercase;
 }
 
+.process-slide--dense .phase-steps-wrap__title {
+  margin-bottom: 0.48rem;
+}
+
 .phase-steps {
   position: relative;
   z-index: 1;
@@ -321,6 +394,16 @@ defineProps<{
   align-items: flex-start;
   gap: 0.7rem;
   padding: 0.5rem 0;
+}
+
+.process-slide--compact .step-row {
+  gap: 0.58rem;
+  padding: 0.42rem 0;
+}
+
+.process-slide--dense .step-row {
+  gap: 0.5rem;
+  padding: 0.34rem 0;
 }
 
 .step-dot {
@@ -342,6 +425,12 @@ defineProps<{
   text-shadow: 0 1px 2px rgba(0,0,0,0.26);
 }
 
+.process-slide--dense .step-dot {
+  width: 1.4rem;
+  height: 1.4rem;
+  font-size: calc(var(--type-caption) * 0.94);
+}
+
 .step-copy {
   min-width: 0;
 }
@@ -358,6 +447,19 @@ defineProps<{
   color: var(--text-muted);
   font-size: var(--type-caption);
   line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.process-slide--compact .step-desc {
+  margin-top: 0.18rem;
+  line-height: 1.38;
+}
+
+.process-slide--dense .step-desc {
+  margin-top: 0.14rem;
+  font-size: calc(var(--type-caption) * 0.94);
+  line-height: 1.3;
 }
 
 .step-conn {
@@ -370,8 +472,22 @@ defineProps<{
   opacity: 0.26;
 }
 
+.process-slide--dense .step-conn {
+  left: 0.67rem;
+  top: 1.74rem;
+  height: calc(100% - 1.38rem);
+}
+
 .phase-highlight {
   min-height: 58px;
+}
+
+.process-slide--compact .phase-highlight {
+  min-height: 52px;
+}
+
+.process-slide--dense .phase-highlight {
+  min-height: 46px;
 }
 
 .phase-highlight__content {
@@ -389,6 +505,10 @@ defineProps<{
   font-size: var(--type-body-tight);
   font-weight: 600;
   line-height: 1.4;
+}
+
+.process-slide--dense .phase-highlight__text {
+  line-height: 1.3;
 }
 
 .process-footer {
