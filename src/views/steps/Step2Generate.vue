@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SlideRenderer from '../../components/SlideRenderer.vue'
 import type { SlideBlueprint, AspectRatio } from '../../components/types'
 import { ASPECT_DIMENSIONS } from '../../components/types'
@@ -163,6 +163,8 @@ const previewScale = computed(() => {
   return 0.2
 })
 const detailPreviewScale = computed(() => {
+  if (detailStageWidth.value > 0 && slideDims.value.w > 0)
+    return detailStageWidth.value / slideDims.value.w
   if (slideAspectRatio.value === 'ratio_48x9') return 0.105
   if (slideAspectRatio.value === 'ratio_32x9') return 0.158
   return 0.315
@@ -444,12 +446,37 @@ function selectedDebugText(key: string): string {
   return detailText(detail[key])
 }
 
+const detailStageRef = ref<HTMLElement | null>(null)
+const detailStageWidth = ref(0)
+let detailResizeObserver: ResizeObserver | null = null
+
+watch(detailStageRef, (el) => {
+  if (detailResizeObserver) {
+    detailResizeObserver.disconnect()
+    detailResizeObserver = null
+  }
+  if (el) {
+    detailResizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        detailStageWidth.value = entry.contentRect.width
+      }
+    })
+    detailResizeObserver.observe(el)
+  } else {
+    detailStageWidth.value = 0
+  }
+})
+
 onMounted(() => {
   window.addEventListener('keydown', handleStepKeydown)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleStepKeydown)
+  if (detailResizeObserver) {
+    detailResizeObserver.disconnect()
+    detailResizeObserver = null
+  }
 })
 </script>
 
@@ -600,6 +627,7 @@ onBeforeUnmount(() => {
           <div class="sdp-preview-shell">
             <div
               v-if="selectedSlide.blueprint"
+              ref="detailStageRef"
               class="sdp-preview-stage"
               :style="{ aspectRatio: `${slideDims.w} / ${slideDims.h}` }"
             >
