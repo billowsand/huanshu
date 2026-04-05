@@ -164,7 +164,7 @@ export const KIND_DEFAULTS: Record<SlideKind, Partial<SlideBlueprint>> = {
       { title: '模型与规则', meta: '分类、评分、召回、推荐', tone: 'violet' },
       { title: '数据底座', meta: '主数据、知识库、行为日志', tone: 'amber' },
     ],
-    layers_infographic_syntax: 'infographic hierarchy-tree-horizontal\\ndata\\n  root\\n    label 智能运营架构\\n    children\\n      - label 前台应用\\n        children\\n          - label 销售工作台\\n          - label 运营看板\\n      - label 流程编排\\n        children\\n          - label 触发规则\\n          - label 审批流\\n      - label 模型与规则\\n        children\\n          - label 评分\\n          - label 推荐\\n      - label 数据底座\\n        children\\n          - label 主数据\\n          - label 知识库',
+    layers_infographic_syntax: 'infographic hierarchy-tree-lr-tech-style-capsule-item\\ndata\\n  root\\n    label 智能运营架构\\n    children\\n      - label 前台应用\\n        desc 面向销售、运营、客服\\n        children\\n          - label 销售工作台\\n          - label 运营看板\\n      - label 流程编排\\n        desc 任务流与审批自动化\\n        children\\n          - label 触发规则\\n          - label 审批流\\n      - label 模型与规则\\n        desc 分类、评分、推荐\\n        children\\n          - label 评分\\n          - label 推荐\\n      - label 数据底座\\n        desc 主数据与知识管理\\n        children\\n          - label 主数据\\n          - label 知识库',
     footer: '建议层数控制在 3-5 层，避免右侧过密。',
   },
   section_list: {

@@ -433,6 +433,7 @@ const processDensityClass = computed(() => {
 
 .step-copy {
   min-width: 0;
+  width: 100%;
 }
 
 .step-label {

@@ -3,12 +3,12 @@ import { onMounted, ref } from 'vue'
 
 const themes = [
   { id: 'dark-yellow',   name: '暗·琥珀', bg: '#0b0c11', accent: '#f59e0b' },
-  { id: 'dark-blue',     name: '暗·深海', bg: '#070c17', accent: '#38bdf8' },
-  { id: 'dark-glass-blue', name: '暗·冰幕', bg: 'linear-gradient(135deg, #06101c, #123055)', accent: '#a5e3ff' },
+  { id: 'dark-blue',     name: '暗·星图', bg: '#020810', accent: '#0EA5E9' },
+  { id: 'dark-glass-blue', name: '暗·极光', bg: 'linear-gradient(135deg, #3b1fdc 0%, #0694a2 50%, #065f46 100%)', accent: '#BAE6FD' },
   { id: 'light-blue',    name: '亮·蓝图', bg: '#eef4ff', accent: '#1d4ed8' },
   { id: 'light-chatgpt', name: '亮·翠绿', bg: '#f5f5f5', accent: '#059669' },
-  { id: 'light-claude',  name: '亮·暖铜', bg: '#f2ece0', accent: '#b5601a' },
-  { id: 'light-gugong',  name: '亮·朱金', bg: '#F9F0DC', accent: '#C0411A' },
+  { id: 'light-claude',  name: '亮·晨曦', bg: '#FDFCF9', accent: '#C25F35' },
+  { id: 'light-gugong',  name: '亮·多巴胺', bg: 'linear-gradient(135deg, #FF6BA8 0%, #C44FED 50%, #F97316 100%)', accent: '#9333EA' },
 ]
 
 const currentTheme = ref('dark-yellow')

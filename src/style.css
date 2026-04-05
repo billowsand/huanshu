@@ -475,119 +475,127 @@ iframe {
   --danger-border: rgba(244,63,94,0.25);
 }
 
-/* ── 2. Dark Blue — "Deep Tech"
-        Midnight navy + electric sky-blue. Cool, focused, systemic. */
+/* ── 2. Dark Blue — "星图终端 / Star Chart"
+        Near-black void + electric sky-blue. Data terminal: flat, sharp, zero noise.
+        Deliberately minimal glass — this is NOT a glassmorphism theme. */
 [data-theme="dark-blue"] {
-  --bg:            #060d1a;
-  --bg-gradient:   radial-gradient(ellipse at 75% 25%, rgba(14,60,160,0.22) 0%, transparent 60%), #060d1a;
-  --glow:          rgba(14,60,160,0.22);
+  --bg:            #020810;
+  --bg-gradient:
+    radial-gradient(ellipse at 88% 12%, rgba(14,165,233,0.22) 0%, transparent 42%),
+    radial-gradient(ellipse at 10% 85%, rgba(6,78,159,0.14) 0%, transparent 38%),
+    #020810;
+  --glow:          rgba(14,165,233,0.22);
 
-  --text:          #dce8f5;
-  --text-muted:    rgba(220,232,245,0.6);
+  --text:          #DFF0FF;
+  --text-muted:    rgba(223,240,255,0.52);
 
-  --primary:        #38bdf8;
-  --primary-light:  #7dd3fc;
-  --primary-bg:     rgba(56,189,248,0.1);
-  --primary-border: rgba(56,189,248,0.25);
+  --primary:        #0EA5E9;
+  --primary-light:  #38BDF8;
+  --primary-bg:     rgba(14,165,233,0.09);
+  --primary-border: rgba(14,165,233,0.24);
 
-  --glass:         rgba(56,189,248,0.04);
-  --glass-border:  rgba(56,189,248,0.1);
-  --glass-highlight: rgba(255,255,255,0.08);
-  --glass-sheen: rgba(125,211,252,0.08);
-  --glass-blur: 16px;
-  --glass-saturate: 124%;
-  --glass-shadow: 0 14px 36px rgba(2,12,32,0.22);
-  --glass-shadow-strong: 0 22px 56px rgba(2,12,32,0.3);
-  --shell-frame: linear-gradient(180deg, color-mix(in srgb, var(--glass) 38%, transparent), transparent 18%);
-  --shell-frame-border: rgba(125,211,252,0.08);
-  --shell-frame-shadow: 0 14px 34px rgba(2,12,32,0.22);
+  /* Minimal glass — almost invisible. Flat terminal aesthetic. */
+  --glass:         rgba(14,165,233,0.03);
+  --glass-border:  rgba(14,165,233,0.1);
+  --glass-highlight: rgba(255,255,255,0.04);
+  --glass-sheen: rgba(14,165,233,0.04);
+  --glass-blur: 8px;
+  --glass-saturate: 110%;
+  --glass-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  --glass-shadow-strong: 0 14px 40px rgba(0,0,0,0.55);
+  --shell-frame: linear-gradient(180deg, rgba(14,165,233,0.08), transparent 20%);
+  --shell-frame-border: rgba(14,165,233,0.1);
+  --shell-frame-shadow: 0 8px 28px rgba(0,0,0,0.4);
 
-  --section-num-stroke: rgba(56,189,248,0.12);
+  --section-num-stroke: rgba(14,165,233,0.14);
+
+  --success:        #10b981;
+  --success-light:  #34d399;
+  --success-contrast: #f0fdfb;
+  --success-bg:     rgba(16,185,129,0.09);
+  --success-border: rgba(16,185,129,0.24);
+
+  --info:        #0EA5E9;
+  --info-light:  #38BDF8;
+  --info-contrast: #f0f9ff;
+  --info-bg:     rgba(14,165,233,0.09);
+  --info-border: rgba(14,165,233,0.24);
+
+  --warning:        #F59E0B;
+  --warning-light:  #FCD34D;
+  --warning-contrast: #fffdf5;
+  --warning-bg:     rgba(245,158,11,0.1);
+  --warning-border: rgba(245,158,11,0.28);
+
+  --danger:        #F43F5E;
+  --danger-light:  #FB7185;
+  --danger-contrast: #fff5f7;
+  --danger-bg:     rgba(244,63,94,0.09);
+  --danger-border: rgba(244,63,94,0.24);
+}
+
+/* ── 3. Dark Glass Blue — "极光琉璃 / Aurora Prism"
+       Vivid multi-color aurora behind maximum-frost glass.
+       This IS the glassmorphism theme — you're literally looking through ice. */
+[data-theme="dark-glass-blue"] {
+  --bg:            #05071A;
+  --bg-gradient:
+    radial-gradient(circle at 18% 14%, rgba(124,58,237,0.60) 0%, transparent 36%),
+    radial-gradient(circle at 82% 18%, rgba(6,182,212,0.55) 0%, transparent 34%),
+    radial-gradient(circle at 55% 88%, rgba(16,185,129,0.40) 0%, transparent 40%),
+    radial-gradient(circle at 8%  72%, rgba(59,130,246,0.35) 0%, transparent 34%),
+    radial-gradient(circle at 90% 80%, rgba(167,139,250,0.28) 0%, transparent 32%),
+    #05071A;
+  --glow:          rgba(124,58,237,0.35);
+
+  --text:          #EEF6FF;
+  --text-muted:    rgba(186,218,255,0.65);
+
+  --primary:        #BAE6FD;
+  --primary-light:  #E0F2FE;
+  --primary-bg:     rgba(186,230,253,0.20);
+  --primary-border: rgba(224,242,254,0.36);
+
+  /* Maximum frost glass — thick, luminous, ultra-saturated */
+  --glass:         rgba(8,15,40,0.38);
+  --glass-border:  rgba(255,255,255,0.24);
+  --glass-highlight: rgba(255,255,255,0.28);
+  --glass-sheen: rgba(186,230,253,0.20);
+  --glass-blur: 36px;
+  --glass-saturate: 200%;
+  --glass-shadow: 0 22px 64px rgba(0,0,0,0.4);
+  --glass-shadow-strong: 0 36px 88px rgba(0,0,0,0.55);
+  --shell-frame:
+    linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.04) 20%, transparent 38%),
+    linear-gradient(135deg, rgba(124,58,237,0.20), transparent 44%);
+  --shell-frame-border: rgba(255,255,255,0.20);
+  --shell-frame-shadow: 0 24px 64px rgba(0,0,0,0.4);
+
+  --section-num-stroke: rgba(186,230,253,0.22);
 
   --success:        #34d399;
   --success-light:  #6ee7b7;
-  --success-contrast: #f2fffb;
-  --success-bg:     rgba(52,211,153,0.1);
-  --success-border: rgba(52,211,153,0.25);
+  --success-contrast: #f0fdfb;
+  --success-bg:     rgba(52,211,153,0.18);
+  --success-border: rgba(110,231,183,0.34);
 
-  --info:        #38bdf8;
-  --info-light:  #7dd3fc;
-  --info-contrast: #f4fbff;
-  --info-bg:     rgba(56,189,248,0.1);
-  --info-border: rgba(56,189,248,0.25);
+  --info:           #BAE6FD;
+  --info-light:     #E0F2FE;
+  --info-contrast:  #f0f9ff;
+  --info-bg:        rgba(186,230,253,0.18);
+  --info-border:    rgba(224,242,254,0.34);
 
-  /* proper amber warning — stands out against blue */
-  --warning:        #fbbf24;
-  --warning-light:  #fde68a;
+  --warning:        #FDE68A;
+  --warning-light:  #FEF08A;
   --warning-contrast: #fffdf5;
-  --warning-bg:     rgba(251,191,36,0.1);
-  --warning-border: rgba(251,191,36,0.28);
+  --warning-bg:     rgba(253,230,138,0.18);
+  --warning-border: rgba(254,240,138,0.34);
 
-  --danger:        #fb7185;
-  --danger-light:  #fda4af;
+  --danger:         #FDA4AF;
+  --danger-light:   #FECDD3;
   --danger-contrast: #fff5f7;
-  --danger-bg:     rgba(251,113,133,0.1);
-  --danger-border: rgba(251,113,133,0.25);
-}
-
-/* ── 3. Dark Glass Blue — "Ice Curtain"
-       Deep navy gradient + high-frost glass. Structured, luminous, infographic-first. */
-[data-theme="dark-glass-blue"] {
-  --bg:            #06101c;
-  --bg-gradient:
-    radial-gradient(circle at 14% 18%, rgba(70,130,255,0.18) 0%, transparent 34%),
-    radial-gradient(circle at 82% 22%, rgba(56,189,248,0.16) 0%, transparent 30%),
-    radial-gradient(circle at 52% 100%, rgba(37,99,235,0.18) 0%, transparent 42%),
-    linear-gradient(180deg, #06101c 0%, #0a1930 55%, #102745 100%);
-  --glow:          rgba(110,180,255,0.2);
-
-  --text:          #f7fbff;
-  --text-muted:    rgba(183,201,224,0.72);
-
-  --primary:        #67c9ff;
-  --primary-light:  #a5e3ff;
-  --primary-bg:     rgba(103,201,255,0.18);
-  --primary-border: rgba(146,220,255,0.34);
-
-  --glass:         rgba(18,34,58,0.34);
-  --glass-border:  rgba(193,225,255,0.18);
-  --glass-highlight: rgba(255,255,255,0.18);
-  --glass-sheen: rgba(125,211,252,0.14);
-  --glass-blur: 22px;
-  --glass-saturate: 155%;
-  --glass-shadow: 0 18px 48px rgba(3,10,25,0.28);
-  --glass-shadow-strong: 0 28px 72px rgba(3,10,25,0.38);
-  --shell-frame:
-    linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02) 18%, transparent 30%),
-    linear-gradient(135deg, rgba(125,211,252,0.1), transparent 38%);
-  --shell-frame-border: rgba(193,225,255,0.16);
-  --shell-frame-shadow: 0 20px 56px rgba(3,10,25,0.28);
-
-  --section-num-stroke: rgba(165,227,255,0.18);
-
-  --success:        #4ade80;
-  --success-light:  #86efac;
-  --success-contrast: #f2fff7;
-  --success-bg:     rgba(74,222,128,0.14);
-  --success-border: rgba(110,231,183,0.3);
-
-  --info:           #67c9ff;
-  --info-light:     #a5e3ff;
-  --info-contrast:  #f4fbff;
-  --info-bg:        rgba(103,201,255,0.15);
-  --info-border:    rgba(146,220,255,0.3);
-
-  --warning:        #fbbf24;
-  --warning-light:  #fde68a;
-  --warning-contrast: #fffdf5;
-  --warning-bg:     rgba(251,191,36,0.14);
-  --warning-border: rgba(253,224,71,0.3);
-
-  --danger:         #fb7185;
-  --danger-light:   #fda4af;
-  --danger-contrast: #fff5f7;
-  --danger-bg:      rgba(251,113,133,0.15);
-  --danger-border:  rgba(253,164,175,0.3);
+  --danger-bg:      rgba(253,164,175,0.18);
+  --danger-border:  rgba(254,205,211,0.34);
 }
 
 /* ── 4. Light Blue — "Blueprint"
@@ -699,129 +707,129 @@ iframe {
   --danger-border: rgba(153,27,27,0.2);
 }
 
-/* ── 6. Light Claude — "Warm Scholar"
-        Antique cream + copper-terracotta. Scholarly, warm, humanistic. */
+/* ── 6. Light Claude — "晨曦 / Claude Dawn"
+        Near-white canvas + coral-terracotta. Modern, humanistic, clean.
+        Evokes Claude's actual brand: warm but minimal, scholarly-modern. */
 [data-theme="light-claude"] {
-  --bg:            #faf7f2;
-  --bg-gradient:   radial-gradient(ellipse at 30% 20%, rgba(181,96,26,0.07) 0%, transparent 55%), #faf7f2;
-  --glow:          rgba(181,96,26,0.07);
+  --bg:            #FDFCF9;
+  --bg-gradient:
+    radial-gradient(ellipse at 28% 18%, rgba(194,95,53,0.07) 0%, transparent 48%),
+    #FDFCF9;
+  --glow:          rgba(194,95,53,0.07);
 
-  --text:          #231a0f;
-  --text-muted:    rgba(35,26,15,0.64);
+  --text:          #1C1008;
+  --text-muted:    rgba(28,16,8,0.58);
 
-  --primary:        #b5601a;
-  --primary-light:  #9a4d14;
-  --primary-bg:     rgba(181,96,26,0.1);
-  --primary-border: rgba(181,96,26,0.22);
+  --primary:        #C25F35;
+  --primary-light:  #A84A26;
+  --primary-bg:     rgba(194,95,53,0.08);
+  --primary-border: rgba(194,95,53,0.20);
 
-  --glass:         rgba(255,249,240,0.82);
-  --glass-border:  rgba(181,96,26,0.1);
-  --glass-highlight: rgba(255,255,255,0.38);
-  --glass-sheen: rgba(255,244,230,0.2);
+  --glass:         rgba(255,252,246,0.88);
+  --glass-border:  rgba(194,95,53,0.09);
+  --glass-highlight: rgba(255,255,255,0.52);
+  --glass-sheen: rgba(255,240,225,0.22);
   --glass-blur: 16px;
-  --glass-saturate: 118%;
-  --glass-shadow: 0 12px 32px rgba(88,52,20,0.08);
-  --glass-shadow-strong: 0 18px 40px rgba(88,52,20,0.12);
-  --shell-frame: linear-gradient(180deg, color-mix(in srgb, var(--glass) 40%, transparent), transparent 18%);
-  --shell-frame-border: rgba(181,96,26,0.07);
-  --shell-frame-shadow: 0 10px 28px rgba(88,52,20,0.08);
+  --glass-saturate: 116%;
+  --glass-shadow: 0 10px 30px rgba(80,36,12,0.07);
+  --glass-shadow-strong: 0 16px 40px rgba(80,36,12,0.11);
+  --shell-frame: linear-gradient(180deg, color-mix(in srgb, var(--glass) 42%, transparent), transparent 18%);
+  --shell-frame-border: rgba(194,95,53,0.06);
+  --shell-frame-shadow: 0 8px 24px rgba(80,36,12,0.07);
 
-  --section-num-stroke: rgba(181,96,26,0.1);
+  --section-num-stroke: rgba(194,95,53,0.09);
 
   /* sage green success */
-  --success:        #276749;
-  --success-light:  #1f5138;
+  --success:        #1e7c52;
+  --success-light:  #166340;
   --success-contrast: #f0fdf4;
-  --success-bg:     rgba(39,103,73,0.08);
-  --success-border: rgba(39,103,73,0.2);
+  --success-bg:     rgba(30,124,82,0.07);
+  --success-border: rgba(30,124,82,0.18);
 
-  /* muted slate-blue info */
-  --info:        #2e5fa3;
-  --info-light:  #244b80;
+  /* steel blue info — clearly distinct from coral */
+  --info:        #3563A8;
+  --info-light:  #2a4f88;
   --info-contrast: #eff6ff;
-  --info-bg:     rgba(46,95,163,0.08);
-  --info-border: rgba(46,95,163,0.2);
+  --info-bg:     rgba(53,99,168,0.07);
+  --info-border: rgba(53,99,168,0.18);
 
-  /* copper warning = primary */
-  --warning:        #b5601a;
-  --warning-light:  #9a4d14;
+  /* amber warning */
+  --warning:        #A65E14;
+  --warning-light:  #8B4D0F;
   --warning-contrast: #fff7ed;
-  --warning-bg:     rgba(181,96,26,0.1);
-  --warning-border: rgba(181,96,26,0.22);
+  --warning-bg:     rgba(166,94,20,0.08);
+  --warning-border: rgba(166,94,20,0.2);
 
   --danger:        #9b1c1c;
   --danger-light:  #7f1d1d;
   --danger-contrast: #fef2f2;
-  --danger-bg:     rgba(155,28,28,0.08);
-  --danger-border: rgba(155,28,28,0.2);
+  --danger-bg:     rgba(155,28,28,0.07);
+  --danger-border: rgba(155,28,28,0.18);
 }
 
-/* ── 7. Light Forbidden City — "故宫·朱金"
-        Vermillion red + imperial gold on white jade marble.
-        Regal, ceremonial warmth — the Forbidden City at dawn.    */
+/* ── 7. Light Dopamine — "多巴胺 / Dopamine Burst"
+        Pure white + vivid candy-color explosions. Maximum saturation.
+        Pink × violet × orange × lime — sugar-rush energy, zero restraint. */
 [data-theme="light-gugong"] {
-  /* canvas — 白玉台基 white jade marble base */
-  --bg:            #F9F0DC;
+  /* canvas — crisp white with vivid color blobs bursting from every corner */
+  --bg:            #FAFAFF;
   --bg-gradient:
-    radial-gradient(ellipse at 15% 20%, rgba(212,148,10,0.16) 0%, transparent 52%),
-    radial-gradient(ellipse at 78% 78%, rgba(192,65,26,0.08) 0%, transparent 46%),
-    radial-gradient(ellipse at 50% 5%,  rgba(220,170,20,0.10) 0%, transparent 38%),
-    #F9F0DC;
-  --glow:          rgba(212,148,10,0.14);
+    radial-gradient(circle at 4%  6%,  rgba(236,72,153,0.34) 0%, transparent 36%),
+    radial-gradient(circle at 96% 6%,  rgba(139,92,246,0.38) 0%, transparent 34%),
+    radial-gradient(circle at 50% 96%, rgba(249,115,22,0.28) 0%, transparent 40%),
+    radial-gradient(circle at 8%  88%, rgba(16,185,129,0.24) 0%, transparent 32%),
+    radial-gradient(circle at 90% 80%, rgba(234,179,8,0.22) 0%, transparent 30%),
+    #FAFAFF;
+  --glow:          rgba(168,85,247,0.22);
 
-  /* text — 深墨 deep ink with warm undertone */
-  --text:          #1C0A04;
-  --text-muted:    rgba(28,10,4,0.62);
+  --text:          #14052E;
+  --text-muted:    rgba(20,5,46,0.58);
 
-  /* brand — 朱红 vermillion (the iconic Forbidden City red) */
-  --primary:        #C0411A;
-  --primary-light:  #9E3313;
-  --primary-bg:     rgba(192,65,26,0.09);
-  --primary-border: rgba(192,65,26,0.22);
+  /* electric violet — the energy anchor */
+  --primary:        #9333EA;
+  --primary-light:  #7C22CE;
+  --primary-bg:     rgba(147,51,234,0.09);
+  --primary-border: rgba(147,51,234,0.22);
 
-  /* glass — 暖玉 warm ivory */
-  --glass:         rgba(255,244,220,0.80);
-  --glass-border:  rgba(192,65,26,0.15);
-  --glass-highlight: rgba(255,252,240,0.46);
-  --glass-sheen: rgba(255,238,195,0.24);
-  --glass-blur: 16px;
-  --glass-saturate: 122%;
-  --glass-shadow: 0 12px 32px rgba(90,35,10,0.09);
-  --glass-shadow-strong: 0 18px 40px rgba(90,35,10,0.15);
-  --shell-frame: linear-gradient(180deg, color-mix(in srgb, var(--glass) 44%, transparent), transparent 20%);
-  --shell-frame-border: rgba(192,65,26,0.08);
-  --shell-frame-shadow: 0 10px 28px rgba(90,35,10,0.08);
+  --glass:         rgba(255,255,255,0.82);
+  --glass-border:  rgba(147,51,234,0.16);
+  --glass-highlight: rgba(255,255,255,0.60);
+  --glass-sheen: rgba(233,213,255,0.28);
+  --glass-blur: 18px;
+  --glass-saturate: 150%;
+  --glass-shadow: 0 12px 32px rgba(147,51,234,0.10);
+  --glass-shadow-strong: 0 20px 48px rgba(147,51,234,0.16);
+  --shell-frame: linear-gradient(180deg, rgba(236,72,153,0.12), rgba(139,92,246,0.07) 24%, transparent 42%);
+  --shell-frame-border: rgba(147,51,234,0.12);
+  --shell-frame-shadow: 0 10px 28px rgba(147,51,234,0.10);
 
-  /* section watermark */
-  --section-num-stroke: rgba(192,65,26,0.10);
+  --section-num-stroke: rgba(147,51,234,0.12);
 
-  /* 松花绿 pine flower green — 碧玉 jade */
-  --success:        #2D7A4F;
-  --success-light:  #236040;
-  --success-contrast: #f0fdf6;
-  --success-bg:     rgba(45,122,79,0.08);
-  --success-border: rgba(45,122,79,0.2);
+  /* vivid candy semantics */
+  --success:        #059669;
+  --success-light:  #047857;
+  --success-contrast: #ECFDF5;
+  --success-bg:     rgba(5,150,105,0.09);
+  --success-border: rgba(5,150,105,0.24);
 
-  /* 石青 stone blue — 青金石 lapis lazuli */
-  --info:        #2A5C8E;
-  --info-light:  #204A72;
-  --info-contrast: #eff6ff;
-  --info-bg:     rgba(42,92,142,0.08);
-  --info-border: rgba(42,92,142,0.2);
+  --info:        #2563EB;
+  --info-light:  #1D4ED8;
+  --info-contrast: #EFF6FF;
+  --info-bg:     rgba(37,99,235,0.09);
+  --info-border: rgba(37,99,235,0.22);
 
-  /* 藤黄 vine yellow — 帝王金 imperial gold */
-  --warning:        #B8860B;
-  --warning-light:  #9A7009;
-  --warning-contrast: #fffbeb;
-  --warning-bg:     rgba(184,134,11,0.09);
-  --warning-border: rgba(184,134,11,0.22);
+  --warning:        #F97316;
+  --warning-light:  #EA580C;
+  --warning-contrast: #FFF7ED;
+  --warning-bg:     rgba(249,115,22,0.09);
+  --warning-border: rgba(249,115,22,0.24);
 
-  /* 丹朱 cinnabar — deeper vermillion */
-  --danger:        #9B1C1C;
-  --danger-light:  #7F1D1D;
-  --danger-contrast: #fef2f2;
-  --danger-bg:     rgba(155,28,28,0.08);
-  --danger-border: rgba(155,28,28,0.2);
+  /* hot pink danger — fits the dopamine palette */
+  --danger:        #E11D8A;
+  --danger-light:  #BE185D;
+  --danger-contrast: #FDF2F8;
+  --danger-bg:     rgba(225,29,138,0.09);
+  --danger-border: rgba(225,29,138,0.22);
 }
 
 

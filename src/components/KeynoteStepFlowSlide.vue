@@ -64,7 +64,7 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
           >
             <div
               :class="step.icon || 'i-carbon:arrow-right'"
-              class="slide-icon-xl"
+              class="sf-hicon"
               :style="{ color: toneVars(step.tone || 'blue').text }"
             />
             <span
@@ -198,6 +198,15 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
   flex-shrink: 0;
   gap: 0.5rem;
   padding: 0 1rem;
+}
+
+.sf-hicon {
+  font-size: 4rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* Step number badge - top-left pill */

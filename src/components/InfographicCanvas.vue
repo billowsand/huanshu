@@ -9,6 +9,18 @@ const props = defineProps<{
 const containerRef = ref<HTMLDivElement>()
 let infographicInstance: any = null
 
+function showFallback(text: string) {
+  if (containerRef.value) {
+    const pre = document.createElement('pre')
+    pre.textContent = text
+    pre.className = props.fallbackClass ?? ''
+    pre.style.whiteSpace = 'pre-wrap'
+    pre.style.wordBreak = 'break-word'
+    containerRef.value.innerHTML = ''
+    containerRef.value.appendChild(pre)
+  }
+}
+
 async function initInfographic(syntax: string) {
   if (!containerRef.value || !syntax?.trim()) return
 
@@ -26,19 +38,17 @@ async function initInfographic(syntax: string) {
       height: containerRef.value.clientHeight || 450,
     })
 
+    // Listen for error events (emitted when template not found, etc.)
+    infographicInstance.on('error', (err: any) => {
+      console.error('[InfographicCanvas] render error:', err)
+      showFallback(syntax)
+    })
+
     infographicInstance.render(syntax)
   }
   catch (err) {
     console.error('[InfographicCanvas] render failed:', err)
-    if (containerRef.value) {
-      const pre = document.createElement('pre')
-      pre.textContent = syntax
-      pre.className = props.fallbackClass ?? ''
-      pre.style.whiteSpace = 'pre-wrap'
-      pre.style.wordBreak = 'break-word'
-      containerRef.value.innerHTML = ''
-      containerRef.value.appendChild(pre)
-    }
+    showFallback(syntax)
   }
 }
 
