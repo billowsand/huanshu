@@ -318,6 +318,7 @@ pub fn make_fallback_slide(page: &PagePlan, layout: Option<&LayoutPlan>, aspect_
         panels: Vec::new(),
         left_items: Vec::new(),
         layers: Vec::new(),
+        layers_infographic_syntax: None,
         list_items: match kind {
             SlideKind::SectionList => list_items,
             _ => Vec::new(),

@@ -171,6 +171,7 @@ export interface SlideBlueprint {
   panels?: SpotlightPanel[]
   left_items?: ListItem[]
   layers?: LayerItem[]
+  layers_infographic_syntax?: string
   list_items?: ListItem[]
   points?: ListItem[]
   ranking?: RankingItem[]

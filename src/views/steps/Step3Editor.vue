@@ -67,6 +67,7 @@ const SIMPLE_FIELDS: EditorField[] = [
   { key: 'direction', label: '布局方向', type: 'select', options: DIRECTION_OPTIONS },
   { key: 'example_title', label: '示例标题', type: 'text', placeholder: '类比例子' },
   { key: 'example_body', label: '示例正文', type: 'textarea', rows: 3, placeholder: '输入示例说明' },
+  { key: 'layers_infographic_syntax', label: '右侧信息图语法', type: 'textarea', rows: 8, placeholder: 'infographic hierarchy-tree-horizontal\\ndata\\n  root\\n    label 架构总览' },
   { key: 'image', label: '主图路径', type: 'text', placeholder: 'media:12 或 https://...' },
 ]
 

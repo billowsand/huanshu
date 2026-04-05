@@ -238,6 +238,7 @@ const slideProps = computed(() => {
         subtitle: s.subtitle ?? '',
         leftItems: s.left_items ?? [],
         layers: s.layers ?? [],
+        layersInfographicSyntax: s.layers_infographic_syntax ?? '',
         footer: s.footer ?? '',
         aspect_ratio: s.aspect_ratio,
       }

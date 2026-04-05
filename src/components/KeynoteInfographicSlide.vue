@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import SlideReveal from './SlideReveal.vue'
+import InfographicCanvas from './InfographicCanvas.vue'
 
 const props = defineProps<{
   section?: string
@@ -9,63 +9,6 @@ const props = defineProps<{
   infographicSyntax: string
   footer?: string
 }>()
-
-const containerRef = ref<HTMLDivElement>()
-let infographicInstance: any = null
-
-async function initInfographic(syntax: string) {
-  if (!containerRef.value || !syntax?.trim()) return
-
-  try {
-    const { Infographic } = await import('@antv/infographic')
-
-    // Destroy previous instance if exists
-    if (infographicInstance) {
-      infographicInstance.destroy()
-      infographicInstance = null
-    }
-
-    infographicInstance = new Infographic({
-      container: containerRef.value,
-      width: containerRef.value.clientWidth || 800,
-      height: containerRef.value.clientHeight || 450,
-    })
-
-    infographicInstance.render(syntax)
-  }
-  catch (err) {
-    console.error('[InfographicSlide] render failed:', err)
-    // Fallback: show syntax as text (safe DOM manipulation to prevent XSS)
-    if (containerRef.value) {
-      const pre = document.createElement('pre')
-      pre.textContent = syntax
-      pre.style.cssText = 'color:#94a3b8;font-size:0.75rem;padding:16px;white-space:pre-wrap;word-break:break-all;'
-      containerRef.value.innerHTML = ''
-      containerRef.value.appendChild(pre)
-    }
-  }
-}
-
-onMounted(async () => {
-  await nextTick()
-  if (props.infographicSyntax) {
-    initInfographic(props.infographicSyntax)
-  }
-})
-
-onUnmounted(() => {
-  if (infographicInstance) {
-    infographicInstance.destroy()
-    infographicInstance = null
-  }
-})
-
-// Re-render when syntax changes
-watch(() => props.infographicSyntax, (newSyntax) => {
-  if (newSyntax) {
-    initInfographic(newSyntax)
-  }
-})
 </script>
 
 <template>
@@ -83,7 +26,12 @@ watch(() => props.infographicSyntax, (newSyntax) => {
 
     <!-- Infographic container -->
     <SlideReveal :delay="220" flex-1 min-h-0>
-      <div ref="containerRef" class="infographic-container" />
+      <div class="infographic-container">
+        <InfographicCanvas
+          :syntax="infographicSyntax"
+          fallback-class="infographic-fallback"
+        />
+      </div>
     </SlideReveal>
 
     <!-- Footer -->
@@ -135,6 +83,12 @@ watch(() => props.infographicSyntax, (newSyntax) => {
   overflow: hidden;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+:deep(.infographic-fallback) {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  padding: 16px;
 }
 
 .slide-footer {

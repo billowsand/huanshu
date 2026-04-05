@@ -140,6 +140,8 @@ pub struct SlideBlueprint {
     #[serde(default)]
     pub layers: Vec<LayerItem>,
     #[serde(default)]
+    pub layers_infographic_syntax: Option<String>,
+    #[serde(default)]
     pub list_items: Vec<ListItem>,
     #[serde(default)]
     pub points: Vec<ListItem>,

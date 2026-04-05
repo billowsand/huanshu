@@ -1027,6 +1027,7 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
   "layers": [
     { "title": "...", "meta": "...", "tone": "amber" }
   ],
+  "layers_infographic_syntax": "infographic hierarchy-tree-horizontal\ndata\n  root\n    label 架构总览\n    children\n      - label 接入层\n      - label 编排层\n      - label 数据层",
   "footer": "..."
 }"#
         }

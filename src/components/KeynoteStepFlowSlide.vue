@@ -184,27 +184,29 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
   }
 }
 
-/* Horizontal node */
+/* Horizontal node - pill shape matching card width */
 .sf-hnode {
   position: relative;
-  width: 4.5rem;
-  height: 4.5rem;
-  border-radius: 50%;
+  width: 100%;
+  height: 5rem;
+  border-radius: 1rem;
   border-width: 1px;
   border-style: solid;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  gap: 0.5rem;
+  padding: 0 1rem;
 }
 
-/* Step number badge (bottom-right of node) */
+/* Step number badge - top-left pill */
 .sf-num {
   position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 1.2rem;
-  height: 1.2rem;
+  top: -0.35rem;
+  left: -0.35rem;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 50%;
   font-size: var(--type-caption);
   font-weight: 800;
@@ -213,6 +215,7 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
   align-items: center;
   justify-content: center;
   color: rgba(0, 0, 0, 0.7);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .sf-hcard {
