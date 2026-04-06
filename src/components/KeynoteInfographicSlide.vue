@@ -58,7 +58,7 @@ const props = defineProps<{
   font-size: 0.68rem;
   letter-spacing: 0.32em;
   text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.6);
+  color: var(--text-muted);
 }
 
 .slide-title {
@@ -73,7 +73,7 @@ const props = defineProps<{
   margin-top: 0.4rem;
   font-size: 0.92rem;
   line-height: 1.6;
-  color: rgba(226, 232, 240, 0.72);
+  color: var(--text-muted);
 }
 
 .infographic-container {
@@ -81,12 +81,12 @@ const props = defineProps<{
   height: 100%;
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
 }
 
 :deep(.infographic-fallback) {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.75rem;
   padding: 16px;
 }
@@ -94,6 +94,6 @@ const props = defineProps<{
 .slide-footer {
   font-size: 0.82rem;
   line-height: 1.6;
-  color: rgba(148, 163, 184, 0.72);
+  color: var(--text-muted);
 }
 </style>

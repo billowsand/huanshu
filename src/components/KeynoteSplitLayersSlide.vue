@@ -126,8 +126,8 @@ const hasInfographic = computed(() => Boolean(props.layersInfographicSyntax?.tri
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--primary);
-  background: rgba(96, 165, 250, 0.1);
-  border: 1px solid rgba(96, 165, 250, 0.2);
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-border);
 }
 
 .split-left-title-row {
@@ -141,7 +141,7 @@ const hasInfographic = computed(() => Boolean(props.layersInfographicSyntax?.tri
 .split-left-index {
   font-size: 0.68rem;
   letter-spacing: 0.14em;
-  color: rgba(148, 163, 184, 0.55);
+  color: var(--text-muted);
 }
 
 .split-left-body {
@@ -153,7 +153,7 @@ const hasInfographic = computed(() => Boolean(props.layersInfographicSyntax?.tri
   margin-left: 1.15rem;
   width: 1px;
   height: 0.8rem;
-  background: linear-gradient(180deg, rgba(96, 165, 250, 0.45), rgba(148, 163, 184, 0.08));
+  background: linear-gradient(180deg, var(--primary), var(--glass));
 }
 
 .split-right-card {
@@ -165,12 +165,12 @@ const hasInfographic = computed(() => Boolean(props.layersInfographicSyntax?.tri
   min-height: 0;
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
 }
 
 :deep(.split-infographic-fallback) {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.75rem;
   padding: 16px;
 }
