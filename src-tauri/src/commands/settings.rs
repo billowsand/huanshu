@@ -1,4 +1,4 @@
-use crate::config::LlmSettings;
+use crate::config::{LlmSettings, ModelServiceSettings};
 use crate::lmstudio::LmStudioClient;
 use crate::AppState;
 use std::sync::Mutex;
@@ -23,9 +23,12 @@ pub async fn save_settings(
 #[tauri::command]
 pub async fn list_models(
     target: Option<String>,
+    service: Option<ModelServiceSettings>,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<Vec<String>, String> {
-    let service = {
+    let service = if let Some(service) = service {
+        service
+    } else {
         let state = state.lock().unwrap();
         match target.as_deref().unwrap_or("llm") {
             "llm" => state.settings.llm.clone(),

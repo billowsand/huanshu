@@ -86,7 +86,10 @@ async function fetchModels(target: ModelTarget) {
     loadingModels.value[target] = true;
     modelErrors.value[target] = "";
     try {
-        modelLists.value[target] = await config.listModels(target);
+        modelLists.value[target] = await config.listModels(
+            target,
+            { ...config.settings[target] },
+        );
     } catch (e: unknown) {
         modelErrors.value[target] = String(e);
     } finally {

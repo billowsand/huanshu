@@ -60,8 +60,8 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
-  async function listModels(target: ModelTarget): Promise<string[]> {
-    return invoke<string[]>('list_models', { target })
+  async function listModels(target: ModelTarget, service?: ModelServiceSettings): Promise<string[]> {
+    return invoke<string[]>('list_models', { target, service })
   }
 
   return { settings, loaded, saving, load, save, listModels }

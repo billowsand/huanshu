@@ -119,9 +119,30 @@ async function browseMediaDir() {
 async function verifyModels() {
     modelError.value = "";
     try {
-        await invoke<string[]>("list_models", { target: "llm" });
-        await invoke<string[]>("list_models", { target: "embedding" });
-        await invoke<string[]>("list_models", { target: "multimodal" });
+        await invoke<string[]>("list_models", {
+            target: "llm",
+            service: {
+                base_url: llmBaseUrl.value,
+                api_key: llmApiKey.value,
+                model: llmModel.value,
+            },
+        });
+        await invoke<string[]>("list_models", {
+            target: "embedding",
+            service: {
+                base_url: embeddingBaseUrl.value,
+                api_key: embeddingApiKey.value,
+                model: embeddingModel.value,
+            },
+        });
+        await invoke<string[]>("list_models", {
+            target: "multimodal",
+            service: {
+                base_url: multimodalBaseUrl.value,
+                api_key: multimodalApiKey.value,
+                model: multimodalModel.value,
+            },
+        });
     } catch (e) {
         modelError.value = String(e);
     }
