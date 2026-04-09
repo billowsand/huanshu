@@ -15,19 +15,22 @@ use crate::generator::utils::{sorted_assets, write_debug};
 // ---------------------------------------------------------------------------
 
 pub async fn ensure_models_ready(
-    client: &LmStudioClient,
-    model: &str,
+    llm_client: &LmStudioClient,
+    llm_model: &str,
+    embedding_client: &LmStudioClient,
     embedding_model: &str,
 ) -> Result<()> {
-    let models = client.list_models().await?;
-    if !models.iter().any(|name| name == model) {
-        bail!("generation model not found in LM Studio: {model}");
+    let llm_models = llm_client.list_models().await?;
+    if !llm_models.iter().any(|name| name == llm_model) {
+        bail!("generation model not found in LM Studio: {llm_model}");
     }
-    if !models.iter().any(|name| name == embedding_model) {
+
+    let embedding_models = embedding_client.list_models().await?;
+    if !embedding_models.iter().any(|name| name == embedding_model) {
         bail!("embedding model not found in LM Studio: {embedding_model}");
     }
     let probe = vec!["icon embedding healthcheck".to_string()];
-    let embeddings = client
+    let embeddings = embedding_client
         .embed(embedding_model, &probe)
         .await
         .with_context(|| {
@@ -236,7 +239,7 @@ async fn enrich_page_plans(
 
     write_debug(debug_dir, "01-page-plan.system.txt", system)?;
     write_debug(debug_dir, "01-page-plan.user.txt", &user)?;
-    let raw = client.generate_text(&config.model, system, &user).await?;
+    let raw = client.generate_text(&config.llm.model, system, &user).await?;
     write_debug(debug_dir, "01-page-plan.raw.txt", &raw)?;
     let resp: PageSignalResponse = crate::generator::utils::parse_json_with_extraction(&raw)
         .context("failed to parse page plan enrichment response")?;
@@ -619,7 +622,7 @@ async fn generate_layout_plans(
 
     write_debug(debug_dir, "02-layout-plan.system.txt", system)?;
     write_debug(debug_dir, "02-layout-plan.user.txt", &user)?;
-    let raw = client.generate_text(&config.model, system, &user).await?;
+    let raw = client.generate_text(&config.llm.model, system, &user).await?;
     write_debug(debug_dir, "02-layout-plan.raw.txt", &raw)?;
     let resp = crate::generator::utils::parse_layout_plan_response(&raw, page_plans).with_context(
         || {
@@ -987,7 +990,7 @@ async fn repair_layout_plans(
     let repair_prefix = format!("02-layout-plan.repair-r{}", round + 1);
     write_debug(debug_dir, &format!("{repair_prefix}.system.txt"), system)?;
     write_debug(debug_dir, &format!("{repair_prefix}.user.txt"), &user)?;
-    let raw = client.generate_text(&config.model, system, &user).await?;
+    let raw = client.generate_text(&config.llm.model, system, &user).await?;
     write_debug(debug_dir, &format!("{repair_prefix}.raw.txt"), &raw)?;
     let resp = crate::generator::utils::parse_layout_plan_response(&raw, &flagged_pages)
         .with_context(|| {
@@ -1229,7 +1232,7 @@ async fn generate_overview_section_descs(
 
     write_debug(&config.debug_dir, "02a-overview-summary.system.txt", system)?;
     write_debug(&config.debug_dir, "02a-overview-summary.user.txt", &user)?;
-    let raw = client.generate_text(&config.model, system, &user).await?;
+    let raw = client.generate_text(&config.llm.model, system, &user).await?;
     write_debug(&config.debug_dir, "02a-overview-summary.raw.txt", &raw)?;
     let resp: OverviewSummaryResponse = crate::generator::utils::parse_json_with_extraction(&raw)
         .context("failed to parse overview summary response")?;
@@ -1281,7 +1284,7 @@ pub async fn enrich_one_page_plan(
     let _ = write_debug(debug_dir, &format!("{prefix}.system.txt"), system);
     let _ = write_debug(debug_dir, &format!("{prefix}.user.txt"), &user);
 
-    match client.generate_text(&config.model, system, &user).await {
+    match client.generate_text(&config.llm.model, system, &user).await {
         Ok(raw) => {
             let _ = write_debug(debug_dir, &format!("{prefix}.raw.txt"), &raw);
             match crate::generator::utils::parse_json_with_extraction::<PageSignalResponse>(&raw) {
@@ -1337,7 +1340,7 @@ pub async fn layout_one_page(
     let _ = write_debug(debug_dir, &format!("{prefix}.system.txt"), system);
     let _ = write_debug(debug_dir, &format!("{prefix}.user.txt"), &user);
 
-    match client.generate_text(&config.model, system, &user).await {
+    match client.generate_text(&config.llm.model, system, &user).await {
         Ok(raw) => {
             let _ = write_debug(debug_dir, &format!("{prefix}.raw.txt"), &raw);
             match crate::generator::utils::parse_json_with_extraction::<crate::types::LayoutCandidateResponse>(&raw) {

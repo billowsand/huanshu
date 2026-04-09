@@ -62,6 +62,8 @@ pub struct AppGlobalSettings {
     pub media_dir: String,
     pub llm_configured: bool,
     pub embeddings_ready: bool,
+    #[serde(default)]
+    pub initialized_embedding_model: String,
 }
 
 impl Default for AppGlobalSettings {
@@ -74,6 +76,7 @@ impl Default for AppGlobalSettings {
             media_dir: default_data.join("media").to_string_lossy().to_string(),
             llm_configured: false,
             embeddings_ready: false,
+            initialized_embedding_model: String::new(),
         }
     }
 }

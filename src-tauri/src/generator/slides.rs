@@ -18,7 +18,8 @@ use crate::generator::utils::{
 /// Generate content slides and emit per-slide progress via a callback as each
 /// slide completes (not after all slides finish).
 pub async fn generate_content_slides_with_progress<F>(
-    client: &LmStudioClient,
+    llm_client: &LmStudioClient,
+    embedding_client: &LmStudioClient,
     config: &GenerationConfig,
     doc: &ParsedDocument,
     page_plans: &[PagePlan],
@@ -40,8 +41,8 @@ where
     // Pre-compute semantically ranked icon candidates for all slides in one
     // batch embedding call, then fall back to lexical if the index is empty.
     let semantic_candidates: Vec<Vec<String>> = precompute_semantic_candidates(
-        client,
-        &config.embedding_model,
+        embedding_client,
+        &config.embedding.model,
         icon_index,
         page_plans,
         layout_plans,
@@ -88,8 +89,8 @@ where
             }
         };
 
-        let client_owned = client.clone();
-        let model = config.model.clone();
+        let client_owned = llm_client.clone();
+        let model = config.llm.model.clone();
         let doc_title = doc.title.clone();
         let page_owned = page.clone();
         let layout_owned = (*layout).clone();
@@ -205,7 +206,7 @@ pub async fn repair_single_slide(
     use crate::generator::icons::collect_icon_candidates_from_slide;
     use crate::generator::utils::blueprint_schema_hint;
 
-    let client = LmStudioClient::new(&config.lmstudio_base_url);
+    let client = config.llm_client();
     let schema_hint = blueprint_schema_hint(&blueprint.kind);
 
     let icon_section = icon_index
@@ -240,7 +241,7 @@ pub async fn repair_single_slide(
     );
 
     let raw = client
-        .generate_text(&config.model, system, &user)
+        .generate_text(&config.llm.model, system, &user)
         .await
         .context("failed to repair slide")?;
 
@@ -295,7 +296,7 @@ pub async fn regenerate_slides_at(
         };
         match generate_one_slide_inner(
             client.clone(),
-            config.model.clone(),
+            config.llm.model.clone(),
             doc.title.clone(),
             page.clone(),
             (*layout).clone(),
@@ -349,12 +350,13 @@ pub enum PageStage {
 /// Each page runs independently; the `used_layouts` parameter carries
 /// information about already-completed pages for layout diversity.
 pub async fn generate_single_page_pipeline(
-    client: &LmStudioClient,
+    llm_client: &LmStudioClient,
+    embedding_client: &LmStudioClient,
     config: &GenerationConfig,
     doc: &ParsedDocument,
     base_page_plan: PagePlan,
     slide_index: usize,
-    total_slides: usize,
+    _total_slides: usize,
     used_layouts_shared: std::sync::Arc<tokio::sync::Mutex<Vec<(usize, String)>>>,
     icon_index: &IconIndex,
     asset_paths: &HashSet<String>,
@@ -366,7 +368,7 @@ pub async fn generate_single_page_pipeline(
     // Stage 1: Enrich page plan
     on_stage(slide_index, PageStage::Planning, Some("丰富页面规划"));
     let page_plan = crate::generator::planning::enrich_one_page_plan(
-        client,
+        llm_client,
         config,
         doc,
         &base_page_plan,
@@ -380,7 +382,7 @@ pub async fn generate_single_page_pipeline(
     // Snapshot layouts right before selection (not at task spawn time)
     let layouts_snapshot = used_layouts_shared.lock().await.clone();
     let layout_plan = crate::generator::planning::layout_one_page(
-        client,
+        llm_client,
         config,
         &page_plan,
         &layouts_snapshot,
@@ -410,8 +412,8 @@ pub async fn generate_single_page_pipeline(
 
     let candidates = {
         let sem_cands = crate::generator::icons::precompute_semantic_candidates(
-            client,
-            &config.embedding_model,
+            embedding_client,
+            &config.embedding.model,
             icon_index,
             std::slice::from_ref(&page_plan),
             std::slice::from_ref(&layout_plan),
@@ -430,8 +432,8 @@ pub async fn generate_single_page_pipeline(
     let asset_list = crate::generator::utils::sorted_assets(asset_paths);
 
     let mut slide = generate_one_slide(
-        client.clone(),
-        config.model.clone(),
+        llm_client.clone(),
+        config.llm.model.clone(),
         doc.title.clone(),
         page_plan.clone(),
         layout_plan.clone(),
@@ -448,8 +450,8 @@ pub async fn generate_single_page_pipeline(
     on_stage(slide_index, PageStage::Normalizing, Some("规范化修复"));
     crate::generator::normalize::normalize_one_blueprint(
         &mut slide,
-        client,
-        &config.embedding_model,
+        embedding_client,
+        &config.embedding.model,
         icon_index,
         asset_paths,
         config.aspect_ratio,
@@ -459,7 +461,8 @@ pub async fn generate_single_page_pipeline(
     // Stage 5: Validate + repair
     on_stage(slide_index, PageStage::Validating, Some("校验与修复"));
     let slide = crate::generator::normalize::repair_one_slide(
-        client,
+        llm_client,
+        embedding_client,
         config,
         doc,
         &page_plan,

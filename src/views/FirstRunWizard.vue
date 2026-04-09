@@ -14,17 +14,21 @@ type Step = 1 | 2 | 3 | 4;
 const currentStep = ref<Step>(1);
 const dataDir = ref("");
 const mediaDir = ref("");
-const baseUrl = ref("http://127.0.0.1:1234");
-const apiKey = ref("");
-const model = ref("qwen/qwen3.5-9b");
+const llmBaseUrl = ref("http://127.0.0.1:1234");
+const llmApiKey = ref("");
+const llmModel = ref("qwen/qwen3.5-9b");
+const embeddingBaseUrl = ref("http://127.0.0.1:1234");
+const embeddingApiKey = ref("");
 const embeddingModel = ref("text-embedding-bge-m3");
+const multimodalBaseUrl = ref("http://127.0.0.1:1234");
+const multimodalApiKey = ref("");
+const multimodalModel = ref("qwen/qwen2.5-vl-7b-instruct");
 const embeddingProgress = ref(0);
 const embeddingStatus = ref("");
 const isInitializing = ref(false);
 const skipLlm = ref(false);
 const skipEmbedding = ref(false);
 const modelError = ref("");
-const models = ref<string[]>([]);
 
 const defaultDataDir = ref("");
 const defaultMediaDir = ref("");
@@ -51,9 +55,12 @@ const canProceedStep1 = computed(
 const canProceedStep2 = computed(
     () =>
         skipLlm.value ||
-        (baseUrl.value.trim() &&
-            model.value.trim() &&
-            embeddingModel.value.trim()),
+        (llmBaseUrl.value.trim() &&
+            llmModel.value.trim() &&
+            embeddingBaseUrl.value.trim() &&
+            embeddingModel.value.trim() &&
+            multimodalBaseUrl.value.trim() &&
+            multimodalModel.value.trim()),
 );
 const dataDirChanged = computed(
     () =>
@@ -112,9 +119,9 @@ async function browseMediaDir() {
 async function verifyModels() {
     modelError.value = "";
     try {
-        const { listModels } = useConfigStore();
-        const client = await invoke<string[]>("list_models");
-        models.value = client;
+        await invoke<string[]>("list_models", { target: "llm" });
+        await invoke<string[]>("list_models", { target: "embedding" });
+        await invoke<string[]>("list_models", { target: "multimodal" });
     } catch (e) {
         modelError.value = String(e);
     }
@@ -126,10 +133,15 @@ async function startEmbeddingInit() {
     embeddingStatus.value = "正在初始化图标向量库...";
 
     try {
-        config.settings.base_url = baseUrl.value;
-        config.settings.api_key = apiKey.value;
-        config.settings.model = model.value;
-        config.settings.embedding_model = embeddingModel.value;
+        config.settings.llm.base_url = llmBaseUrl.value;
+        config.settings.llm.api_key = llmApiKey.value;
+        config.settings.llm.model = llmModel.value;
+        config.settings.embedding.base_url = embeddingBaseUrl.value;
+        config.settings.embedding.api_key = embeddingApiKey.value;
+        config.settings.embedding.model = embeddingModel.value;
+        config.settings.multimodal.base_url = multimodalBaseUrl.value;
+        config.settings.multimodal.api_key = multimodalApiKey.value;
+        config.settings.multimodal.model = multimodalModel.value;
         await config.save();
 
         await invoke("ensure_icon_embeddings");
@@ -152,14 +164,23 @@ async function finishWizard() {
                 media_dir: mediaDir.value,
                 llm_configured: !skipLlm.value,
                 embeddings_ready: embeddingsReady.value,
+                initialized_embedding_model:
+                    !skipLlm.value && !skipEmbedding.value
+                        ? embeddingModel.value
+                        : "",
             },
         });
 
         if (!skipLlm.value) {
-            config.settings.base_url = baseUrl.value;
-            config.settings.api_key = apiKey.value;
-            config.settings.model = model.value;
-            config.settings.embedding_model = embeddingModel.value;
+            config.settings.llm.base_url = llmBaseUrl.value;
+            config.settings.llm.api_key = llmApiKey.value;
+            config.settings.llm.model = llmModel.value;
+            config.settings.embedding.base_url = embeddingBaseUrl.value;
+            config.settings.embedding.api_key = embeddingApiKey.value;
+            config.settings.embedding.model = embeddingModel.value;
+            config.settings.multimodal.base_url = multimodalBaseUrl.value;
+            config.settings.multimodal.api_key = multimodalApiKey.value;
+            config.settings.multimodal.model = multimodalModel.value;
             await config.save();
         }
 
@@ -296,9 +317,9 @@ async function finishWizard() {
 
                 <div class="field-group">
                     <div class="field">
-                        <label>API 地址</label>
+                        <label>大语言模型 API 地址</label>
                         <input
-                            v-model="baseUrl"
+                            v-model="llmBaseUrl"
                             placeholder="http://127.0.0.1:1234"
                         />
                     </div>
@@ -311,7 +332,7 @@ async function finishWizard() {
                             ></label
                         >
                         <input
-                            v-model="apiKey"
+                            v-model="llmApiKey"
                             type="password"
                             placeholder="sk-..."
                             autocomplete="off"
@@ -319,8 +340,29 @@ async function finishWizard() {
                     </div>
 
                     <div class="field">
-                        <label>生成模型</label>
-                        <input v-model="model" placeholder="qwen/qwen3.5-9b" />
+                        <label>大语言模型</label>
+                        <input
+                            v-model="llmModel"
+                            placeholder="qwen/qwen3.5-9b"
+                        />
+                    </div>
+
+                    <div class="field">
+                        <label>向量模型 API 地址</label>
+                        <input
+                            v-model="embeddingBaseUrl"
+                            placeholder="http://127.0.0.1:1234"
+                        />
+                    </div>
+
+                    <div class="field">
+                        <label>向量模型 API Key</label>
+                        <input
+                            v-model="embeddingApiKey"
+                            type="password"
+                            placeholder="sk-..."
+                            autocomplete="off"
+                        />
                     </div>
 
                     <div class="field">
@@ -328,6 +370,32 @@ async function finishWizard() {
                         <input
                             v-model="embeddingModel"
                             placeholder="text-embedding-bge-m3"
+                        />
+                    </div>
+
+                    <div class="field">
+                        <label>多模态模型 API 地址</label>
+                        <input
+                            v-model="multimodalBaseUrl"
+                            placeholder="http://127.0.0.1:1234"
+                        />
+                    </div>
+
+                    <div class="field">
+                        <label>多模态模型 API Key</label>
+                        <input
+                            v-model="multimodalApiKey"
+                            type="password"
+                            placeholder="sk-..."
+                            autocomplete="off"
+                        />
+                    </div>
+
+                    <div class="field">
+                        <label>多模态模型</label>
+                        <input
+                            v-model="multimodalModel"
+                            placeholder="qwen/qwen2.5-vl-7b-instruct"
                         />
                     </div>
                 </div>
@@ -393,7 +461,19 @@ async function finishWizard() {
                     <div class="summary-row">
                         <span class="summary-label">大模型</span>
                         <span class="summary-value">{{
-                            skipLlm ? "未配置" : model
+                            skipLlm ? "未配置" : llmModel
+                        }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">向量模型</span>
+                        <span class="summary-value">{{
+                            skipLlm ? "未配置" : embeddingModel
+                        }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">多模态模型</span>
+                        <span class="summary-value">{{
+                            skipLlm ? "未配置" : multimodalModel
                         }}</span>
                     </div>
                     <div class="summary-row">

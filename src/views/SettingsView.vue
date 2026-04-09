@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { useConfigStore } from "../stores/config";
+import { useConfigStore, type ModelTarget } from "../stores/config";
 import { useAppSettingsStore } from "../stores/appSettings";
 import { invoke } from "@tauri-apps/api/core";
 import BrandMark from "../components/BrandMark.vue";
@@ -10,27 +10,87 @@ const router = useRouter();
 const config = useConfigStore();
 const appSettings = useAppSettingsStore();
 
-const models = ref<string[]>([]);
-const loadingModels = ref(false);
-const modelError = ref("");
+const modelLists = ref<Record<ModelTarget, string[]>>({
+    llm: [],
+    embedding: [],
+    multimodal: [],
+});
+const loadingModels = ref<Record<ModelTarget, boolean>>({
+    llm: false,
+    embedding: false,
+    multimodal: false,
+});
+const modelErrors = ref<Record<ModelTarget, string>>({
+    llm: "",
+    embedding: "",
+    multimodal: "",
+});
 const saved = ref(false);
 const initializingEmbeddings = ref(false);
 const embeddingStatus = ref("");
+
+const embeddingModelCurrent = computed(
+    () => config.settings.embedding.model.trim(),
+);
+const embeddingModelInitialized = computed(
+    () => appSettings.settings.initialized_embedding_model.trim(),
+);
+const embeddingCacheReady = computed(
+    () =>
+        appSettings.settings.embeddings_ready &&
+        embeddingModelCurrent.value.length > 0 &&
+        embeddingModelCurrent.value === embeddingModelInitialized.value,
+);
+const embeddingStatusLabel = computed(() => {
+    if (embeddingCacheReady.value) {
+        return "已初始化";
+    }
+    if (appSettings.settings.embeddings_ready && embeddingModelInitialized.value) {
+        return "模型已变更，需重新初始化";
+    }
+    return "未初始化";
+});
+
+const modelSections: Array<{
+    key: ModelTarget;
+    title: string;
+    desc: string;
+    hint: string;
+}> = [
+    {
+        key: "llm",
+        title: "大语言模型",
+        desc: "负责 Markdown 优化、页面规划、布局选择和幻灯片正文生成。",
+        hint: "推荐 qwen/qwen3.5-9b 或更强的指令模型",
+    },
+    {
+        key: "embedding",
+        title: "向量模型",
+        desc: "负责图标语义匹配与向量检索，需支持 /v1/embeddings。",
+        hint: "推荐 text-embedding-bge-m3 或同类 embedding 模型",
+    },
+    {
+        key: "multimodal",
+        title: "多模态模型",
+        desc: "负责图片理解与自动描述，不再复用文本生成模型配置。",
+        hint: "推荐支持图像输入的视觉模型，如 qwen2.5-vl 系列",
+    },
+];
 
 onMounted(async () => {
     await config.load();
     await appSettings.load();
 });
 
-async function fetchModels() {
-    loadingModels.value = true;
-    modelError.value = "";
+async function fetchModels(target: ModelTarget) {
+    loadingModels.value[target] = true;
+    modelErrors.value[target] = "";
     try {
-        models.value = await config.listModels();
+        modelLists.value[target] = await config.listModels(target);
     } catch (e: unknown) {
-        modelError.value = String(e);
+        modelErrors.value[target] = String(e);
     } finally {
-        loadingModels.value = false;
+        loadingModels.value[target] = false;
     }
 }
 
@@ -47,8 +107,7 @@ async function initEmbeddings() {
     embeddingStatus.value = "正在初始化...";
     try {
         await invoke("ensure_icon_embeddings");
-        appSettings.settings.embeddings_ready = true;
-        await appSettings.save();
+        await appSettings.load();
         embeddingStatus.value = "初始化完成！";
     } catch (e) {
         embeddingStatus.value = `失败: ${e}`;
@@ -83,119 +142,115 @@ async function initEmbeddings() {
 
         <div class="settings-body">
             <div class="settings-card">
-                <h2 class="section-title">LLM API 连接（OpenAI 兼容）</h2>
+                <h2 class="section-title">模型服务配置</h2>
                 <p class="section-desc">
-                    支持任何 OpenAI 兼容接口：LM
-                    Studio、Ollama、OpenAI、DeepSeek、SiliconFlow
-                    等。本地服务无需填写 API Key。
+                    现在支持分别配置大语言模型、向量模型和多模态模型。三类能力可指向不同
+                    URL、API Key 和模型 ID。
                 </p>
 
-                <div class="field-group">
-                    <div class="field">
-                        <label>API 地址</label>
-                        <input
-                            v-model="config.settings.base_url"
-                            placeholder="http://127.0.0.1:1234"
-                        />
-                        <p class="hint">
-                            LM Studio 默认：http://127.0.0.1:1234 · Ollama
-                            默认：http://127.0.0.1:11434 ·
-                            OpenAI：https://api.openai.com
+                <div class="model-service-grid">
+                    <section
+                        v-for="section in modelSections"
+                        :key="section.key"
+                        class="service-panel"
+                    >
+                        <div class="model-header">
+                            <div>
+                                <h3>{{ section.title }}</h3>
+                                <p class="service-desc">{{ section.desc }}</p>
+                            </div>
+                            <button
+                                class="btn"
+                                :disabled="loadingModels[section.key]"
+                                @click="fetchModels(section.key)"
+                            >
+                                <span
+                                    v-if="loadingModels[section.key]"
+                                    class="i-carbon:renew spin"
+                                />
+                                <span v-else class="i-carbon:refresh" />
+                                {{
+                                    loadingModels[section.key]
+                                        ? "加载中..."
+                                        : "获取模型"
+                                }}
+                            </button>
+                        </div>
+
+                        <p v-if="modelErrors[section.key]" class="error-msg">
+                            {{ modelErrors[section.key] }}
                         </p>
-                    </div>
-                    <div class="field">
-                        <label
-                            >API Key
-                            <span style="font-weight: 400; opacity: 0.5"
-                                >（本地服务留空）</span
-                            ></label
-                        >
-                        <input
-                            v-model="config.settings.api_key"
-                            type="password"
-                            placeholder="sk-..."
-                            autocomplete="off"
-                        />
-                    </div>
-                </div>
 
-                <div class="model-section">
-                    <div class="model-header">
-                        <h3>模型选择</h3>
-                        <button
-                            class="btn"
-                            :disabled="loadingModels"
-                            @click="fetchModels"
-                        >
-                            <span
-                                v-if="loadingModels"
-                                class="i-carbon:renew spin"
-                            />
-                            <span v-else class="i-carbon:refresh" />
-                            {{ loadingModels ? "加载中..." : "获取可用模型" }}
-                        </button>
-                    </div>
-                    <p v-if="modelError" class="error-msg">{{ modelError }}</p>
-
-                    <div class="field-group">
-                        <div class="field">
-                            <label>生成模型</label>
-                            <div class="select-row">
-                                <select v-model="config.settings.model">
-                                    <option
-                                        v-for="m in models"
-                                        :key="m"
-                                        :value="m"
-                                    >
-                                        {{ m }}
-                                    </option>
-                                    <option :value="config.settings.model">
-                                        {{ config.settings.model }} (当前)
-                                    </option>
-                                </select>
+                        <div class="field-group">
+                            <div class="field">
+                                <label>API 地址</label>
                                 <input
-                                    v-model="config.settings.model"
-                                    placeholder="或手动输入模型 ID"
+                                    v-model="
+                                        config.settings[section.key].base_url
+                                    "
+                                    placeholder="http://127.0.0.1:1234"
+                                />
+                                <p class="hint">
+                                    本地常见地址：LM Studio
+                                    `http://127.0.0.1:1234`，Ollama
+                                    `http://127.0.0.1:11434`
+                                </p>
+                            </div>
+
+                            <div class="field">
+                                <label>
+                                    API Key
+                                    <span class="subtle"
+                                        >（本地服务留空）</span
+                                    >
+                                </label>
+                                <input
+                                    v-model="config.settings[section.key].api_key"
+                                    type="password"
+                                    placeholder="sk-..."
+                                    autocomplete="off"
                                 />
                             </div>
-                            <p class="hint">
-                                用于生成幻灯片内容，推荐 qwen/qwen3.5-9b
-                                或更大的模型
-                            </p>
-                        </div>
 
-                        <div class="field">
-                            <label>Embedding 模型</label>
-                            <div class="select-row">
-                                <select
-                                    v-model="config.settings.embedding_model"
-                                >
-                                    <option
-                                        v-for="m in models"
-                                        :key="m"
-                                        :value="m"
+                            <div class="field">
+                                <label>模型</label>
+                                <div class="select-row">
+                                    <select
+                                        v-model="
+                                            config.settings[section.key].model
+                                        "
                                     >
-                                        {{ m }}
-                                    </option>
-                                    <option
-                                        :value="config.settings.embedding_model"
-                                    >
-                                        {{
-                                            config.settings.embedding_model
-                                        }}
-                                        (当前)
-                                    </option>
-                                </select>
-                                <input
-                                    v-model="config.settings.embedding_model"
-                                    placeholder="或手动输入模型 ID"
-                                />
+                                        <option
+                                            v-for="m in modelLists[section.key]"
+                                            :key="m"
+                                            :value="m"
+                                        >
+                                            {{ m }}
+                                        </option>
+                                        <option
+                                            :value="
+                                                config.settings[section.key]
+                                                    .model
+                                            "
+                                        >
+                                            {{
+                                                config.settings[section.key]
+                                                    .model
+                                            }}
+                                            (当前)
+                                        </option>
+                                    </select>
+                                    <input
+                                        v-model="
+                                            config.settings[section.key].model
+                                        "
+                                        placeholder="或手动输入模型 ID"
+                                    />
+                                </div>
+                                <p class="hint">{{ section.hint }}</p>
                             </div>
-                            <p class="hint">
-                                用于图标语义匹配，推荐 text-embedding-bge-m3
-                            </p>
                         </div>
-                    </div>
+                    </section>
                 </div>
             </div>
 
@@ -224,7 +279,7 @@ async function initEmbeddings() {
                             max="8"
                         />
                         <p class="hint">
-                            同时生成的幻灯片数量，建议 1（避免 LM Studio 过载）
+                            同时生成的幻灯片数量，建议 1（避免本地模型过载）
                         </p>
                     </div>
                 </div>
@@ -263,26 +318,22 @@ async function initEmbeddings() {
                     <div
                         class="status-indicator"
                         :class="{
-                            ready: appSettings.settings.embeddings_ready,
+                            ready: embeddingCacheReady,
                         }"
                     >
                         <span
-                            v-if="appSettings.settings.embeddings_ready"
+                            v-if="embeddingCacheReady"
                             class="i-carbon:checkmark-circle"
                         />
                         <span v-else class="i-carbon:warning" />
-                        <span>{{
-                            appSettings.settings.embeddings_ready
-                                ? "已初始化"
-                                : "未初始化"
-                        }}</span>
+                        <span>{{ embeddingStatusLabel }}</span>
                     </div>
 
                     <button
                         class="btn"
                         :disabled="
                             initializingEmbeddings ||
-                            appSettings.settings.embeddings_ready
+                            embeddingCacheReady
                         "
                         @click="initEmbeddings"
                     >
@@ -293,12 +344,30 @@ async function initEmbeddings() {
                         {{
                             initializingEmbeddings
                                 ? embeddingStatus
-                                : appSettings.settings.embeddings_ready
+                                : embeddingCacheReady
                                   ? "已就绪"
-                                  : "重新初始化"
+                                  : "开始初始化"
                         }}
                     </button>
                 </div>
+
+                <p
+                    v-if="
+                        appSettings.settings.initialized_embedding_model &&
+                        appSettings.settings.initialized_embedding_model !==
+                            config.settings.embedding.model
+                    "
+                    class="warning-notice"
+                >
+                    <span class="i-carbon:warning" />
+                    当前向量模型为
+                    <code>{{ config.settings.embedding.model }}</code
+                    >，缓存仍对应
+                    <code>{{
+                        appSettings.settings.initialized_embedding_model
+                    }}</code
+                    >，需要重新初始化。
+                </p>
 
                 <p
                     v-if="!appSettings.settings.llm_configured"
@@ -313,24 +382,17 @@ async function initEmbeddings() {
                 <h2 class="section-title">使用说明</h2>
                 <ol class="guide-list">
                     <li>
-                        <b>本地模型（LM Studio / Ollama）</b>：填写本地地址，API
-                        Key 留空，点击「获取可用模型」验证连接
+                        文本生成、向量检索、图片理解现在各自独立配置，允许分别接入不同服务。
                     </li>
                     <li>
-                        <b>云端 API（OpenAI / DeepSeek / SiliconFlow）</b
-                        >：填写对应 Base URL 和 API Key，手动输入模型名称
+                        向量模型必须支持 <code>/v1/embeddings</code>，否则图标语义匹配和向量库初始化无法工作。
                     </li>
                     <li>
-                        注意：Embedding 模型需要支持
-                        <code>/v1/embeddings</code>，用于图标语义匹配；云端 API
-                        可填同一模型
+                        多模态模型用于图片分析与自动描述，需支持图像输入的
+                        <code>/v1/chat/completions</code>。
                     </li>
                     <li>
-                        保存设置后，在 Studio 主界面上传 Markdown
-                        文件并点击「生成 Keynote」
-                    </li>
-                    <li>
-                        生成完成后点击「全屏演示」查看幻灯片，不需要启动任何服务
+                        保存设置后，在 Studio 主界面上传 Markdown 文件并点击「生成 Keynote」。
                     </li>
                 </ol>
             </div>
@@ -392,7 +454,7 @@ async function initEmbeddings() {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    max-width: 720px;
+    max-width: 980px;
     margin: 0 auto;
     width: 100%;
 }
@@ -412,25 +474,42 @@ async function initEmbeddings() {
     font-weight: 600;
 }
 
-.section-desc {
+.section-desc,
+.service-desc {
     font-size: 0.8rem;
     color: var(--studio-muted);
     line-height: 1.6;
 }
 
-.model-section {
+.model-service-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.9rem;
+}
+
+.service-panel {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.9rem;
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--studio-border);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+        var(--studio-panel-2);
 }
+
 .model-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 0.75rem;
 }
+
 .model-header h3 {
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin: 0;
 }
 
 .field-group {
@@ -438,6 +517,7 @@ async function initEmbeddings() {
     flex-direction: column;
     gap: 0.75rem;
 }
+
 .field-group.two-col {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -454,17 +534,24 @@ async function initEmbeddings() {
     display: flex;
     gap: 0.4rem;
 }
+
 .select-row select {
     flex: 1;
 }
+
 .select-row input {
-    flex: 1.5;
+    flex: 1.35;
 }
 
 .hint {
     font-size: 0.7rem;
     color: var(--studio-muted);
     line-height: 1.5;
+}
+
+.subtle {
+    font-weight: 400;
+    opacity: 0.5;
 }
 
 .error-msg {
@@ -479,6 +566,7 @@ async function initEmbeddings() {
 .info-card {
     border-color: var(--studio-primary-border);
 }
+
 .guide-list {
     padding-left: 1.2rem;
     display: flex;
@@ -488,6 +576,7 @@ async function initEmbeddings() {
     color: var(--studio-muted);
     line-height: 1.6;
 }
+
 .guide-list li code {
     background: var(--studio-surface);
     border: 1px solid var(--studio-border);
@@ -501,6 +590,7 @@ async function initEmbeddings() {
 .spin {
     animation: spin 0.7s linear infinite;
 }
+
 @keyframes spin {
     to {
         transform: rotate(360deg);
@@ -547,5 +637,29 @@ async function initEmbeddings() {
     border-radius: 6px;
     font-size: 0.8rem;
     color: var(--studio-muted);
+}
+
+@media (max-width: 980px) {
+    .model-service-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .settings-body {
+        padding: 1rem;
+    }
+
+    .field-group.two-col,
+    .select-row {
+        grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .embedding-status {
+        align-items: flex-start;
+        flex-direction: column;
+    }
 }
 </style>

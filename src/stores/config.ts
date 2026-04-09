@@ -3,20 +3,38 @@ import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
 export interface LlmSettings {
-  base_url: string
-  api_key: string
-  model: string
-  embedding_model: string
+  llm: ModelServiceSettings
+  embedding: ModelServiceSettings
+  multimodal: ModelServiceSettings
   repair_rounds: number
   concurrency: number
 }
 
+export interface ModelServiceSettings {
+  base_url: string
+  api_key: string
+  model: string
+}
+
+export type ModelTarget = 'llm' | 'embedding' | 'multimodal'
+
 export const useConfigStore = defineStore('config', () => {
   const settings = ref<LlmSettings>({
-    base_url: 'http://127.0.0.1:1234',
-    api_key: '',
-    model: 'qwen/qwen3.5-9b',
-    embedding_model: 'text-embedding-bge-m3',
+    llm: {
+      base_url: 'http://127.0.0.1:1234',
+      api_key: '',
+      model: 'qwen/qwen3.5-9b',
+    },
+    embedding: {
+      base_url: 'http://127.0.0.1:1234',
+      api_key: '',
+      model: 'text-embedding-bge-m3',
+    },
+    multimodal: {
+      base_url: 'http://127.0.0.1:1234',
+      api_key: '',
+      model: 'qwen/qwen2.5-vl-7b-instruct',
+    },
     repair_rounds: 4,
     concurrency: 4,
   })
@@ -42,8 +60,8 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
-  async function listModels(): Promise<string[]> {
-    return invoke<string[]>('list_models')
+  async function listModels(target: ModelTarget): Promise<string[]> {
+    return invoke<string[]>('list_models', { target })
   }
 
   return { settings, loaded, saving, load, save, listModels }

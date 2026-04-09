@@ -13,7 +13,8 @@ use crate::generator::utils::{
 };
 
 pub async fn repair_until_valid(
-    client: &LmStudioClient,
+    llm_client: &LmStudioClient,
+    embedding_client: &LmStudioClient,
     config: &GenerationConfig,
     doc: &ParsedDocument,
     page_plans: &[PagePlan],
@@ -112,7 +113,7 @@ pub async fn repair_until_valid(
             )?;
 
             crate::generator::slides::regenerate_slides_at(
-                client,
+                llm_client,
                 config,
                 doc,
                 page_plans,
@@ -155,7 +156,9 @@ pub async fn repair_until_valid(
             let debug_prefix = format!("04-repair-round{}", round + 1);
             write_debug(debug_dir, &format!("{debug_prefix}.system.txt"), system)?;
             write_debug(debug_dir, &format!("{debug_prefix}.user.txt"), &user)?;
-            let raw = client.generate_text(&config.model, system, &user).await?;
+            let raw = llm_client
+                .generate_text(&config.llm.model, system, &user)
+                .await?;
             write_debug(debug_dir, &format!("{debug_prefix}.raw.txt"), &raw)?;
             let resp: RepairResponse = crate::generator::utils::parse_json_with_extraction(&raw)?;
             write_debug(
@@ -176,8 +179,8 @@ pub async fn repair_until_valid(
 
         normalize_blueprints(
             slides.as_mut_slice(),
-            client,
-            &config.embedding_model,
+            embedding_client,
+            &config.embedding.model,
             icon_index,
             asset_paths,
             config.aspect_ratio,
@@ -353,7 +356,7 @@ pub fn make_fallback_slide(page: &PagePlan, layout: Option<&LayoutPlan>, aspect_
 
 pub async fn normalize_blueprints(
     slides: &mut [SlideBlueprint],
-    client: &LmStudioClient,
+    embedding_client: &LmStudioClient,
     embedding_model: &str,
     icon_index: &IconIndex,
     asset_paths: &HashSet<String>,
@@ -368,7 +371,7 @@ pub async fn normalize_blueprints(
         apply_component_defaults(slide);
     }
     // Fix only icon slots that are invalid/missing — valid icons kept as-is
-    crate::generator::icons::fix_invalid_icons(slides, client, embedding_model, icon_index).await?;
+    crate::generator::icons::fix_invalid_icons(slides, embedding_client, embedding_model, icon_index).await?;
     Ok(())
 }
 
@@ -1066,7 +1069,7 @@ pub fn infer_layers_from_split_slide(slide: &SlideBlueprint) -> Vec<LayerItem> {
 /// Normalize a single blueprint (CPU-only passes + icon fix).
 pub async fn normalize_one_blueprint(
     slide: &mut SlideBlueprint,
-    client: &LmStudioClient,
+    embedding_client: &LmStudioClient,
     embedding_model: &str,
     icon_index: &IconIndex,
     asset_paths: &HashSet<String>,
@@ -1080,7 +1083,7 @@ pub async fn normalize_one_blueprint(
     // Fix invalid icons for this single slide
     crate::generator::icons::fix_invalid_icons(
         std::slice::from_mut(slide),
-        client,
+        embedding_client,
         embedding_model,
         icon_index,
     )
@@ -1090,7 +1093,8 @@ pub async fn normalize_one_blueprint(
 
 /// Validate and repair a single slide until it passes or all rounds are exhausted.
 pub async fn repair_one_slide(
-    client: &LmStudioClient,
+    llm_client: &LmStudioClient,
+    embedding_client: &LmStudioClient,
     config: &GenerationConfig,
     doc: &ParsedDocument,
     page_plan: &PagePlan,
@@ -1128,18 +1132,11 @@ pub async fn repair_one_slide(
 
             let mut new_layout = layout_plan.clone();
             new_layout.kind = new_kind.clone();
-            let extra_context = format!(
-                "Previous attempt used component kind '{:?}' and failed validation:\n{}\nDo NOT use '{:?}' again.",
-                slide.kind,
-                issues.iter().map(|i| i.message.as_str()).collect::<Vec<_>>().join("\n"),
-                slide.kind,
-            );
-
             let prev_kind_str = format!("{:?}", slide.kind);
             let error_msgs: Vec<String> = issues.iter().map(|i| i.message.clone()).collect();
             let mut slides_vec = vec![slide.clone()];
             match crate::generator::slides::regenerate_slides_at(
-                client,
+                llm_client,
                 config,
                 doc,
                 std::slice::from_ref(page_plan),
@@ -1181,7 +1178,7 @@ pub async fn repair_one_slide(
             let _ = write_debug(debug_dir, &format!("{debug_prefix}.system.txt"), system);
             let _ = write_debug(debug_dir, &format!("{debug_prefix}.user.txt"), &user);
 
-            match client.generate_text(&config.model, system, &user).await {
+            match llm_client.generate_text(&config.llm.model, system, &user).await {
                 Ok(raw) => {
                     let _ = write_debug(debug_dir, &format!("{debug_prefix}.raw.txt"), &raw);
                     if let Ok(resp) = crate::generator::utils::parse_json_with_extraction::<RepairResponse>(&raw) {
@@ -1195,7 +1192,15 @@ pub async fn repair_one_slide(
         }
 
         // Re-normalize after repair
-        normalize_one_blueprint(&mut slide, client, &config.embedding_model, icon_index, asset_paths, config.aspect_ratio).await?;
+        normalize_one_blueprint(
+            &mut slide,
+            embedding_client,
+            &config.embedding.model,
+            icon_index,
+            asset_paths,
+            config.aspect_ratio,
+        )
+        .await?;
     }
 
     // All rounds exhausted: try deterministic fallback

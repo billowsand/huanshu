@@ -163,7 +163,7 @@ pub async fn import_media_asset(
     req: ImportMediaRequest,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<MediaAssetResponse, String> {
-    let (asset, full_path, media_dir, llm_configured, base_url, api_key, model) = {
+    let (asset, full_path, media_dir, llm_configured, service) = {
         let state = state.lock().unwrap();
         let media_dir = state.app_settings.media_dir.clone();
         let media_dir_path = PathBuf::from(&media_dir);
@@ -203,16 +203,14 @@ pub async fn import_media_asset(
         asset.id = id;
 
         let llm_configured = state.app_settings.llm_configured;
-        let base_url = state.settings.base_url.clone();
-        let api_key = state.settings.api_key.clone();
-        let model = state.settings.model.clone();
+        let service = state.settings.multimodal.clone();
 
-        (asset, full_path, media_dir, llm_configured, base_url, api_key, model)
+        (asset, full_path, media_dir, llm_configured, service)
     };
 
     let mut final_asset = asset;
     if llm_configured && final_asset.media_type == "image" {
-        let caption = generate_caption_for_image_internal(&base_url, &api_key, &model, &full_path).await;
+        let caption = generate_caption_for_image_internal(&service, &full_path).await;
         if let Ok(caption) = caption {
             final_asset.caption = Some(caption);
             let state = state.lock().unwrap();
@@ -225,16 +223,14 @@ pub async fn import_media_asset(
 }
 
 async fn generate_caption_for_image_internal(
-    base_url: &str,
-    api_key: &str,
-    model: &str,
+    service: &crate::config::ModelServiceSettings,
     image_path: &PathBuf,
 ) -> Result<String, String> {
-    let client = crate::lmstudio::LmStudioClient::new(base_url)
-        .with_api_key(api_key);
+    let client = crate::lmstudio::LmStudioClient::new(&service.base_url)
+        .with_api_key(&service.api_key);
 
     client
-        .generate_image_caption(model, &image_path.to_string_lossy())
+        .generate_image_caption(&service.model, &image_path.to_string_lossy())
         .await
         .map_err(|e| e.to_string())
 }

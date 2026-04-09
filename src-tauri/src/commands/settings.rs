@@ -1,8 +1,8 @@
 use crate::config::LlmSettings;
 use crate::lmstudio::LmStudioClient;
-use tauri::State;
 use crate::AppState;
 use std::sync::Mutex;
+use tauri::State;
 
 #[tauri::command]
 pub async fn get_settings(state: State<'_, Mutex<AppState>>) -> Result<LlmSettings, String> {
@@ -21,11 +21,19 @@ pub async fn save_settings(
 }
 
 #[tauri::command]
-pub async fn list_models(state: State<'_, Mutex<AppState>>) -> Result<Vec<String>, String> {
-    let (base_url, api_key) = {
+pub async fn list_models(
+    target: Option<String>,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<Vec<String>, String> {
+    let service = {
         let state = state.lock().unwrap();
-        (state.settings.base_url.clone(), state.settings.api_key.clone())
+        match target.as_deref().unwrap_or("llm") {
+            "llm" => state.settings.llm.clone(),
+            "embedding" => state.settings.embedding.clone(),
+            "multimodal" => state.settings.multimodal.clone(),
+            other => return Err(format!("unknown model target: {other}")),
+        }
     };
-    let client = LmStudioClient::new(&base_url).with_api_key(&api_key);
+    let client = LmStudioClient::new(&service.base_url).with_api_key(&service.api_key);
     client.list_models().await.map_err(|e| e.to_string())
 }

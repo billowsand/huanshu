@@ -36,6 +36,8 @@ struct BootstrapData {
     media_dir: String,
     llm_configured: bool,
     embeddings_ready: bool,
+    #[serde(default)]
+    initialized_embedding_model: String,
 }
 
 fn load_bootstrap_data_dir() -> PathBuf {
@@ -62,6 +64,7 @@ fn load_bootstrap_settings() -> Option<AppGlobalSettings> {
                     media_dir: boot.media_dir,
                     llm_configured: boot.llm_configured,
                     embeddings_ready: boot.embeddings_ready,
+                    initialized_embedding_model: boot.initialized_embedding_model,
                 });
             }
         }
@@ -79,6 +82,7 @@ fn save_bootstrap_settings(settings: &AppGlobalSettings) -> anyhow::Result<()> {
         media_dir: settings.media_dir.clone(),
         llm_configured: settings.llm_configured,
         embeddings_ready: settings.embeddings_ready,
+        initialized_embedding_model: settings.initialized_embedding_model.clone(),
     };
     std::fs::write(&boot_path, serde_json::to_string_pretty(&boot)?)?;
     Ok(())
@@ -127,6 +131,11 @@ impl AppState {
                 "false"
             },
         )?;
+        db::set_app_setting(
+            &conn,
+            "initialized_embedding_model",
+            &self.app_settings.initialized_embedding_model,
+        )?;
 
         self.db = Arc::new(Mutex::new(conn));
         self.settings_path = settings_path;
@@ -172,11 +181,19 @@ impl AppState {
                 .flatten()
                 .map(|v| v == "true")
                 .unwrap_or(false);
+            let initialized_embedding_model = db::get_app_setting(
+                &*conn,
+                "initialized_embedding_model",
+            )
+            .ok()
+            .flatten()
+            .unwrap_or_default();
             AppGlobalSettings {
                 data_dir: data_dir_str,
                 media_dir,
                 llm_configured,
                 embeddings_ready,
+                initialized_embedding_model,
             }
         });
 

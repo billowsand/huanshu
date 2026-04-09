@@ -7,6 +7,7 @@ export interface AppGlobalSettings {
   media_dir: string
   llm_configured: boolean
   embeddings_ready: boolean
+  initialized_embedding_model: string
 }
 
 export const useAppSettingsStore = defineStore('appSettings', () => {
@@ -15,6 +16,7 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
     media_dir: '',
     llm_configured: false,
     embeddings_ready: false,
+    initialized_embedding_model: '',
   })
   const loaded = ref(false)
 

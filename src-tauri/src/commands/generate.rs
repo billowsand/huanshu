@@ -192,11 +192,14 @@ pub async fn optimize_markdown_headings(
         st.settings.clone()
     };
 
-    let client = LmStudioClient::new(&settings.base_url).with_api_key(&settings.api_key);
+    let llm_client = LmStudioClient::new(&settings.llm.base_url).with_api_key(&settings.llm.api_key);
+    let embedding_client =
+        LmStudioClient::new(&settings.embedding.base_url).with_api_key(&settings.embedding.api_key);
     crate::generator::planning::ensure_models_ready(
-        &client,
-        &settings.model,
-        &settings.embedding_model,
+        &llm_client,
+        &settings.llm.model,
+        &embedding_client,
+        &settings.embedding.model,
     )
     .await
     .map_err(|e| e.to_string())?;
@@ -211,8 +214,8 @@ pub async fn optimize_markdown_headings(
         raw
     );
 
-    let response = client
-        .generate_text(&settings.model, system, &user)
+    let response = llm_client
+        .generate_text(&settings.llm.model, system, &user)
         .await
         .map_err(|e| e.to_string())?;
     let cleaned = strip_markdown_fences(&response);
@@ -304,8 +307,9 @@ pub async fn generate_slides(
         json!({
             "source_markdown": md_content,
             "frontmatter_title": config.frontmatter_title,
-            "model": config.model,
-            "embedding_model": config.embedding_model,
+            "llm_model": config.llm.model,
+            "embedding_model": config.embedding.model,
+            "multimodal_model": config.multimodal.model,
             "debug_dir": config.debug_dir.display().to_string(),
         }),
         true,
@@ -470,7 +474,7 @@ pub async fn repair_slide(
     let icon_index = {
         let conn = state.lock().unwrap();
         let db = conn.db.lock().unwrap();
-        IconIndex::load_with_cache(&project_dir, &settings.embedding_model, &db)
+        IconIndex::load_with_cache(&project_dir, &settings.embedding.model, &db)
             .unwrap_or_else(|_| IconIndex::load(&project_dir).unwrap_or_else(|_| IconIndex::empty()))
     };
     let asset_paths = crate::validate::collect_assets(&project_dir);
@@ -510,31 +514,36 @@ async fn run_pipeline(
     use crate::generator::slides::{generate_single_page_pipeline, PageStage};
     use crate::icon::IconIndex;
     use crate::input::parse_markdown;
-    use crate::lmstudio::LmStudioClient;
     use crate::validate::collect_assets;
 
     reset_debug_dir(&config.debug_dir)?;
 
     let asset_paths = collect_assets(&config.project_dir);
-    let client = LmStudioClient::new(&config.lmstudio_base_url)
-        .with_api_key(&config.api_key);
+    let llm_client = config.llm_client();
+    let embedding_client = config.embedding_client();
 
     // Load icon index with embedding cache (sync DB read)
     let mut icon_index = {
         let conn = db.lock().unwrap();
-        IconIndex::load_with_cache(&config.project_dir, &config.embedding_model, &*conn)?
+        IconIndex::load_with_cache(&config.project_dir, &config.embedding.model, &*conn)?
     };
     if !icon_index.is_embedded() {
         emit_progress(&app, &db, run_id, "init", "首次使用，正在预计算图标向量...", 0.04);
         icon_index
-            .embed_all(&client, &config.embedding_model, &db)
+            .embed_all(&embedding_client, &config.embedding.model, &db)
             .await?;
         emit_progress(&app, &db, run_id, "init", "图标向量缓存已生成", 0.05);
     }
 
     // Verify models are available
     emit_progress(&app, &db, run_id, "init", "验证大模型连接...", 0.05);
-    planning::ensure_models_ready(&client, &config.model, &config.embedding_model).await?;
+    planning::ensure_models_ready(
+        &llm_client,
+        &config.llm.model,
+        &embedding_client,
+        &config.embedding.model,
+    )
+    .await?;
     record_log(
         &app,
         &db,
@@ -545,9 +554,10 @@ async fn run_pipeline(
         "模型连接检查",
         "模型与向量模型已通过连通性验证",
         json!({
-            "model": config.model,
-            "embedding_model": config.embedding_model,
-            "base_url": config.lmstudio_base_url,
+            "llm_model": config.llm.model,
+            "llm_base_url": config.llm.base_url,
+            "embedding_model": config.embedding.model,
+            "embedding_base_url": config.embedding.base_url,
         }),
         true,
     );
@@ -609,7 +619,8 @@ async fn run_pipeline(
     for (idx, page_plan) in page_plans.iter().enumerate() {
         let app_clone = app.clone();
         let db_clone = db.clone();
-        let client_clone = client.clone();
+        let llm_client_clone = llm_client.clone();
+        let embedding_client_clone = embedding_client.clone();
         let config_clone = config.clone();
         let doc_clone = doc.clone();
         let page_plan_owned = page_plan.clone();
@@ -648,8 +659,9 @@ async fn run_pipeline(
                     });
                 });
 
-            match crate::generator::slides::generate_single_page_pipeline(
-                &client_clone,
+            match generate_single_page_pipeline(
+                &llm_client_clone,
+                &embedding_client_clone,
                 &config_clone,
                 &doc_clone,
                 page_plan_owned.clone(),
@@ -782,12 +794,12 @@ async fn run_pipeline(
     // Phase 3: Assemble (cover + overview + content + closing)
     emit_progress(&app, &db, run_id, "assembling", "组装封面与目录...", 0.9);
     let final_slides = planning::assemble_slides(
-        &client,
+        &llm_client,
         config,
         &doc,
         &page_plans,
         content_slides,
-        &config.model,
+        &config.llm.model,
     )
     .await;
 
@@ -861,22 +873,28 @@ pub async fn ensure_icon_embeddings(
 
     let config = GenerationConfig::from_settings(&settings, project_dir, crate::types::AspectRatio::Ratio16x9);
 
-    let client = LmStudioClient::new(&config.lmstudio_base_url)
-        .with_api_key(&config.api_key);
+    let embedding_client = config.embedding_client();
 
     let mut icon_index = {
         let conn = db.lock().unwrap();
-        IconIndex::load_with_cache(&config.project_dir, &config.embedding_model, &*conn)
+        IconIndex::load_with_cache(&config.project_dir, &config.embedding.model, &*conn)
             .map_err(|e| e.to_string())?
     };
 
     if !icon_index.is_embedded() {
         println!("[icon-index] embedding icons at startup...");
         icon_index
-            .embed_all(&client, &config.embedding_model, &db)
+            .embed_all(&embedding_client, &config.embedding.model, &db)
             .await
             .map_err(|e| e.to_string())?;
         println!("[icon-index] startup embedding complete");
+    }
+
+    {
+        let mut st = state.lock().unwrap();
+        st.app_settings.embeddings_ready = true;
+        st.app_settings.initialized_embedding_model = config.embedding.model.clone();
+        st.persist_app_settings().map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -908,7 +926,7 @@ pub async fn recommend_icons_for_query(
 
     let icon_index = {
         let conn = db.lock().unwrap();
-        IconIndex::load_with_cache(&config.project_dir, &config.embedding_model, &*conn)
+        IconIndex::load_with_cache(&config.project_dir, &config.embedding.model, &*conn)
             .map_err(|e| e.to_string())?
     };
 
@@ -917,8 +935,11 @@ pub async fn recommend_icons_for_query(
     }
 
     if icon_index.is_embedded() {
-        let client = LmStudioClient::new(&config.lmstudio_base_url).with_api_key(&config.api_key);
-        if let Ok(embeddings) = client.embed(&config.embedding_model, &[query.to_string()]).await {
+        let embedding_client = config.embedding_client();
+        if let Ok(embeddings) = embedding_client
+            .embed(&config.embedding.model, &[query.to_string()])
+            .await
+        {
             if let Some(query_emb) = embeddings.first() {
                 let semantic = icon_index
                     .semantic_search_with_emb(query_emb, max)
