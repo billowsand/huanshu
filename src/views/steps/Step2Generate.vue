@@ -280,27 +280,36 @@ function kindLabel(kind?: string | null): string {
 }
 
 function resolvePageStage(item: SlideProgressItem): PageStageKey {
-  if (props.stage === 'error') {
-    const ps = props.pageStatuses.get(item.index)
-    if (ps?.stage === 'error')
-      return 'error'
-    if (item.blueprint)
-      return 'done'
-    return 'pending'
-  }
-
+  // Priority 1: Use per-page status from gen:page_status events
   const ps = props.pageStatuses.get(item.index)
   if (ps?.stage) {
     if (['planning', 'layout', 'content', 'normalizing', 'validating', 'done', 'error', 'pending'].includes(ps.stage))
       return ps.stage as PageStageKey
   }
 
+  // Priority 2: Fallback for backward compatibility when pageStatuses is not available
+  // Determine stage based on what has been completed, not what is about to start
   if (item.blueprint)
     return 'done'
-  if (item.layoutPlan)
-    return props.stage === 'generating' ? 'content' : 'layout'
-  if (item.pagePlan)
+
+  // Has layout plan: page has completed layout stage
+  if (item.layoutPlan) {
+    // If global stage is still 'generating', treat as content phase
+    if (props.stage === 'generating')
+      return 'content'
     return 'layout'
+  }
+
+  // Has page plan: page has completed planning stage
+  if (item.pagePlan) {
+    // If global stage is still in planning phase, keep it as 'planning'
+    if (props.stage === 'page_plan')
+      return 'planning'
+    // Otherwise, it's ready for layout
+    return 'layout'
+  }
+
+  // Nothing completed yet: determine based on global stage
   if (props.stage === 'page_plan')
     return 'planning'
   return 'pending'
