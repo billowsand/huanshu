@@ -20,15 +20,17 @@ pub async fn ensure_models_ready(
     embedding_client: &LmStudioClient,
     embedding_model: &str,
 ) -> Result<()> {
-    let llm_models = llm_client.list_models().await?;
-    if !llm_models.iter().any(|name| name == llm_model) {
-        bail!("generation model not found in LM Studio: {llm_model}");
+    // Health check LLM model by attempting a simple generation
+    let test_prompt = "简短回复 ok 即可";
+    let result = llm_client
+        .generate_text(llm_model, "你是一个简洁的助手", test_prompt)
+        .await
+        .with_context(|| format!("LLM model is not usable: {llm_model}"))?;
+    if result.trim().is_empty() {
+        bail!("LLM model returned empty response: {llm_model}");
     }
 
-    let embedding_models = embedding_client.list_models().await?;
-    if !embedding_models.iter().any(|name| name == embedding_model) {
-        bail!("embedding model not found in LM Studio: {embedding_model}");
-    }
+    // Health check embedding model with embed call
     let probe = vec!["icon embedding healthcheck".to_string()];
     let embeddings = embedding_client
         .embed(embedding_model, &probe)

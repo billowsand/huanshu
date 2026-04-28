@@ -18,9 +18,16 @@
       "mcp__zread__read_file",
       "mcp__zread__get_repo_structure",
       "Bash(cargo test:*)",
-      "Bash(xargs -I{} basename {})"
+      "Bash(xargs -I{} basename {})",
+      "mcp__code-review-graph__semantic_search_nodes_tool",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)"
     ]
   },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "code-review-graph"
+  ],
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": true,
     "context7@claude-plugins-official": true
