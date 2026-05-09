@@ -216,7 +216,10 @@ async function finishWizard() {
 
 <template>
     <div class="wizard-layout">
-        <div class="wizard-card">
+        <div
+            class="wizard-card"
+            :class="{ 'wizard-card-wide': currentStep === 2 }"
+        >
             <div class="wizard-header">
                 <div class="wizard-logo">
                     <span class="wizard-logo-mark">
@@ -336,89 +339,102 @@ async function finishWizard() {
                     跳过此步骤仍可使用幻灯片播放功能，但无法生成新幻灯片
                 </div>
 
-                <div class="field-group">
-                    <div class="field">
-                        <label>大语言模型 API 地址</label>
-                        <input
-                            v-model="llmBaseUrl"
-                            placeholder="http://127.0.0.1:1234"
-                        />
-                    </div>
+                <div class="model-config-grid">
+                    <section class="model-config-panel">
+                        <h4 class="panel-title">大语言模型</h4>
+                        <div class="field">
+                            <label>API 地址</label>
+                            <input
+                                v-model="llmBaseUrl"
+                                placeholder="http://127.0.0.1:1234"
+                            />
+                        </div>
+                        <div class="field">
+                            <label
+                                >API Key
+                                <span style="opacity: 0.5"
+                                    >(本地留空)</span
+                                ></label
+                            >
+                            <input
+                                v-model="llmApiKey"
+                                type="password"
+                                placeholder="sk-..."
+                                autocomplete="off"
+                            />
+                        </div>
+                        <div class="field">
+                            <label>模型</label>
+                            <input
+                                v-model="llmModel"
+                                placeholder="qwen/qwen3.5-9b"
+                            />
+                        </div>
+                    </section>
 
-                    <div class="field">
-                        <label
-                            >API Key
-                            <span style="opacity: 0.5"
-                                >(本地服务留空)</span
-                            ></label
-                        >
-                        <input
-                            v-model="llmApiKey"
-                            type="password"
-                            placeholder="sk-..."
-                            autocomplete="off"
-                        />
-                    </div>
+                    <section class="model-config-panel">
+                        <h4 class="panel-title">向量模型</h4>
+                        <div class="field">
+                            <label>API 地址</label>
+                            <input
+                                v-model="embeddingBaseUrl"
+                                placeholder="http://127.0.0.1:1234"
+                            />
+                        </div>
+                        <div class="field">
+                            <label
+                                >API Key
+                                <span style="opacity: 0.5"
+                                    >(本地留空)</span
+                                ></label
+                            >
+                            <input
+                                v-model="embeddingApiKey"
+                                type="password"
+                                placeholder="sk-..."
+                                autocomplete="off"
+                            />
+                        </div>
+                        <div class="field">
+                            <label>模型</label>
+                            <input
+                                v-model="embeddingModel"
+                                placeholder="text-embedding-bge-m3"
+                            />
+                        </div>
+                    </section>
 
-                    <div class="field">
-                        <label>大语言模型</label>
-                        <input
-                            v-model="llmModel"
-                            placeholder="qwen/qwen3.5-9b"
-                        />
-                    </div>
-
-                    <div class="field">
-                        <label>向量模型 API 地址</label>
-                        <input
-                            v-model="embeddingBaseUrl"
-                            placeholder="http://127.0.0.1:1234"
-                        />
-                    </div>
-
-                    <div class="field">
-                        <label>向量模型 API Key</label>
-                        <input
-                            v-model="embeddingApiKey"
-                            type="password"
-                            placeholder="sk-..."
-                            autocomplete="off"
-                        />
-                    </div>
-
-                    <div class="field">
-                        <label>向量模型</label>
-                        <input
-                            v-model="embeddingModel"
-                            placeholder="text-embedding-bge-m3"
-                        />
-                    </div>
-
-                    <div class="field">
-                        <label>多模态模型 API 地址</label>
-                        <input
-                            v-model="multimodalBaseUrl"
-                            placeholder="http://127.0.0.1:1234"
-                        />
-                    </div>
-
-                    <div class="field">
-                        <label>多模态模型 API Key</label>
-                        <input
-                            v-model="multimodalApiKey"
-                            type="password"
-                            placeholder="sk-..."
-                            autocomplete="off"
-                        />
-                    </div>
-
-                    <div class="field">
-                        <label>多模态模型</label>
-                        <input
-                            v-model="multimodalModel"
-                            placeholder="qwen/qwen2.5-vl-7b-instruct"
-                        />
-                    </div>
+                    <section class="model-config-panel">
+                        <h4 class="panel-title">多模态模型</h4>
+                        <div class="field">
+                            <label>API 地址</label>
+                            <input
+                                v-model="multimodalBaseUrl"
+                                placeholder="http://127.0.0.1:1234"
+                            />
+                        </div>
+                        <div class="field">
+                            <label
+                                >API Key
+                                <span style="opacity: 0.5"
+                                    >(本地留空)</span
+                                ></label
+                            >
+                            <input
+                                v-model="multimodalApiKey"
+                                type="password"
+                                placeholder="sk-..."
+                                autocomplete="off"
+                            />
+                        </div>
+                        <div class="field">
+                            <label>模型</label>
+                            <input
+                                v-model="multimodalModel"
+                                placeholder="qwen/qwen2.5-vl-7b-instruct"
+                            />
+                        </div>
+                    </section>
                 </div>
 
                 <p v-if="modelError" class="error-msg">{{ modelError }}</p>
@@ -587,6 +603,13 @@ async function finishWizard() {
     padding: 2.5rem;
     max-width: 560px;
     width: 100%;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 4rem);
+}
+
+.wizard-card-wide {
+    max-width: 960px;
 }
 
 .wizard-header {
@@ -705,7 +728,9 @@ async function finishWizard() {
 }
 
 .wizard-step {
-    min-height: 300px;
+    min-height: 200px;
+    flex: 1;
+    overflow-y: auto;
 }
 
 .step-title {
@@ -769,6 +794,36 @@ async function finishWizard() {
     font-size: 0.8rem;
     color: var(--studio-muted);
     margin-bottom: 1.5rem;
+}
+
+.model-config-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.model-config-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.75rem;
+    border-radius: 10px;
+    border: 1px solid var(--studio-border);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+        var(--studio-panel-2);
+}
+
+.panel-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+@media (max-width: 700px) {
+    .model-config-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .embedding-progress {
