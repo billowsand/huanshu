@@ -4,7 +4,7 @@ use crate::input::ParsedDocument;
 use crate::lmstudio::LmStudioClient;
 use crate::types::*;
 use crate::validate::validate_blueprints;
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -73,10 +73,7 @@ pub async fn repair_until_valid(
                         .unwrap_or_default();
                     let errs: Vec<String> = issues
                         .iter()
-                        .filter(|iss| {
-                            iss.message
-                                .starts_with(&format!("slide {}:", idx + 1))
-                        })
+                        .filter(|iss| iss.message.starts_with(&format!("slide {}:", idx + 1)))
                         .map(|iss| iss.message.clone())
                         .collect();
                     (idx, prev_kind, errs)
@@ -93,7 +90,9 @@ pub async fn repair_until_valid(
                     let new_kind = pick_different_kind(page, current_kind);
                     eprintln!(
                         "repair_until_valid: slide {} switching kind {:?} → {:?} for final regen",
-                        idx + 1, current_kind, new_kind
+                        idx + 1,
+                        current_kind,
+                        new_kind
                     );
                     lp.reason =
                         format!("re-kind from {:?} after validation failures", current_kind);
@@ -207,7 +206,10 @@ pub async fn repair_until_valid(
 
         if still_failing.is_empty() {
             // Index parsing failed; nothing we can do.
-            bail!(format_issue_block("slides remain invalid after repair", &issues));
+            bail!(format_issue_block(
+                "slides remain invalid after repair",
+                &issues
+            ));
         }
 
         eprintln!(
@@ -254,7 +256,11 @@ pub async fn repair_until_valid(
 /// kind are guaranteed by the `apply_component_defaults` call in the caller; this
 /// function only pre-fills the five kinds it can meaningfully populate from
 /// key_points (SectionIntro, FeatureGrid, OutcomeGrid, SectionList, StepFlow).
-pub fn make_fallback_slide(page: &PagePlan, layout: Option<&LayoutPlan>, aspect_ratio: AspectRatio) -> SlideBlueprint {
+pub fn make_fallback_slide(
+    page: &PagePlan,
+    layout: Option<&LayoutPlan>,
+    aspect_ratio: AspectRatio,
+) -> SlideBlueprint {
     use crate::generator::planning::safe_fallback_kind;
     // Deliberately ignore the layout plan's kind — it's the one that failed.
     let _ = layout;
@@ -371,7 +377,13 @@ pub async fn normalize_blueprints(
         apply_component_defaults(slide);
     }
     // Fix only icon slots that are invalid/missing — valid icons kept as-is
-    crate::generator::icons::fix_invalid_icons(slides, embedding_client, embedding_model, icon_index).await?;
+    crate::generator::icons::fix_invalid_icons(
+        slides,
+        embedding_client,
+        embedding_model,
+        icon_index,
+    )
+    .await?;
     Ok(())
 }
 
@@ -555,8 +567,8 @@ pub fn repair_assets(slide: &mut SlideBlueprint, asset_paths: &HashSet<String>) 
 pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
     let cols_multiplier = match slide.aspect_ratio {
         Some(AspectRatio::Ratio16x9) => 1,
-        Some(AspectRatio::Ratio32x9) => 2,  // 4 * 2 = 8 cols max
-        Some(AspectRatio::Ratio48x9) => 3,  // 4 * 3 = 12 cols max
+        Some(AspectRatio::Ratio32x9) => 2, // 4 * 2 = 8 cols max
+        Some(AspectRatio::Ratio48x9) => 3, // 4 * 3 = 12 cols max
         None => 1,
     };
 
@@ -899,7 +911,8 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
                 if phase.phase.trim().is_empty() {
                     phase.phase = format!("阶段{}", idx + 1);
                 }
-                phase.icon
+                phase
+                    .icon
                     .get_or_insert_with(|| "i-carbon:idea".to_string());
                 phase.tone.get_or_insert_with(|| match idx {
                     0 => "amber".to_string(),
@@ -945,7 +958,10 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
                 .mode
                 .get_or_insert_with(|| "side-by-side".to_string());
             compare.left.tone.get_or_insert_with(|| "blue".to_string());
-            compare.right.tone.get_or_insert_with(|| "amber".to_string());
+            compare
+                .right
+                .tone
+                .get_or_insert_with(|| "amber".to_string());
             if compare.left.items.is_empty() {
                 compare.left.items.push(CompareItem {
                     label: "待补充".to_string(),
@@ -1110,11 +1126,7 @@ pub async fn repair_one_slide(
     let max_rounds = config.repair_rounds.max(3);
 
     for round in 0..max_rounds {
-        let issues = validate_blueprints(
-            std::slice::from_ref(&slide),
-            icon_index,
-            asset_paths,
-        );
+        let issues = validate_blueprints(std::slice::from_ref(&slide), icon_index, asset_paths);
         if issues.is_empty() {
             return Ok(slide);
         }
@@ -1127,7 +1139,9 @@ pub async fn repair_one_slide(
             let new_kind = pick_different_kind(page_plan, &slide.kind);
             eprintln!(
                 "repair_one_slide: slide {} switching {:?} → {:?}",
-                slide_idx + 1, slide.kind, new_kind
+                slide_idx + 1,
+                slide.kind,
+                new_kind
             );
 
             let mut new_layout = layout_plan.clone();
@@ -1151,9 +1165,14 @@ pub async fn repair_one_slide(
             .await
             {
                 Ok(()) => {
-                    slide = slides_vec.into_iter().next().unwrap_or_else(|| make_fallback_slide(page_plan, Some(layout_plan), config.aspect_ratio));
+                    slide = slides_vec.into_iter().next().unwrap_or_else(|| {
+                        make_fallback_slide(page_plan, Some(layout_plan), config.aspect_ratio)
+                    });
                 }
-                Err(e) => eprintln!("repair_one_slide regen failed for slide {}: {e}", slide_idx + 1),
+                Err(e) => eprintln!(
+                    "repair_one_slide regen failed for slide {}: {e}",
+                    slide_idx + 1
+                ),
             }
         } else {
             // Standard LLM repair round
@@ -1178,16 +1197,24 @@ pub async fn repair_one_slide(
             let _ = write_debug(debug_dir, &format!("{debug_prefix}.system.txt"), system);
             let _ = write_debug(debug_dir, &format!("{debug_prefix}.user.txt"), &user);
 
-            match llm_client.generate_text(&config.llm.model, system, &user).await {
+            match llm_client
+                .generate_text(&config.llm.model, system, &user)
+                .await
+            {
                 Ok(raw) => {
                     let _ = write_debug(debug_dir, &format!("{debug_prefix}.raw.txt"), &raw);
-                    if let Ok(resp) = crate::generator::utils::parse_json_with_extraction::<RepairResponse>(&raw) {
+                    if let Ok(resp) =
+                        crate::generator::utils::parse_json_with_extraction::<RepairResponse>(&raw)
+                    {
                         if let Some(repaired) = resp.slides.into_iter().next() {
                             slide = repaired;
                         }
                     }
                 }
-                Err(e) => eprintln!("repair_one_slide LLM failed for slide {}: {e}", slide_idx + 1),
+                Err(e) => eprintln!(
+                    "repair_one_slide LLM failed for slide {}: {e}",
+                    slide_idx + 1
+                ),
             }
         }
 
@@ -1208,7 +1235,8 @@ pub async fn repair_one_slide(
     if !issues.is_empty() {
         eprintln!(
             "repair_one_slide: slide {} still invalid after {} rounds; using fallback",
-            slide_idx + 1, max_rounds
+            slide_idx + 1,
+            max_rounds
         );
         slide = make_fallback_slide(page_plan, Some(layout_plan), config.aspect_ratio);
         apply_component_defaults(&mut slide);

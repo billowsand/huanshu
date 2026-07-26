@@ -1,0 +1,36 @@
+name: Bug
+description: 报告一个 bug 或错误输出
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 幻述版本
+      description: 运行 `cargo tauri build --version` 或查看 about 页面获取版本号
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 输入 Markdown 内容：...
+        2. 点击「开始生成」
+        3. 实际输出：...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期输出
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际输出
+    validations:
+      required: true
+  - type: input
+    id: lmstudio
+    attributes:
+      label: LM Studio 版本
+      description: "可选，但有助于排查 LLM 调用问题"

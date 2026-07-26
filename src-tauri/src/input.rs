@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -13,7 +13,11 @@ pub enum HeadingLevel {
 pub fn detect_granularity(raw: &str) -> HeadingLevel {
     let h2 = raw.lines().filter(|l| l.starts_with("## ")).count();
     let h3 = raw.lines().filter(|l| l.starts_with("### ")).count();
-    if h2 > h3 { HeadingLevel::H2 } else { HeadingLevel::H3 }
+    if h2 > h3 {
+        HeadingLevel::H2
+    } else {
+        HeadingLevel::H3
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

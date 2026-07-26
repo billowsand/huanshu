@@ -3,6 +3,19 @@
   "type": "module",
   "private": true,
   "version": "0.1.0",
+  "description": "幻述 — 将 Markdown 文档自动转化为精美的 Slidev 演示文稿",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/billowsand/huanshu.git"
+  },
+  "bugs": {
+    "url": "https://github.com/billowsand/huanshu/issues"
+  },
+  "homepage": "https://github.com/billowsand/huanshu#readme",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "bunx vite",
     "build": "bunx vue-tsc && bunx vite build",

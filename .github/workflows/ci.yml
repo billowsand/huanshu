@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri"
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked -- -D warnings
+
+      - name: Build
+        run: cargo build --manifest-path src-tauri/Cargo.toml --locked --all-targets
+
+      - name: Test
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --all-targets
+
+  frontend:
+    name: frontend (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Type check
+        run: bun run build

@@ -2,7 +2,7 @@ use crate::generator::utils::cosine_similarity;
 use crate::icon::{IconIndex, IconRecord};
 use crate::lmstudio::LmStudioClient;
 use crate::types::{LayoutPlan, PagePlan, SlideBlueprint};
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use std::collections::HashMap;
 
 const PROMPT_ICON_LIMIT: usize = 48;
@@ -40,8 +40,12 @@ pub async fn precompute_semantic_candidates(
                 page.section_title.clone(),
                 page.objective.clone(),
             ];
-            if let Some(sub) = &page.subsection_title { parts.push(sub.clone()); }
-            if let Some(shape) = &page.content_shape  { parts.push(shape.clone()); }
+            if let Some(sub) = &page.subsection_title {
+                parts.push(sub.clone());
+            }
+            if let Some(shape) = &page.content_shape {
+                parts.push(shape.clone());
+            }
             parts.extend(page.key_points.iter().cloned());
             if let Some(layout) = layout_by_id.get(page.page_id.as_str()) {
                 parts.push(layout.title.clone());
@@ -139,7 +143,11 @@ pub async fn fix_invalid_icons(
                 .unwrap_or(false);
             if !is_valid {
                 let q = format!("{title} {field_title}");
-                invalid_slots.push(InvalidSlot { slide_idx: sidx, field_key: key, query: q });
+                invalid_slots.push(InvalidSlot {
+                    slide_idx: sidx,
+                    field_key: key,
+                    query: q,
+                });
             }
         };
 
@@ -237,14 +245,48 @@ fn write_icon_back(slides: &mut [SlideBlueprint], slide_idx: usize, field_key: &
     let idx: usize = idx.parse().unwrap_or(0);
 
     match kind {
-        "card" => { if let Some(c) = slide.cards.get_mut(idx) { c.icon = Some(icon); } }
-        "panel" => { if let Some(p) = slide.panels.get_mut(idx) { p.icon = Some(icon); } }
-        "left" => { if let Some(it) = slide.left_items.get_mut(idx) { it.icon = Some(icon); } }
-        "list" => { if let Some(it) = slide.list_items.get_mut(idx) { it.icon = Some(icon); } }
-        "point" => { if let Some(it) = slide.points.get_mut(idx) { it.icon = Some(icon); } }
-        "center" => { if let Some(it) = slide.center_items.get_mut(idx) { it.icon = Some(icon); } }
-        "timeline" => { if let Some(ev) = slide.timeline_events.get_mut(idx) { ev.icon = Some(icon); } }
-        "swot" => { if let Some(swot) = &mut slide.swot_data { if let Some(q) = swot.quadrants.get_mut(idx) { q.icon = Some(icon); } } }
+        "card" => {
+            if let Some(c) = slide.cards.get_mut(idx) {
+                c.icon = Some(icon);
+            }
+        }
+        "panel" => {
+            if let Some(p) = slide.panels.get_mut(idx) {
+                p.icon = Some(icon);
+            }
+        }
+        "left" => {
+            if let Some(it) = slide.left_items.get_mut(idx) {
+                it.icon = Some(icon);
+            }
+        }
+        "list" => {
+            if let Some(it) = slide.list_items.get_mut(idx) {
+                it.icon = Some(icon);
+            }
+        }
+        "point" => {
+            if let Some(it) = slide.points.get_mut(idx) {
+                it.icon = Some(icon);
+            }
+        }
+        "center" => {
+            if let Some(it) = slide.center_items.get_mut(idx) {
+                it.icon = Some(icon);
+            }
+        }
+        "timeline" => {
+            if let Some(ev) = slide.timeline_events.get_mut(idx) {
+                ev.icon = Some(icon);
+            }
+        }
+        "swot" => {
+            if let Some(swot) = &mut slide.swot_data {
+                if let Some(q) = swot.quadrants.get_mut(idx) {
+                    q.icon = Some(icon);
+                }
+            }
+        }
         _ => {}
     }
 }
@@ -252,14 +294,27 @@ fn write_icon_back(slides: &mut [SlideBlueprint], slide_idx: usize, field_key: &
 /// Fill default icons when no icon index is available.
 fn fill_default_icons(slide: &mut SlideBlueprint) {
     let default = "i-carbon:circle-dash";
-    for card in &mut slide.cards { card.icon.get_or_insert_with(|| default.to_string()); }
-    for panel in &mut slide.panels { panel.icon.get_or_insert_with(|| default.to_string()); }
-    for item in slide.left_items.iter_mut().chain(slide.list_items.iter_mut()).chain(slide.points.iter_mut()) {
+    for card in &mut slide.cards {
+        card.icon.get_or_insert_with(|| default.to_string());
+    }
+    for panel in &mut slide.panels {
+        panel.icon.get_or_insert_with(|| default.to_string());
+    }
+    for item in slide
+        .left_items
+        .iter_mut()
+        .chain(slide.list_items.iter_mut())
+        .chain(slide.points.iter_mut())
+    {
         item.icon.get_or_insert_with(|| default.to_string());
     }
-    for item in &mut slide.center_items { item.icon.get_or_insert_with(|| default.to_string()); }
+    for item in &mut slide.center_items {
+        item.icon.get_or_insert_with(|| default.to_string());
+    }
     if let Some(swot) = &mut slide.swot_data {
-        for q in &mut swot.quadrants { q.icon.get_or_insert_with(|| default.to_string()); }
+        for q in &mut swot.quadrants {
+            q.icon.get_or_insert_with(|| default.to_string());
+        }
     }
 }
 
@@ -323,7 +378,12 @@ pub fn collect_icon_candidates_from_slide(
     for panel in &slide.panels {
         queries.push(panel.title.clone());
     }
-    for item in slide.list_items.iter().chain(slide.points.iter()).chain(slide.left_items.iter()) {
+    for item in slide
+        .list_items
+        .iter()
+        .chain(slide.points.iter())
+        .chain(slide.left_items.iter())
+    {
         queries.push(item.title.clone());
     }
     for step in &slide.steps {

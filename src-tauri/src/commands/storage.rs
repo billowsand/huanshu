@@ -1,4 +1,4 @@
-use crate::crypto::{CryptoService, validate_password_strength};
+use crate::crypto::{validate_password_strength, CryptoService};
 use crate::db::{self, MediaAsset};
 use crate::types::AppGlobalSettings;
 use crate::AppState;
@@ -94,10 +94,16 @@ fn remap_media_refs_in_json(
         return Ok(blueprints_json.to_string());
     }
 
-    fn rewrite_value(value: &mut serde_json::Value, media_id_map: &std::collections::HashMap<i64, i64>) {
+    fn rewrite_value(
+        value: &mut serde_json::Value,
+        media_id_map: &std::collections::HashMap<i64, i64>,
+    ) {
         match value {
             serde_json::Value::String(text) => {
-                if let Some(old_id) = text.strip_prefix("media:").and_then(|id| id.parse::<i64>().ok()) {
+                if let Some(old_id) = text
+                    .strip_prefix("media:")
+                    .and_then(|id| id.parse::<i64>().ok())
+                {
                     if let Some(new_id) = media_id_map.get(&old_id) {
                         *text = format!("media:{new_id}");
                     }
@@ -117,7 +123,8 @@ fn remap_media_refs_in_json(
         }
     }
 
-    let mut value: serde_json::Value = serde_json::from_str(blueprints_json).map_err(|e| e.to_string())?;
+    let mut value: serde_json::Value =
+        serde_json::from_str(blueprints_json).map_err(|e| e.to_string())?;
     rewrite_value(&mut value, media_id_map);
     serde_json::to_string(&value).map_err(|e| e.to_string())
 }
@@ -167,7 +174,11 @@ pub async fn import_media_asset(
         let state = state.lock().unwrap();
         let media_dir = state.app_settings.media_dir.clone();
         let media_dir_path = PathBuf::from(&media_dir);
-        let subdir = if req.media_type == "video" { "videos" } else { "images" };
+        let subdir = if req.media_type == "video" {
+            "videos"
+        } else {
+            "images"
+        };
 
         let project_media = media_dir_path
             .join("projects")
@@ -215,7 +226,12 @@ pub async fn import_media_asset(
             final_asset.caption = Some(caption);
             let state = state.lock().unwrap();
             let db = state.db.lock().unwrap();
-            let _ = db::update_media_asset_caption(&*db, final_asset.id, final_asset.caption.as_deref(), None);
+            let _ = db::update_media_asset_caption(
+                &*db,
+                final_asset.id,
+                final_asset.caption.as_deref(),
+                None,
+            );
         }
     }
 
@@ -226,8 +242,8 @@ async fn generate_caption_for_image_internal(
     service: &crate::config::ModelServiceSettings,
     image_path: &PathBuf,
 ) -> Result<String, String> {
-    let client = crate::lmstudio::LmStudioClient::new(&service.base_url)
-        .with_api_key(&service.api_key);
+    let client =
+        crate::lmstudio::LmStudioClient::new(&service.base_url).with_api_key(&service.api_key);
 
     client
         .generate_image_caption(&service.model, &image_path.to_string_lossy())
@@ -266,7 +282,10 @@ pub fn get_project_media(
     let db = state.db.lock().unwrap();
     let media_dir = state.app_settings.media_dir.clone();
     let assets = db::get_media_assets_for_project(&*db, project_id).map_err(|e| e.to_string())?;
-    Ok(assets.into_iter().map(|a| MediaAssetResponse::from_asset(a, &media_dir)).collect())
+    Ok(assets
+        .into_iter()
+        .map(|a| MediaAssetResponse::from_asset(a, &media_dir))
+        .collect())
 }
 
 #[tauri::command]
@@ -297,7 +316,7 @@ pub fn export_project(
     password: Option<String>,
 ) -> Result<Vec<u8>, String> {
     let do_encrypt = encrypted.unwrap_or(false);
-    
+
     let pwd = if do_encrypt {
         let p = password.ok_or("Password required for encrypted export")?;
         validate_password_strength(&p)?;
@@ -339,29 +358,40 @@ pub fn export_project(
     zip.write_all(project.blueprints_json.as_bytes())
         .map_err(|e| e.to_string())?;
 
-    let media_metadata: Vec<serde_json::Value> = assets.iter().map(|a| {
-        serde_json::json!({
-            "id": a.id,
-            "filename": a.filename,
-            "original_name": a.original_name,
-            "media_type": a.media_type,
-            "mime_type": a.mime_type,
-            "storage_path": a.storage_path,
-            "caption": a.caption,
-            "description": a.description,
-            "slide_index": a.slide_index,
-            "file_size": a.file_size,
+    let media_metadata: Vec<serde_json::Value> = assets
+        .iter()
+        .map(|a| {
+            serde_json::json!({
+                "id": a.id,
+                "filename": a.filename,
+                "original_name": a.original_name,
+                "media_type": a.media_type,
+                "mime_type": a.mime_type,
+                "storage_path": a.storage_path,
+                "caption": a.caption,
+                "description": a.description,
+                "slide_index": a.slide_index,
+                "file_size": a.file_size,
+            })
         })
-    }).collect();
+        .collect();
     zip.start_file("content/media.json", SimpleFileOptions::default())
         .map_err(|e| e.to_string())?;
-    zip.write_all(serde_json::to_string_pretty(&serde_json::json!(media_metadata)).unwrap().as_bytes())
-        .map_err(|e| e.to_string())?;
+    zip.write_all(
+        serde_json::to_string_pretty(&serde_json::json!(media_metadata))
+            .unwrap()
+            .as_bytes(),
+    )
+    .map_err(|e| e.to_string())?;
 
     for asset in &assets {
         let full_path = media_dir.join(&asset.storage_path);
         if full_path.exists() {
-            let subdir = if asset.media_type == "video" { "videos" } else { "images" };
+            let subdir = if asset.media_type == "video" {
+                "videos"
+            } else {
+                "images"
+            };
             let entry_path = format!("content/media/{}/{}", subdir, asset.filename);
             zip.start_file(&entry_path, SimpleFileOptions::default())
                 .map_err(|e| e.to_string())?;
@@ -498,11 +528,25 @@ pub fn import_project(
 
                 let meta = media_metadata.get(filename);
                 let old_media_id = meta.and_then(|m| m.get("id").and_then(|v| v.as_i64()));
-                let mime_type = meta.and_then(|m| m.get("mime_type").and_then(|v| v.as_str().map(String::from)));
-                let caption = meta.and_then(|m| m.get("caption").and_then(|v| v.as_str().map(String::from)));
-                let description = meta.and_then(|m| m.get("description").and_then(|v| v.as_str().map(String::from)));
-                let slide_index = meta.and_then(|m| m.get("slide_index").and_then(|v| v.as_i64().map(|n| n as i32)));
-                let original_name = meta.and_then(|m| m.get("original_name").and_then(|v| v.as_str().map(String::from)))
+                let mime_type = meta.and_then(|m| {
+                    m.get("mime_type")
+                        .and_then(|v| v.as_str().map(String::from))
+                });
+                let caption =
+                    meta.and_then(|m| m.get("caption").and_then(|v| v.as_str().map(String::from)));
+                let description = meta.and_then(|m| {
+                    m.get("description")
+                        .and_then(|v| v.as_str().map(String::from))
+                });
+                let slide_index = meta.and_then(|m| {
+                    m.get("slide_index")
+                        .and_then(|v| v.as_i64().map(|n| n as i32))
+                });
+                let original_name = meta
+                    .and_then(|m| {
+                        m.get("original_name")
+                            .and_then(|v| v.as_str().map(String::from))
+                    })
                     .unwrap_or_else(|| filename.to_string());
 
                 let asset = MediaAsset {
@@ -523,7 +567,8 @@ pub fn import_project(
                     file_size: Some(file.size() as i64),
                     created_at: ts,
                 };
-                let new_media_id = db::create_media_asset(&*db, &asset).map_err(|e| e.to_string())?;
+                let new_media_id =
+                    db::create_media_asset(&*db, &asset).map_err(|e| e.to_string())?;
                 if let Some(old_media_id) = old_media_id {
                     media_id_map.insert(old_media_id, new_media_id);
                 }

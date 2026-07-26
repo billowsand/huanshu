@@ -1,12 +1,37 @@
 # 幻述 - AI 演示文稿生成工作室
 
-将 Markdown 文档自动转化为精美的 Slidev 演示文稿。
+[![CI](https://img.shields.io/github/actions/workflow/status/billowsand/huanshu/ci.yml?style=flat-square&logo=github)](https://github.com/billowsand/huanshu/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-1.77+-orange?style=flat-square&logo=rust)](https://www.rust-lang.org)
+[![Vue](https://img.shields.io/badge/Vue-3.5-blue?style=flat-square&logo=vuedotjs)](https://vuejs.org)
+
+> 将 Markdown 文档自动转化为精美的 Slidev 演示文稿，AI 驱动 · 完全本地运行
+
+<!--
+  应用截图 / 演示 GIF 建议放置在此处（1200×630px 效果最佳）
+  截图路径：docs/screenshot.png
+  上传到 GitHub 后在 Settings → Social preview 手动设置
+-->
+
+![架构概览](project-backbone.png)
+
+## 30 秒上手
+
+```bash
+# 1. 安装依赖
+bun install
+
+# 2. 启动开发版
+cargo tauri dev
+
+# 3. 打开应用后，在右上角「设置」中填写 LM Studio 的模型名称
+#    （LM Studio 需要在 Local Server 界面启动，加载聊天模型 + Embedding 模型）
+```
 
 ## 功能特点
 
 - **三步生成**：素材准备 → AI 生成 → 编辑完善
-- **智能布局**：AI 根据内容自动选择最佳幻灯片模板
-- **18 种模板**：封面、目录、分隔页、网格、对比、时间线、SWOT、信息图等
+- **智能布局**：AI 根据内容自动选择最佳幻灯片模板（18 种）
 - **多比例支持**：16:9 标准、32:9 超宽、48:9 全景
 - **并发生成**：多页并行处理，实时跟踪每页状态
 - **本地运行**：基于 LM Studio，完全离线可用
@@ -15,28 +40,24 @@
 
 ## 环境要求
 
-- [LM Studio](https://lmstudio.ai/)（需加载聊天模型和 Embedding 模型）
-- Node.js 18+
-- Rust 1.70+
-- Bun
+| 工具 | 版本 | 说明 |
+|------|------|------|
+| [LM Studio](https://lmstudio.ai/) | 任意 | 需加载聊天模型和 Embedding 模型 |
+| Node.js | 18+ | 前端构建 |
+| Rust | 1.77+ | 后端编译 |
+| Bun | 1.0+ | 包管理器 |
 
 ## 安装运行
 
 ```bash
-# 安装依赖
-bun install
+# 开发模式（推荐）
+cargo tauri dev
 
-# 运行开发版本
-bun dev
+# 生产构建
+bun build
+cargo tauri build
+# 构建产物在 src-tauri/target/release/bundle/msi/ 或 nsis/
 ```
-
-## LM Studio 配置
-
-1. 下载并启动 [LM Studio](https://lmstudio.ai/)
-2. 在 **Local Server** 界面加载一个聊天模型（如 Qwen、Llama）
-3. 加载一个 Embedding 模型（用于图标语义匹配）
-4. 点击 "Start Server"，默认地址为 `http://localhost:1234`
-5. 在幻述设置中填入模型名称
 
 ## 使用步骤
 
@@ -44,9 +65,7 @@ bun dev
 
 1. 输入项目名称
 2. 粘贴或上传 Markdown 内容
-3. 选择生成粒度：
-   - **H2**：每个 `##` 标题生成一页
-   - **H3**：每个 `###` 标题生成一页
+3. 选择生成粒度：**H2**（每个 `##` 一页）或 **H3**（每个 `###` 一页）
 4. 选择幻灯片比例：16:9 / 32:9 / 48:9
 5. 可选上传配图
 6. 点击 **开始生成**
@@ -188,8 +207,6 @@ LLM 根据 PagePlan 的以下信号选择布局：
 4. **density**：信息密度（低/中/高）
 5. **visual_need**：视觉需求（纯文本/可选图/需配图）
 
-模板选择后，Audit 模块验证布局是否真正适配内容信号，不适配则触发修复。
-
 ## 多比例幻灯片
 
 支持三种幻灯片比例，适应不同展示场景：
@@ -215,7 +232,7 @@ LLM 根据 PagePlan 的以下信号选择布局：
 ## 项目结构
 
 ```
-auto-slidev/
+huanshu/
 ├── src/                          # Vue 前端
 │   ├── components/               # 幻灯片 Vue 组件
 │   │   ├── SlideRenderer.vue     # 模板渲染器
@@ -234,13 +251,13 @@ auto-slidev/
 │   │   └── appSettings.ts        # 应用设置
 │   └── views/                    # 页面视图
 │       ├── HomeView.vue          # 首页（项目管理）
-│       ├── WorkflowView.vue      # 三步工作流
+│       ├── WorkflowView.vue       # 三步工作流
 │       ├── PresentationOverlay.vue # 全屏演示
-│       ├── SettingsView.vue      # 设置页
-│       └── steps/                # 工作流步骤
-│           ├── Step1Prepare.vue  # 素材准备
-│           ├── Step2Generate.vue # AI 生成
-│           └── Step3Editor.vue   # 编辑完善
+│       ├── SettingsView.vue       # 设置页
+│       └── steps/                 # 工作流步骤
+│           ├── Step1Prepare.vue   # 素材准备
+│           ├── Step2Generate.vue  # AI 生成
+│           └── Step3Editor.vue    # 编辑完善
 ├── src-tauri/                    # Rust 后端
 │   └── src/
 │       ├── commands/             # Tauri 命令
@@ -256,14 +273,15 @@ auto-slidev/
 │       │   ├── render.rs         # 蓝图渲染
 │       │   ├── icons.rs          # 图标匹配
 │       │   └── utils.rs          # 工具函数
-│       ├── crypto.rs             # AES-256-GCM 加解密
-│       ├── db.rs                 # SQLite 数据库
-│       ├── input.rs              # Markdown 解析
-│       ├── lmstudio.rs           # LM Studio API
-│       ├── config.rs             # 生成配置
-│       ├── types.rs              # 类型定义
-│       └── validate.rs           # 结构校验
-└── package.json
+│       ├── crypto.rs              # AES-256-GCM 加解密
+│       ├── db.rs                  # SQLite 数据库
+│       ├── input.rs               # Markdown 解析
+│       ├── lmstudio.rs            # LM Studio API
+│       ├── config.rs              # 生成配置
+│       ├── types.rs               # 类型定义
+│       └── validate.rs            # 结构校验
+├── package.json
+└── Cargo.toml
 ```
 
 ## 配置说明
@@ -286,6 +304,23 @@ auto-slidev/
 | embedding_model | Embedding 模型 | - |
 | api_key | API 密钥（可选） | - |
 
+## 局限性 / 已知问题
+
+- **依赖 LM Studio**：必须在本地运行 LM Studio 并加载相应模型，不支持纯云端 LLM
+- **仅支持 Markdown 输入**：暂不支持 Word、PDF 等格式直接导入
+- **中英文标题优化**：模板布局对中英文混排的优化有限
+- **Embeddin 模型必需**：图标语义匹配依赖 Embedding 模型，不加载会导致图标匹配失效
+
+## 项目状态
+
+🚧 **Beta** — 功能已基本完整，但仍在积极开发中，可能存在 breaking change。
+
+路线图：
+- [ ] 支持更多输入格式（Word、PDF）
+- [ ] 云端 LLM 后端支持
+- [ ] 更多幻灯片模板
+- [ ] 插件系统
+
 ## License
 
-MIT
+[MIT](LICENSE)

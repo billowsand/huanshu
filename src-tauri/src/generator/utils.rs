@@ -57,11 +57,7 @@ fn truncate_for_display(s: &str, max_len: usize) -> String {
     }
 
     let truncated: String = trimmed.chars().take(max_len).collect();
-    format!(
-        "{}... [truncated, {} chars total]",
-        truncated,
-        total_chars
-    )
+    format!("{}... [truncated, {} chars total]", truncated, total_chars)
 }
 
 pub fn parse_blueprint_with_repair(
@@ -541,9 +537,7 @@ fn normalize_kind_name(kind: &str) -> String {
         "step_flow" | "steps" | "workflow" => "step_flow",
         "process" => "process",
         "compare" | "comparison" | "versus" | "vs" => "compare",
-        "issue_stack" | "issues" | "problems" | "challenge_stack" | "pain_points" => {
-            "issue_stack"
-        }
+        "issue_stack" | "issues" | "problems" | "challenge_stack" | "pain_points" => "issue_stack",
         "swot" => "swot",
         "infographic" => "infographic",
         // Common hallucinated kinds → nearest valid equivalent

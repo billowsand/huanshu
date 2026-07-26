@@ -208,7 +208,10 @@ pub fn audit_layout_plans(page_plans: &[PagePlan], layouts: &[LayoutPlan]) -> Ve
                     ));
                 }
             }
-            SlideKind::Cover | SlideKind::Closing | SlideKind::Overview | SlideKind::Infographic => {}
+            SlideKind::Cover
+            | SlideKind::Closing
+            | SlideKind::Overview
+            | SlideKind::Infographic => {}
         }
 
         if is_text_thesis

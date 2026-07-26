@@ -146,7 +146,10 @@ impl IconIndex {
         self.icon_embeddings = Some(embeddings);
         self.embedding_model = Some(embedding_model.to_string());
 
-        println!("[icon-index] stored {} icon embeddings in DB cache", self.icons.len());
+        println!(
+            "[icon-index] stored {} icon embeddings in DB cache",
+            self.icons.len()
+        );
         Ok(self.icons.len())
     }
 
@@ -260,7 +263,9 @@ fn load_icons_from_embedded() -> Result<(Vec<IconRecord>, String)> {
 }
 
 /// Load icons from filesystem (fallback for development).
-fn load_icons_from_filesystem(collections: Vec<(PathBuf, String)>) -> Result<(Vec<IconRecord>, String)> {
+fn load_icons_from_filesystem(
+    collections: Vec<(PathBuf, String)>,
+) -> Result<(Vec<IconRecord>, String)> {
     let mut icons = Vec::new();
     let mut package_versions: Vec<String> = Vec::new();
 
@@ -301,16 +306,20 @@ fn discover_icon_collections(project_root: &Path) -> Result<Vec<(PathBuf, String
         project_root.join("studio").join("package.json"),
     ];
     for pkg_path in &candidates {
-        let Ok(raw) = fs::read_to_string(pkg_path) else { continue };
-        let Ok(json) = serde_json::from_str::<Value>(&raw) else { continue };
+        let Ok(raw) = fs::read_to_string(pkg_path) else {
+            continue;
+        };
+        let Ok(json) = serde_json::from_str::<Value>(&raw) else {
+            continue;
+        };
         for key in ["dependencies", "devDependencies"] {
             if let Some(obj) = json.get(key).and_then(Value::as_object) {
                 for (pkg, ver) in obj.iter() {
                     if pkg.starts_with("@iconify-json/") {
                         // Store version string for cache key
-                        packages.entry(pkg.clone()).or_insert_with(|| {
-                            ver.as_str().unwrap_or("unknown").to_string()
-                        });
+                        packages
+                            .entry(pkg.clone())
+                            .or_insert_with(|| ver.as_str().unwrap_or("unknown").to_string());
                     }
                 }
             }

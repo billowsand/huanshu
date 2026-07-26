@@ -181,13 +181,11 @@ impl AppState {
                 .flatten()
                 .map(|v| v == "true")
                 .unwrap_or(false);
-            let initialized_embedding_model = db::get_app_setting(
-                &*conn,
-                "initialized_embedding_model",
-            )
-            .ok()
-            .flatten()
-            .unwrap_or_default();
+            let initialized_embedding_model =
+                db::get_app_setting(&*conn, "initialized_embedding_model")
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default();
             AppGlobalSettings {
                 data_dir: data_dir_str,
                 media_dir,

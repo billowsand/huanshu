@@ -101,8 +101,17 @@ where
         let handle = tokio::task::spawn(async move {
             let _permit = permit;
             generate_one_slide(
-                client_owned, model, doc_title, page_owned, layout_owned,
-                asset_list, candidates, schema_hint, debug_dir_owned, prefix, idx,
+                client_owned,
+                model,
+                doc_title,
+                page_owned,
+                layout_owned,
+                asset_list,
+                candidates,
+                schema_hint,
+                debug_dir_owned,
+                prefix,
+                idx,
             )
             .await
         });
@@ -135,8 +144,18 @@ pub async fn generate_one_slide(
     slide_idx: usize,
 ) -> Result<SlideBlueprint> {
     generate_one_slide_inner(
-        client, model, doc_title, page, layout, asset_list, candidates,
-        schema_hint, debug_dir, prefix, slide_idx, String::new(),
+        client,
+        model,
+        doc_title,
+        page,
+        layout,
+        asset_list,
+        candidates,
+        schema_hint,
+        debug_dir,
+        prefix,
+        slide_idx,
+        String::new(),
     )
     .await
 }
@@ -273,8 +292,12 @@ pub async fn regenerate_slides_at(
         .collect();
 
     for (idx, prev_kind, errors) in failing {
-        let Some(page) = page_plans.get(*idx) else { continue };
-        let Some(layout) = layout_by_id.get(page.page_id.as_str()) else { continue };
+        let Some(page) = page_plans.get(*idx) else {
+            continue;
+        };
+        let Some(layout) = layout_by_id.get(page.page_id.as_str()) else {
+            continue;
+        };
         let asset_list = sorted_assets(asset_paths);
         let candidates = collect_icon_candidates(icon_index, page, layout);
         let schema_hint = blueprint_schema_hint(&layout.kind);
@@ -396,11 +419,7 @@ pub async fn generate_single_page_pipeline(
     }
 
     // Stage 3: Content generation
-    on_stage(
-        slide_index,
-        PageStage::Content,
-        Some("生成页面内容"),
-    );
+    on_stage(slide_index, PageStage::Content, Some("生成页面内容"));
 
     let display_index =
         crate::generator::utils::parse_page_display_index(&page_id).unwrap_or(slide_index + 1);

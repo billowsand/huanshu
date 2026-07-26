@@ -262,7 +262,11 @@ pub fn validate_blueprints(
             }
         }
         if slide.kind == SlideKind::Infographic {
-            if slide.infographic_syntax.as_ref().is_none_or(|s| s.trim().is_empty()) {
+            if slide
+                .infographic_syntax
+                .as_ref()
+                .is_none_or(|s| s.trim().is_empty())
+            {
                 issues.push(issue(idx, "infographic slide requires infographic_syntax"));
             }
         }
@@ -341,33 +345,53 @@ fn has_text(value: Option<&str>) -> bool {
 fn collect_tones(slide: &SlideBlueprint) -> Vec<(String, String)> {
     let mut out = Vec::new();
     for (i, c) in slide.cards.iter().enumerate() {
-        if let Some(t) = &c.tone { out.push((format!("card[{}].tone", i), t.clone())); }
+        if let Some(t) = &c.tone {
+            out.push((format!("card[{}].tone", i), t.clone()));
+        }
     }
     for (i, p) in slide.panels.iter().enumerate() {
-        if let Some(t) = &p.tone { out.push((format!("panel[{}].tone", i), t.clone())); }
+        if let Some(t) = &p.tone {
+            out.push((format!("panel[{}].tone", i), t.clone()));
+        }
     }
     for (i, l) in slide.layers.iter().enumerate() {
-        if let Some(t) = &l.tone { out.push((format!("layer[{}].tone", i), t.clone())); }
+        if let Some(t) = &l.tone {
+            out.push((format!("layer[{}].tone", i), t.clone()));
+        }
     }
     for (i, ci) in slide.center_items.iter().enumerate() {
-        if let Some(t) = &ci.tone { out.push((format!("center_item[{}].tone", i), t.clone())); }
+        if let Some(t) = &ci.tone {
+            out.push((format!("center_item[{}].tone", i), t.clone()));
+        }
     }
     for (i, s) in slide.steps.iter().enumerate() {
-        if let Some(t) = &s.tone { out.push((format!("step[{}].tone", i), t.clone())); }
+        if let Some(t) = &s.tone {
+            out.push((format!("step[{}].tone", i), t.clone()));
+        }
     }
     for (i, ph) in slide.phases.iter().enumerate() {
-        if let Some(t) = &ph.tone { out.push((format!("phase[{}].tone", i), t.clone())); }
+        if let Some(t) = &ph.tone {
+            out.push((format!("phase[{}].tone", i), t.clone()));
+        }
     }
     for (i, ev) in slide.timeline_events.iter().enumerate() {
-        if let Some(t) = &ev.tone { out.push((format!("timeline_event[{}].tone", i), t.clone())); }
+        if let Some(t) = &ev.tone {
+            out.push((format!("timeline_event[{}].tone", i), t.clone()));
+        }
     }
     if let Some(cd) = &slide.compare_data {
-        if let Some(t) = &cd.left.tone { out.push(("compare_data.left.tone".into(), t.clone())); }
-        if let Some(t) = &cd.right.tone { out.push(("compare_data.right.tone".into(), t.clone())); }
+        if let Some(t) = &cd.left.tone {
+            out.push(("compare_data.left.tone".into(), t.clone()));
+        }
+        if let Some(t) = &cd.right.tone {
+            out.push(("compare_data.right.tone".into(), t.clone()));
+        }
     }
     if let Some(sd) = &slide.swot_data {
         for (i, q) in sd.quadrants.iter().enumerate() {
-            if let Some(t) = &q.tone { out.push((format!("swot.quadrant[{}].tone", i), t.clone())); }
+            if let Some(t) = &q.tone {
+                out.push((format!("swot.quadrant[{}].tone", i), t.clone()));
+            }
         }
     }
     out

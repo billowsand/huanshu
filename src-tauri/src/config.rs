@@ -39,11 +39,7 @@ pub struct LlmSettings {
 impl Default for LlmSettings {
     fn default() -> Self {
         Self {
-            llm: ModelServiceSettings::new(
-                "http://127.0.0.1:1234",
-                "",
-                "qwen/qwen3.5-9b",
-            ),
+            llm: ModelServiceSettings::new("http://127.0.0.1:1234", "", "qwen/qwen3.5-9b"),
             embedding: ModelServiceSettings::new(
                 "http://127.0.0.1:1234",
                 "",

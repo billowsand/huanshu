@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -60,7 +60,10 @@ impl LmStudioClient {
             ]
         });
         let resp = self
-            .apply_auth(self.client.post(format!("{}/v1/chat/completions", self.base_url)))
+            .apply_auth(
+                self.client
+                    .post(format!("{}/v1/chat/completions", self.base_url)),
+            )
             .json(&payload)
             .send()
             .await
@@ -145,7 +148,10 @@ impl LmStudioClient {
         });
 
         let resp = self
-            .apply_auth(self.client.post(format!("{}/v1/chat/completions", self.base_url)))
+            .apply_auth(
+                self.client
+                    .post(format!("{}/v1/chat/completions", self.base_url)),
+            )
             .json(&payload)
             .send()
             .await

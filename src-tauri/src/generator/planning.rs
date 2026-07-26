@@ -241,7 +241,9 @@ async fn enrich_page_plans(
 
     write_debug(debug_dir, "01-page-plan.system.txt", system)?;
     write_debug(debug_dir, "01-page-plan.user.txt", &user)?;
-    let raw = client.generate_text(&config.llm.model, system, &user).await?;
+    let raw = client
+        .generate_text(&config.llm.model, system, &user)
+        .await?;
     write_debug(debug_dir, "01-page-plan.raw.txt", &raw)?;
     let resp: PageSignalResponse = crate::generator::utils::parse_json_with_extraction(&raw)
         .context("failed to parse page plan enrichment response")?;
@@ -624,7 +626,9 @@ async fn generate_layout_plans(
 
     write_debug(debug_dir, "02-layout-plan.system.txt", system)?;
     write_debug(debug_dir, "02-layout-plan.user.txt", &user)?;
-    let raw = client.generate_text(&config.llm.model, system, &user).await?;
+    let raw = client
+        .generate_text(&config.llm.model, system, &user)
+        .await?;
     write_debug(debug_dir, "02-layout-plan.raw.txt", &raw)?;
     let resp = crate::generator::utils::parse_layout_plan_response(&raw, page_plans).with_context(
         || {
@@ -992,7 +996,9 @@ async fn repair_layout_plans(
     let repair_prefix = format!("02-layout-plan.repair-r{}", round + 1);
     write_debug(debug_dir, &format!("{repair_prefix}.system.txt"), system)?;
     write_debug(debug_dir, &format!("{repair_prefix}.user.txt"), &user)?;
-    let raw = client.generate_text(&config.llm.model, system, &user).await?;
+    let raw = client
+        .generate_text(&config.llm.model, system, &user)
+        .await?;
     write_debug(debug_dir, &format!("{repair_prefix}.raw.txt"), &raw)?;
     let resp = crate::generator::utils::parse_layout_plan_response(&raw, &flagged_pages)
         .with_context(|| {
@@ -1094,20 +1100,18 @@ pub async fn make_overview_slide(
         .sections
         .iter()
         .enumerate()
-        .map(|(idx, section)| {
-            OverviewItem {
-                number: format!("{:02}", idx + 1),
-                title: summarize(&section.title, 18),
-                desc: summarize(
-                    &clean_model_text(
-                        section_descs
-                            .get(idx)
-                            .map(String::as_str)
-                            .unwrap_or("待补充"),
-                    ),
-                    16,
+        .map(|(idx, section)| OverviewItem {
+            number: format!("{:02}", idx + 1),
+            title: summarize(&section.title, 18),
+            desc: summarize(
+                &clean_model_text(
+                    section_descs
+                        .get(idx)
+                        .map(String::as_str)
+                        .unwrap_or("待补充"),
                 ),
-            }
+                16,
+            ),
         })
         .collect::<Vec<_>>();
 
@@ -1234,7 +1238,9 @@ async fn generate_overview_section_descs(
 
     write_debug(&config.debug_dir, "02a-overview-summary.system.txt", system)?;
     write_debug(&config.debug_dir, "02a-overview-summary.user.txt", &user)?;
-    let raw = client.generate_text(&config.llm.model, system, &user).await?;
+    let raw = client
+        .generate_text(&config.llm.model, system, &user)
+        .await?;
     write_debug(&config.debug_dir, "02a-overview-summary.raw.txt", &raw)?;
     let resp: OverviewSummaryResponse = crate::generator::utils::parse_json_with_extraction(&raw)
         .context("failed to parse overview summary response")?;
@@ -1291,7 +1297,11 @@ pub async fn enrich_one_page_plan(
             let _ = write_debug(debug_dir, &format!("{prefix}.raw.txt"), &raw);
             match crate::generator::utils::parse_json_with_extraction::<PageSignalResponse>(&raw) {
                 Ok(resp) => {
-                    let _ = write_debug(debug_dir, &format!("{prefix}.parsed.json"), &serde_json::to_string_pretty(&resp).unwrap_or_default());
+                    let _ = write_debug(
+                        debug_dir,
+                        &format!("{prefix}.parsed.json"),
+                        &serde_json::to_string_pretty(&resp).unwrap_or_default(),
+                    );
                     if let Some(patch) = resp.pages.into_iter().next() {
                         return merge_page_signal_patch(base_plan, &patch, asset_paths);
                     }
@@ -1345,9 +1355,16 @@ pub async fn layout_one_page(
     match client.generate_text(&config.llm.model, system, &user).await {
         Ok(raw) => {
             let _ = write_debug(debug_dir, &format!("{prefix}.raw.txt"), &raw);
-            match crate::generator::utils::parse_json_with_extraction::<crate::types::LayoutCandidateResponse>(&raw) {
+            match crate::generator::utils::parse_json_with_extraction::<
+                crate::types::LayoutCandidateResponse,
+            >(&raw)
+            {
                 Ok(resp) => {
-                    let _ = write_debug(debug_dir, &format!("{prefix}.parsed.json"), &serde_json::to_string_pretty(&resp).unwrap_or_default());
+                    let _ = write_debug(
+                        debug_dir,
+                        &format!("{prefix}.parsed.json"),
+                        &serde_json::to_string_pretty(&resp).unwrap_or_default(),
+                    );
                     if !resp.candidates.is_empty() {
                         let chosen = select_layout_with_diversity(&resp.candidates, used_layouts);
                         return LayoutPlan {
@@ -1364,7 +1381,10 @@ pub async fn layout_one_page(
                         };
                     }
                 }
-                Err(e) => eprintln!("parse error layout candidates page {}: {e}", page_plan.page_id),
+                Err(e) => eprintln!(
+                    "parse error layout candidates page {}: {e}",
+                    page_plan.page_id
+                ),
             }
         }
         Err(e) => eprintln!("LLM error layout page {}: {e}", page_plan.page_id),
@@ -1445,10 +1465,7 @@ fn select_layout_with_diversity<'a>(
     let total = used_layouts.len() as f32;
     let kind_count = |kind: &SlideKind| -> f32 {
         let kind_str = format!("{:?}", kind);
-        used_layouts
-            .iter()
-            .filter(|(_, k)| k == &kind_str)
-            .count() as f32
+        used_layouts.iter().filter(|(_, k)| k == &kind_str).count() as f32
     };
 
     // Sort candidates by (raw_score - diversity_penalty), descending.
@@ -1493,7 +1510,11 @@ fn fallback_overview_section_desc(section: &Section, page_plans: &[PagePlan]) ->
         .subsections
         .iter()
         .map(|sub| sub.title.as_str())
-        .chain(related_pages.iter().flat_map(|page| page.key_points.iter().map(String::as_str)))
+        .chain(
+            related_pages
+                .iter()
+                .flat_map(|page| page.key_points.iter().map(String::as_str)),
+        )
         .chain(related_pages.iter().map(|page| page.objective.as_str()))
         .chain(section.paragraphs.iter().map(String::as_str))
         .filter(|text| !text.trim().is_empty())

@@ -106,7 +106,15 @@ fn record_log(
     let entry = {
         let conn = db.lock().unwrap();
         db::append_generation_log(
-            &*conn, run_id, slide_index, stage, kind, title, summary, &detail, important,
+            &*conn,
+            run_id,
+            slide_index,
+            stage,
+            kind,
+            title,
+            summary,
+            &detail,
+            important,
         )
     };
     if let Ok(entry) = entry {
@@ -192,7 +200,8 @@ pub async fn optimize_markdown_headings(
         st.settings.clone()
     };
 
-    let llm_client = LmStudioClient::new(&settings.llm.base_url).with_api_key(&settings.llm.api_key);
+    let llm_client =
+        LmStudioClient::new(&settings.llm.base_url).with_api_key(&settings.llm.api_key);
     let embedding_client =
         LmStudioClient::new(&settings.embedding.base_url).with_api_key(&settings.embedding.api_key);
     crate::generator::planning::ensure_models_ready(
@@ -220,7 +229,10 @@ pub async fn optimize_markdown_headings(
         .map_err(|e| e.to_string())?;
     let cleaned = strip_markdown_fences(&response);
 
-    let final_markdown = if cleaned.lines().any(|line| line.trim_start().starts_with("# ")) {
+    let final_markdown = if cleaned
+        .lines()
+        .any(|line| line.trim_start().starts_with("# "))
+    {
         cleaned
     } else if let Some(title) = title_hint {
         format!("# {}\n\n{}", title, cleaned.trim())
@@ -459,7 +471,9 @@ pub async fn repair_slide(
     let aspect_ratio = active_project_id
         .and_then(|pid| {
             let db_lock = db.lock().unwrap();
-            crate::db::get_project(&*db_lock, pid).ok().and_then(|p| p.aspect_ratio)
+            crate::db::get_project(&*db_lock, pid)
+                .ok()
+                .and_then(|p| p.aspect_ratio)
         })
         .or_else(|| blueprints.get(index).and_then(|bp| bp.aspect_ratio))
         .unwrap_or(crate::types::AspectRatio::Ratio16x9);
@@ -474,8 +488,9 @@ pub async fn repair_slide(
     let icon_index = {
         let conn = state.lock().unwrap();
         let db = conn.db.lock().unwrap();
-        IconIndex::load_with_cache(&project_dir, &settings.embedding.model, &db)
-            .unwrap_or_else(|_| IconIndex::load(&project_dir).unwrap_or_else(|_| IconIndex::empty()))
+        IconIndex::load_with_cache(&project_dir, &settings.embedding.model, &db).unwrap_or_else(
+            |_| IconIndex::load(&project_dir).unwrap_or_else(|_| IconIndex::empty()),
+        )
     };
     let asset_paths = crate::validate::collect_assets(&project_dir);
 
@@ -528,7 +543,14 @@ async fn run_pipeline(
         IconIndex::load_with_cache(&config.project_dir, &config.embedding.model, &*conn)?
     };
     if !icon_index.is_embedded() {
-        emit_progress(&app, &db, run_id, "init", "首次使用，正在预计算图标向量...", 0.04);
+        emit_progress(
+            &app,
+            &db,
+            run_id,
+            "init",
+            "首次使用，正在预计算图标向量...",
+            0.04,
+        );
         icon_index
             .embed_all(&embedding_client, &config.embedding.model, &db)
             .await?;
@@ -582,12 +604,28 @@ async fn run_pipeline(
     );
 
     // Phase 1: Derive page plans deterministically
-    emit_progress(&app, &db, run_id, "page_plan", "从文档结构推导页面...", 0.15);
+    emit_progress(
+        &app,
+        &db,
+        run_id,
+        "page_plan",
+        "从文档结构推导页面...",
+        0.15,
+    );
     let page_plans = planning::derive_page_plans(&doc, config.granularity);
     if page_plans.is_empty() {
-        return Err(anyhow::anyhow!("page derivation produced no pages — check that the document has content"));
+        return Err(anyhow::anyhow!(
+            "page derivation produced no pages — check that the document has content"
+        ));
     }
-    emit_progress(&app, &db, run_id, "page_plan", format!("推导了 {} 个页面", page_plans.len()).as_str(), 0.2);
+    emit_progress(
+        &app,
+        &db,
+        run_id,
+        "page_plan",
+        format!("推导了 {} 个页面", page_plans.len()).as_str(),
+        0.2,
+    );
     record_log(
         &app,
         &db,
@@ -605,9 +643,17 @@ async fn run_pipeline(
 
     // Phase 2: Per-page concurrent pipeline
     let total = page_plans.len();
-    emit_progress(&app, &db, run_id, "generating", format!("并发生成 {total} 张幻灯片...").as_str(), 0.2);
+    emit_progress(
+        &app,
+        &db,
+        run_id,
+        "generating",
+        format!("并发生成 {total} 张幻灯片...").as_str(),
+        0.2,
+    );
 
-    let blueprints_arc = std::sync::Arc::new(tokio::sync::Mutex::new(vec![None::<SlideBlueprint>; total]));
+    let blueprints_arc =
+        std::sync::Arc::new(tokio::sync::Mutex::new(vec![None::<SlideBlueprint>; total]));
     let used_layouts_arc: std::sync::Arc<tokio::sync::Mutex<Vec<(usize, String)>>> =
         std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new()));
     let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(config.concurrency.max(1)));
@@ -640,24 +686,29 @@ async fn run_pipeline(
             let emit_stage_app = app_clone.clone();
             let emit_stage_idx = idx;
             let on_stage_cb: std::sync::Arc<dyn Fn(usize, PageStage, Option<&str>) + Send + Sync> =
-                std::sync::Arc::new(move |_slide_idx: usize, stage: PageStage, msg: Option<&str>| {
-                    let stage_str = match stage {
-                        PageStage::Planning => "planning",
-                        PageStage::Layout => "layout",
-                        PageStage::Content => "content",
-                        PageStage::Normalizing => "normalizing",
-                        PageStage::Validating => "validating",
-                        PageStage::Done => "done",
-                        PageStage::Error => "error",
-                        PageStage::Pending => "pending",
-                    };
-                    let _ = emit_stage_app.emit("gen:page_status", PageStatusEvent {
-                        slide_index: emit_stage_idx,
-                        stage: stage_str.to_string(),
-                        message: msg.map(str::to_string),
-                        blueprint: None,
-                    });
-                });
+                std::sync::Arc::new(
+                    move |_slide_idx: usize, stage: PageStage, msg: Option<&str>| {
+                        let stage_str = match stage {
+                            PageStage::Planning => "planning",
+                            PageStage::Layout => "layout",
+                            PageStage::Content => "content",
+                            PageStage::Normalizing => "normalizing",
+                            PageStage::Validating => "validating",
+                            PageStage::Done => "done",
+                            PageStage::Error => "error",
+                            PageStage::Pending => "pending",
+                        };
+                        let _ = emit_stage_app.emit(
+                            "gen:page_status",
+                            PageStatusEvent {
+                                slide_index: emit_stage_idx,
+                                stage: stage_str.to_string(),
+                                message: msg.map(str::to_string),
+                                blueprint: None,
+                            },
+                        );
+                    },
+                );
 
             match generate_single_page_pipeline(
                 &llm_client_clone,
@@ -684,14 +735,18 @@ async fn run_pipeline(
                         bp[idx] = Some(blueprint.clone());
                     }
                     // Emit gen:page_status with blueprint for the frontend
-                    let _ = app_clone.emit("gen:page_status", PageStatusEvent {
-                        slide_index: idx,
-                        stage: "done".to_string(),
-                        message: Some(format!("幻灯片 {}/{} 完成", idx + 1, total)),
-                        blueprint: Some(blueprint.clone()),
-                    });
+                    let _ = app_clone.emit(
+                        "gen:page_status",
+                        PageStatusEvent {
+                            slide_index: idx,
+                            stage: "done".to_string(),
+                            message: Some(format!("幻灯片 {}/{} 完成", idx + 1, total)),
+                            blueprint: Some(blueprint.clone()),
+                        },
+                    );
                     // Also emit gen:slide_ready for backward compatibility
-                    let done_count = completed_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                    let done_count =
+                        completed_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
                     let _ = app_clone.emit(
                         "gen:slide_ready",
                         GenerationEvent {
@@ -721,12 +776,15 @@ async fn run_pipeline(
                 Err(e) => {
                     failed_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     eprintln!("page {} pipeline failed: {e}", idx + 1);
-                    let _ = app_clone.emit("gen:page_status", PageStatusEvent {
-                        slide_index: idx,
-                        stage: "error".to_string(),
-                        message: Some(format!("幻灯片 {} 生成失败: {e}", idx + 1)),
-                        blueprint: None,
-                    });
+                    let _ = app_clone.emit(
+                        "gen:page_status",
+                        PageStatusEvent {
+                            slide_index: idx,
+                            stage: "error".to_string(),
+                            message: Some(format!("幻灯片 {} 生成失败: {e}", idx + 1)),
+                            blueprint: None,
+                        },
+                    );
                 }
             }
         });
@@ -771,13 +829,14 @@ async fn run_pipeline(
             .iter()
             .enumerate()
             .map(|(idx, page)| {
-                bp.get(idx)
-                    .cloned()
-                    .flatten()
-                    .unwrap_or_else(|| {
-                        eprintln!("slide {} missing, using fallback", idx + 1);
-                        crate::generator::normalize::make_fallback_slide(page, None, config.aspect_ratio)
-                    })
+                bp.get(idx).cloned().flatten().unwrap_or_else(|| {
+                    eprintln!("slide {} missing, using fallback", idx + 1);
+                    crate::generator::normalize::make_fallback_slide(
+                        page,
+                        None,
+                        config.aspect_ratio,
+                    )
+                })
             })
             .collect()
     };
@@ -859,9 +918,7 @@ async fn run_pipeline(
 /// Ensure icon embeddings are computed and cached.
 /// Call this on app startup to avoid first-generation delay.
 #[tauri::command]
-pub async fn ensure_icon_embeddings(
-    state: State<'_, Mutex<AppState>>,
-) -> Result<(), String> {
+pub async fn ensure_icon_embeddings(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
     let (settings, project_dir, db) = {
         let st = state.lock().unwrap();
         (
@@ -871,7 +928,11 @@ pub async fn ensure_icon_embeddings(
         )
     };
 
-    let config = GenerationConfig::from_settings(&settings, project_dir, crate::types::AspectRatio::Ratio16x9);
+    let config = GenerationConfig::from_settings(
+        &settings,
+        project_dir,
+        crate::types::AspectRatio::Ratio16x9,
+    );
 
     let embedding_client = config.embedding_client();
 
@@ -922,7 +983,11 @@ pub async fn recommend_icons_for_query(
         )
     };
 
-    let config = GenerationConfig::from_settings(&settings, project_dir, crate::types::AspectRatio::Ratio16x9);
+    let config = GenerationConfig::from_settings(
+        &settings,
+        project_dir,
+        crate::types::AspectRatio::Ratio16x9,
+    );
 
     let icon_index = {
         let conn = db.lock().unwrap();

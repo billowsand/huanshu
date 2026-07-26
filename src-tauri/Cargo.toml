@@ -2,6 +2,15 @@
 name = "auto-slidev-studio"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.77"
+description = "将 Markdown 文档自动转化为精美的 Slidev 演示文稿"
+license = "MIT"
+authors = ["幻述 Authors"]
+repository = "https://github.com/billowsand/huanshu"
+homepage = "https://github.com/billowsand/huanshu"
+readme = "README.md"
+keywords = ["slidev", "markdown", "presentation", "ai", "generator"]
+categories = ["text-processing", "command-line-utilities", "graphics"]
 
 [lib]
 name = "auto_slidev_studio_lib"
