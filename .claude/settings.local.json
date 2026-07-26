@@ -30,7 +30,9 @@
       "Bash(RUSTFLAGS=\"-D warnings\" cargo clippy --locked -- -D warnings)",
       "Bash(RUSTFLAGS=\"-D warnings\" cargo clippy --manifest-path src-tauri/Cargo.toml --locked -- -D warnings)",
       "WebSearch",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   },
   "enableAllProjectMcpServers": true,
