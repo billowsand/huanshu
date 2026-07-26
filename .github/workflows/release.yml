@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    name: release (${{ matrix.platform })
+    name: release (${{ matrix.platform }})
     runs-on: ${{ matrix.platform }}
     strategy:
       fail-fast: false
