@@ -21,7 +21,16 @@
       "Bash(xargs -I{} basename {})",
       "mcp__code-review-graph__semantic_search_nodes_tool",
       "Bash(git add:*)",
-      "Bash(git commit -m ':*)"
+      "Bash(git commit -m ':*)",
+      "Bash(gh release *)",
+      "Bash(gh run *)",
+      "Read(//e/huanshu/**)",
+      "Bash(python -c \"from pathlib import Path; p=Path\\('src-tauri/src/../../node_modules/@iconify-json/carbon/icons.json'\\); print\\(p.resolve\\(\\), p.exists\\(\\)\\); p2=Path\\('src-tauri/src/../../../node_modules/@iconify-json/carbon/icons.json'\\); print\\(p2.resolve\\(\\), p2.exists\\(\\)\\)\")",
+      "Bash(python -c \"from pathlib import Path; import os; os.chdir\\('src-tauri'\\); print\\(Path\\('../../package.json'\\).resolve\\(\\), Path\\('../../package.json'\\).exists\\(\\)\\); print\\(Path\\('../package.json'\\).resolve\\(\\), Path\\('../package.json'\\).exists\\(\\)\\)\")",
+      "Bash(RUSTFLAGS=\"-D warnings\" cargo clippy --locked -- -D warnings)",
+      "Bash(RUSTFLAGS=\"-D warnings\" cargo clippy --manifest-path src-tauri/Cargo.toml --locked -- -D warnings)",
+      "WebSearch",
+      "Bash(git add *)"
     ]
   },
   "enableAllProjectMcpServers": true,
