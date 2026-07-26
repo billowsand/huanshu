@@ -65,8 +65,9 @@ jobs:
           releaseBody: |
             ## 下载
 
-            - **Windows**: 安装包 `幻述_*_x64-setup.exe`（NSIS）
-            - **Linux**: `*.AppImage` 或 `*.deb`
+            - **Windows**: `Huanshu_*_x64-setup.exe`（NSIS 安装包）
+            - **Linux**: `Huanshu_*.AppImage` 或 `Huanshu_*.deb`
+            - 也可使用 portable 二进制：`auto-slidev-studio_windows_x64.exe` / `auto-slidev-studio_linux_x64`
 
             查看 [CHANGELOG](https://github.com/billowsand/huanshu/blob/master/CHANGELOG.md) 了解详细更新内容。
           # Publish as a real (non-draft) release so downloads are public.

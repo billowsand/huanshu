@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "幻述",
+  "productName": "Huanshu",
   "version": "0.1.0",
   "identifier": "com.auto-slidev.studio",
   "build": {
