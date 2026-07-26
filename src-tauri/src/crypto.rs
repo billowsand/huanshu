@@ -2,7 +2,7 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
-use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
+use argon2::Argon2;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -28,10 +28,8 @@ pub struct CryptoService;
 
 impl CryptoService {
     pub fn derive_key(password: &str, salt: &[u8]) -> Result<[u8; 32], String> {
-        let salt_b64 = BASE64.encode(salt);
-        let salt_str =
-            SaltString::from_b64(&salt_b64).map_err(|e| format!("Failed to create salt: {}", e))?;
-
+        // Use raw Argon2id KDF (not PHC SaltString) so we can store the salt as
+        // standard base64 in the file header. SaltString::from_b64 rejects '=' padding.
         let argon2 = Argon2::new(
             argon2::Algorithm::Argon2id,
             argon2::Version::V0x13,
@@ -39,13 +37,10 @@ impl CryptoService {
                 .map_err(|e| format!("Invalid Argon2 params: {}", e))?,
         );
 
-        let hash = argon2
-            .hash_password(password.as_bytes(), &salt_str)
-            .map_err(|e| format!("Key derivation failed: {}", e))?;
-
-        let hash_bytes = hash.hash.ok_or("No hash output")?;
         let mut key = [0u8; 32];
-        key.copy_from_slice(&hash_bytes.as_bytes()[..32]);
+        argon2
+            .hash_password_into(password.as_bytes(), salt, &mut key)
+            .map_err(|e| format!("Key derivation failed: {}", e))?;
         Ok(key)
     }
 
