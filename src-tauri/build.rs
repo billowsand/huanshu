@@ -11,9 +11,9 @@ fn main() {
                 let after_colon = &after_name[colon + 1..];
                 // Skip whitespace and find opening quote
                 let trimmed = after_colon.trim_start();
-                if trimmed.starts_with('"') {
-                    if let Some(end_quote) = trimmed[1..].find('"') {
-                        let version = &trimmed[1..1 + end_quote];
+                if let Some(stripped) = trimmed.strip_prefix('"') {
+                    if let Some(end_quote) = stripped.find('"') {
+                        let version = &stripped[..end_quote];
                         println!("cargo:rustc-env=EMBEDDED_ICONS_CARBON_VERSION={}", version);
                     }
                 }
