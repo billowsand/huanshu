@@ -29,12 +29,15 @@ jobs:
         run: |
           sudo apt-get update
           # Prefer ayatana appindicator; libappindicator3-dev conflicts with it on Ubuntu 24.04.
+          # fuse/appimagetool deps for AppImage bundling
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
             librsvg2-dev \
             patchelf \
             libgtk-3-dev \
-            libayatana-appindicator3-dev
+            libayatana-appindicator3-dev \
+            libfuse2 \
+            file
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -60,10 +63,16 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "幻述 ${{ github.ref_name }}"
           releaseBody: |
+            ## 下载
+
+            - **Windows**: 安装包 `幻述_*_x64-setup.exe`（NSIS）
+            - **Linux**: `*.AppImage` 或 `*.deb`
+
             查看 [CHANGELOG](https://github.com/billowsand/huanshu/blob/master/CHANGELOG.md) 了解详细更新内容。
-          releaseDraft: true
+          # Publish as a real (non-draft) release so downloads are public.
+          releaseDraft: false
           prerelease: false
-          # tauri.conf.json has bundle.active=false, so only the plain binary is produced.
+          # Also upload plain binaries as a fallback for portable use.
           uploadPlainBinary: true
 
   frontend-release:
