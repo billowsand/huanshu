@@ -36,6 +36,35 @@
 - 没有写"不要使用此模板"的规则，导致模板被误选
 
 
+## 移除一个 Slide 模板（反流程）
+
+2026-09 实例：移除 `Infographic` 模板与 `@antv/infographic` 依赖，模板数 18 → 17。
+**不要重新加回 @antv/infographic**（用户明确弃用；`SplitLayers` 右侧也一并改回内置分层卡片渲染）。
+
+反流程比加模板多两个易漏点：**LLM 提示词白名单**和**旧数据兼容**。
+
+前端：
+1. `src/components/KeynoteXxxSlide.vue` 删文件（若有专用渲染器如 `InfographicCanvas.vue` 一并删）
+2. `src/components/SlideRenderer.vue`：`import`、`componentMap`、`kindPresetMap`（氛围图预设）、props 映射 `case 'xxx'`
+3. `src/components/types.ts`：`SlideKind` 联合类型、`SlideBlueprint` 中该模板专属字段
+4. `src/composables/useSlideEditor.ts`：`KIND_META`、`KIND_FIELDS`、`KIND_DEFAULTS`
+5. `src/views/steps/Step3Editor.vue`：`FIELD_DEFS` 中该模板专属字段
+
+Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 struct 字面量编译不过）：
+6. `src-tauri/src/types.rs`：`SlideKind` 变体 + `SlideBlueprint` 字段
+7. `src-tauri/src/generator/planning.rs`：两处 system 提示词白名单、layout plan 规则文案、`apply_layout_fallbacks` 候选列表、各 `SlideBlueprint { .. }` 字面量
+8. `src-tauri/src/generator/slides.rs`：内容生成提示词的字段要求
+9. `src-tauri/src/generator/utils.rs`：`normalize_kind_name` 映射、`SlideKind → snake_case` 映射、`blueprint_schema_hint`
+10. `src-tauri/src/generator/normalize.rs`：默认值修复分支 + 字面量
+11. `src-tauri/src/generator/audit.rs`、`src-tauri/src/validate.rs`：`match` 分支 / 结构校验
+12. 文档：README 模板数、CHANGELOG（新增 `[Unreleased]`，不要改已发布版本号条目）
+
+必查两点：
+- `grep -rn "<模板名>" src src-tauri/src` 应 0 命中（仅剩迁移说明/测试里的字符串）
+- **旧数据兼容**：`SlideKind` 是 `#[serde(rename_all = "snake_case")]` 外部标签枚举，删变体后 DB / `.keynn` 里带旧 kind 的牌组会**整体反序列化失败**，而 `commands/projects.rs` 用的是 `unwrap_or_default()` → 项目静默变空。所以 `SlideBlueprint.kind` 挂了
+  `#[serde(deserialize_with = "de_slide_kind")]`（未知 kind → `Cover`，与前端 `SlideRenderer.vue` 的 `?? KeynoteCoverSlide` 兜底一致），并有回归测试 `legacy_infographic_kind_degrades_without_losing_slides`。
+
+
 ## 多比例幻灯片支持 (16:9 / 32:9 / 48:9)
 
 ### 功能说明
@@ -118,6 +147,72 @@ payload.bin (加密的原始 ZIP 内容)
 2. **验证机制**：header 中包含用同一密钥加密的测试字符串，解密时先验证测试字符串是否正确
 3. **自动检测**：导入时调用 `is_encrypted_file` 判断是否需要密码
 4. **密码强度**：必须包含大小写字母和数字，最少 8 字符
+
+## 打包与发布（Tauri）
+
+### 一键打包（推荐）
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1
+```
+
+脚本做的事：`bun install` → `bun run build`（前端 → `src-tauri/dist-studio`）→ `bunx tauri build --bundles nsis` → 把两个产物汇总复制到 `dist-package/`（命名与 CI release 一致）：
+
+| 产物 | 路径 | 用途 |
+|---|---|---|
+| `Huanshu_<version>_x64-setup.exe` | `dist-package/` | NSIS 安装包，currentUser 安装，静默 `/S`，卸载 `/S` |
+| `auto-slidev-studio_windows_x64.exe` | `dist-package/` | 免安装单文件，双击即跑 |
+
+参数：`-SkipFrontend`（只改了 Rust，复用已有 dist-studio）、`-NoInstall`（只出 exe）、`-DebugProfile`（debug 编译，编译快、冒烟用）。
+
+### 手动等价命令
+
+```bash
+bun run build                                  # 或 bunx vite build（跳过类型检查）
+bunx tauri build --bundles nsis                # 自动先跑 beforeBuildCommand
+# 产物：target/release/bundle/nsis/Huanshu_<version>_x64-setup.exe
+#       target/release/auto-slidev-studio.exe（免安装）
+```
+
+### 必须记住的坑
+
+1. **没有 `cargo-tauri`**：`cargo tauri build` 会直接报 `no such command: tauri`。Tauri CLI 走 devDependency，统一用 `bunx tauri`。
+2. **构建目录是 `<repo>/target`**：根 `Cargo.toml` 是 workspace（members = src-tauri），不是 `src-tauri/target`。README/SETUP 早期写的 `src-tauri/target/.../bundle/msi/` 是错的，且本项目没有 msi target。
+3. **前端产物目录固定为 `src-tauri/dist-studio`**：由 `vite.config.ts` 的 `build.outDir` 决定，与 `tauri.conf.json` 的 `build.frontendDist` 对应。改了 vite outDir 就必须同步改 tauri.conf.json。
+4. **Windows 只能出 nsis**：`bundle.targets` 里的 `appimage`/`deb` 需要 Linux 宿主，本机构建要显式 `--bundles nsis`。Linux/发布产物交给 `.github/workflows/release.yml`（tag `v*` 触发，tauri-action）。
+5. **`beforeBuildCommand` 是 `bun run build`**：不是 `bun build`（`bun build` 是 Bun 自带 bundler，不会跑 vue-tsc + vite）。前端类型错误会直接让 tauri build 失败。
+6. **PowerShell 脚本必须 ASCII-only**：Windows PowerShell 5.1 把无 BOM 的 .ps1 按 ANSI(GBK) 读，中文注释会变成乱码并引发 parse error。中文只写进 `.md` 文档。
+7. **打包前必须关掉正在运行的 幻述**：Windows 上运行中的 exe 是活映像，cargo 覆盖时直接失败：
+   `error: failed to remove file ... target\release\auto-slidev-studio.exe` + `拒绝访问。 (os error 5)`。
+   （注意：Windows 允许重命名运行中的 exe，所以“文件能改名”不代表可以重建——别看错现象。）
+   `scripts/package.ps1` 已内置前置检查，会直接报出占用进程 pid，不会白等一趟完整编译。
+   优雅关闭：`(Get-Process auto-slidev-studio).CloseMainWindow()`（`decorations:false` 的窗口同样响应 WM_CLOSE），不行再 `Stop-Process -Force`。
+
+### 打包后必须验证（各步骤实测命令）
+
+```powershell
+# 1) 冒烟：直接跑未安装二进制，看窗口是否真的起来
+$p = Start-Process D:\huanshu\target\release\auto-slidev-studio.exe -PassThru
+Start-Sleep 12; $p.Refresh()
+if ($p.HasExited) { "EXITED $($p.ExitCode)" } else { "RUNNING $($p.MainWindowTitle)" }
+
+# 2) 安装包静默安装 + 校验落盘
+Start-Process dist-package\Huanshu_0.1.0_x64-setup.exe -ArgumentList '/S' -Wait   # 落到 %LOCALAPPDATA%\Huanshu
+Start-Process "$env:LOCALAPPDATA\Huanshu\auto-slidev-studio.exe" -PassThru       # 再跑一次
+
+# 3) 卸载清理（避免留残留影响下次验证）
+Start-Process "$env:LOCALAPPDATA\Huanshu\uninstall.exe" -ArgumentList '/S' -Wait
+```
+
+预期：`MainWindowTitle` 为 `幻述`。窗口 `decorations: false`，标题来自 `tauri.conf.json` 的 `app.windows[0].title`。
+
+### 运行前置与分发注意
+
+- 运行时依赖本机 **WebView2 运行时**（Win10+ 一般已预装；可用 `reg query "HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" /v pv` 查版本）。
+- `webviewInstallMode` 当前是 `downloadBootstrapper`：目标机缺 WebView2 时需联网下载。要纯离线装机改成 `embedBootstrapper` 或 `offlineInstaller`（体积显著增大）。
+- 安装包未签名，首次安装会有 SmartScreen 提示。
+- LM Studio 是外部依赖，不打包；装完需在应用「设置」里填模型名，否则生成流程不可用。
+- `build.rs` 依赖 `node_modules/@iconify-json/carbon`，所以打包前必须 `bun install`。
 
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph
