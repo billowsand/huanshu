@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **信息图幻灯片（`Infographic` / `@antv/infographic`）**：移除 `@antv/infographic` 依赖与 `Infographic` 模板（模板数 18 → 17），`SplitLayers` 恢复为内置的分层卡片渲染（去掉右侧 @antv 语法可视化）。前端产物 JS 由 1820.92 kB 降至 978.61 kB。
 - 旧牌组兼容：`SlideBlueprint.kind` 反序列化改为容错（未知 kind 回退为 `Cover`），已存在于数据库或 `.keynn` 中的 `infographic` 页面不会导致整个项目加载失败。
 
+- **旧批量生成流水线死代码**：并发生成架构（25db08c）上线后遗留的整段旧流水线已删除，包括
+  `run_page_plan` / `run_layout_plan` / `generate_content_slides_with_progress` /
+  `repair_until_valid` / `normalize_blueprints` 及 `generator/audit.rs` 布局审计模块、
+  `PagePlanResponse` / `LayoutPlanResponse`、布局规划缓存与修复函数；`PageStage` 移除从未构造的
+  `Pending` / `Error` 变体（前端保留自有兜底状态）。同时删除无调用方的
+  `GenerationConfig::multimodal_client`、`CryptoService::validate_password`、
+  `db::update_project_media_root`。`cargo check` 警告 28 → 0。
+
 ## [0.1.0] - 2024-07-26
 
 ### Added

@@ -399,16 +399,6 @@ pub struct SwotData {
     pub strategy: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PagePlanResponse {
-    pub pages: Vec<PagePlan>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LayoutPlanResponse {
-    pub pages: Vec<LayoutPlan>,
-}
-
 /// Top-K ranked layout candidates returned by the LLM for diversity-aware selection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutCandidateResponse {

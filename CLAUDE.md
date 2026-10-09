@@ -1,29 +1,26 @@
 # Auto-Slidev 模板扩展说明
 
 ## 新增一个 Slide 模板的标准流程
-
-当你要给 Auto-Slidev 增加一个新模板时，按下面顺序改：
+当你要给 Auto-Slidev 增加一个新模板时，按下面顺序改（渲染由前端 `SlideRenderer.vue` 完成，Rust 侧只产出 blueprint）：
 
 1. `src/components/`
    新建 `KeynoteXxxSlide.vue`，Props 设计需清楚。
 2. `src-tauri/src/types.rs`
    新增 `SlideKind` 枚举项，以及该模板对应的数据结构。
-3. `src-tauri/src/generator/render.rs`
-   把 blueprint 渲染成 `<KeynoteXxxSlide ... />`。
-4. `src-tauri/src/generator/planning.rs`
+3. `src-tauri/src/generator/planning.rs`
    在 layout plan 提示词里写清楚：
    - 什么时候应该选这个模板
    - 什么时候不能选这个模板
    - 它和相邻模板的边界是什么
-5. `src-tauri/src/generator/utils.rs`
+4. `src-tauri/src/generator/utils.rs`
    在 `blueprint_schema_hint()` 里加入严格 JSON 示例。
-6. `src-tauri/src/generator/slides.rs`
+5. `src-tauri/src/generator/slides.rs`
    在内容生成提示词里加入该模板的字段要求。
-7. `src-tauri/src/generator/normalize.rs`
+6. `src-tauri/src/generator/normalize.rs`
    增加默认值修复、长度收敛、tone/icon 修复。
-8. `src-tauri/src/validate.rs`
+7. `src-tauri/src/validate.rs`
    增加结构校验，避免生成结果进入非法状态。
-9. 文档
+8. 文档
    更新 `CLAUDE.md`，把组件用途、Props 和新增流程记录下来。
 
 
@@ -52,11 +49,11 @@
 
 Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 struct 字面量编译不过）：
 6. `src-tauri/src/types.rs`：`SlideKind` 变体 + `SlideBlueprint` 字段
-7. `src-tauri/src/generator/planning.rs`：两处 system 提示词白名单、layout plan 规则文案、`apply_layout_fallbacks` 候选列表、各 `SlideBlueprint { .. }` 字面量
+7. `src-tauri/src/generator/planning.rs`：`layout_one_page` 的 system 提示词白名单与规则文案、`safe_fallback_kind` / `variety_fallback_kind` / `pick_different_kind` 候选列表、各 `SlideBlueprint { .. }` 字面量
 8. `src-tauri/src/generator/slides.rs`：内容生成提示词的字段要求
-9. `src-tauri/src/generator/utils.rs`：`normalize_kind_name` 映射、`SlideKind → snake_case` 映射、`blueprint_schema_hint`
+9. `src-tauri/src/generator/utils.rs`：`slide_kind_name`（`SlideKind → snake_case`）映射、`blueprint_schema_hint`
 10. `src-tauri/src/generator/normalize.rs`：默认值修复分支 + 字面量
-11. `src-tauri/src/generator/audit.rs`、`src-tauri/src/validate.rs`：`match` 分支 / 结构校验
+11. `src-tauri/src/validate.rs`：结构校验
 12. 文档：README 模板数、CHANGELOG（新增 `[Unreleased]`，不要改已发布版本号条目）
 
 必查两点：

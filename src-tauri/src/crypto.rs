@@ -157,38 +157,6 @@ impl CryptoService {
             .map_err(|e| format!("Decryption failed: {}", e))
     }
 
-    pub fn validate_password(data: &[u8], password: &str) -> Result<bool, String> {
-        let separator_idx = data
-            .iter()
-            .position(|&b| b == b'\n')
-            .ok_or("Invalid file format: missing separator")?;
-
-        let header_json = &data[..separator_idx];
-
-        let header: CryptoHeader =
-            serde_json::from_slice(header_json).map_err(|e| format!("Invalid header: {}", e))?;
-
-        let salt = BASE64
-            .decode(&header.salt)
-            .map_err(|e| format!("Invalid salt: {}", e))?;
-        let test_nonce_bytes = BASE64
-            .decode(&header.test_nonce)
-            .map_err(|e| format!("Invalid test nonce: {}", e))?;
-        let test_ciphertext = BASE64
-            .decode(&header.test_ciphertext)
-            .map_err(|e| format!("Invalid test ciphertext: {}", e))?;
-
-        let key = Self::derive_key(password, &salt)?;
-        let test_cipher = Aes256Gcm::new_from_slice(&key)
-            .map_err(|e| format!("Failed to create test cipher: {}", e))?;
-        let test_nonce = Nonce::from_slice(&test_nonce_bytes);
-
-        match test_cipher.decrypt(test_nonce, test_ciphertext.as_ref()) {
-            Ok(_) => Ok(true),
-            Err(_) => Ok(false),
-        }
-    }
-
     pub fn is_encrypted(data: &[u8]) -> bool {
         let separator_idx = match data.iter().position(|&b| b == b'\n') {
             Some(idx) => idx,

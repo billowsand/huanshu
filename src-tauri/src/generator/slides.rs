@@ -5,130 +5,12 @@ use crate::lmstudio::LmStudioClient;
 use crate::types::*;
 use anyhow::{Context, Result};
 use std::collections::{BTreeMap, HashSet};
-use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tokio::sync::Semaphore;
 
-use crate::generator::icons::{collect_icon_candidates, precompute_semantic_candidates};
+use crate::generator::icons::collect_icon_candidates;
 use crate::generator::utils::{
     blueprint_schema_hint, parse_page_display_index, sanitize_filename, sorted_assets, write_debug,
 };
-
-/// Generate content slides and emit per-slide progress via a callback as each
-/// slide completes (not after all slides finish).
-pub async fn generate_content_slides_with_progress<F>(
-    llm_client: &LmStudioClient,
-    embedding_client: &LmStudioClient,
-    config: &GenerationConfig,
-    doc: &ParsedDocument,
-    page_plans: &[PagePlan],
-    layout_plans: &[LayoutPlan],
-    icon_index: &IconIndex,
-    asset_paths: &HashSet<String>,
-    debug_dir: &Path,
-    concurrency: usize,
-    on_slide_ready: F,
-) -> Result<Vec<SlideBlueprint>>
-where
-    F: Fn(usize, SlideBlueprint) + Send + 'static,
-{
-    let layout_by_id = layout_plans
-        .iter()
-        .map(|layout| (layout.page_id.clone(), layout))
-        .collect::<BTreeMap<_, _>>();
-
-    // Pre-compute semantically ranked icon candidates for all slides in one
-    // batch embedding call, then fall back to lexical if the index is empty.
-    let semantic_candidates: Vec<Vec<String>> = precompute_semantic_candidates(
-        embedding_client,
-        &config.embedding.model,
-        icon_index,
-        page_plans,
-        layout_plans,
-    )
-    .await
-    .unwrap_or_else(|_| vec![Vec::new(); page_plans.len()]);
-
-    let sem = Arc::new(Semaphore::new(concurrency.max(1)));
-
-    enum SlideSource {
-        Cached(SlideBlueprint),
-        Pending(tokio::task::JoinHandle<Result<SlideBlueprint>>),
-    }
-
-    let mut sources: Vec<SlideSource> = Vec::with_capacity(page_plans.len());
-
-    for (idx, page) in page_plans.iter().enumerate() {
-        let layout = layout_by_id
-            .get(&page.page_id)
-            .ok_or_else(|| anyhow::anyhow!("missing layout plan for page {}", page.page_id))?;
-        let display_index = parse_page_display_index(&page.page_id).unwrap_or(idx + 1);
-        let prefix = format!(
-            "03-slide-{:02}-{}",
-            display_index,
-            sanitize_filename(&page.page_id)
-        );
-        let parsed_path = debug_dir.join(format!("{prefix}.parsed.json"));
-        if parsed_path.is_file() {
-            if let Ok(cached) =
-                serde_json::from_str::<BlueprintWrapper>(&fs::read_to_string(&parsed_path)?)
-            {
-                sources.push(SlideSource::Cached(cached.slide));
-                continue;
-            }
-        }
-
-        // Use semantic candidates if available, otherwise fall back to lexical
-        let candidates = {
-            let sem_cands = semantic_candidates.get(idx).cloned().unwrap_or_default();
-            if sem_cands.is_empty() {
-                collect_icon_candidates(icon_index, page, layout)
-            } else {
-                sem_cands
-            }
-        };
-
-        let client_owned = llm_client.clone();
-        let model = config.llm.model.clone();
-        let doc_title = doc.title.clone();
-        let page_owned = page.clone();
-        let layout_owned = (*layout).clone();
-        let asset_list = sorted_assets(asset_paths);
-        let schema_hint = blueprint_schema_hint(&layout.kind);
-        let debug_dir_owned = debug_dir.to_path_buf();
-        let permit = sem.clone().acquire_owned().await?;
-        let handle = tokio::task::spawn(async move {
-            let _permit = permit;
-            generate_one_slide(
-                client_owned,
-                model,
-                doc_title,
-                page_owned,
-                layout_owned,
-                asset_list,
-                candidates,
-                schema_hint,
-                debug_dir_owned,
-                prefix,
-                idx,
-            )
-            .await
-        });
-        sources.push(SlideSource::Pending(handle));
-    }
-
-    let mut slides = Vec::with_capacity(sources.len());
-    for (idx, source) in sources.into_iter().enumerate() {
-        let slide = match source {
-            SlideSource::Cached(s) => s,
-            SlideSource::Pending(handle) => handle.await??,
-        };
-        on_slide_ready(idx, slide.clone());
-        slides.push(slide);
-    }
-    Ok(slides)
-}
 
 pub async fn generate_one_slide(
     client: LmStudioClient,
@@ -356,14 +238,12 @@ pub async fn regenerate_slides_at(
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PageStage {
-    Pending,
     Planning,
     Layout,
     Content,
     Normalizing,
     Validating,
     Done,
-    Error,
 }
 
 /// Run the full pipeline for a single page:

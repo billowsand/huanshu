@@ -271,8 +271,6 @@ huanshu/
 │       │   ├── planning.rs       # 页面/布局规划
 │       │   ├── slides.rs         # 内容生成
 │       │   ├── normalize.rs      # 规范化修复
-│       │   ├── audit.rs          # 布局审计
-│       │   ├── render.rs         # 蓝图渲染
 │       │   ├── icons.rs          # 图标匹配
 │       │   └── utils.rs          # 工具函数
 │       ├── crypto.rs              # AES-256-GCM 加解密

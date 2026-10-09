@@ -63,10 +63,6 @@ impl From<GenerationLogEntry> for GenerationLogEvent {
     }
 }
 
-fn read_optional_text(path: &Path) -> Option<String> {
-    std::fs::read_to_string(path).ok()
-}
-
 fn strip_markdown_fences(raw: &str) -> String {
     let trimmed = raw.trim();
     if !trimmed.starts_with("```") {
@@ -694,8 +690,6 @@ async fn run_pipeline(
                             PageStage::Normalizing => "normalizing",
                             PageStage::Validating => "validating",
                             PageStage::Done => "done",
-                            PageStage::Error => "error",
-                            PageStage::Pending => "pending",
                         };
                         let _ = emit_stage_app.emit(
                             "gen:page_status",

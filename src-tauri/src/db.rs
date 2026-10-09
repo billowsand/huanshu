@@ -258,14 +258,6 @@ pub fn update_project_blueprints(conn: &Connection, id: i64, blueprints_json: &s
     Ok(())
 }
 
-pub fn update_project_media_root(conn: &Connection, id: i64, media_root: &str) -> Result<()> {
-    conn.execute(
-        "UPDATE projects SET media_root=?1, updated_at=?2 WHERE id=?3",
-        params![media_root, now_ts(), id],
-    )?;
-    Ok(())
-}
-
 pub fn update_project_aspect_ratio(
     conn: &Connection,
     id: i64,

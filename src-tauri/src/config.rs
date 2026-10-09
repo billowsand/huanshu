@@ -184,7 +184,4 @@ impl GenerationConfig {
         crate::lmstudio::LmStudioClient::from_service(&self.embedding)
     }
 
-    pub fn multimodal_client(&self) -> anyhow::Result<crate::lmstudio::LmStudioClient> {
-        crate::lmstudio::LmStudioClient::from_service(&self.multimodal)
-    }
 }

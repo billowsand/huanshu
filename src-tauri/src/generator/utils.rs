@@ -88,31 +88,6 @@ pub fn parse_blueprint_with_repair(
     serde_json::from_value(value).context("model did not return a valid slide blueprint")
 }
 
-pub fn parse_layout_plan_response(
-    raw: &str,
-    page_plans: &[PagePlan],
-) -> Result<LayoutPlanResponse> {
-    let json_text = extract_json_object(raw).unwrap_or_else(|| raw.to_string());
-    let sanitized = sanitize_json_text(&json_text);
-    let mut value: Value = match serde_json::from_str(&sanitized) {
-        Ok(v) => v,
-        Err(e) => {
-            anyhow::bail!(
-                "layout plan JSON parse failed:\n\
-                 ~~~ raw preview ~~~\n{}\n\
-                 ~~~ extracted & sanitized preview ~~~\n{}\n\
-                 ~~~ serde error ~~~\n{}",
-                truncate_for_display(raw, 300),
-                truncate_for_display(&sanitized, 300),
-                e
-            )
-        }
-    };
-    normalize_layout_plan_value(&mut value, page_plans);
-    validate_layout_plan_value(&value)?;
-    serde_json::from_value(value).context("model did not return a valid layout plan")
-}
-
 pub fn sanitize_json_text(text: &str) -> String {
     let trimmed = text.trim();
     let without_fence = trimmed
@@ -430,176 +405,6 @@ pub fn normalize_blueprint_value(value: &mut Value, expected_kind: &SlideKind) {
         | SlideKind::Closing
         | SlideKind::Overview => {}
     }
-}
-
-pub fn normalize_layout_plan_value(value: &mut Value, page_plans: &[PagePlan]) {
-    if value.get("pages").is_none() && value.is_array() {
-        *value = Value::Object(Map::from_iter([("pages".to_string(), value.take())]));
-    }
-
-    let Some(pages) = value.get_mut("pages").and_then(Value::as_array_mut) else {
-        return;
-    };
-
-    for page in pages {
-        let Some(obj) = page.as_object_mut() else {
-            continue;
-        };
-        promote_string_field(obj, "component_kind", "kind");
-        promote_string_field(obj, "layout_kind", "kind");
-        promote_string_field(obj, "reasoning", "reason");
-
-        if let Some(kind) = obj.get("kind").and_then(Value::as_str) {
-            obj.insert("kind".to_string(), Value::String(normalize_kind_name(kind)));
-        } else {
-            obj.insert(
-                "kind".to_string(),
-                Value::String("feature_grid".to_string()),
-            );
-        }
-
-        let page_id = get_string(obj, &["page_id"]);
-        let matching_plan = page_id
-            .as_deref()
-            .and_then(|id| resolve_page_plan(page_plans, id));
-
-        if let Some(plan) = matching_plan {
-            obj.insert("page_id".to_string(), Value::String(plan.page_id.clone()));
-            obj.entry("title".to_string())
-                .or_insert_with(|| Value::String(clean_model_text(&plan.page_title)));
-            if let Some(subtitle) = plan
-                .takeaway
-                .as_deref()
-                .filter(|text| !text.trim().is_empty())
-                .map(clean_model_text)
-                .or_else(|| {
-                    plan.subsection_title
-                        .as_deref()
-                        .filter(|text| !text.trim().is_empty())
-                        .map(clean_model_text)
-                })
-            {
-                obj.entry("subtitle".to_string())
-                    .or_insert_with(|| Value::String(subtitle));
-            }
-            obj.entry("section_label".to_string()).or_insert_with(|| {
-                Value::String(clean_model_text(
-                    plan.subsection_title
-                        .as_deref()
-                        .unwrap_or(&plan.section_title),
-                ))
-            });
-        } else {
-            // No matching page plan — use page_id as title fallback so validation passes
-            let fallback_title = obj
-                .get("page_id")
-                .and_then(Value::as_str)
-                .unwrap_or("Slide")
-                .replace('_', " ");
-            obj.entry("title".to_string())
-                .or_insert_with(|| Value::String(fallback_title));
-        }
-
-        obj.entry("reason".to_string())
-            .or_insert_with(|| Value::String("Auto-normalized from model output.".to_string()));
-        remove_keys(obj, &["component_kind", "layout_kind", "reasoning"]);
-    }
-}
-
-fn resolve_page_plan<'a>(page_plans: &'a [PagePlan], page_id: &str) -> Option<&'a PagePlan> {
-    page_plans
-        .iter()
-        .find(|plan| plan.page_id.eq_ignore_ascii_case(page_id))
-}
-
-fn normalize_kind_name(kind: &str) -> String {
-    let base = kind
-        .trim()
-        .to_ascii_lowercase()
-        .replace('-', "_")
-        .replace(' ', "_");
-    // Map model hallucinations / content_shape values to valid SlideKind names
-    match base.as_str() {
-        "cover" => "cover",
-        "overview" => "overview",
-        "section_intro" | "section_overview" | "chapter_intro" | "chapter_overview" => {
-            "section_intro"
-        }
-        "feature_grid" => "feature_grid",
-        "spotlight" => "spotlight",
-        "split_layers" => "split_layers",
-        "section_list" | "list" | "bullet_list" | "bullets" => "section_list",
-        "focus_example" | "focus" | "example" => "focus_example",
-        "outcome_grid" | "outcomes" => "outcome_grid",
-        "center_grid" | "grid" => "center_grid",
-        "timeline" => "timeline",
-        "step_flow" | "steps" | "workflow" => "step_flow",
-        "process" => "process",
-        "compare" | "comparison" | "versus" | "vs" => "compare",
-        "issue_stack" | "issues" | "problems" | "challenge_stack" | "pain_points" => "issue_stack",
-        "swot" => "swot",
-        // Common hallucinated kinds → nearest valid equivalent
-        "checklist" | "check_list" => "section_list",
-        "matrix" => "center_grid",
-        "summary" | "conclusion" => "center_grid",
-        "architecture" | "diagram" => "split_layers",
-        "table" | "data_table" => "compare",
-        "quote" | "statement" | "callout" => "spotlight",
-        "metrics" | "stats" | "numbers" => "outcome_grid",
-        // Unknown / hallucinated kind — log so it is visible in debug output
-        _ => {
-            eprintln!(
-                "[warn] normalize_kind_name: unrecognized kind '{}' → feature_grid",
-                kind
-            );
-            "feature_grid"
-        }
-    }
-    .to_string()
-}
-
-fn validate_layout_plan_value(value: &Value) -> Result<()> {
-    let Some(pages) = value.get("pages").and_then(Value::as_array) else {
-        anyhow::bail!("layout plan response is missing a `pages` array");
-    };
-
-    for (idx, page) in pages.iter().enumerate() {
-        let Some(obj) = page.as_object() else {
-            anyhow::bail!("layout plan entry {} is not a JSON object", idx + 1);
-        };
-
-        let page_label = obj
-            .get("page_id")
-            .and_then(Value::as_str)
-            .filter(|text| !text.trim().is_empty())
-            .map(|id| format!("page_id={id}"))
-            .unwrap_or_else(|| format!("index={}", idx + 1));
-
-        let mut missing = Vec::new();
-        for field in ["page_id", "kind", "title", "reason"] {
-            let present = obj
-                .get(field)
-                .map(|value| match value {
-                    Value::String(text) => !text.trim().is_empty(),
-                    Value::Null => false,
-                    _ => true,
-                })
-                .unwrap_or(false);
-            if !present {
-                missing.push(field);
-            }
-        }
-
-        if !missing.is_empty() {
-            anyhow::bail!(
-                "layout plan {} is missing required field(s): {}",
-                page_label,
-                missing.join(", ")
-            );
-        }
-    }
-
-    Ok(())
 }
 
 fn normalize_feature_grid_like_slide(slide: &mut Map<String, Value>) {
@@ -1244,37 +1049,6 @@ pub fn write_debug(root: &Path, filename: &str, content: &str) -> Result<()> {
         .with_context(|| format!("failed to write debug file: {}", path.display()))
 }
 
-pub fn load_cached_layout_plans(
-    debug_dir: &Path,
-    page_plans: &[PagePlan],
-) -> Result<Option<Vec<LayoutPlan>>> {
-    use crate::generator::audit::audit_layout_plans;
-
-    let candidates = [
-        debug_dir.join("02-layout-plan.final.parsed.json"),
-        debug_dir.join("02-layout-plan.parsed.json"),
-    ];
-    let mut best: Option<(std::time::SystemTime, Vec<LayoutPlan>)> = None;
-    for path in candidates {
-        if !path.is_file() {
-            continue;
-        }
-        let cached = serde_json::from_str::<LayoutPlanResponse>(&fs::read_to_string(&path)?)
-            .with_context(|| format!("failed to read cached layout plan: {}", path.display()))?;
-        let issues = audit_layout_plans(page_plans, &cached.pages);
-        if issues.is_empty() {
-            let modified = fs::metadata(&path)
-                .and_then(|meta| meta.modified())
-                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-            match &best {
-                Some((best_time, _)) if modified <= *best_time => {}
-                _ => best = Some((modified, cached.pages)),
-            }
-        }
-    }
-    Ok(best.map(|(_, pages)| pages))
-}
-
 pub fn sanitize_filename(input: &str) -> String {
     input
         .chars()
@@ -1290,29 +1064,6 @@ pub fn sanitize_filename(input: &str) -> String {
 
 pub fn parse_page_display_index(page_id: &str) -> Option<usize> {
     page_id.parse::<usize>().ok()
-}
-
-pub fn compute_doc_hash(doc: &crate::input::ParsedDocument) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut hasher = DefaultHasher::new();
-    doc.title.hash(&mut hasher);
-    for sec in &doc.sections {
-        sec.title.hash(&mut hasher);
-        for para in &sec.paragraphs {
-            para.hash(&mut hasher);
-        }
-        for sub in &sec.subsections {
-            sub.title.hash(&mut hasher);
-            for para in &sub.paragraphs {
-                para.hash(&mut hasher);
-            }
-        }
-    }
-    for para in &doc.intro {
-        para.hash(&mut hasher);
-    }
-    format!("{:016x}", hasher.finish())
 }
 
 pub fn format_issue_block(title: &str, issues: &[crate::validate::ValidationIssue]) -> String {

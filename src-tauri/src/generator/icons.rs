@@ -319,7 +319,7 @@ fn fill_default_icons(slide: &mut SlideBlueprint) {
 }
 
 /// Lexical fallback for icon candidate collection when embedding fails or is unavailable.
-/// Used as fallback in generate_content_slides_with_progress.
+/// Used as fallback in the per-page generation pipeline.
 pub fn collect_icon_candidates(
     icon_index: &IconIndex,
     page: &PagePlan,
