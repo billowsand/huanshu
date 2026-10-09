@@ -26,7 +26,7 @@ defineProps<{
     </div>
     <TagBadge v-if="subtitle" inline class="mt-3">{{ subtitle }}</TagBadge>
 
-    <div class="issue-stack" flex-1 flex flex-col gap-5 justify-center mt-5>
+    <div class="issue-stack" flex-1 min-h-0 flex flex-col gap-4 mt-5>
       <GlassCard
         v-for="(card, idx) in cards"
         :key="`${card.title}-${idx}`"
@@ -74,12 +74,20 @@ defineProps<{
 </template>
 
 <style scoped>
+.issue-stack {
+  min-height: 0;
+}
+
 .issue-card {
-  min-height: 132px;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .issue-card__head {
-  padding: 0.8rem 1.2rem 0.7rem;
+  flex: none;
+  padding: 0.6rem 1.2rem 0.55rem;
 }
 
 .issue-card__head-inner {
@@ -89,39 +97,48 @@ defineProps<{
 }
 
 .issue-card__eyebrow {
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   opacity: 0.94;
 }
 
 .issue-card__body {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1.2rem 1.35rem 1.15rem;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 0.8rem 1.25rem 0.85rem;
   color: var(--text);
+  overflow: hidden;
 }
 
 .issue-card__summary {
   margin: 0;
-  font-size: 1.05rem;
-  line-height: 1.55;
+  font-size: 1rem;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .issue-card__meta {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
+  gap: 0.45rem;
 }
 
 .issue-card__pill {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
-  padding: 0.2rem 0.72rem;
+  min-height: 26px;
+  padding: 0.16rem 0.65rem;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   line-height: 1.2;
   opacity: 0.88;
 }
