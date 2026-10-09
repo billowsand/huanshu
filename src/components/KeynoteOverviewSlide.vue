@@ -41,7 +41,7 @@ const gridCols = computed(() => props.items.length <= 2 ? 1 : 2)
             items-center
             gap="3"
           >
-            <div class="slide-icon-2xl" font-mono text="var(--primary)" opacity-50>{{ item.number }}</div>
+            <div class="slide-icon-2xl slide-number" font-mono text="var(--primary)" opacity-50>{{ item.number }}</div>
             <div>
               <div font-bold text="var(--text)">{{ item.title }}</div>
               <div class="slide-text-caption" opacity-50>{{ item.desc }}</div>

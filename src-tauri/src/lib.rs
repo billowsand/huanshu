@@ -4,6 +4,7 @@ mod crypto;
 mod db;
 mod embedded_icons;
 mod generator;
+mod fonts;
 mod icon;
 mod input;
 mod lmstudio;
@@ -40,6 +41,8 @@ struct BootstrapData {
     embeddings_ready: bool,
     #[serde(default)]
     initialized_embedding_model: String,
+    #[serde(default)]
+    fonts: types::FontSettings,
 }
 
 fn load_bootstrap_data_dir() -> PathBuf {
@@ -67,6 +70,7 @@ fn load_bootstrap_settings() -> Option<AppGlobalSettings> {
                     llm_configured: boot.llm_configured,
                     embeddings_ready: boot.embeddings_ready,
                     initialized_embedding_model: boot.initialized_embedding_model,
+                    fonts: boot.fonts,
                 });
             }
         }
@@ -85,6 +89,7 @@ fn save_bootstrap_settings(settings: &AppGlobalSettings) -> anyhow::Result<()> {
         llm_configured: settings.llm_configured,
         embeddings_ready: settings.embeddings_ready,
         initialized_embedding_model: settings.initialized_embedding_model.clone(),
+        fonts: settings.fonts.clone(),
     };
     std::fs::write(&boot_path, serde_json::to_string_pretty(&boot)?)?;
     Ok(())
@@ -137,6 +142,11 @@ impl AppState {
             &conn,
             "initialized_embedding_model",
             &self.app_settings.initialized_embedding_model,
+        )?;
+        db::set_app_setting(
+            &conn,
+            "fonts",
+            &serde_json::to_string(&self.app_settings.fonts)?,
         )?;
 
         self.db = Arc::new(Mutex::new(conn));
@@ -194,6 +204,11 @@ impl AppState {
                 llm_configured,
                 embeddings_ready,
                 initialized_embedding_model,
+                fonts: db::get_app_setting(&*conn, "fonts")
+                    .ok()
+                    .flatten()
+                    .and_then(|value| serde_json::from_str(&value).ok())
+                    .unwrap_or_default(),
             }
         });
 
@@ -241,6 +256,7 @@ pub fn run() {
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             text::segment_title,
+            fonts::list_system_fonts,
             commands::generate::generate_slides,
             commands::generate::detect_granularity,
             commands::generate::optimize_markdown_headings,

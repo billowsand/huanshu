@@ -1,0 +1,44 @@
+/* Render the selected family's native regular face everywhere. This also
+   overrides component, utility and inline weights inherited from the old theme. */
+#app,
+#app * {
+  font-weight: normal !important;
+  font-synthesis-weight: none;
+}
+
+/* Roles follow content semantics, independently of font size and theme. */
+:is(.slide-shell, .slidev-slide, .md-preview) {
+  font-family: var(--font-body);
+}
+
+:is(.slide-title, .cover-title, .closing-title, .slide-section-title, .slide-compact-title),
+:is(.slide-shell, .slidev-slide, .md-preview) :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--font-title) !important;
+}
+
+:is(.slide-shell, .slidev-slide) :is(
+  .tag-pill, .tool-badge, .slide-caption, .slide-text-note,
+  .closing-note, .closing-kicker, .closing-mark, .section-intro__note,
+  .section-intro__meta-label, .phase-steps-wrap__title, .issue-card__eyebrow,
+  .slide-footnote, .center-grid-footer, .process-footer, .footnotes
+) {
+  font-family: var(--font-caption) !important;
+}
+
+:is(.slide-shell, .slidev-slide) :is(
+  .slide-subtitle, .cover-subtitle, .cover-en-title, .closing-subtitle,
+  .section-intro__subtitle, .phase-head__subtitle
+) {
+  font-family: var(--font-subtitle) !important;
+}
+
+:is(.slide-shell, .slidev-slide) :is(
+  .section-num, .step-number, .slide-number, .sf-num, .step-dot, .phase-chip,
+  .section-intro__card-index, .split-left-index, .tl-date, .tl-year
+) {
+  font-family: var(--font-number) !important;
+}
+
+:is(.slide-shell, .slidev-slide, .md-preview) :is(code, pre, kbd, samp) {
+  font-family: var(--font-code) !important;
+}

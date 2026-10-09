@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { normalizeFonts, type FontSettings } from '../typography'
 
 export interface AppGlobalSettings {
   data_dir: string
@@ -8,6 +9,7 @@ export interface AppGlobalSettings {
   llm_configured: boolean
   embeddings_ready: boolean
   initialized_embedding_model: string
+  fonts: FontSettings
 }
 
 export const useAppSettingsStore = defineStore('appSettings', () => {
@@ -17,13 +19,14 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
     llm_configured: false,
     embeddings_ready: false,
     initialized_embedding_model: '',
+    fonts: normalizeFonts(),
   })
   const loaded = ref(false)
 
   async function load() {
     try {
       const s = await invoke<AppGlobalSettings>('get_app_settings')
-      settings.value = s
+      settings.value = { ...s, fonts: normalizeFonts(s.fonts) }
       loaded.value = true
     } catch (e) {
       console.error('Failed to load app settings:', e)

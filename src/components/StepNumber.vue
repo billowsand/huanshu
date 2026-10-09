@@ -15,6 +15,7 @@ const colorMap: Record<string, { bg: string; border: string; text: string }> = {
 
 <template>
   <div
+    class="step-number"
     rounded-full
     :class="size || 'w-10 h-10'"
     flex

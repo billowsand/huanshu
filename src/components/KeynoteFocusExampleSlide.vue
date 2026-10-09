@@ -28,7 +28,7 @@ defineProps<{
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="mt-3">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3">{{ subtitle }}</TagBadge>
 
     <div flex-1 flex flex-col justify-center>
     <div grid grid-cols-2 gap-5 mt-4>
@@ -62,7 +62,7 @@ defineProps<{
               flex items-center gap-2
               :style="item.muted ? { opacity: 0.4 } : {}"
             >
-              <div :style="{ color: item.muted ? 'var(--text-muted)' : 'var(--primary)' }" font-mono>{{ item.index }}</div>
+              <div class="slide-number" :style="{ color: item.muted ? 'var(--text-muted)' : 'var(--primary)' }" font-mono>{{ item.index }}</div>
               <span>
                 {{ item.label }}
                 <span opacity-50>（{{ item.meta }}）</span>

@@ -46,7 +46,7 @@ defineProps<{
       </GlassCard>
     </CardGrid>
 
-    <div v-if="footer" class="slide-meta center-grid-footer" mt-2 font-mono>{{ footer }}</div>
+    <div v-if="footer" class="slide-footnote slide-meta center-grid-footer" mt-2 font-mono>{{ footer }}</div>
   </div>
 </template>
 

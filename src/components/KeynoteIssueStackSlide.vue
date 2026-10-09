@@ -25,7 +25,7 @@ defineProps<{
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="mt-3">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3">{{ subtitle }}</TagBadge>
 
     <div class="issue-stack" flex-1 min-h-0 flex flex-col gap-4 mt-5>
       <GlassCard
@@ -68,7 +68,7 @@ defineProps<{
       </GlassCard>
     </div>
 
-    <div v-if="footer" mt-4 text-center class="slide-text-caption" opacity-40>
+    <div v-if="footer" mt-4 text-center class="slide-footnote slide-text-caption" opacity-40>
       {{ footer }}
     </div>
   </div>

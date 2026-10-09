@@ -39,6 +39,12 @@ const props = defineProps<{
 }>()
 
 const effectiveCols = computed(() => props.cols ?? props.cards.length)
+const firstBodyRow = computed(() => {
+  const fields = ['number', 'subtitle', 'body', 'items', 'risk', 'conclusion', 'footerTag'] as const
+  return fields.find(field => props.cards.some(card => field === 'items'
+    ? card.items?.length
+    : field === 'footerTag' ? card.footerTag || card.footer_tag : card[field]))
+})
 
 // normal ≤3, compact =4, mini ≥5
 const density = computed(() => {
@@ -89,11 +95,11 @@ function normalizeItem(item: CardItem) {
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="mt-3">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3">{{ subtitle }}</TagBadge>
 
     <div flex-1 flex flex-col justify-center>
     <div
-      class="grid mt-4"
+      class="feature-grid mt-4"
       :style="{
         gridTemplateColumns: `repeat(${effectiveCols}, minmax(0, 1fr))`,
         gap: cardGap,
@@ -108,16 +114,18 @@ function normalizeItem(item: CardItem) {
         <GlassCard
           overflow
           :text-center="card.centered"
-          class="flex flex-col h-full"
+          class="feature-card"
         >
           <div
             v-if="card.topBar || card.topBarClass || card.top_bar_class"
+            class="feature-top-bar"
             h-1
             :class="card.topBarClass || card.top_bar_class"
           />
 
           <div
             v-if="card.icon || card.title"
+            class="feature-header"
             flex items-center gap-2
             :style="{
               ...headerStyle,
@@ -129,14 +137,14 @@ function normalizeItem(item: CardItem) {
             <span font-bold :style="{ fontSize: headerStyle.fontSize, color: toneVars(card.titleTone || card.tone).text }">{{ card.title }}</span>
           </div>
 
-          <div flex flex-col gap-3 flex-1 :style="bodyStyle">
-            <div v-if="card.number" font-mono :style="{ ...numberStyle, color: toneVars(card.tone).solid, opacity: 0.5 }">
+          <div class="feature-body" :data-first-row="firstBodyRow" :style="bodyStyle">
+            <div v-if="card.number" class="slide-number feature-number" font-mono :style="{ ...numberStyle, color: toneVars(card.tone).solid, opacity: 0.5 }">
               {{ card.number }}
             </div>
-            <div v-if="card.subtitle" opacity-60>{{ card.subtitle }}</div>
-            <div v-if="card.body" opacity-70 leading-relaxed v-html="card.body" />
+            <div v-if="card.subtitle" class="feature-subtitle" opacity-60>{{ card.subtitle }}</div>
+            <div v-if="card.body" class="feature-copy" opacity-70 leading-relaxed v-html="card.body" />
 
-            <div v-if="card.items?.length" flex flex-col gap-2>
+            <div v-if="card.items?.length" class="feature-items" flex flex-col gap-2>
               <div
                 v-for="(item, idx) in card.items"
                 :key="idx"
@@ -159,6 +167,7 @@ function normalizeItem(item: CardItem) {
 
             <div
               v-if="card.risk"
+              class="feature-risk"
               rounded-full px-3 py-1 text-center
               :style="{
                 background: toneVars(card.tone).bg,
@@ -171,7 +180,8 @@ function normalizeItem(item: CardItem) {
 
             <div
               v-if="card.conclusion"
-              mt-1 rounded-lg px-3 py-2 text-center
+              class="feature-conclusion"
+              rounded-lg px-3 py-2 text-center
               :style="{
                 background: toneVars(card.tone).bg,
                 border: `1px solid ${toneVars(card.tone).border}`
@@ -182,7 +192,7 @@ function normalizeItem(item: CardItem) {
               </span>
             </div>
 
-            <div v-if="card.footerTag || card.footer_tag">
+            <div v-if="card.footerTag || card.footer_tag" class="feature-footer">
               <TagBadge :color="card.footerTone || card.footer_tone || card.tone">{{ card.footerTag || card.footer_tag }}</TagBadge>
             </div>
           </div>
@@ -199,6 +209,54 @@ function normalizeItem(item: CardItem) {
 </template>
 
 <style scoped>
+/* Each visual row shares its tallest content across the cards in that row.
+   Explicit tracks keep optional fields from shifting the following sections. */
+.feature-grid {
+  display: grid;
+}
+
+.feature-card-animated,
+.feature-card {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 9;
+  row-gap: 0;
+  min-width: 0;
+}
+
+.feature-top-bar { grid-row: 1; }
+.feature-header { grid-row: 2; }
+
+.feature-body {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 3 / span 7;
+  row-gap: 0;
+  min-width: 0;
+}
+
+.feature-body > * {
+  min-width: 0;
+  align-self: start;
+  overflow-wrap: anywhere;
+}
+
+.feature-body > * { margin-top: 0.75rem; }
+.feature-body[data-first-row="number"] > .feature-number,
+.feature-body[data-first-row="subtitle"] > .feature-subtitle,
+.feature-body[data-first-row="body"] > .feature-copy,
+.feature-body[data-first-row="items"] > .feature-items,
+.feature-body[data-first-row="risk"] > .feature-risk,
+.feature-body[data-first-row="conclusion"] > .feature-conclusion,
+.feature-body[data-first-row="footerTag"] > .feature-footer { margin-top: 0; }
+.feature-number { grid-row: 1; }
+.feature-subtitle { grid-row: 2; }
+.feature-copy { grid-row: 3; }
+.feature-items { grid-row: 4; }
+.feature-risk { grid-row: 5; }
+.feature-conclusion { grid-row: 6; align-self: stretch; }
+.feature-footer { grid-row: 7; }
+
 .feature-card-animated {
   opacity: 0;
   height: 100%;

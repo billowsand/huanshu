@@ -54,11 +54,11 @@ const cardGap = computed(() => ({ normal: '1rem', compact: '0.75rem', mini: '0.5
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="mt-3">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3">{{ subtitle }}</TagBadge>
 
     <div flex-1 flex flex-col justify-center>
     <div
-      class="grid mt-4"
+      class="outcome-grid mt-4"
       :style="{
         gridTemplateColumns: `repeat(${effectiveCols}, minmax(0, 1fr))`,
         gap: cardGap,
@@ -69,13 +69,14 @@ const cardGap = computed(() => ({ normal: '1rem', compact: '0.75rem', mini: '0.5
         :key="card.title"
         overflow
         text-center
+        class="outcome-card"
       >
-        <div h-1 :class="card.topBarClass || card.top_bar_class" />
-        <div flex flex-col items-center gap-3 :style="bodyStyle">
-          <div :class="card.icon" :style="{ ...iconStyle, color: toneVars(card.tone).text }" />
-          <div font-bold :style="{ fontSize: bodyStyle.fontSize }">{{ card.title }}</div>
-          <div opacity-60 leading-relaxed :style="{ fontSize: bodyStyle.fontSize }" v-html="card.body" />
-          <TagBadge :color="card.tone" inline class="self-center">{{ card.tag }}</TagBadge>
+        <div class="outcome-top-bar" h-1 :class="card.topBarClass || card.top_bar_class" />
+        <div class="outcome-content" :style="bodyStyle">
+          <div class="outcome-icon" :class="card.icon" :style="{ ...iconStyle, color: toneVars(card.tone).text }" />
+          <div class="outcome-title" font-bold :style="{ fontSize: bodyStyle.fontSize }">{{ card.title }}</div>
+          <div class="outcome-copy" opacity-60 leading-relaxed :style="{ fontSize: bodyStyle.fontSize }" v-html="card.body" />
+          <TagBadge :color="card.tone" inline class="outcome-tag">{{ card.tag }}</TagBadge>
         </div>
       </GlassCard>
     </div>
@@ -87,3 +88,36 @@ const cardGap = computed(() => ({ normal: '1rem', compact: '0.75rem', mini: '0.5
     </div>
   </div>
 </template>
+
+<style scoped>
+.outcome-grid { display: grid; }
+
+.outcome-card {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 5;
+  row-gap: 0;
+  min-width: 0;
+}
+
+.outcome-top-bar { grid-row: 1; }
+
+.outcome-content {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 2 / span 4;
+  row-gap: 0.75rem;
+  justify-items: center;
+}
+
+.outcome-content > * {
+  min-width: 0;
+  align-self: start;
+  overflow-wrap: anywhere;
+}
+
+.outcome-icon { grid-row: 1; }
+.outcome-title { grid-row: 2; }
+.outcome-copy { grid-row: 3; }
+.outcome-tag { grid-row: 4; }
+</style>

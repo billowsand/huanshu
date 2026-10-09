@@ -41,7 +41,7 @@ defineProps<{
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="mt-2">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2">{{ subtitle }}</TagBadge>
 
     <div class="compare-layout" flex-1 flex gap="4" items-stretch min-h-0 mt-4>
 
@@ -254,7 +254,7 @@ defineProps<{
       </div>
     </div>
 
-    <div v-if="footer" mt-4 text-center class="slide-text-caption" opacity-40>
+    <div v-if="footer" mt-4 text-center class="slide-footnote slide-text-caption" opacity-40>
       {{ footer }}
     </div>
   </div>

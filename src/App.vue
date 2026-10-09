@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
 import { RouterView } from 'vue-router'
 import TitleBar from './components/TitleBar.vue'
+import { useAppSettingsStore } from './stores/appSettings'
+import { applyFonts } from './typography'
+import './themes/typography.css'
 
 const router = useRouter()
+const appSettings = useAppSettingsStore()
+watch(() => appSettings.settings.fonts, applyFonts, { deep: true, immediate: true, flush: 'sync' })
 
 onMounted(async () => {
+  await appSettings.load()
   try {
     const firstRun = await invoke<boolean>('is_first_run')
     if (firstRun) {

@@ -24,7 +24,7 @@ defineProps<{
       <SlideTitle class="slide-title slide-compact-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="mt-3">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3">{{ subtitle }}</TagBadge>
 
     <div flex-1 flex flex-col justify-center>
     <div flex flex-col gap-4 mt-3>

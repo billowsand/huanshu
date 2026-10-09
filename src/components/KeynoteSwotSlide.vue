@@ -41,7 +41,7 @@ function summaryFirst(quadrantKey: string) {
       <SlideTitle class="slide-title slide-compact-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="mt-2">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2">{{ subtitle }}</TagBadge>
 
     <div
       class="grid flex-1 min-h-0"

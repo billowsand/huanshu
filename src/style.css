@@ -6,8 +6,15 @@
   --titlebar-height: 36px;
   --slidev-code-padding: 8px 10px;
   --slidev-code-background: #16161690 !important;
-  --font-sans: 'MiSans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --font-mono: 'JetBrains Mono', 'MiSans', 'Fira Code', 'Cascadia Code', monospace;
+  --font-interface: 'Microsoft YaHei', sans-serif;
+  --font-title: 'Microsoft YaHei', sans-serif;
+  --font-subtitle: 'Microsoft YaHei', sans-serif;
+  --font-body: 'Microsoft YaHei', sans-serif;
+  --font-caption: 'Microsoft YaHei', sans-serif;
+  --font-number: 'Microsoft YaHei', sans-serif;
+  --font-code: 'Microsoft YaHei', sans-serif;
+  --font-sans: var(--font-interface);
+  --font-mono: var(--font-code);
   --type-title: 2rem;
   --type-title-line: 1.18;
   --type-subtitle: 1.0625rem;

@@ -20,7 +20,6 @@ const props = defineProps<{
 const isVertical = computed(() => props.direction === 'vertical')
 const safeStepCount = computed(() => Math.max(props.steps.length, 1))
 const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
-const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
 </script>
 
 <template>
@@ -31,11 +30,11 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="mt-2">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2">{{ subtitle }}</TagBadge>
 
     <!-- ─── Horizontal Flow ─── -->
     <div v-if="!isVertical" flex-1 flex flex-col justify-center>
-      <div relative flex justify-around items-start>
+      <div class="sf-horizontal" :style="{ gridTemplateColumns: `repeat(${safeStepCount}, minmax(0, 1fr))` }">
         <div
           class="sf-track"
           absolute rounded-full
@@ -51,10 +50,9 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
         <div
           v-for="(step, idx) in steps"
           :key="step.title"
-          flex flex-col items-center
           class="sf-step-animated"
           style="position: relative; z-index: 2; padding: 0 0.5rem"
-          :style="{ width: stepWidth, animationDelay: `${idx * 90 + 100}ms` }"
+          :style="{ animationDelay: `${idx * 90 + 100}ms` }"
         >
           <div
             class="sf-hnode"
@@ -84,10 +82,10 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
             }"
           >
             <div
-              font-bold class="slide-text-caption" leading-snug
+              font-bold class="slide-text-caption sf-htitle" leading-snug
               :style="{ color: toneVars(step.tone || 'blue').text }"
             >{{ step.title }}</div>
-            <div v-if="step.body" class="slide-text-caption" opacity-60 leading-relaxed mt-1>
+            <div v-if="step.body" class="slide-text-caption sf-hbody" opacity-60 leading-relaxed mt-1>
               {{ step.body }}
             </div>
           </GlassCard>
@@ -114,7 +112,7 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
               }"
             >
               <span
-                class="slide-text-caption"
+                class="slide-text-caption slide-number"
                 font-bold font-mono
                 :style="{ color: toneVars(step.tone || 'blue').text }"
               >{{ idx + 1 }}</span>
@@ -162,13 +160,27 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
       </div>
     </div>
 
-    <div v-if="footer" mt-4 text-center class="slide-text-caption" opacity-40>
+    <div v-if="footer" mt-4 text-center class="slide-footnote slide-text-caption" opacity-40>
       {{ footer }}
     </div>
   </div>
 </template>
 
 <style scoped>
+.sf-horizontal {
+  position: relative;
+  display: grid;
+}
+
+.sf-horizontal > .sf-step-animated {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
+  min-width: 0;
+}
+
+.sf-hnode { grid-row: 1; }
+
 /* Horizontal step entrance */
 .sf-step-animated {
   opacity: 0;
@@ -232,7 +244,15 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
 
 .sf-hcard {
   width: 100%;
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 2 / span 2;
+  min-width: 0;
 }
+
+.sf-htitle { grid-row: 1; }
+.sf-hbody { grid-row: 2; }
+.sf-hcard > * { align-self: start; overflow-wrap: anywhere; }
 
 /* Vertical node */
 .sf-vnode {

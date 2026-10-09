@@ -56,6 +56,56 @@ impl AspectRatio {
     }
 }
 
+fn default_font() -> String {
+    "Microsoft YaHei".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FontSettings {
+    pub interface: String,
+    pub title: String,
+    pub subtitle: String,
+    pub body: String,
+    pub caption: String,
+    pub number: String,
+    pub code: String,
+}
+
+impl Default for FontSettings {
+    fn default() -> Self {
+        Self {
+            interface: default_font(),
+            title: default_font(),
+            subtitle: default_font(),
+            body: default_font(),
+            caption: default_font(),
+            number: default_font(),
+            code: default_font(),
+        }
+    }
+}
+
+impl FontSettings {
+    pub fn normalize(&mut self) {
+        for font in [
+            &mut self.interface,
+            &mut self.title,
+            &mut self.subtitle,
+            &mut self.body,
+            &mut self.caption,
+            &mut self.number,
+            &mut self.code,
+        ] {
+            *font = if font.trim().is_empty() {
+                default_font()
+            } else {
+                font.trim().to_string()
+            };
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppGlobalSettings {
     pub data_dir: String,
@@ -64,6 +114,8 @@ pub struct AppGlobalSettings {
     pub embeddings_ready: bool,
     #[serde(default)]
     pub initialized_embedding_model: String,
+    #[serde(default)]
+    pub fonts: FontSettings,
 }
 
 impl Default for AppGlobalSettings {
@@ -77,7 +129,36 @@ impl Default for AppGlobalSettings {
             llm_configured: false,
             embeddings_ready: false,
             initialized_embedding_model: String::new(),
+            fonts: FontSettings::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod typography_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_settings_default_to_yahei() {
+        let settings: AppGlobalSettings = serde_json::from_str(r#"{
+            "data_dir": "data", "media_dir": "media",
+            "llm_configured": false, "embeddings_ready": false
+        }"#).unwrap();
+        assert_eq!(settings.fonts, FontSettings::default());
+    }
+
+    #[test]
+    fn partial_fonts_preserve_customization_and_roundtrip() {
+        let mut fonts: FontSettings = serde_json::from_str(
+            r#"{"title":"  KaiTi  ","body":"思源黑体","code":" "}"#
+        ).unwrap();
+        fonts.normalize();
+        assert_eq!(fonts.title, "KaiTi");
+        assert_eq!(fonts.body, "思源黑体");
+        assert_eq!(fonts.interface, "Microsoft YaHei");
+        assert_eq!(fonts.code, "Microsoft YaHei");
+        let restored: FontSettings = serde_json::from_str(&serde_json::to_string(&fonts).unwrap()).unwrap();
+        assert_eq!(restored, fonts);
     }
 }
 

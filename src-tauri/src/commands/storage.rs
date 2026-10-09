@@ -137,12 +137,16 @@ pub fn get_app_settings(state: State<'_, Mutex<AppState>>) -> Result<AppGlobalSe
 
 #[tauri::command]
 pub fn save_app_settings(
-    settings: AppGlobalSettings,
+    mut settings: AppGlobalSettings,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
     let mut state = state.lock().unwrap();
-    state.app_settings = settings;
-    state.persist_app_settings().map_err(|e| e.to_string())?;
+    settings.fonts.normalize();
+    let previous = std::mem::replace(&mut state.app_settings, settings);
+    if let Err(error) = state.persist_app_settings() {
+        state.app_settings = previous;
+        return Err(error.to_string());
+    }
     Ok(())
 }
 

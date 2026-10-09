@@ -1,14 +1,29 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useConfigStore, type ModelTarget } from "../stores/config";
 import { useAppSettingsStore } from "../stores/appSettings";
 import { invoke } from "@tauri-apps/api/core";
 import BrandMark from "../components/BrandMark.vue";
+import { applyFonts, fontRoles, normalizeFonts, type FontRole } from "../typography";
+import SystemFontPicker from "../components/SystemFontPicker.vue";
 
 const router = useRouter();
 const config = useConfigStore();
 const appSettings = useAppSettingsStore();
+const fontDraft = ref(normalizeFonts(appSettings.settings.fonts));
+const saving = ref(false);
+const fontsReady = ref(false);
+const activeFontRole = ref<FontRole | null>(null);
+function applyFontToAll(name: string) {
+    fontDraft.value = normalizeFonts(Object.fromEntries(fontRoles.map(role => [role.key, name])));
+}
+function resetFonts() {
+    activeFontRole.value = null;
+    fontDraft.value = normalizeFonts();
+}
+watch(fontDraft, applyFonts, { deep: true, flush: 'sync' });
+onBeforeUnmount(() => applyFonts(appSettings.settings.fonts));
 
 const modelLists = ref<Record<ModelTarget, string[]>>({
     llm: [],
@@ -81,6 +96,8 @@ const modelSections: Array<{
 onMounted(async () => {
     await config.load();
     await appSettings.load();
+    fontDraft.value = normalizeFonts(appSettings.settings.fonts);
+    fontsReady.value = appSettings.loaded;
 });
 
 async function fetchModels(target: ModelTarget) {
@@ -99,16 +116,30 @@ async function fetchModels(target: ModelTarget) {
 }
 
 async function save() {
+    if (saving.value) return;
+    saving.value = true;
     saveError.value = "";
     saved.value = false;
     try {
         await config.save();
+        const previousFonts = appSettings.settings.fonts;
+        appSettings.settings.fonts = normalizeFonts(fontDraft.value);
+        try {
+            await appSettings.save();
+        } catch (error) {
+            appSettings.settings.fonts = previousFonts;
+            applyFonts(fontDraft.value);
+            throw error;
+        }
+        fontDraft.value = normalizeFonts(appSettings.settings.fonts);
         saved.value = true;
         setTimeout(() => {
             saved.value = false;
         }, 2000);
     } catch (e: unknown) {
         saveError.value = String(e);
+    } finally {
+        saving.value = false;
     }
 }
 
@@ -118,6 +149,7 @@ async function initEmbeddings() {
     try {
         await invoke("ensure_icon_embeddings");
         await appSettings.load();
+        applyFonts(fontDraft.value);
         embeddingStatus.value = "初始化完成！";
     } catch (e) {
         embeddingStatus.value = `失败: ${e}`;
@@ -141,17 +173,38 @@ async function initEmbeddings() {
             </div>
             <button
                 class="btn btn-primary"
-                :disabled="config.saving"
+                :disabled="saving || config.saving || !fontsReady"
                 @click="save"
             >
                 <span v-if="saved" class="i-carbon:checkmark" />
                 <span v-else class="i-carbon:save" />
-                {{ saved ? "已保存" : "保存设置" }}
+                {{ saving ? "保存中..." : saved ? "已保存" : "保存设置" }}
             </button>
         </header>
 
         <div class="settings-body">
             <p v-if="saveError" class="error-msg" role="alert">{{ saveError }}</p>
+            <div class="settings-card">
+                <div class="model-header">
+                    <div>
+                        <h2 class="section-title">字体与个性化</h2>
+                        <p class="section-desc">共 {{ fontRoles.length }} 类字体，默认均为微软雅黑。修改后实时预览，点击「保存设置」保留。</p>
+                    </div>
+                    <button class="btn" :disabled="!fontsReady" @click="resetFonts">恢复默认字体</button>
+                </div>
+                <p class="hint">点击字体名称展开系统字体列表，支持中文名和英文名搜索。安装新字体后可点击刷新；未安装的字体回退到微软雅黑。代码排版需要等宽时，可选择 Consolas 等字体。</p>
+                <div class="font-grid">
+                    <div v-for="role in fontRoles" :key="role.key" class="font-panel field">
+                        <label :for="`font-${role.key}`">{{ role.label }}</label>
+                        <p class="hint">{{ role.desc }}</p>
+                        <SystemFontPicker :id="`font-${role.key}`" v-model="fontDraft[role.key]"
+                            :label="role.label" :sample="role.sample" :disabled="!fontsReady"
+                            :open="activeFontRole === role.key"
+                            @update:open="activeFontRole = $event ? role.key : activeFontRole === role.key ? null : activeFontRole"
+                            @apply-all="applyFontToAll" />
+                    </div>
+                </div>
+            </div>
             <div class="settings-card">
                 <h2 class="section-title">模型服务配置</h2>
                 <p class="section-desc">
@@ -503,6 +556,20 @@ async function initEmbeddings() {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+}
+
+.font-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+    gap: 0.9rem;
+    align-items: start;
+}
+
+.font-panel {
+    padding: 0.9rem;
+    border: 1px solid var(--studio-border);
+    border-radius: 8px;
+    background: var(--studio-panel-2);
 }
 
 .section-title {

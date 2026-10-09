@@ -44,7 +44,7 @@ const gridGap = computed(() => {
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="mt-3">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3">{{ subtitle }}</TagBadge>
 
     <div :style="{ display: 'grid', gridTemplateColumns: gridCols, gap: gridGap }" mt-3 class="flex-1 items-stretch min-h-0">
       <div class="split-left-col">
@@ -88,7 +88,7 @@ const gridGap = computed(() => {
             <div v-if="idx < layers.length - 1" class="slide-icon-xl" text-center opacity-30 :style="{ color: toneVars(layers[idx + 1].tone).text }">↑</div>
           </template>
         </div>
-        <div v-if="footer" mt-1 class="slide-text-caption" opacity-50 text-center v-html="footer" />
+        <div v-if="footer" mt-1 class="slide-footnote slide-text-caption" opacity-50 text-center v-html="footer" />
       </div>
     </div>
   </div>

@@ -52,7 +52,7 @@ const processDensityClass = computed(() => {
       <div class="slide-title-divider" />
     </div>
     <div class="process-topbar">
-      <TagBadge v-if="subtitle" inline class="process-badge">{{ subtitle }}</TagBadge>
+      <TagBadge v-if="subtitle" inline class="slide-subtitle process-badge">{{ subtitle }}</TagBadge>
       <div v-if="summary" class="process-summary glass-card">
         <div class="process-summary__line" />
         <span>{{ summary }}</span>
@@ -164,7 +164,7 @@ const processDensityClass = computed(() => {
       </div>
     </div>
 
-    <div v-if="footer" class="process-footer">
+    <div v-if="footer" class="slide-footnote process-footer">
       {{ footer }}
     </div>
   </div>
