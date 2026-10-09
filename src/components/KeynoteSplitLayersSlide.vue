@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
-import InfographicCanvas from './InfographicCanvas.vue'
 
 const props = defineProps<{
   section: string
   title: string
   subtitle?: string
   layersTitle?: string
-  layersInfographicSyntax?: string
   leftItems: Array<{
     step?: string
     icon: string
@@ -35,8 +33,6 @@ const gridGap = computed(() => {
   if (props.aspect_ratio === 'ratio_32x9') return '1.35rem'
   return '1.25rem'
 })
-
-const hasInfographic = computed(() => Boolean(props.layersInfographicSyntax?.trim()))
 </script>
 
 <template>
@@ -76,13 +72,7 @@ const hasInfographic = computed(() => Boolean(props.layersInfographicSyntax?.tri
 
       <div class="glass-card split-right-card p-4 flex flex-col gap-3 min-h-0">
         <div font-bold class="slide-text-meta" text="var(--primary)" mb-1>{{ layersTitle || '架构层次' }}</div>
-        <div v-if="hasInfographic" class="split-right-visual">
-          <InfographicCanvas
-            :syntax="layersInfographicSyntax || ''"
-            fallback-class="split-infographic-fallback"
-          />
-        </div>
-        <div v-else flex flex-col gap-2 class="slide-text-caption">
+        <div flex flex-col gap-2 class="slide-text-caption">
           <template v-for="(layer, idx) in layers" :key="layer.title">
             <div
               rounded-lg px-3 py-2 flex items-center justify-between
@@ -158,20 +148,5 @@ const hasInfographic = computed(() => Boolean(props.layersInfographicSyntax?.tri
 
 .split-right-card {
   overflow: hidden;
-}
-
-.split-right-visual {
-  flex: 1;
-  min-height: 0;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-}
-
-:deep(.split-infographic-fallback) {
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  padding: 16px;
 }
 </style>

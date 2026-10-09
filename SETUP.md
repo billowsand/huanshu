@@ -41,7 +41,7 @@ bun install
 ## 开发模式
 
 ```bash
-cargo tauri dev
+bunx tauri dev
 ```
 
 Tauri 会自动：
@@ -53,21 +53,27 @@ Tauri 会自动：
 > ```bash
 > bun dev
 > ```
-> 确认 :5173 能正常访问后再跑 `cargo tauri dev`。
+> 确认 :5173 能正常访问后再跑 `bunx tauri dev`。
 
 ---
 
 ## 构建发行版（生成 .exe 安装包）
 
-```bash
-# 先构建前端资产
-bun build
+> 一键打包（含免安装单文件，汇总到 `dist-package/`）：
+> `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1`
+> 详细步骤与注意事项见 `CLAUDE.md` 的「打包与发布」章节。
 
-# 构建 Tauri .exe
-cargo tauri build
+```bash
+# 一条命令：Tauri CLI 会先执行 beforeBuildCommand（`bun run build`）再打包
+bunx tauri build --bundles nsis
+
+# 或分步执行
+bun run build
+bunx tauri build --bundles nsis --no-bundle   # 只出可执行文件
 ```
 
-构建产物：`src-tauri/target/release/bundle/msi/` 或 `nsis/`
+构建产物：`target/release/bundle/nsis/Huanshu_<version>_x64-setup.exe`（安装包）
+与 `target/release/auto-slidev-studio.exe`（免安装单文件）
 
 ---
 
@@ -75,7 +81,7 @@ cargo tauri build
 
 ```bash
 # 用任意 512×512 PNG 生成所有尺寸图标
-cargo tauri icon icon.png
+bunx tauri icon icon.png
 ```
 
 临时跳过：把 `src-tauri/tauri.conf.json` 中 `bundle.icon` 改为 `[]`
@@ -105,7 +111,7 @@ auto-slidev-studio/
 
 ## 使用流程
 
-1. **启动** → `cargo tauri dev`
+1. **启动** → `bunx tauri dev`
 2. **设置 LLM** → 右上角「设置」，填写 LM Studio 地址和模型名
 3. **上传 Markdown** → 点击「上传文件」或粘贴内容
 4. **生成** → 点击「生成 Keynote」，六阶段进度实时可见

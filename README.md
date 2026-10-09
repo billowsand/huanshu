@@ -22,7 +22,7 @@
 bun install
 
 # 2. 启动开发版
-cargo tauri dev
+bunx tauri dev
 
 # 3. 打开应用后，在右上角「设置」中填写 LM Studio 的模型名称
 #    （LM Studio 需要在 Local Server 界面启动，加载聊天模型 + Embedding 模型）
@@ -31,7 +31,7 @@ cargo tauri dev
 ## 功能特点
 
 - **三步生成**：素材准备 → AI 生成 → 编辑完善
-- **智能布局**：AI 根据内容自动选择最佳幻灯片模板（18 种）
+- **智能布局**：AI 根据内容自动选择最佳幻灯片模板（17 种）
 - **多比例支持**：16:9 标准、32:9 超宽、48:9 全景
 - **并发生成**：多页并行处理，实时跟踪每页状态
 - **本地运行**：基于 LM Studio，完全离线可用
@@ -51,12 +51,12 @@ cargo tauri dev
 
 ```bash
 # 开发模式（推荐）
-cargo tauri dev
+bunx tauri dev
 
-# 生产构建
-bun build
-cargo tauri build
-# 构建产物在 src-tauri/target/release/bundle/msi/ 或 nsis/
+# 生产构建（自动先跑前端 `bun run build`，产物 targets 见 src-tauri/tauri.conf.json）
+bunx tauri build --bundles nsis
+# 安装包：target/release/bundle/nsis/Huanshu_<version>_x64-setup.exe
+# 免安装单文件：target/release/auto-slidev-studio.exe
 ```
 
 ## 使用步骤
@@ -170,11 +170,10 @@ Markdown 文档
   "steps": [...],
   "compare_data": {...},
   "swot_data": {...},
-  "infographic_data": {...}
 }
 ```
 
-### 18 种幻灯片模板
+### 17 种幻灯片模板
 
 | 模板 | 用途 | 关键字段 |
 |------|------|---------|
@@ -195,7 +194,6 @@ Markdown 文档
 | `Compare` | 双栏对比 | compare_data |
 | `IssueStack` | 问题堆叠 | cards, panels |
 | `Swot` | SWOT 分析 | swot_data |
-| `Infographic` | 信息图 | infographic_data |
 
 ### 布局选择策略
 
@@ -236,7 +234,7 @@ huanshu/
 ├── src/                          # Vue 前端
 │   ├── components/               # 幻灯片 Vue 组件
 │   │   ├── SlideRenderer.vue     # 模板渲染器
-│   │   ├── Keynote*.vue          # 18 种模板组件
+│   │   ├── Keynote*.vue          # 17 种模板组件
 │   │   ├── PasswordDialog.vue    # 加密密码对话框
 │   │   ├── ExportDialog.vue      # 导出对话框
 │   │   ├── PipelineProgress.vue  # 生成进度条

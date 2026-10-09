@@ -24,7 +24,6 @@ export const KIND_META: Record<SlideKind, KindMeta> = {
   compare:      { label: '对比',    icon: 'i-carbon:compare',       desc: '左右双栏对比分析' },
   issue_stack:  { label: '问题堆叠', icon: 'i-carbon:warning-alt',  desc: '纵向堆叠的问题/挑战说明卡片' },
   swot:         { label: 'SWOT',   icon: 'i-carbon:analytics',     desc: '四象限战略分析矩阵' },
-  infographic:  { label: '信息图',  icon: 'i-carbon:chart-treemap',  desc: '基于 AntV Infographic 的数据可视化信息图' },
 }
 
 export const ALL_KINDS = Object.keys(KIND_META) as SlideKind[]
@@ -36,7 +35,7 @@ export const KIND_FIELDS: Record<SlideKind, string[]> = {
   section_intro:['kind', 'section', 'badge', 'title', 'subtitle', 'note', 'cards'],
   feature_grid: ['kind', 'section', 'title', 'subtitle', 'note', 'cards'],
   spotlight:    ['kind', 'label', 'label_tone', 'title', 'panels', 'images', 'image', 'placeholder', 'side_width'],
-  split_layers: ['kind', 'section', 'title', 'subtitle', 'left_items', 'layers', 'layers_infographic_syntax', 'footer'],
+  split_layers: ['kind', 'section', 'title', 'subtitle', 'left_items', 'layers', 'footer'],
   section_list: ['kind', 'section', 'title', 'subtitle', 'list_items'],
   focus_example:['kind', 'section', 'title', 'subtitle', 'points', 'example_title', 'example_body', 'ranking'],
   outcome_grid: ['kind', 'section', 'title', 'subtitle', 'note', 'cards'],
@@ -47,7 +46,6 @@ export const KIND_FIELDS: Record<SlideKind, string[]> = {
   compare:      ['kind', 'section', 'title', 'subtitle', 'compare_data', 'footer'],
   issue_stack:  ['kind', 'section', 'title', 'subtitle', 'cards', 'footer'],
   swot:         ['kind', 'section', 'title', 'subtitle', 'swot_data'],
-  infographic:  ['kind', 'section', 'title', 'subtitle', 'infographic_syntax', 'footer'],
 }
 
 export const KIND_DEFAULTS: Record<SlideKind, Partial<SlideBlueprint>> = {
@@ -164,7 +162,6 @@ export const KIND_DEFAULTS: Record<SlideKind, Partial<SlideBlueprint>> = {
       { title: '模型与规则', meta: '分类、评分、召回、推荐', tone: 'violet' },
       { title: '数据底座', meta: '主数据、知识库、行为日志', tone: 'amber' },
     ],
-    layers_infographic_syntax: 'infographic hierarchy-tree-lr-tech-style-capsule-item\\ndata\\n  root\\n    label 智能运营架构\\n    children\\n      - label 前台应用\\n        desc 面向销售、运营、客服\\n        children\\n          - label 销售工作台\\n          - label 运营看板\\n      - label 流程编排\\n        desc 任务流与审批自动化\\n        children\\n          - label 触发规则\\n          - label 审批流\\n      - label 模型与规则\\n        desc 分类、评分、推荐\\n        children\\n          - label 评分\\n          - label 推荐\\n      - label 数据底座\\n        desc 主数据与知识管理\\n        children\\n          - label 主数据\\n          - label 知识库',
     footer: '建议层数控制在 3-5 层，避免右侧过密。',
   },
   section_list: {
@@ -372,13 +369,6 @@ export const KIND_DEFAULTS: Record<SlideKind, Partial<SlideBlueprint>> = {
       ],
       strategy: '建议采用"试点先行 + 能力沉淀"策略，先快速证明价值，再逐步扩展。',
     },
-  },
-  infographic: {
-    section: '13',
-    title: '关键数据一览',
-    subtitle: '用可视化方式呈现核心信息。',
-    infographic_syntax: 'infographic list-grid-3-col\ndata\n  lists\n    - label 核心指标\n      desc 关键数据描述\n    - label 增长趋势\n      desc 趋势描述\n    - label 关键发现\n      desc 发现描述',
-    footer: '信息图模板可替换为其他内置模板。',
   },
 }
 

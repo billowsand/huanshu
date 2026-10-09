@@ -327,7 +327,6 @@ pub fn make_fallback_slide(
         panels: Vec::new(),
         left_items: Vec::new(),
         layers: Vec::new(),
-        layers_infographic_syntax: None,
         list_items: match kind {
             SlideKind::SectionList => list_items,
             _ => Vec::new(),
@@ -356,7 +355,6 @@ pub fn make_fallback_slide(
         direction: None,
         compare_data: None,
         swot_data: None,
-        infographic_syntax: None,
     }
 }
 
@@ -976,11 +974,6 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
                     highlight: false,
                 });
             }
-        }
-        SlideKind::Infographic => {
-            slide.infographic_syntax.get_or_insert_with(|| {
-                "infographic list-grid-3-col\ndata\n  lists\n    - label 要点1\n      desc 描述1\n    - label 要点2\n      desc 描述2\n    - label 要点3\n      desc 描述3".to_string()
-            });
         }
         _ => {}
     }

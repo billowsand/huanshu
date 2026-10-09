@@ -22,7 +22,6 @@
     "preview": "bunx vite preview"
   },
   "dependencies": {
-    "@antv/infographic": "^0.2.16",
     "@codemirror/commands": "^6.10.3",
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/language": "^6.12.3",
@@ -38,6 +37,7 @@
   },
   "devDependencies": {
     "@iconify-json/carbon": "^1.2.8",
+    "@tauri-apps/cli": "^2",
     "@types/markdown-it": "^14.1.2",
     "@unocss/reset": "^66.1.2",
     "@vitejs/plugin-vue": "^5.2.3",

@@ -20,7 +20,6 @@ import KeynoteProcessSlide from './KeynoteProcessSlide.vue'
 import KeynoteCompareSlide from './KeynoteCompareSlide.vue'
 import KeynoteIssueStackSlide from './KeynoteIssueStackSlide.vue'
 import KeynoteSwotSlide from './KeynoteSwotSlide.vue'
-import KeynoteInfographicSlide from './KeynoteInfographicSlide.vue'
 
 const props = defineProps<{
   slide: SlideBlueprint
@@ -46,7 +45,6 @@ const componentMap: Record<string, unknown> = {
   compare: KeynoteCompareSlide,
   issue_stack: KeynoteIssueStackSlide,
   swot: KeynoteSwotSlide,
-  infographic: KeynoteInfographicSlide,
 }
 
 const component = computed(() => componentMap[props.slide.kind] ?? KeynoteCoverSlide)
@@ -120,7 +118,6 @@ const kindPresetMap: Partial<Record<SlideBlueprint['kind'], number[]>> = {
   compare: [0, 3],
   issue_stack: [3, 2],
   swot: [2, 0],
-  infographic: [1, 3],
 }
 
 function hashString(input: string) {
@@ -238,7 +235,6 @@ const slideProps = computed(() => {
         subtitle: s.subtitle ?? '',
         leftItems: s.left_items ?? [],
         layers: s.layers ?? [],
-        layersInfographicSyntax: s.layers_infographic_syntax ?? '',
         footer: s.footer ?? '',
         aspect_ratio: s.aspect_ratio,
       }
@@ -327,14 +323,6 @@ const slideProps = computed(() => {
         subtitle: s.subtitle ?? '',
         quadrants: s.swot_data?.quadrants ?? [],
         strategy: s.swot_data?.strategy ?? '',
-      }
-    case 'infographic':
-      return {
-        section: s.section ?? '',
-        title: s.title,
-        subtitle: s.subtitle ?? '',
-        infographicSyntax: s.infographic_syntax ?? '',
-        footer: s.footer ?? '',
       }
     default:
       return { title: s.title }

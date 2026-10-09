@@ -18,7 +18,6 @@ export type SlideKind =
   | 'compare'
   | 'issue_stack'
   | 'swot'
-  | 'infographic'
 
 export type AspectRatio = 'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9'
 export const ASPECT_DIMENSIONS: Record<AspectRatio, { w: number, h: number }> = {
@@ -171,7 +170,6 @@ export interface SlideBlueprint {
   panels?: SpotlightPanel[]
   left_items?: ListItem[]
   layers?: LayerItem[]
-  layers_infographic_syntax?: string
   list_items?: ListItem[]
   points?: ListItem[]
   ranking?: RankingItem[]
@@ -185,5 +183,4 @@ export interface SlideBlueprint {
   direction?: string
   compare_data?: CompareData
   swot_data?: SwotData
-  infographic_syntax?: string
 }

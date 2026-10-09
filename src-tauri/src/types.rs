@@ -101,11 +101,22 @@ pub enum SlideKind {
     Compare,
     IssueStack,
     Swot,
-    Infographic,
+}
+
+/// Tolerant kind deserialization for persisted decks: a kind that no longer exists (for example the
+/// removed `infographic` layout) must not fail the whole project load. Falls back to `Cover`,
+/// matching the unknown-kind fallback in the frontend `SlideRenderer.vue`.
+fn de_slide_kind<'de, D>(deserializer: D) -> Result<SlideKind, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw = Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value(raw).unwrap_or(SlideKind::Cover))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlideBlueprint {
+    #[serde(deserialize_with = "de_slide_kind")]
     pub kind: SlideKind,
     pub aspect_ratio: Option<AspectRatio>,
     pub section: Option<String>,
@@ -143,8 +154,6 @@ pub struct SlideBlueprint {
     #[serde(default)]
     pub layers: Vec<LayerItem>,
     #[serde(default)]
-    pub layers_infographic_syntax: Option<String>,
-    #[serde(default)]
     pub list_items: Vec<ListItem>,
     #[serde(default)]
     pub points: Vec<ListItem>,
@@ -170,8 +179,6 @@ pub struct SlideBlueprint {
     pub compare_data: Option<CompareData>,
     #[serde(default)]
     pub swot_data: Option<SwotData>,
-    #[serde(default)]
-    pub infographic_syntax: Option<String>,
 }
 
 impl SlideBlueprint {
@@ -488,5 +495,20 @@ where
         other => Err(serde::de::Error::custom(format!(
             "expected string-like value, got {other}"
         ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_infographic_kind_degrades_without_losing_slides() {
+        let legacy = r#"[{"kind":"infographic","title":"\u65e7\u4fe1\u606f\u56fe\u9875"},{"kind":"swot","title":"\u77e9\u9635"}]"#;
+        let deck: Vec<SlideBlueprint> =
+            serde_json::from_str(legacy).expect("legacy deck must load");
+        assert_eq!(deck.len(), 2, "removing a kind must not wipe the deck");
+        assert_eq!(deck[0].kind, SlideKind::Cover);
+        assert_eq!(deck[1].kind, SlideKind::Swot);
     }
 }
