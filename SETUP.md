@@ -6,7 +6,7 @@
 |------|------|------|
 | Rust | ≥ 1.77 | https://rustup.rs |
 | Bun | ≥ 1.0 | https://bun.sh |
-| Tauri CLI v2 | 最新 | `cargo install tauri-cli --version "^2"` |
+| Tauri CLI v2 | 最新 | `bun add -d @tauri-apps/cli`（已装为 devDependency；不要用 `cargo install tauri-cli`） |
 | LM Studio | 任意 | https://lmstudio.ai |
 
 ---
@@ -45,6 +45,7 @@ bunx tauri dev
 ```
 
 Tauri 会自动：
+
 1. 运行 `bun dev`（Vite on :5173）
 2. 编译 Rust 后端
 3. 打开 Auto-Slidev Studio 窗口
@@ -62,8 +63,11 @@ Tauri 会自动：
 > 一键打包（含免安装单文件，汇总到 `dist-package/`）：
 > `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1`
 > 详细步骤与注意事项见 `CLAUDE.md` 的「打包与发布」章节。
+>
+> ⚠️ **不要用 `cargo build --release`，也不要用 `cargo tauri build`。**
+> `cargo build --release` 缺少 `custom-protocol` feature，Tauri 会把二进制约成 **dev 模式**，
+> 前端资源不内嵌，运行时会去连 `http://localhost:5173`，双击后只有 `ERR_CONNECTION_REFUSED`（"打不开"）。
 
-```bash
 # 一条命令：Tauri CLI 会先执行 beforeBuildCommand（`bun run build`）再打包
 bunx tauri build --bundles nsis
 
@@ -74,6 +78,12 @@ bunx tauri build --bundles nsis --no-bundle   # 只出可执行文件
 
 构建产物：`target/release/bundle/nsis/Huanshu_<version>_x64-setup.exe`（安装包）
 与 `target/release/auto-slidev-studio.exe`（免安装单文件）
+
+Tauri CLI 是 devDependency，若提示找不到 `tauri`，先跑 `bun install`。构建后自检（应为 0，出现 1 说明是 dev 构建）：
+
+```bash
+grep -c "rustc-cfg=dev" target/release/build/auto-slidev-studio-*/output
+```
 
 ---
 

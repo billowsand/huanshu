@@ -7,6 +7,7 @@ mod generator;
 mod icon;
 mod input;
 mod lmstudio;
+mod network;
 mod render;
 mod types;
 mod validate;

@@ -59,6 +59,10 @@ bunx tauri build --bundles nsis
 # 免安装单文件：target/release/auto-slidev-studio.exe
 ```
 
+> ⚠️ **不要用 `cargo build --release` 或 `cargo tauri build`**。缺少 `custom-protocol` feature 时
+> Tauri 会把二进制约成 dev 模式（前端资源不内嵌，运行时去连 `localhost:5173`），
+> 双击只会看到 `ERR_CONNECTION_REFUSED`。详见 [SETUP.md](SETUP.md)。
+
 ## 使用步骤
 
 ### 第一步：准备素材
@@ -302,9 +306,20 @@ huanshu/
 | embedding_model | Embedding 模型 | - |
 | api_key | API 密钥（可选） | - |
 
+### SOCKS5 代理
+
+在「设置 → 模型服务配置」中，每个服务（大语言模型、向量模型、多模态模型）均可独立启用 SOCKS5 代理：
+
+- 代理地址填写 `socks5://127.0.0.1:1080`，也支持 `socks5h://` 和 IPv6 地址；必须填写端口。
+- 需要认证时同时填写代理用户名和密码，无需认证则两项留空。
+- 点击「获取模型」可测试尚未保存的代理配置；保存后应用于文稿优化、幻灯片生成与修复、向量检索和图片理解。
+- 启用后，HTTP/HTTPS 模型请求通过 SOCKS5 隧道传输，模型域名由代理解析，HTTPS 仍验证服务端证书。代理失败时返回错误，不回退直连。
+- 默认关闭，关闭时直接连接；本地模型与云端模型可以分别选择连接方式。云端服务需提供应用所使用的 OpenAI 兼容 API。
+- 配置随模型设置保存到数据目录的 `settings.json`；代理密码与 API Key 一样保存在此文件中。
+
 ## 局限性 / 已知问题
 
-- **依赖 LM Studio**：必须在本地运行 LM Studio 并加载相应模型，不支持纯云端 LLM
+- **模型 API 兼容性**：支持本地或云端 OpenAI 兼容服务，尚未适配其他提供商的原生 API；SOCKS5 代理只负责网络传输。
 - **仅支持 Markdown 输入**：暂不支持 Word、PDF 等格式直接导入
 - **中英文标题优化**：模板布局对中英文混排的优化有限
 - **Embeddin 模型必需**：图标语义匹配依赖 Embedding 模型，不加载会导致图标匹配失效

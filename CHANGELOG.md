@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **模型服务 SOCKS5 代理**：大语言模型 / 向量模型 / 多模态模型可各自启用 SOCKS5 代理，
+  支持用户名密码认证（支持 `socks5://` / `socks5h://`），模型域名由代理解析；
+  代理不可用时返回错误而不回退直连。旧 `settings.json` 无 `proxy` 字段时默认关闭。
+
+### Fixed
+
+- **修复生产构建产出无法启动**：`src-tauri/Cargo.toml` 补回标准 `[features]` 段
+  （`custom-protocol = ["tauri/custom-protocol"]`），否则 `cargo build --release`
+  编出的二进制处于 dev 模式、不内嵌前端资源，运行时去连 `http://localhost:5173`，
+  双击后只有 `ERR_CONNECTION_REFUSED`。
+
+### Changed
+
+- **构建方式统一为 Tauri CLI**：`@tauri-apps/cli` 已作为开发依赖，请使用 `bunx tauri build`
+  （不要再直接 `cargo build --release` / `cargo tauri build`）。
+
 ### Removed
 
 - **信息图幻灯片（`Infographic` / `@antv/infographic`）**：移除 `@antv/infographic` 依赖与 `Infographic` 模板（模板数 18 → 17），`SplitLayers` 恢复为内置的分层卡片渲染（去掉右侧 @antv 语法可视化）。前端产物 JS 由 1820.92 kB 降至 978.61 kB。

@@ -200,10 +200,9 @@ pub async fn optimize_markdown_headings(
         st.settings.clone()
     };
 
-    let llm_client =
-        LmStudioClient::new(&settings.llm.base_url).with_api_key(&settings.llm.api_key);
+    let llm_client = LmStudioClient::from_service(&settings.llm).map_err(|e| e.to_string())?;
     let embedding_client =
-        LmStudioClient::new(&settings.embedding.base_url).with_api_key(&settings.embedding.api_key);
+        LmStudioClient::from_service(&settings.embedding).map_err(|e| e.to_string())?;
     crate::generator::planning::ensure_models_ready(
         &llm_client,
         &settings.llm.model,
@@ -534,8 +533,8 @@ async fn run_pipeline(
     reset_debug_dir(&config.debug_dir)?;
 
     let asset_paths = collect_assets(&config.project_dir);
-    let llm_client = config.llm_client();
-    let embedding_client = config.embedding_client();
+    let llm_client = config.llm_client()?;
+    let embedding_client = config.embedding_client()?;
 
     // Load icon index with embedding cache (sync DB read)
     let mut icon_index = {
@@ -934,7 +933,7 @@ pub async fn ensure_icon_embeddings(state: State<'_, Mutex<AppState>>) -> Result
         crate::types::AspectRatio::Ratio16x9,
     );
 
-    let embedding_client = config.embedding_client();
+    let embedding_client = config.embedding_client().map_err(|e| e.to_string())?;
 
     let mut icon_index = {
         let conn = db.lock().unwrap();
@@ -1000,7 +999,7 @@ pub async fn recommend_icons_for_query(
     }
 
     if icon_index.is_embedded() {
-        let embedding_client = config.embedding_client();
+        let embedding_client = config.embedding_client().map_err(|e| e.to_string())?;
         if let Ok(embeddings) = embedding_client
             .embed(&config.embedding.model, &[query.to_string()])
             .await

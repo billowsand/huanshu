@@ -6,7 +6,7 @@ body:
     id: version
     attributes:
       label: 幻述版本
-      description: 运行 `cargo tauri build --version` 或查看 about 页面获取版本号
+      description: 查看应用「关于」页面，或运行 `bunx tauri info` 获取版本号
     validations:
       required: true
   - type: textarea

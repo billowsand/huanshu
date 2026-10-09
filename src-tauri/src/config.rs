@@ -10,6 +10,8 @@ pub struct ModelServiceSettings {
     #[serde(default)]
     pub api_key: String,
     pub model: String,
+    #[serde(default)]
+    pub proxy: crate::network::Socks5Settings,
 }
 
 impl ModelServiceSettings {
@@ -22,6 +24,7 @@ impl ModelServiceSettings {
             base_url: base_url.into(),
             api_key: api_key.into(),
             model: model.into(),
+            proxy: Default::default(),
         }
     }
 }
@@ -173,17 +176,15 @@ impl GenerationConfig {
         }
     }
 
-    pub fn llm_client(&self) -> crate::lmstudio::LmStudioClient {
-        crate::lmstudio::LmStudioClient::new(&self.llm.base_url).with_api_key(&self.llm.api_key)
+    pub fn llm_client(&self) -> anyhow::Result<crate::lmstudio::LmStudioClient> {
+        crate::lmstudio::LmStudioClient::from_service(&self.llm)
     }
 
-    pub fn embedding_client(&self) -> crate::lmstudio::LmStudioClient {
-        crate::lmstudio::LmStudioClient::new(&self.embedding.base_url)
-            .with_api_key(&self.embedding.api_key)
+    pub fn embedding_client(&self) -> anyhow::Result<crate::lmstudio::LmStudioClient> {
+        crate::lmstudio::LmStudioClient::from_service(&self.embedding)
     }
 
-    pub fn multimodal_client(&self) -> crate::lmstudio::LmStudioClient {
-        crate::lmstudio::LmStudioClient::new(&self.multimodal.base_url)
-            .with_api_key(&self.multimodal.api_key)
+    pub fn multimodal_client(&self) -> anyhow::Result<crate::lmstudio::LmStudioClient> {
+        crate::lmstudio::LmStudioClient::from_service(&self.multimodal)
     }
 }

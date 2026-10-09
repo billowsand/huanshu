@@ -16,6 +16,12 @@ categories = ["text-processing", "command-line-utilities", "graphics"]
 name = "auto_slidev_studio_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
+# Without it `tauri` compiles in dev mode and the app loads devUrl (http://localhost:5173)
+# instead of the bundled frontend, which shows ERR_CONNECTION_REFUSED at runtime.
+custom-protocol = ["tauri/custom-protocol"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -27,7 +33,7 @@ tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "process", "time", "sync"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "socks"] }
 anyhow = "1.0"
 regex = "1.11"
 dirs = "5"

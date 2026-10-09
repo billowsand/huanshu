@@ -225,7 +225,7 @@ pub async fn repair_single_slide(
     use crate::generator::icons::collect_icon_candidates_from_slide;
     use crate::generator::utils::blueprint_schema_hint;
 
-    let client = config.llm_client();
+    let client = config.llm_client()?;
     let schema_hint = blueprint_schema_hint(&blueprint.kind);
 
     let icon_section = icon_index

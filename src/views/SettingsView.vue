@@ -26,6 +26,7 @@ const modelErrors = ref<Record<ModelTarget, string>>({
     multimodal: "",
 });
 const saved = ref(false);
+const saveError = ref("");
 const initializingEmbeddings = ref(false);
 const embeddingStatus = ref("");
 
@@ -98,11 +99,17 @@ async function fetchModels(target: ModelTarget) {
 }
 
 async function save() {
-    await config.save();
-    saved.value = true;
-    setTimeout(() => {
-        saved.value = false;
-    }, 2000);
+    saveError.value = "";
+    saved.value = false;
+    try {
+        await config.save();
+        saved.value = true;
+        setTimeout(() => {
+            saved.value = false;
+        }, 2000);
+    } catch (e: unknown) {
+        saveError.value = String(e);
+    }
 }
 
 async function initEmbeddings() {
@@ -144,6 +151,7 @@ async function initEmbeddings() {
         </header>
 
         <div class="settings-body">
+            <p v-if="saveError" class="error-msg" role="alert">{{ saveError }}</p>
             <div class="settings-card">
                 <h2 class="section-title">模型服务配置</h2>
                 <p class="section-desc">
@@ -251,6 +259,31 @@ async function initEmbeddings() {
                                     />
                                 </div>
                                 <p class="hint">{{ section.hint }}</p>
+                            </div>
+                            <div class="proxy-config">
+                                <label class="proxy-toggle">
+                                    <input type="checkbox" v-model="config.settings[section.key].proxy.enabled" />
+                                    启用 SOCKS5 代理
+                                </label>
+                                <p class="hint">
+                                    {{ config.settings[section.key].proxy.enabled ? "此服务的所有请求通过代理，域名由代理解析。" : "此服务直接连接。" }}
+                                </p>
+                                <template v-if="config.settings[section.key].proxy.enabled">
+                                    <div class="field">
+                                        <label :for="`proxy-url-${section.key}`">代理地址</label>
+                                        <input :id="`proxy-url-${section.key}`" v-model="config.settings[section.key].proxy.url" placeholder="socks5://127.0.0.1:1080" spellcheck="false" />
+                                        <p class="hint">支持 socks5:// 和 socks5h://，需填写端口。</p>
+                                    </div>
+                                    <div class="field">
+                                        <label :for="`proxy-user-${section.key}`">代理用户名（可选）</label>
+                                        <input :id="`proxy-user-${section.key}`" v-model="config.settings[section.key].proxy.username" autocomplete="off" />
+                                    </div>
+                                    <div class="field">
+                                        <label :for="`proxy-password-${section.key}`">代理密码（可选）</label>
+                                        <input :id="`proxy-password-${section.key}`" v-model="config.settings[section.key].proxy.password" type="password" autocomplete="off" />
+                                        <p class="hint">无需认证时两项留空。点击「获取模型」可测试当前配置；保存后用于生成。</p>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </section>
@@ -525,6 +558,27 @@ async function initEmbeddings() {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
+}
+
+.proxy-config {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    border-top: 1px solid var(--studio-border);
+    padding-top: 0.75rem;
+}
+
+.proxy-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.proxy-toggle input {
+    width: auto;
+    accent-color: var(--studio-primary);
 }
 
 .field {

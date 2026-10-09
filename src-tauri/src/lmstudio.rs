@@ -11,12 +11,13 @@ pub struct LmStudioClient {
 }
 
 impl LmStudioClient {
-    pub fn new(base_url: impl Into<String>) -> Self {
-        Self {
-            client: Client::new(),
-            base_url: base_url.into().trim_end_matches('/').to_string(),
+    pub fn from_service(service: &crate::config::ModelServiceSettings) -> Result<Self> {
+        Ok(Self {
+            client: crate::network::build_client(&service.proxy)?,
+            base_url: service.base_url.trim_end_matches('/').to_string(),
             api_key: None,
         }
+        .with_api_key(&service.api_key))
     }
 
     pub fn with_api_key(mut self, key: impl Into<String>) -> Self {

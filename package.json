@@ -19,7 +19,10 @@
   "scripts": {
     "dev": "bunx vite",
     "build": "bunx vue-tsc && bunx vite build",
-    "preview": "bunx vite preview"
+    "preview": "bunx vite preview",
+    "tauri": "tauri",
+    "app:build": "tauri build",
+    "app:dev": "tauri dev"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

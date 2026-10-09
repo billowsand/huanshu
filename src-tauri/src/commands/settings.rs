@@ -15,9 +15,23 @@ pub async fn save_settings(
     settings: LlmSettings,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
+    for (name, service) in [
+        ("大语言模型", &settings.llm),
+        ("向量模型", &settings.embedding),
+        ("多模态模型", &settings.multimodal),
+    ] {
+        service
+            .proxy
+            .validate()
+            .map_err(|e| format!("{name}: {e}"))?;
+    }
     let mut state = state.lock().unwrap();
-    state.settings = settings;
-    state.persist_settings().map_err(|e| e.to_string())
+    let previous = std::mem::replace(&mut state.settings, settings);
+    if let Err(error) = state.persist_settings() {
+        state.settings = previous;
+        return Err(error.to_string());
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -37,6 +51,6 @@ pub async fn list_models(
             other => return Err(format!("unknown model target: {other}")),
         }
     };
-    let client = LmStudioClient::new(&service.base_url).with_api_key(&service.api_key);
+    let client = LmStudioClient::from_service(&service).map_err(|e| e.to_string())?;
     client.list_models().await.map_err(|e| e.to_string())
 }

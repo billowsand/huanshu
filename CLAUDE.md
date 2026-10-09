@@ -187,6 +187,8 @@ bunx tauri build --bundles nsis                # 自动先跑 beforeBuildCommand
    （注意：Windows 允许重命名运行中的 exe，所以“文件能改名”不代表可以重建——别看错现象。）
    `scripts/package.ps1` 已内置前置检查，会直接报出占用进程 pid，不会白等一趟完整编译。
    优雅关闭：`(Get-Process auto-slidev-studio).CloseMainWindow()`（`decorations:false` 的窗口同样响应 WM_CLOSE），不行再 `Stop-Process -Force`。
+8. **`src-tauri/Cargo.toml` 的 `[features] custom-protocol` 不能删**：Tauri v2 靠这个 feature 决定内嵌前端资源还是走 `devUrl`。删掉后 `cargo build --release` 照样编得过，但产物是 **dev 模式**（前端资源不内嵌，运行时去连 `http://localhost:5173`），双击只有 `ERR_CONNECTION_REFUSED`。用 `bunx tauri build` 就不会踩到。
+   构建后自检：`grep -c "rustc-cfg=dev" target/release/build/auto-slidev-studio-*/output` 应全为 `0`，出现 `1` 说明这次是 dev 构建。
 
 ### 打包后必须验证（各步骤实测命令）
 
@@ -213,6 +215,7 @@ Start-Process "$env:LOCALAPPDATA\Huanshu\uninstall.exe" -ArgumentList '/S' -Wait
 - 安装包未签名，首次安装会有 SmartScreen 提示。
 - LM Studio 是外部依赖，不打包；装完需在应用「设置」里填模型名，否则生成流程不可用。
 - `build.rs` 依赖 `node_modules/@iconify-json/carbon`，所以打包前必须 `bun install`。
+
 
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph

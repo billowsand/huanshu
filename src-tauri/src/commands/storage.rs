@@ -243,7 +243,7 @@ async fn generate_caption_for_image_internal(
     image_path: &PathBuf,
 ) -> Result<String, String> {
     let client =
-        crate::lmstudio::LmStudioClient::new(&service.base_url).with_api_key(&service.api_key);
+        crate::lmstudio::LmStudioClient::from_service(service).map_err(|e| e.to_string())?;
 
     client
         .generate_image_caption(&service.model, &image_path.to_string_lossy())
