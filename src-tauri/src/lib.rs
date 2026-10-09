@@ -9,6 +9,7 @@ mod input;
 mod lmstudio;
 mod network;
 mod render;
+mod text;
 mod types;
 mod validate;
 
@@ -239,6 +240,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
+            text::segment_title,
             commands::generate::generate_slides,
             commands::generate::detect_granularity,
             commands::generate::optimize_markdown_headings,

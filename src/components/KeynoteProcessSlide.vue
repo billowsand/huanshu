@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
 
@@ -47,7 +48,7 @@ const processDensityClass = computed(() => {
 
   <div class="process-slide" :class="processDensityClass" relative z-10 flex flex-col h-full>
     <div class="slide-header process-header">
-      <h1 class="slide-title slide-compact-title">{{ title }}</h1>
+      <SlideTitle class="slide-title slide-compact-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
     <div class="process-topbar">
@@ -68,7 +69,7 @@ const processDensityClass = computed(() => {
         :key="phase.phase"
         class="phase-col phase-col-animated"
         flex flex-col
-        :style="{ animationDelay: `${phaseIdx * 80 + 100}ms` }"
+        :style="{ animationDelay: `${phaseIdx * 80 + 100}ms`, '--phase-solid': toneVars(phase.tone).solid }"
       >
         <GlassCard
           padding="px-4 py-3"

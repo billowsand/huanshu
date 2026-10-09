@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 import { toneVars, type Tone } from './keynoteTheme'
 
 const props = defineProps<{
@@ -36,11 +37,11 @@ const props = defineProps<{
       >
         {{ label }}
       </div>
-      <h2 class="slide-title">{{ title }}</h2>
+      <SlideTitle as="h2" class="slide-title" :title="title" />
     </div>
 
     <div flex gap-5 flex-1 min-h-0>
-      <div flex-1 rounded-xl overflow-hidden border="1 solid white/8" bg="white/3" flex items-center justify-center>
+      <div class="spotlight-media" flex-1 rounded-xl overflow-hidden border="1 solid white/8" bg="white/3" flex items-center justify-center>
         <ImageCarousel v-if="images?.length" :images="images" />
         <img v-else-if="props.image" :src="props.image" object-contain max-h-full max-w-full rounded-lg />
         <div v-else class="glass-card w-full h-full flex items-center justify-center">

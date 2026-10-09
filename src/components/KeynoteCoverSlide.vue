@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 import SlideReveal from './SlideReveal.vue'
 
 defineProps<{
@@ -20,10 +21,8 @@ defineProps<{
         {{ badge }}
       </div>
     </SlideReveal>
-    <SlideReveal :delay="200" text-center>
-      <h1 class="cover-title">
-        {{ title }}
-      </h1>
+    <SlideReveal :delay="200" text-center w-full min-w-0>
+      <SlideTitle class="cover-title" :title="title" />
       <div v-if="subtitle" class="cover-subtitle">
         {{ subtitle }}
       </div>

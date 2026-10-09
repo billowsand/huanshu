@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
 
@@ -27,7 +28,7 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
 
   <div relative z-10 py-6 flex flex-col h-full>
     <div class="slide-header">
-      <h1 class="slide-title">{{ title }}</h1>
+      <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
     <TagBadge v-if="subtitle" inline class="mt-2">{{ subtitle }}</TagBadge>
@@ -36,6 +37,7 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
     <div v-if="!isVertical" flex-1 flex flex-col justify-center>
       <div relative flex justify-around items-start>
         <div
+          class="sf-track"
           absolute rounded-full
           :style="{
             top: '2.24rem',
@@ -59,7 +61,7 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
             :style="{
               background: toneVars(step.tone || 'blue').bg,
               borderColor: toneVars(step.tone || 'blue').border,
-              boxShadow: `0 0 28px ${toneVars(step.tone || 'blue').solid}30, inset 0 1px 0 rgba(255,255,255,0.08)`,
+              boxShadow: `0 0 28px color-mix(in srgb, ${toneVars(step.tone || 'blue').solid} 19%, transparent), inset 0 1px 0 rgba(255,255,255,0.08)`,
             }"
           >
             <div
@@ -69,7 +71,7 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
             />
             <span
               class="sf-num"
-              :style="{ background: toneVars(step.tone || 'blue').solid }"
+              :style="{ background: toneVars(step.tone || 'blue').solid, '--step-contrast': toneVars(step.tone || 'blue').contrast }"
             >{{ idx + 1 }}</span>
           </div>
           <GlassCard
@@ -78,7 +80,7 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
             textCenter
             :style="{
               background: toneVars(step.tone || 'blue').bg,
-              borderColor: toneVars(step.tone || 'blue').border + '70',
+              borderColor: toneVars(step.tone || 'blue').border,
             }"
           >
             <div
@@ -108,7 +110,7 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
               :style="{
                 background: toneVars(step.tone || 'blue').bg,
                 borderColor: toneVars(step.tone || 'blue').border,
-                boxShadow: `0 0 16px ${toneVars(step.tone || 'blue').solid}28`,
+                boxShadow: `0 0 16px color-mix(in srgb, ${toneVars(step.tone || 'blue').solid} 16%, transparent)`,
               }"
             >
               <span
@@ -120,10 +122,11 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
             <!-- Connecting line to next step -->
             <div
               v-if="idx < steps.length - 1"
+              class="sf-connector"
               flex-1 mt-1 mb-1
               style="width: 2px; min-height: 14px; border-radius: 2px"
               :style="{
-                background: `linear-gradient(to bottom, ${toneVars(step.tone || 'blue').solid}45, ${toneVars(steps[idx + 1].tone || 'blue').solid}18)`,
+                background: `linear-gradient(to bottom, color-mix(in srgb, ${toneVars(step.tone || 'blue').solid} 27%, transparent), color-mix(in srgb, ${toneVars(steps[idx + 1].tone || 'blue').solid} 9%, transparent))`,
               }"
             />
           </div>
@@ -134,7 +137,7 @@ const stepWidth = computed(() => `${100 / safeStepCount.value}%`)
               padding="px-4 py-3"
               :style="{
                 background: toneVars(step.tone || 'blue').bg,
-                borderColor: toneVars(step.tone || 'blue').border + '80',
+                borderColor: toneVars(step.tone || 'blue').border,
               }"
             >
               <div flex items-center gap-2 mb-1>

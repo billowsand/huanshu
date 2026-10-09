@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 import { toneVars, type Tone } from './keynoteTheme'
 
 defineProps<{
@@ -21,7 +22,7 @@ defineProps<{
 
   <div relative z-10 py-6 flex flex-col h-full>
     <div class="slide-header">
-      <h1 class="slide-title slide-compact-title">{{ title }}</h1>
+      <SlideTitle class="slide-title slide-compact-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
     <TagBadge v-if="subtitle" inline class="mt-2">{{ subtitle }}</TagBadge>
@@ -80,21 +81,21 @@ defineProps<{
                 <!-- Stem: card → node -->
                 <div
                   class="tl-stem"
-                  :style="{ background: toneVars(evt.tone).solid + '70' }"
+                  :style="{ background: `color-mix(in srgb, ${toneVars(evt.tone).solid} 44%, transparent)` }"
                 />
                 <!-- Node ring -->
                 <div
                   class="tl-node"
                   :style="{
                     background: toneVars(evt.tone).solid,
-                    boxShadow: `0 0 12px ${toneVars(evt.tone).solid}90, 0 0 24px ${toneVars(evt.tone).solid}40`,
+                    boxShadow: `0 0 12px color-mix(in srgb, ${toneVars(evt.tone).solid} 56%, transparent), 0 0 24px color-mix(in srgb, ${toneVars(evt.tone).solid} 25%, transparent)`,
                     borderColor: toneVars(evt.tone).border,
                   }"
                 />
                 <!-- Stem: node → date -->
                 <div
                   class="tl-stem"
-                  :style="{ background: toneVars(evt.tone).solid + '30' }"
+                  :style="{ background: `color-mix(in srgb, ${toneVars(evt.tone).solid} 19%, transparent)` }"
                 />
                 <!-- Date label -->
                 <div class="tl-date pt-1">{{ evt.date }}</div>
@@ -111,21 +112,21 @@ defineProps<{
                 <!-- Stem: date → node -->
                 <div
                   class="tl-stem"
-                  :style="{ background: toneVars(evt.tone).solid + '30' }"
+                  :style="{ background: `color-mix(in srgb, ${toneVars(evt.tone).solid} 19%, transparent)` }"
                 />
                 <!-- Node ring -->
                 <div
                   class="tl-node"
                   :style="{
                     background: toneVars(evt.tone).solid,
-                    boxShadow: `0 0 12px ${toneVars(evt.tone).solid}90, 0 0 24px ${toneVars(evt.tone).solid}40`,
+                    boxShadow: `0 0 12px color-mix(in srgb, ${toneVars(evt.tone).solid} 56%, transparent), 0 0 24px color-mix(in srgb, ${toneVars(evt.tone).solid} 25%, transparent)`,
                     borderColor: toneVars(evt.tone).border,
                   }"
                 />
                 <!-- Stem: node → card -->
                 <div
                   class="tl-stem"
-                  :style="{ background: toneVars(evt.tone).solid + '70' }"
+                  :style="{ background: `color-mix(in srgb, ${toneVars(evt.tone).solid} 44%, transparent)` }"
                 />
                 <!-- Card below -->
                 <div class="tl-below" flex-1 flex flex-col justify-start pt-3 w-full px-2>

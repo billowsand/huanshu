@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 import SlideReveal from "./SlideReveal.vue";
 
 defineProps<{
@@ -30,9 +31,7 @@ defineProps<{
 
         <SlideReveal :delay="180">
             <div class="closing-kicker">END</div>
-            <h1 class="closing-title">
-                {{ title }}
-            </h1>
+            <SlideTitle class="closing-title" :title="title" />
             <div v-if="subtitle" class="closing-subtitle">
                 {{ subtitle }}
             </div>

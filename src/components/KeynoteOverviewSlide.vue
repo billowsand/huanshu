@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -22,7 +23,7 @@ const gridCols = computed(() => props.items.length <= 2 ? 1 : 2)
 
   <div relative z-10 flex flex-col h-full py-6>
     <div class="slide-header">
-      <h1 class="slide-title slide-compact-title">{{ title }}</h1>
+      <SlideTitle class="slide-title slide-compact-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
 

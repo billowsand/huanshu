@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 import { toneVars, type Tone } from './keynoteTheme'
 
 defineProps<{
@@ -21,10 +22,10 @@ defineProps<{
     <TagBadge v-if="badge">{{ badge }}</TagBadge>
 
     <div class="slide-header center-grid-header">
-      <h2 class="slide-title center-grid-title">
-        {{ title }}<br v-if="accent" />
-        <span v-if="accent" text="var(--primary)">{{ accent }}</span>
-      </h2>
+      <SlideTitle as="h2" class="slide-title center-grid-title" :title="title">
+        <br v-if="accent" />
+        <SlideTitle v-if="accent" as="span" text="var(--primary)" :title="accent" />
+      </SlideTitle>
       <div class="slide-title-divider center-grid-divider" />
     </div>
 

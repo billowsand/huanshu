@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
 import SlideReveal from './SlideReveal.vue'
@@ -37,7 +38,7 @@ function summaryFirst(quadrantKey: string) {
 
   <div relative z-10 py-6 flex flex-col gap-4 h-full>
     <div class="slide-header">
-      <h1 class="slide-title slide-compact-title">{{ title }}</h1>
+      <SlideTitle class="slide-title slide-compact-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
     <TagBadge v-if="subtitle" inline class="mt-2">{{ subtitle }}</TagBadge>
@@ -78,7 +79,7 @@ function summaryFirst(quadrantKey: string) {
           >
             <div
               class="swot-flag-icon"
-              :style="{ background: toneVars(quadrant.tone).solid }"
+              :style="{ background: toneVars(quadrant.tone).solid, '--quadrant-contrast': toneVars(quadrant.tone).contrast }"
             >
               <div :class="quadrant.icon || 'i-carbon:idea'" class="slide-icon-sm" text-white />
             </div>

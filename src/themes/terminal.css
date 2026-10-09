@@ -1,0 +1,363 @@
+/* Terminal: coordinated studio and slide palettes. All rules are opt-in. */
+[data-theme="dark-terminal"] {
+  color-scheme: dark;
+  --terminal-bg: #151614;
+  --terminal-panel: #1b1d19;
+  --terminal-raised: #242720;
+  --terminal-text: #eeeede;
+  --terminal-muted: #a1a697;
+  --terminal-border: #393d33;
+  --terminal-border-hover: #68705d;
+  --terminal-primary: #ed9b62;
+  --terminal-primary-hover: #f4b787;
+  --terminal-primary-bg: #30251e;
+  --terminal-primary-border: #76543b;
+  --terminal-primary-contrast: #20170f;
+  --terminal-success: #a9c58c;
+  --terminal-success-bg: #252e20;
+  --terminal-success-border: #546843;
+  --terminal-info: #96b9ce;
+  --terminal-info-bg: #202a30;
+  --terminal-info-border: #465e6c;
+  --terminal-danger: #e99388;
+  --terminal-danger-bg: #322321;
+  --terminal-danger-border: #754b44;
+  --terminal-grid: rgba(161, 166, 151, 0.07);
+  --terminal-solid-contrast: #151614;
+  --terminal-edge-light: rgba(238, 238, 222, 0.08);
+  --terminal-edge-dark: rgba(0, 0, 0, 0.28);
+  --terminal-card-shadow: inset 0 1px 0 var(--terminal-edge-light),
+    inset 0 -1px 0 var(--terminal-edge-dark),
+    0 2px 3px rgba(0, 0, 0, 0.30), 0 9px 20px -6px rgba(0, 0, 0, 0.46);
+  --terminal-raised-shadow: inset 0 1px 0 var(--terminal-edge-light),
+    0 3px 5px rgba(0, 0, 0, 0.34), 0 15px 30px -8px rgba(0, 0, 0, 0.56);
+  --terminal-inner-shadow: inset 0 1px 0 var(--terminal-edge-light),
+    0 1px 2px rgba(0, 0, 0, 0.22);
+}
+
+[data-theme="light-terminal"] {
+  color-scheme: light;
+  --terminal-bg: #f4f3eb;
+  --terminal-panel: #faf9f3;
+  --terminal-raised: #eaeade;
+  --terminal-text: #25291f;
+  --terminal-muted: #656b5c;
+  --terminal-border: #c9cebe;
+  --terminal-border-hover: #8b947e;
+  --terminal-primary: #9d4a1c;
+  --terminal-primary-hover: #803b16;
+  --terminal-primary-bg: #eee0d1;
+  --terminal-primary-border: #c4a383;
+  --terminal-primary-contrast: #fff9ee;
+  --terminal-success: #49682c;
+  --terminal-success-bg: #e7edde;
+  --terminal-success-border: #a6b592;
+  --terminal-info: #36627b;
+  --terminal-info-bg: #e3ebee;
+  --terminal-info-border: #9aafba;
+  --terminal-danger: #a64239;
+  --terminal-danger-bg: #f2e2dc;
+  --terminal-danger-border: #c6a29a;
+  --terminal-grid: rgba(101, 107, 92, 0.08);
+  --terminal-solid-contrast: #fff9ee;
+  --terminal-edge-light: rgba(255, 255, 255, 0.88);
+  --terminal-edge-dark: rgba(37, 41, 31, 0.06);
+  --terminal-card-shadow: inset 0 1px 0 var(--terminal-edge-light),
+    inset 0 -1px 0 var(--terminal-edge-dark),
+    0 2px 3px rgba(37, 41, 31, 0.07), 0 9px 20px -6px rgba(37, 41, 31, 0.16);
+  --terminal-raised-shadow: inset 0 1px 0 var(--terminal-edge-light),
+    0 3px 5px rgba(37, 41, 31, 0.09), 0 15px 30px -8px rgba(37, 41, 31, 0.22);
+  --terminal-inner-shadow: inset 0 1px 0 var(--terminal-edge-light),
+    0 1px 2px rgba(37, 41, 31, 0.06);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) {
+  --font-mono: 'Cascadia Code', 'JetBrains Mono', 'Consolas', 'MiSans', 'Microsoft YaHei', monospace;
+  --bg: var(--terminal-bg);
+  --bg-gradient: var(--terminal-bg);
+  --text: var(--terminal-text);
+  --text-muted: var(--terminal-muted);
+  --primary: var(--terminal-primary);
+  --primary-light: var(--terminal-primary);
+  --primary-bg: var(--terminal-primary-bg);
+  --primary-border: var(--terminal-primary-border);
+  --glass: var(--terminal-panel);
+  --glass-border: var(--terminal-border);
+  --glass-highlight: var(--terminal-edge-light);
+  --glass-sheen: transparent;
+  --glass-blur: 0px;
+  --glass-saturate: 100%;
+  --glass-shadow: var(--terminal-card-shadow);
+  --glass-shadow-strong: var(--terminal-raised-shadow);
+  --glow: transparent;
+  --shell-frame: transparent;
+  --shell-frame-border: var(--terminal-border);
+  --shell-frame-shadow: none;
+  --section-num-stroke: var(--terminal-border);
+  --success: var(--terminal-success);
+  --success-light: var(--terminal-success);
+  --success-bg: var(--terminal-success-bg);
+  --success-border: var(--terminal-success-border);
+  --success-contrast: var(--terminal-solid-contrast);
+  --info: var(--terminal-info);
+  --info-light: var(--terminal-info);
+  --info-bg: var(--terminal-info-bg);
+  --info-border: var(--terminal-info-border);
+  --info-contrast: var(--terminal-solid-contrast);
+  --warning: var(--terminal-primary);
+  --warning-light: var(--terminal-primary);
+  --warning-bg: var(--terminal-primary-bg);
+  --warning-border: var(--terminal-primary-border);
+  --warning-contrast: var(--terminal-primary-contrast);
+  --danger: var(--terminal-danger);
+  --danger-light: var(--terminal-danger);
+  --danger-bg: var(--terminal-danger-bg);
+  --danger-border: var(--terminal-danger-border);
+  --danger-contrast: var(--terminal-solid-contrast);
+  --studio-bg: var(--terminal-bg);
+  --studio-panel: var(--terminal-panel);
+  --studio-panel-2: var(--terminal-panel);
+  --studio-surface: var(--terminal-raised);
+  --studio-border: var(--terminal-border);
+  --studio-border-hover: var(--terminal-border-hover);
+  --studio-text: var(--terminal-text);
+  --studio-muted: var(--terminal-muted);
+  --studio-primary: var(--terminal-primary);
+  --studio-primary-light: var(--terminal-primary-hover);
+  --studio-primary-bg: var(--terminal-primary-bg);
+  --studio-primary-border: var(--terminal-primary-border);
+  --studio-primary-contrast: var(--terminal-primary-contrast);
+  --studio-success: var(--terminal-success);
+  --studio-success-bg: var(--terminal-success-bg);
+  --studio-error: var(--terminal-danger);
+  --studio-error-bg: var(--terminal-danger-bg);
+  --studio-error-border: var(--terminal-danger-border);
+  --slidev-code-background: var(--terminal-raised) !important;
+}
+
+/* Shared shell covers editor previews, thumbnails, overview and presentation. */
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .slide-shell {
+  background: var(--bg);
+  background-image: linear-gradient(var(--terminal-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--terminal-grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .slide-shell__ambient {
+  display: none;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .slide-shell__frame {
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: none;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .glass-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 2px;
+  box-shadow: var(--terminal-card-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Override scoped component geometry and intentional inline glow styles only. */
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.slide-shell, .slidev-slide) :is(
+  [rounded-lg], [rounded-xl], [rounded-2xl], [rounded-full],
+  .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-full,
+  .tag-pill, .tool-badge, .cp-panel, .cp-header, .cp-footer, .cp-item,
+  .cp-mode-badge, .cp-vs-badge, .cp-balance-badge,
+  .sf-hnode, .sf-vnode, .sf-num, .tl-card, .tl-node,
+  .phase-chip, .step-dot, .swot-flag, .swot-flag-icon, .swot-summary,
+  .split-left-step, .issue-card__pill
+) {
+  border-radius: 2px;
+  box-shadow: none !important;
+  text-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Cards sit above the canvas; nested cards retain a quieter, lower elevation.
+   Important is needed for the component's inline node glows and the reset above. */
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.slide-shell, .slidev-slide) :is(
+  .glass-card, .spotlight-media, .sf-hnode, .sf-vnode
+) {
+  box-shadow: var(--terminal-card-shadow) !important;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.slide-shell, .slidev-slide) .glass-card .glass-card {
+  box-shadow: var(--terminal-inner-shadow) !important;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.slide-shell, .slidev-slide) .swot-flag {
+  box-shadow: var(--terminal-inner-shadow) !important;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(
+  .slide-title, .cover-title, .closing-title, .slide-section-title
+) {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(
+  .tag-pill, .tool-badge, .closing-kicker, .closing-mark,
+  .section-intro__meta-label, .section-intro__card-index,
+  .phase-chip, .phase-steps-wrap__title, .split-left-index, .issue-card__eyebrow
+) {
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.amber-badge, .amber-header) {
+  background: var(--primary-bg);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.slide-title-divider, .divider-amber, .process-summary__line) {
+  height: 1px;
+  background: var(--primary);
+  opacity: 1;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-num {
+  font-size: var(--type-meta);
+  font-weight: 400;
+  color: var(--text-muted);
+  -webkit-text-stroke: 0;
+  letter-spacing: 0.08em;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.cp-divider-line, .cp-simple-divider, .tl-axis-line, .split-left-connector, .sf-track, .sf-connector) {
+  background: var(--glass-border) !important;
+  opacity: 1;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.phase-chip, .step-dot) {
+  background: var(--phase-solid) !important;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .phase-highlight {
+  background: var(--glass) !important;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .phase-head::after,
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-intro__card::after,
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .phase-steps-wrap__glow {
+  display: none;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-intro__lead {
+  background: var(--glass);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-intro__meta {
+  border-color: var(--glass-border);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-intro__note {
+  border-color: var(--success-border);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(
+  .section-intro__meta-label, .section-intro__card-index,
+  .closing-subtitle, .closing-note, .closing-mark
+) {
+  color: var(--text-muted);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-intro__card-item {
+  color: var(--text);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .closing-kicker {
+  color: var(--primary);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .sf-num {
+  color: var(--step-contrast);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .spotlight-media {
+  background: var(--glass);
+  border-color: var(--glass-border);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .carousel-indicator {
+  background: var(--text-muted);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .carousel-indicator.is-active {
+  background: var(--primary);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .swot-flag-icon {
+  color: var(--quadrant-contrast);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .swot-flag-icon > div {
+  color: inherit;
+}
+
+/* App chrome shares the same card elevations; retain round theme swatches. */
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(
+  .btn, input, textarea, select, .project-card, .card-icon-wrap,
+  .heading-mark, .titlebar-brand-chip, .empty-icon-circle, .slide-card-bg,
+  .theme-popover, .modal-box, .badge, .slide-card, .kind-badge
+) {
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.heading-mark, .titlebar-brand-chip) {
+  background: var(--studio-panel);
+  border-color: var(--studio-border);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .project-card:hover {
+  box-shadow: var(--terminal-raised-shadow);
+  transform: none;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.project-card, .slide-card) {
+  box-shadow: var(--terminal-card-shadow);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.theme-popover, .modal-box) {
+  box-shadow: var(--terminal-raised-shadow);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.heading-mark, .card-icon-wrap) {
+  box-shadow: var(--terminal-inner-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.project-card, .slide-card) {
+    transition: none;
+  }
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(input, textarea, select):focus-visible {
+  outline: 2px solid var(--studio-primary);
+  outline-offset: 2px;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.page-crumb, .heading-eyebrow, .project-count, .card-date, .badge, .kind-badge) {
+  font-family: var(--font-mono);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .card-accent {
+  background: var(--studio-primary);
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .slide-card .kind-badge {
+  background: var(--studio-primary-bg) !important;
+  border-color: var(--studio-primary-border) !important;
+  color: var(--studio-primary) !important;
+}
+
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .slide-card:hover {
+  border-color: var(--studio-border-hover);
+}

@@ -36,7 +36,8 @@ onUnmounted(() => clearInterval(timer))
     <div v-if="images.length > 1" absolute bottom-2 left-0 right-0 flex justify-center gap-1>
       <div
         v-for="(_, i) in images" :key="i"
-        :class="i === idx ? 'bg-amber-400 w-4' : 'bg-white/30 w-2'"
+        class="carousel-indicator"
+        :class="i === idx ? 'bg-amber-400 w-4 is-active' : 'bg-white/30 w-2'"
         h-1.5 rounded-full style="transition: all 0.3s ease;"
       />
     </div>

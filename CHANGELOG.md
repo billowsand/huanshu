@@ -9,11 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **终端明暗主题**：新增「终端·墨」与「终端·纸」，应用界面与全部 17 种幻灯片模板统一使用暖黑 / 纸白底色、细线边框、近直角卡片和等宽标签；预览、缩略图与播放共用样式。
+
 - **模型服务 SOCKS5 代理**：大语言模型 / 向量模型 / 多模态模型可各自启用 SOCKS5 代理，
   支持用户名密码认证（支持 `socks5://` / `socks5h://`），模型域名由代理解析；
   代理不可用时返回错误而不回退直连。旧 `settings.json` 无 `proxy` 字段时默认关闭。
 
 ### Fixed
+
+- **标题按词换行**：全部幻灯片主标题使用 Rust jieba 分词，保持词语与标点完整，均衡多行长度，并保留手动换行，避免长标题末尾单字孤行。
 
 - **修复生产构建产出无法启动**：`src-tauri/Cargo.toml` 补回标准 `[features]` 段
   （`custom-protocol = ["tauri/custom-protocol"]`），否则 `cargo build --release`

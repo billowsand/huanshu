@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 defineProps<{
   section: string
   title: string
@@ -24,7 +25,7 @@ defineProps<{
 
   <div relative z-10 flex flex-col h-full py-6>
     <div class="slide-header">
-      <h1 class="slide-title">{{ title }}</h1>
+      <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
     <TagBadge v-if="subtitle" inline class="mt-3">{{ subtitle }}</TagBadge>
@@ -61,7 +62,7 @@ defineProps<{
               flex items-center gap-2
               :style="item.muted ? { opacity: 0.4 } : {}"
             >
-              <div :style="{ color: item.muted ? '#52525b' : 'var(--primary)' }" font-mono>{{ item.index }}</div>
+              <div :style="{ color: item.muted ? 'var(--text-muted)' : 'var(--primary)' }" font-mono>{{ item.index }}</div>
               <span>
                 {{ item.label }}
                 <span opacity-50>（{{ item.meta }}）</span>

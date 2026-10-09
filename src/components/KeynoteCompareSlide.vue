@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 import { toneVars, type Tone } from './keynoteTheme'
 
 defineProps<{
@@ -37,7 +38,7 @@ defineProps<{
 
   <div relative z-10 py-6 flex flex-col h-full>
     <div class="slide-header">
-      <h1 class="slide-title">{{ title }}</h1>
+      <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
     <TagBadge v-if="subtitle" inline class="mt-2">{{ subtitle }}</TagBadge>
@@ -67,7 +68,7 @@ defineProps<{
               v-if="mode === 'pros-cons'"
               class="cp-mode-badge"
               :style="{
-                background: toneVars('green').solid + '20',
+                background: toneVars('green').bg,
                 borderColor: toneVars('green').border,
                 color: toneVars('green').text,
               }"
@@ -187,7 +188,7 @@ defineProps<{
               v-if="mode === 'pros-cons'"
               class="cp-mode-badge"
               :style="{
-                background: toneVars('red').solid + '20',
+                background: toneVars('red').bg,
                 borderColor: toneVars('red').border,
                 color: toneVars('red').text,
               }"

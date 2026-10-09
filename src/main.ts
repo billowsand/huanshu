@@ -9,6 +9,7 @@ import FirstRunWizard from './views/FirstRunWizard.vue'
 import 'virtual:uno.css'
 import '@unocss/reset/tailwind.css'
 import './style.css'
+import './themes/terminal.css'
 
 // Keynote slide components
 import GlassCard from './components/GlassCard.vue'

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
 
@@ -53,7 +54,7 @@ const cardGridGap = computed(() => {
       <TagBadge v-if="badge" inline color="green">{{ badge }}</TagBadge>
 
       <div class="slide-header section-intro__header">
-        <h1 class="slide-title section-intro__title">{{ title }}</h1>
+        <SlideTitle class="slide-title section-intro__title" :title="title" />
         <div class="slide-title-divider section-intro__divider" />
       </div>
 

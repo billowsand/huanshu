@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 const themes = [
   { id: 'dark-yellow',   name: '暗·琥珀', bg: '#0b0c11', accent: '#f59e0b' },
@@ -9,9 +9,12 @@ const themes = [
   { id: 'light-chatgpt', name: '亮·翠绿', bg: '#f5f5f5', accent: '#059669' },
   { id: 'light-claude',  name: '亮·晨曦', bg: '#FDFCF9', accent: '#C25F35' },
   { id: 'light-gugong',  name: '亮·多巴胺', bg: 'linear-gradient(135deg, #FF6BA8 0%, #C44FED 50%, #F97316 100%)', accent: '#9333EA' },
+  { id: 'dark-terminal', name: '终端·墨', bg: '#151614', accent: '#ed9b62' },
+  { id: 'light-terminal', name: '终端·纸', bg: '#f4f3eb', accent: '#9d4a1c' },
 ]
 
 const currentTheme = ref('dark-yellow')
+let themeObserver: MutationObserver | undefined
 
 function setTheme(themeId: string) {
   currentTheme.value = themeId
@@ -20,10 +23,15 @@ function setTheme(themeId: string) {
 }
 
 onMounted(() => {
-  const themeId = document.documentElement.getAttribute('data-theme') || 'dark-yellow'
-  currentTheme.value = themeId
-  document.documentElement.setAttribute('data-theme', themeId)
+  const syncTheme = () => {
+    currentTheme.value = document.documentElement.getAttribute('data-theme') || 'dark-yellow'
+  }
+  syncTheme()
+  themeObserver = new MutationObserver(syncTheme)
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
 })
+
+onUnmounted(() => themeObserver?.disconnect())
 </script>
 
 <template>
@@ -37,6 +45,8 @@ onMounted(() => {
         :class="{ active: currentTheme === theme.id }"
         :style="{ background: theme.bg }"
         :title="theme.name"
+        :aria-label="theme.name"
+        :aria-pressed="currentTheme === theme.id"
         @click="setTheme(theme.id)"
       >
         <span class="swatch-dot" :style="{ background: theme.accent }" />
