@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **放映残留任务栏黑边**：窗口处于最大化时开始放映，tao 会把无边框窗口的客户区按显示器工作区裁剪（`WM_NCCALCSIZE`），
+  即使 WebView 已进入全屏，屏幕底部仍留出任务栏高度的黑条。现在进入放映前先记录并取消最大化，退出放映
+  （含直接卸载组件、用户按 Esc 或拒绝全屏）时先退出全屏再恢复最大化。配套补充 `core:window:allow-set-fullscreen` 窗口权限。
 - **流程页步骤说明被截断**：`WorkflowView` 的侧栏描述类名 `.step-desc` 与 `Process` 幻灯片的步骤说明同名，全局样式让幻灯片文案被限宽省略号截断；改为 `.steps-nav .step-desc` 只约束侧栏，幻灯片内步骤说明恢复完整换行。新增 `scripts/check-notes-theme.mjs` 与 `check-slide-layout.mjs` 的 Process 换行断言守护该回归。
 
 ### Removed

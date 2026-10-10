@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { isTauri } from '@tauri-apps/api/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import SlideRenderer from '../components/SlideRenderer.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import type { SlideBlueprint, AspectRatio } from '../components/types'
@@ -108,27 +110,59 @@ function updateViewport() {
   viewportHeight.value = window.innerHeight
 }
 
-async function enterWindowFullscreen() {
-  // Window-level fullscreen removed — using DOM fullscreen only
+// Tauri already turns DOM fullscreen into native window fullscreen (WebView2
+// ContainsFullScreenElementChanged → setFullscreen). But tao clamps a *maximized* borderless
+// window's client area to the monitor work area (WM_NCCALCSIZE) even while fullscreen, so a
+// maximized window leaves the taskbar strip black. Unmaximize before entering, restore on exit.
+let restoreMaximized = false
+
+async function unmaximizeForFullscreen() {
+  if (!isTauri()) return
+  try {
+    const win = getCurrentWindow()
+    if (await win.isMaximized()) {
+      restoreMaximized = true
+      await win.unmaximize()
+    }
+  } catch (e) {
+    console.warn('[presentation] unmaximize failed', e)
+  }
 }
 
-async function exitWindowFullscreen() {
-  // Window-level fullscreen removed
+async function restoreMaximizedWindow() {
+  if (!isTauri() || !restoreMaximized) return
+  restoreMaximized = false
+  try {
+    const win = getCurrentWindow()
+    // Make sure fullscreen is left first, otherwise tao's saved placement overrides maximize
+    await win.setFullscreen(false)
+    await win.maximize()
+  } catch (e) {
+    console.warn('[presentation] re-maximize failed', e)
+  }
+}
+
+async function enterFullscreen() {
+  await unmaximizeForFullscreen()
+  await presOverlayRef.value?.requestFullscreen().catch(() => {})
+  isFullscreen.value = !!document.fullscreenElement
+  if (!isFullscreen.value) await restoreMaximizedWindow()
 }
 
 async function toggleFullscreen() {
   if (!isFullscreen.value) {
-    await presOverlayRef.value?.requestFullscreen().catch(() => {})
-    isFullscreen.value = true
+    await enterFullscreen()
   } else {
     await document.exitFullscreen().catch(() => {})
     isFullscreen.value = false
+    await restoreMaximizedWindow()
   }
   updateViewport()
 }
 
 async function onFullscreenChange() {
   isFullscreen.value = !!document.fullscreenElement
+  if (!isFullscreen.value) await restoreMaximizedWindow()
   updateViewport()
 }
 
@@ -190,6 +224,7 @@ async function exitPresentation() {
   if (document.fullscreenElement) {
     await document.exitFullscreen().catch(() => {})
   }
+  await restoreMaximizedWindow()
   emit('exit')
 }
 
@@ -241,10 +276,8 @@ onMounted(async () => {
   if (shortcutTimer) clearTimeout(shortcutTimer)
   shortcutTimer = setTimeout(() => { showShortcuts.value = false }, 3000)
   await new Promise(r => setTimeout(r, 0))
-  try {
-    await presOverlayRef.value?.requestFullscreen()
-  } catch { /* user may deny — gracefully continue windowed */ }
-  isFullscreen.value = !!document.fullscreenElement
+  // user may deny DOM fullscreen — enterFullscreen then continues windowed
+  await enterFullscreen()
   if (presOverlayRef.value) {
     resizeObserver = new ResizeObserver(() => {
       updateViewport()
@@ -263,6 +296,8 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   resizeObserver = null
   if (shortcutTimer) clearTimeout(shortcutTimer)
+  // Unmounting without going through exitPresentation must still give back the maximized window
+  void restoreMaximizedWindow()
 })
 </script>
 
