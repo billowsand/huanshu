@@ -93,6 +93,14 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
 - 所有确定性兜底：`fallback_candidates`、repair 最后一轮的 `pick_different_kind`、`make_fallback_slide`
   都走 `planning::eligible_fallback_kinds`，只会返回可用 kind
 
+现有硬条件：`step_flow` 要点 ≤4 / `process` 要点 ≥5；`compare` 需 pair 或 comparison；
+`issue_stack` 需 warning/causal 或问题类措辞；`swot` 需 matrix 或 SWOT 措辞；`spotlight` 需
+`preferred_assets` 非空；32:9 禁 `spotlight`，48:9 禁 `spotlight`/`compare`/`focus_example`；
+`section_intro` 仅且必须用于 `section_summary` 页；Cover/Overview/Closing 不在表中，永不可选。
+
+不变量：`UNIVERSAL_CONTENT_KINDS`（`feature_grid`、`section_list`）对任何内容页、任何比例都可用，
+兜底链依赖它保证总能找到可用 kind——给这两个模板加硬条件前先改兜底逻辑（有单测守护）。
+
 ### 兜底打分表（`generator/layout_scoring.rs`）
 
 LLM 没给出可用候选、repair 最后一轮换模板、生成兜底页时，用这张表给所有内容模板打分排序，
@@ -110,13 +118,27 @@ LLM 没给出可用候选、repair 最后一轮换模板、生成兜底页时，
 **不要**再用单字「层」或泛词「时间」；density 用 `content_units`（拉丁词数 + 汉字数/2），
 因为中文没有空格，按空白分词会让几乎所有中文页都判成 low。
 
-现有硬条件：`step_flow` 要点 ≤4 / `process` 要点 ≥5；`compare` 需 pair 或 comparison；
-`issue_stack` 需 warning/causal 或问题类措辞；`swot` 需 matrix 或 SWOT 措辞；`spotlight` 需
-`preferred_assets` 非空；32:9 禁 `spotlight`，48:9 禁 `spotlight`/`compare`/`focus_example`；
-`section_intro` 仅且必须用于 `section_summary` 页；Cover/Overview/Closing 不在表中，永不可选。
+### 观测与真机探针
 
-不变量：`UNIVERSAL_CONTENT_KINDS`（`feature_grid`、`section_list`）对任何内容页、任何比例都可用，
-兜底链依赖它保证总能找到可用 kind——给这两个模板加硬条件前先改兜底逻辑（有单测守护）。
+每次生成在调试目录（项目的 `.slidev-gen-debug/`）写出：
+- `02-layout-NN.parsed.json`：该页解析出的候选与 `dropped`（解析不了的条目及原因）
+- `02-layout-assignment.json`：`stats.assigned` 与 `stats.llm_top_choice`（逐页取 LLM 首选时的
+  牌组）的对比——相邻/隔页重复次数、kind 分布、最大占比（`section_intro` 不计）；
+  `traded_down_pages`（为多样性改选）、`fallback_pages`（走了确定性兜底）、逐页候选
+- `05-layout-final.json`：repair/兜底之后**实际渲染**的分布，及与分配结果不一致的页
+- 生成日志「布局分配」一行汇总上述关键数字
+
+调权重、改规则或换模型后，用真机探针在固定文档上对比（需 LM Studio 在跑，读应用的 settings.json）：
+
+```bash
+cargo test -p auto-slidev-studio --lib layout_probe -- --ignored --nocapture
+```
+
+默认文档 `src-tauri/fixtures/layout-probe-sample.md`（覆盖对比/架构/流程/时间线/SWOT/风险等页型）；
+环境变量 `LAYOUT_PROBE_MD` / `LAYOUT_PROBE_ASPECT`（`16x9`/`32x9`/`48x9`）/ `LAYOUT_PROBE_OUT` /
+`LAYOUT_PROBE_SETTINGS` 可覆盖。只跑 enrich → 候选 → 分配，18 页约 90 秒（qwen3.5-9b，并发 4）。
+LLM 回复即使不是合法 JSON（实测出现过单引号字符串），`candidate_parsing` 也会按模式抢救出 kind/score。
+
 
 ## 幻灯片字号体系（`--type-scale`）
 

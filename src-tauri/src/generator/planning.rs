@@ -1136,6 +1136,160 @@ fn deck_objective(cands: &[Vec<LayoutCandidate>], choice: &[usize], cap: usize) 
     total
 }
 
+// ---------------------------------------------------------------------------
+// Layout observability
+// ---------------------------------------------------------------------------
+
+/// Deck-level layout statistics, written to the debug directory so runs (and weight
+/// changes) can be compared.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct LayoutStats {
+    pub pages: usize,
+    pub distinct_kinds: usize,
+    /// Pages using the same kind as the page right before them. Repeats of the structural
+    /// section_intro (e.g. intro → page → intro) are not counted.
+    pub adjacent_repeats: usize,
+    /// Pages using the same kind as the page two before them (A-B-A rhythm), same exclusion.
+    pub gap2_repeats: usize,
+    /// Largest share of content pages taken by one kind (section_intro excluded, as it
+    /// is structural).
+    pub max_kind_share: f64,
+    pub distribution: std::collections::BTreeMap<&'static str, usize>,
+}
+
+pub fn layout_stats(kinds: &[SlideKind]) -> LayoutStats {
+    let mut distribution = std::collections::BTreeMap::new();
+    for kind in kinds {
+        *distribution.entry(slide_kind_name(kind)).or_insert(0) += 1;
+    }
+    let content_pages = kinds
+        .iter()
+        .filter(|kind| **kind != SlideKind::SectionIntro)
+        .count();
+    let max_content_count = distribution
+        .iter()
+        .filter(|(name, _)| **name != slide_kind_name(&SlideKind::SectionIntro))
+        .map(|(_, count)| *count)
+        .max()
+        .unwrap_or(0);
+    LayoutStats {
+        pages: kinds.len(),
+        distinct_kinds: distribution.len(),
+        adjacent_repeats: kinds
+            .windows(2)
+            .filter(|w| w[0] == w[1] && w[0] != SlideKind::SectionIntro)
+            .count(),
+        gap2_repeats: kinds
+            .windows(3)
+            .filter(|w| w[0] == w[2] && w[0] != SlideKind::SectionIntro)
+            .count(),
+        max_kind_share: if content_pages == 0 {
+            0.0
+        } else {
+            let share = max_content_count as f64 / content_pages as f64;
+            (share * 1000.0).round() / 1000.0
+        },
+        distribution,
+    }
+}
+
+/// Debug report for the deck-level assignment (`02-layout-assignment.json`).
+///
+/// `stats.llm_top_choice` is the deck you would get by taking each page's best candidate
+/// independently; comparing it with `stats.assigned` shows what the global assignment changed.
+pub fn layout_assignment_report(
+    candidates: &[Vec<LayoutCandidate>],
+    assigned: &[LayoutPlan],
+) -> serde_json::Value {
+    let is_fallback = |list: &Vec<LayoutCandidate>| {
+        list.first()
+            .map_or(true, |c| c.reason.starts_with("deterministic fallback"))
+    };
+    let top_choice: Vec<SlideKind> = assigned
+        .iter()
+        .enumerate()
+        .map(|(i, plan)| {
+            candidates
+                .get(i)
+                .and_then(|list| list.first())
+                .map_or_else(|| plan.kind.clone(), |c| c.kind.clone())
+        })
+        .collect();
+    let assigned_kinds: Vec<SlideKind> = assigned.iter().map(|plan| plan.kind.clone()).collect();
+    let empty = Vec::new();
+    serde_json::json!({
+        "stats": {
+            "assigned": layout_stats(&assigned_kinds),
+            "llm_top_choice": layout_stats(&top_choice),
+        },
+        "fallback_pages": assigned
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| is_fallback(candidates.get(*i).unwrap_or(&empty)))
+            .map(|(_, plan)| plan.page_id.as_str())
+            .collect::<Vec<_>>(),
+        "traded_down_pages": assigned
+            .iter()
+            .zip(&top_choice)
+            .filter(|(plan, top)| plan.kind != **top)
+            .map(|(plan, _)| plan.page_id.as_str())
+            .collect::<Vec<_>>(),
+        "pages": assigned
+            .iter()
+            .enumerate()
+            .map(|(i, plan)| serde_json::json!({
+                "page_id": plan.page_id,
+                "title": plan.title,
+                "kind": slide_kind_name(&plan.kind),
+                "reason": plan.reason,
+                "candidates": candidates.get(i).unwrap_or(&empty),
+            }))
+            .collect::<Vec<_>>(),
+    })
+}
+
+/// One-line Chinese summary of the assignment for the generation log.
+pub fn layout_assignment_summary(
+    candidates: &[Vec<LayoutCandidate>],
+    assigned: &[LayoutPlan],
+) -> String {
+    let report = layout_assignment_report(candidates, assigned);
+    let count = |key: &str| report[key].as_array().map_or(0, Vec::len);
+    let repeats = |which: &str| report["stats"][which]["adjacent_repeats"].as_u64().unwrap_or(0);
+    format!(
+        "全局分配 {} 页布局：{}；相邻重复 {} 次（逐页首选为 {} 次），为多样性改选 {} 页，兜底 {} 页",
+        assigned.len(),
+        assigned
+            .iter()
+            .map(|plan| slide_kind_name(&plan.kind))
+            .collect::<Vec<_>>()
+            .join(" → "),
+        repeats("assigned"),
+        repeats("llm_top_choice"),
+        count("traded_down_pages"),
+        count("fallback_pages"),
+    )
+}
+
+/// Debug report comparing the assigned layouts with what was actually rendered after
+/// validation/repair (`05-layout-final.json`): repair can switch kinds or fall back.
+pub fn final_layout_report(assigned: &[LayoutPlan], rendered: &[SlideKind]) -> serde_json::Value {
+    serde_json::json!({
+        "stats": layout_stats(rendered),
+        "changed_after_assignment": assigned
+            .iter()
+            .zip(rendered)
+            .filter(|(plan, kind)| plan.kind != **kind)
+            .map(|(plan, kind)| serde_json::json!({
+                "page_id": plan.page_id,
+                "title": plan.title,
+                "assigned": slide_kind_name(&plan.kind),
+                "rendered": slide_kind_name(kind),
+            }))
+            .collect::<Vec<_>>(),
+    })
+}
+
 fn fallback_overview_section_desc(section: &Section, page_plans: &[PagePlan]) -> String {
     use crate::generator::utils::{clean_model_text, summarize};
 
@@ -1467,6 +1621,74 @@ mod tests {
         assert_eq!(density(&"数字化转型".repeat(90)), "high");
         assert_eq!(density("简短说明"), "low");
         assert_eq!(density(&"word ".repeat(70)), "medium");
+    }
+
+    #[test]
+    fn layout_stats_counts_repeats_and_shares() {
+        let kinds = vec![
+            SlideKind::SectionIntro,
+            SlideKind::FeatureGrid,
+            SlideKind::FeatureGrid,
+            SlideKind::Timeline,
+            SlideKind::FeatureGrid,
+        ];
+        let stats = layout_stats(&kinds);
+        // section_intro → x → section_intro is structural and not a repeat.
+        let structural = layout_stats(&[
+            SlideKind::SectionIntro,
+            SlideKind::Timeline,
+            SlideKind::SectionIntro,
+        ]);
+        assert_eq!(structural.gap2_repeats, 0);
+        assert_eq!(stats.pages, 5);
+        assert_eq!(stats.distinct_kinds, 3);
+        assert_eq!(stats.adjacent_repeats, 1);
+        // windows of 3: [FG,FG,TL] no, [FG,TL,FG] yes
+        assert_eq!(stats.gap2_repeats, 1);
+        // 3 feature_grid out of 4 content pages (section_intro excluded)
+        assert!((stats.max_kind_share - 0.75).abs() < 1e-6);
+        assert_eq!(stats.distribution["feature_grid"], 3);
+    }
+
+    #[test]
+    fn assignment_report_compares_with_per_page_top_choice() {
+        let pages: Vec<PagePlan> = (1..=3).map(content_page).collect();
+        let mut candidates = vec![
+            vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::OutcomeGrid, 8)];
+            2
+        ];
+        candidates.push(Vec::new()); // page 3: planning failed -> fallback
+        let assigned = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
+        let report = layout_assignment_report(&candidates, &assigned);
+
+        assert_eq!(report["stats"]["llm_top_choice"]["adjacent_repeats"], 1);
+        assert_eq!(report["stats"]["assigned"]["adjacent_repeats"], 0);
+        // Either of the two identical pages may be the one traded down.
+        assert_eq!(report["traded_down_pages"].as_array().unwrap().len(), 1);
+        assert_eq!(report["fallback_pages"], serde_json::json!(["3"]));
+        assert_eq!(report["pages"].as_array().unwrap().len(), 3);
+
+        let summary = layout_assignment_summary(&candidates, &assigned);
+        assert!(summary.contains("相邻重复 0 次（逐页首选为 1 次）"), "{summary}");
+        assert!(summary.contains("为多样性改选 1 页，兜底 1 页"), "{summary}");
+    }
+
+    #[test]
+    fn final_layout_report_lists_kinds_changed_after_assignment() {
+        let pages: Vec<PagePlan> = (1..=2).map(content_page).collect();
+        let candidates = vec![vec![cand(SlideKind::Timeline, 9)], vec![cand(SlideKind::Compare, 9)]];
+        let assigned = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
+        let rendered = vec![SlideKind::Timeline, SlideKind::FeatureGrid];
+        let report = final_layout_report(&assigned, &rendered);
+        assert_eq!(
+            report["changed_after_assignment"],
+            serde_json::json!([{
+                "page_id": "2",
+                "title": "页面2",
+                "assigned": "compare",
+                "rendered": "feature_grid",
+            }])
+        );
     }
 }
 

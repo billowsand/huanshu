@@ -31,12 +31,26 @@ const REASON_KEYS: &[&str] = &["reason", "rationale", "why", "explanation"];
 /// - score format: `8`, `8.6`, `"8"`, `"8/10"`, `85` (percent), `0.85` (fraction); a missing
 ///   score is derived from the entry's rank.
 ///
-/// Fails only when the reply contains no JSON at all.
+/// If the reply is not valid JSON at all, `kind` / `score` pairs are salvaged by pattern.
+/// Fails only when nothing candidate-like can be found.
 pub fn parse_layout_candidates(raw: &str) -> anyhow::Result<ParsedCandidates> {
-    let value: Value = crate::generator::utils::parse_json_with_extraction(raw)?;
     let mut candidates = Vec::new();
     let mut dropped = Vec::new();
-    for (rank, entry) in candidate_entries(value).iter().enumerate() {
+    let entries = match crate::generator::utils::parse_json_with_extraction::<Value>(raw) {
+        Ok(value) => candidate_entries(value),
+        Err(err) => {
+            let salvaged = salvage_entries(raw);
+            if salvaged.is_empty() {
+                return Err(err);
+            }
+            dropped.push(format!(
+                "reply was not valid JSON; salvaged {} entries by pattern",
+                salvaged.len()
+            ));
+            salvaged
+        }
+    };
+    for (rank, entry) in entries.iter().enumerate() {
         match parse_entry(entry, rank) {
             Ok(candidate) => candidates.push(candidate),
             Err(why) => dropped.push(format!("#{}: {why}", rank + 1)),
@@ -74,6 +88,50 @@ fn candidate_entries(value: Value) -> Vec<Value> {
         }
         _ => Vec::new(),
     }
+}
+
+/// Last resort for replies that are not valid JSON (seen in practice: a single-quoted
+/// `reason` string). Pulls `kind` / `score` pairs out by pattern, in reply order; each
+/// kind's score is searched only up to the next kind.
+fn salvage_entries(raw: &str) -> Vec<Value> {
+    use regex::Regex;
+    use std::sync::OnceLock;
+
+    static KIND: OnceLock<Regex> = OnceLock::new();
+    static SCORE: OnceLock<Regex> = OnceLock::new();
+    let kind_re = KIND.get_or_init(|| {
+        Regex::new(r#"["']?(?:kind|layout|type)["']?\s*:\s*["']([A-Za-z][A-Za-z_\- ]*)["']"#)
+            .unwrap()
+    });
+    let score_re = SCORE.get_or_init(|| {
+        Regex::new(r#"["']?(?:score|fitness|confidence|rating)["']?\s*:\s*["']?([0-9]+(?:\.[0-9]+)?)"#)
+            .unwrap()
+    });
+
+    let kinds: Vec<(usize, &str)> = kind_re
+        .captures_iter(raw)
+        .map(|caps| (caps.get(0).unwrap().end(), caps.get(1).unwrap().as_str()))
+        .collect();
+    kinds
+        .iter()
+        .enumerate()
+        .map(|(i, (after_kind, kind))| {
+            let segment_end = kinds
+                .get(i + 1)
+                .map_or(raw.len(), |(next_end, next_kind)| next_end - next_kind.len());
+            let segment = &raw[*after_kind..segment_end.max(*after_kind)];
+            let mut entry = Map::new();
+            entry.insert("kind".to_string(), Value::String(kind.to_string()));
+            if let Some(caps) = score_re.captures(segment) {
+                entry.insert("score".to_string(), Value::String(caps[1].to_string()));
+            }
+            entry.insert(
+                "reason".to_string(),
+                Value::String("(salvaged from malformed JSON)".to_string()),
+            );
+            Value::Object(entry)
+        })
+        .collect()
 }
 
 fn parse_entry(entry: &Value, rank: usize) -> Result<LayoutCandidate, String> {
@@ -289,4 +347,42 @@ mod tests {
     fn no_json_is_an_error() {
         assert!(parse_layout_candidates("I think feature grid fits best.").is_err());
     }
+
+    #[test]
+    fn malformed_json_is_salvaged_by_pattern() {
+        // Real qwen3.5-9b reply: the second reason uses single quotes, so the whole reply
+        // is invalid JSON.
+        let raw = r#"{
+  "candidates": [
+    {
+      "kind": "feature_grid",
+      "score": 9.5,
+      "reason": "four parallel key points of equal weight"
+    },
+    {
+      "kind": "outcome_grid",
+      "score": 8.0,
+      "reason": 'The content describes four distinct deliverables'
+    },
+    {
+      "kind": "center_grid",
+      "score": 6.5,
+      "reason": "clear central theme ('Overall Objectives')"
+    }
+  ]
+}"#;
+        let parsed = parse_layout_candidates(raw).unwrap();
+        let got: Vec<(SlideKind, u8)> =
+            parsed.candidates.iter().map(|c| (c.kind.clone(), c.score)).collect();
+        assert_eq!(
+            got,
+            vec![
+                (SlideKind::FeatureGrid, 10),
+                (SlideKind::OutcomeGrid, 8),
+                (SlideKind::CenterGrid, 7),
+            ]
+        );
+        assert!(parsed.dropped[0].contains("salvaged 3 entries"));
+    }
 }
+

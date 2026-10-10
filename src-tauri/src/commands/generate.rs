@@ -729,17 +729,7 @@ async fn run_pipeline(
 
     // Phase 2b: deck-level layout assignment (deterministic, CPU only)
     let layout_plans = planning::assign_layouts(&enriched_plans, &layout_candidates, config.aspect_ratio);
-    let assignment_report = json!(layout_plans
-        .iter()
-        .zip(&layout_candidates)
-        .map(|(layout, candidates)| json!({
-            "page_id": layout.page_id,
-            "title": layout.title,
-            "kind": crate::generator::utils::slide_kind_name(&layout.kind),
-            "reason": layout.reason,
-            "candidates": candidates,
-        }))
-        .collect::<Vec<_>>());
+    let assignment_report = planning::layout_assignment_report(&layout_candidates, &layout_plans);
     let _ = crate::generator::utils::write_debug(
         &config.debug_dir,
         "02-layout-assignment.json",
@@ -753,15 +743,7 @@ async fn run_pipeline(
         "layout_plan",
         "status",
         "布局分配",
-        &format!(
-            "全局分配 {} 页布局：{}",
-            layout_plans.len(),
-            layout_plans
-                .iter()
-                .map(|layout| crate::generator::utils::slide_kind_name(&layout.kind))
-                .collect::<Vec<_>>()
-                .join(" → ")
-        ),
+        &planning::layout_assignment_summary(&layout_candidates, &layout_plans),
         json!({ "assignment": assignment_report, "page_plans": enriched_plans, "layout_plans": layout_plans }),
         true,
     );
@@ -957,6 +939,18 @@ async fn run_pipeline(
         crate::generator::normalize::normalize_lengths(slide);
         crate::generator::normalize::normalize_tones(slide);
     }
+
+    // Repair / fallback may have changed kinds after assignment; record what actually renders.
+    let rendered_kinds: Vec<_> = content_slides.iter().map(|slide| slide.kind.clone()).collect();
+    let _ = crate::generator::utils::write_debug(
+        &config.debug_dir,
+        "05-layout-final.json",
+        &serde_json::to_string_pretty(&planning::final_layout_report(
+            &layout_plans,
+            &rendered_kinds,
+        ))
+        .unwrap_or_default(),
+    );
 
     // Phase 3: Assemble (cover + overview + content + closing)
     emit_progress(&app, &db, run_id, "assembling", "组装封面与目录...", 0.9);
