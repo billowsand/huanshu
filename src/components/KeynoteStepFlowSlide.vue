@@ -51,6 +51,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
           v-for="(step, idx) in steps"
           :key="step.title"
           class="sf-step-animated"
+          :data-tone="step.tone || 'blue'"
           style="position: relative; z-index: 2; padding: 0 0.5rem"
           :style="{ animationDelay: `${idx * 90 + 100}ms` }"
         >
@@ -100,6 +101,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
           v-for="(step, idx) in steps"
           :key="step.title"
           flex gap="4"
+          :data-tone="step.tone || 'blue'"
         >
           <!-- Left: track column (node + line) -->
           <div flex flex-col items-center flex-shrink-0 w-10>

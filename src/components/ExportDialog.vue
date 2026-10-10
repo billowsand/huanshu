@@ -144,7 +144,7 @@ function handleClose() {
                   <span :class="showPassword ? 'i-carbon:view-off' : 'i-carbon:view'" />
                 </button>
               </div>
-              <div class="strength-bar">
+              <div class="strength-bar" :data-strength="strength.score">
                 <div class="strength-track">
                   <div
                     class="strength-fill"

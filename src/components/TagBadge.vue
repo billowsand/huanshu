@@ -18,6 +18,7 @@ const colorMap: Record<string, { bg: string; border: string; text: string }> = {
 <template>
   <div
     class="tag-pill"
+    :data-tone="color || 'neutral'"
     :class="inline ? 'inline-block' : ''"
     :style="{
       background: color ? colorMap[color]?.bg : 'var(--primary-bg)',

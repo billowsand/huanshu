@@ -16,6 +16,7 @@ const colorMap: Record<string, { bg: string; border: string; text: string }> = {
 <template>
   <div
     class="step-number"
+    :data-tone="color || 'neutral'"
     rounded-full
     :class="size || 'w-12 h-12'"
     flex

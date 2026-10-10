@@ -56,6 +56,7 @@ function summaryFirst(quadrantKey: string) {
         :key="quadrant.key"
         overflow
         class="swot-card flex flex-col"
+        :data-tone="quadrant.tone || 'amber'"
         :class="[
           isRightColumn(cardIdx) ? 'swot-card-right' : 'swot-card-left',
           `swot-entrance-${cardIdx}`

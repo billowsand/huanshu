@@ -975,6 +975,11 @@ onBeforeUnmount(() => {
                 <span class="i-carbon:add" /> 添加
               </button>
             </div>
+            <p v-if="editorKind === 'issue_stack' && section.key === 'cards'" class="ej-hint" role="status">
+              {{ getArrayValue(section.key).length > 4
+                ? '问题卡片超过 4 张，建议拆成两页，保证说明和关键词完整显示。'
+                : '2–3 张使用上下结构，4 张使用左右结构。每张保留一句说明和 2–4 个短关键词；说明较长时建议拆页。' }}
+            </p>
             <div v-if="getArrayValue(section.key).length === 0" class="ej-hint">{{ section.emptyText }}</div>
             <div v-for="(item, index) in getArrayValue(section.key)" :key="`${section.key}-${index}`" class="ej-card-block">
               <div class="ej-card-head">

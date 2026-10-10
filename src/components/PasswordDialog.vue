@@ -114,7 +114,7 @@ function handleClose() {
               </button>
             </div>
 
-            <div v-if="mode === 'encrypt'" class="strength-bar">
+            <div v-if="mode === 'encrypt'" class="strength-bar" :data-strength="strength.score">
               <div class="strength-track">
                 <div
                   class="strength-fill"

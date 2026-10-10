@@ -11,6 +11,8 @@ import '@unocss/reset/tailwind.css'
 import './style.css'
 import './themes/terminal.css'
 import './themes/notes.css'
+import './themes/notes-layouts.css'
+import './themes/notes-studio.css'
 
 // Keynote slide components
 import GlassCard from './components/GlassCard.vue'

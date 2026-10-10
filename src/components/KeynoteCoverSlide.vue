@@ -11,7 +11,7 @@ defineProps<{
 </script>
 
 <template>
-  <div relative z-10 flex flex-col items-center justify-center h-full gap-6>
+  <div class="cover-layout" relative z-10 flex flex-col items-center justify-center h-full gap-6>
     <SlideReveal v-if="badges?.length" :delay="100" flex items-center gap-3 mb-2>
       <div
         v-for="badge in badges"

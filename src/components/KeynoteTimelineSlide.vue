@@ -43,6 +43,7 @@ defineProps<{
               v-for="(evt, idx) in events"
               :key="evt.date"
               class="tl-col tl-item-animated"
+              :data-tone="evt.tone || 'amber'"
               flex flex-col items-center
               :style="{
                 width: `${100 / events.length}%`,

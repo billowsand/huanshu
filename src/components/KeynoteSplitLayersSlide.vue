@@ -76,6 +76,8 @@ const gridGap = computed(() => {
         <div flex flex-col gap-2 class="slide-text-caption">
           <template v-for="(layer, idx) in layers" :key="layer.title">
             <div
+              class="split-layer"
+              :data-tone="layer.tone || 'amber'"
               rounded-lg px-3 py-2 flex items-center justify-between
               :style="{
                 background: toneVars(layer.tone).bg,

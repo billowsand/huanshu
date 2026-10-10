@@ -184,6 +184,7 @@ function normalizeItem(item: CardItem) {
           overflow
           :text-center="card.centered"
           class="feature-card"
+          :data-tone="card.tone || 'amber'"
         >
           <div
             v-if="card.topBar || card.topBarClass || card.top_bar_class"
@@ -195,6 +196,7 @@ function normalizeItem(item: CardItem) {
           <div
             v-if="card.icon || card.title"
             class="feature-header"
+            :data-tone="card.titleTone || card.tone || 'amber'"
             flex items-center gap-2
             :style="{
               ...headerStyle,

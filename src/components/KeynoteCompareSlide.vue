@@ -1,350 +1,170 @@
 <script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SlideTitle from './SlideTitle.vue'
 import { toneVars, type Tone } from './keynoteTheme'
 
-defineProps<{
+type CompareSide = {
+  title: string
+  tone?: Tone
+  icon?: string
+  items: Array<{ label: string; desc?: string; highlight?: boolean }>
+  conclusion?: string
+}
+const props = defineProps<{
   section?: string
   title: string
   subtitle?: string
   mode?: 'side-by-side' | 'pros-cons' | 'versus'
-  left: {
-    title: string
-    tone?: Tone
-    icon?: string
-    items: Array<{
-      label: string
-      desc?: string
-      highlight?: boolean
-    }>
-    conclusion?: string
-  }
-  right: {
-    title: string
-    tone?: Tone
-    icon?: string
-    items: Array<{
-      label: string
-      desc?: string
-      highlight?: boolean
-    }>
-    conclusion?: string
-  }
+  left: CompareSide
+  right: CompareSide
   footer?: string
 }>()
+
+const sides = computed(() => [props.left, props.right].map((side, index) => ({
+  ...side, tone: side.tone || (index === 0 ? 'blue' : 'amber') as Tone,
+})))
+// Preserve authored order. A shared row keeps the next pair aligned even when
+// one description wraps; unequal lists retain an explicit empty cell.
+const rows = computed(() => Array.from({ length: Math.max(props.left.items.length, props.right.items.length) },
+  (_, index) => [props.left.items[index], props.right.items[index]]))
+const clean = (text?: string) => (text || '').replace(/\s/g, '')
+const footerText = computed(() => clean(props.footer) && !sides.value.some(side => clean(side.conclusion) === clean(props.footer)) ? props.footer : '')
+const root = ref<HTMLElement>()
+const body = ref<HTMLElement>()
+const fit = ref(1)
+const layoutStyle = computed(() => ({
+  '--compare-fit': fit.value,
+  '--compare-copy': `${rows.value.length <= 2 ? 1.35 : rows.value.length === 3 ? 1.2 : 1.05}rem`,
+  '--compare-gap': rows.value.length >= 4 ? '6px' : '12px',
+  '--compare-pad': rows.value.length >= 5 ? '2px' : rows.value.length === 4 ? '4px' : '18px',
+  '--compare-desc-gap': rows.value.length >= 4 ? '4px' : '8px',
+  '--compare-leading': rows.value.length >= 4 ? 1.4 : 1.5,
+}))
+let observer: ResizeObserver | undefined
+let frame = 0
+let disposed = false
+async function fitContent() {
+  fit.value = 1
+  await nextTick()
+  if (disposed || !root.value || !body.value) return
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const bounds = root.value.getBoundingClientRect()
+    const overflowing = body.value.scrollHeight > body.value.clientHeight + 1
+      || root.value.scrollHeight > root.value.clientHeight + 1
+      || [...root.value.querySelectorAll<HTMLElement>('.cp-copy,.cp-footer,.compare-footnote,.cp-header')].some(el =>
+        el.scrollWidth > el.clientWidth + 1 || el.getBoundingClientRect().bottom > bounds.bottom + 1)
+    if (!overflowing) break
+    const copy = root.value.querySelector<HTMLElement>('.cp-desc')
+    const size = copy ? parseFloat(getComputedStyle(copy).fontSize) : 20
+    if (size <= 16.1) break
+    fit.value *= Math.max(16 / size, 0.92)
+    await nextTick()
+    if (disposed || !root.value || !body.value) return
+  }
+}
+function scheduleFit() {
+  cancelAnimationFrame(frame)
+  frame = requestAnimationFrame(() => { void fitContent() })
+}
+watch(() => [props.left, props.right, props.title, props.subtitle, props.footer, props.mode], scheduleFit, { deep: true, flush: 'post' })
+onMounted(() => {
+  observer = new ResizeObserver(scheduleFit)
+  if (root.value) observer.observe(root.value)
+  if (body.value) observer.observe(body.value)
+  document.fonts.addEventListener('loadingdone', scheduleFit)
+  void document.fonts.ready.then(() => { if (!disposed) scheduleFit() })
+  scheduleFit()
+})
+onBeforeUnmount(() => {
+  disposed = true
+  observer?.disconnect()
+  cancelAnimationFrame(frame)
+  document.fonts.removeEventListener('loadingdone', scheduleFit)
+})
 </script>
 
 <template>
   <div v-if="section" class="section-num">{{ section }}</div>
-
-  <div relative z-10 py-4 flex flex-col h-full>
+  <div ref="root" class="compare-slide" :style="layoutStyle" relative z-10 py-4 flex flex-col h-full>
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
     <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2">{{ subtitle }}</TagBadge>
 
-    <div class="compare-layout" flex-1 flex gap="4" items-stretch min-h-0 mt-4>
-
-      <!-- ── Left Panel ── -->
-      <div class="cp-panel glass-card" flex-1 flex flex-col overflow-hidden>
-        <!-- Panel header -->
-        <div
-          class="cp-header"
-          :style="{
-            background: toneVars(left.tone || 'blue').bg,
-            borderBottomColor: toneVars(left.tone || 'blue').border,
-          }"
-        >
-          <div flex items-center gap-2>
-            <div
-              v-if="left.icon"
-              :class="left.icon"
-              class="slide-icon-lg"
-              flex-shrink-0
-              :style="{ color: toneVars(left.tone || 'blue').text }"
-            />
-            <!-- pros-cons: show checkmark badge -->
-            <div
-              v-if="mode === 'pros-cons'"
-              class="cp-mode-badge"
-              :style="{
-                background: toneVars('green').bg,
-                borderColor: toneVars('green').border,
-                color: toneVars('green').text,
-              }"
-            >
-              <div i-carbon:checkmark-filled class="slide-icon-xs" />
-              <span>优势</span>
-            </div>
-            <span
-              font-bold class="slide-card-title"
-              :style="{ color: toneVars(left.tone || 'blue').text }"
-            >{{ left.title }}</span>
-          </div>
+    <div class="compare-layout">
+      <div class="cp-heading-row cp-pair">
+        <div v-for="(side, sideIndex) in sides" :key="sideIndex" class="cp-header cp-panel glass-card" :data-tone="side.tone"
+          :style="{ background: toneVars(side.tone).bg, borderColor: toneVars(side.tone).border, color: toneVars(side.tone).text }">
+          <div v-if="side.icon" :class="side.icon" class="slide-icon-lg cp-icon" />
+          <span v-if="mode === 'pros-cons'" class="cp-mode-badge">{{ sideIndex === 0 ? '优势' : '劣势' }}</span>
+          <span class="slide-card-title cp-heading">{{ side.title }}</span>
         </div>
+        <div class="cp-axis-label" :class="{ 'cp-vs-badge': mode === 'versus', 'cp-balance-badge': mode === 'pros-cons' }">
+          {{ mode === 'versus' ? 'VS' : mode === 'pros-cons' ? '±' : '↔' }}
+        </div>
+      </div>
 
-        <!-- Panel items -->
-        <div class="cp-body" flex-1 flex flex-col gap-2 overflow-y-auto>
-          <div
-            v-for="(item, idx) in left.items"
-            :key="idx"
-            class="cp-item"
-            :style="item.highlight ? {
-              background: toneVars(left.tone || 'blue').bg,
-              borderColor: toneVars(left.tone || 'blue').border,
-              borderLeftColor: toneVars(left.tone || 'blue').solid,
-              borderLeftWidth: '2px',
-            } : {}"
-          >
-            <div flex items-start gap-2>
-              <div
-                :class="item.highlight ? 'i-carbon:star-filled' : 'i-carbon:checkmark-filled'"
-                class="slide-icon-sm"
-                flex-shrink-0 mt-0.5
-                :style="{ color: toneVars(left.tone || 'blue').text }"
-              />
-              <div flex-1>
-                <div class="slide-text-meta" font-medium leading-snug>{{ item.label }}</div>
-                <div v-if="item.desc" class="slide-text-caption" opacity-60 mt-0.5 leading-relaxed>
-                  {{ item.desc }}
-                </div>
+      <div ref="body" class="cp-body">
+        <div v-for="(pair, index) in rows" :key="index" class="cp-pair cp-row">
+          <div v-for="(item, sideIndex) in pair" :key="sideIndex" class="cp-item cp-panel glass-card"
+            :class="{ 'cp-item--empty': !item }" :data-tone="sides[sideIndex].tone" :data-highlight="!!item?.highlight"
+            :style="{ borderColor: toneVars(sides[sideIndex].tone).border,
+              background: item?.highlight ? toneVars(sides[sideIndex].tone).bg : undefined,
+              borderLeftColor: toneVars(sides[sideIndex].tone).solid }">
+            <template v-if="item">
+              <div :class="item.highlight ? 'i-carbon:star-filled' : mode === 'pros-cons' && sideIndex === 1 ? 'i-carbon:close' : 'i-carbon:checkmark-filled'"
+                class="slide-icon-sm cp-icon" :style="{ color: toneVars(sides[sideIndex].tone).text }" />
+              <div class="cp-copy">
+                <div class="slide-text-meta cp-label">{{ item.label }}</div>
+                <div v-if="item.desc" class="slide-text-caption cp-desc">{{ item.desc }}</div>
               </div>
-            </div>
+            </template>
+            <span v-else class="cp-empty">—</span>
           </div>
-        </div>
-
-        <!-- Conclusion footer -->
-        <div
-          v-if="left.conclusion"
-          class="cp-footer"
-          :style="{
-            borderTopColor: toneVars(left.tone || 'blue').border,
-            background: toneVars(left.tone || 'blue').bg,
-          }"
-        >
-          <div i-carbon:idea flex-shrink-0 :style="{ color: toneVars(left.tone || 'blue').text }" />
-          <span class="slide-text-caption" :style="{ color: toneVars(left.tone || 'blue').text }">
-            {{ left.conclusion }}
-          </span>
+          <span class="cp-row-index">{{ String(index + 1).padStart(2, '0') }}</span>
         </div>
       </div>
 
-      <!-- ── Center Divider ── -->
-
-      <!-- versus mode: VS badge -->
-      <div
-        v-if="mode === 'versus'"
-        class="cp-divider"
-        flex flex-col items-center justify-center gap-2 flex-shrink-0
-      >
-        <div class="cp-divider-line" />
-        <div class="glass-card cp-vs-badge">
-          <span class="slide-text-meta" font-bold letter-spacing-wider text="var(--primary)">VS</span>
-        </div>
-        <div class="cp-divider-line" />
-      </div>
-
-      <!-- pros-cons mode: balance indicator -->
-      <div
-        v-else-if="mode === 'pros-cons'"
-        class="cp-divider"
-        flex flex-col items-center justify-center gap-2 flex-shrink-0
-      >
-        <div class="cp-divider-line" />
-        <div class="glass-card cp-balance-badge" flex flex-col items-center gap-1>
-          <div i-carbon:checkmark class="slide-icon-sm" text="var(--success)" />
-          <div style="width: 1px; height: 8px; background: var(--glass-border)" />
-          <div i-carbon:close class="slide-icon-sm" text="var(--danger)" />
-        </div>
-        <div class="cp-divider-line" />
-      </div>
-
-      <!-- side-by-side mode: simple line -->
-      <div
-        v-else
-        class="cp-simple-divider flex-shrink-0"
-      />
-
-      <!-- ── Right Panel ── -->
-      <div class="cp-panel glass-card" flex-1 flex flex-col overflow-hidden>
-        <!-- Panel header -->
-        <div
-          class="cp-header"
-          :style="{
-            background: toneVars(right.tone || 'amber').bg,
-            borderBottomColor: toneVars(right.tone || 'amber').border,
-          }"
-        >
-          <div flex items-center gap-2>
-            <div
-              v-if="right.icon"
-              :class="right.icon"
-              class="slide-icon-lg"
-              flex-shrink-0
-              :style="{ color: toneVars(right.tone || 'amber').text }"
-            />
-            <!-- pros-cons: show cross badge -->
-            <div
-              v-if="mode === 'pros-cons'"
-              class="cp-mode-badge"
-              :style="{
-                background: toneVars('red').bg,
-                borderColor: toneVars('red').border,
-                color: toneVars('red').text,
-              }"
-            >
-              <div i-carbon:close-filled class="slide-icon-xs" />
-              <span>劣势</span>
-            </div>
-            <span
-              font-bold class="slide-card-title"
-              :style="{ color: toneVars(right.tone || 'amber').text }"
-            >{{ right.title }}</span>
-          </div>
-        </div>
-
-        <!-- Panel items -->
-        <div class="cp-body" flex-1 flex flex-col gap-2 overflow-y-auto>
-          <div
-            v-for="(item, idx) in right.items"
-            :key="idx"
-            class="cp-item"
-            :style="item.highlight ? {
-              background: toneVars(right.tone || 'amber').bg,
-              borderColor: toneVars(right.tone || 'amber').border,
-              borderLeftColor: toneVars(right.tone || 'amber').solid,
-              borderLeftWidth: '2px',
-            } : {}"
-          >
-            <div flex items-start gap-2>
-              <div
-                :class="item.highlight
-                  ? 'i-carbon:star-filled'
-                  : mode === 'pros-cons'
-                    ? 'i-carbon:close'
-                    : 'i-carbon:checkmark-filled'"
-                class="slide-icon-sm"
-                flex-shrink-0 mt-0.5
-                :style="{ color: toneVars(right.tone || 'amber').text }"
-              />
-              <div flex-1>
-                <div class="slide-text-meta" font-medium leading-snug>{{ item.label }}</div>
-                <div v-if="item.desc" class="slide-text-caption" opacity-60 mt-0.5 leading-relaxed>
-                  {{ item.desc }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Conclusion footer -->
-        <div
-          v-if="right.conclusion"
-          class="cp-footer"
-          :style="{
-            borderTopColor: toneVars(right.tone || 'amber').border,
-            background: toneVars(right.tone || 'amber').bg,
-          }"
-        >
-          <div i-carbon:idea flex-shrink-0 :style="{ color: toneVars(right.tone || 'amber').text }" />
-          <span class="slide-text-caption" :style="{ color: toneVars(right.tone || 'amber').text }">
-            {{ right.conclusion }}
-          </span>
+      <div v-if="sides.some(side => side.conclusion)" class="cp-pair cp-conclusions">
+        <div v-for="(side, sideIndex) in sides" :key="sideIndex" class="cp-footer" :data-tone="side.tone"
+          :class="{ 'cp-footer--empty': !side.conclusion }"
+          :style="{ background: toneVars(side.tone).bg, borderColor: toneVars(side.tone).border, color: toneVars(side.tone).text }">
+          <div v-if="side.conclusion" i-carbon:idea class="slide-icon-sm cp-icon" />
+          <span class="slide-text-caption cp-conclusion">{{ side.conclusion }}</span>
         </div>
       </div>
     </div>
-
-    <div v-if="footer" mt-4 text-center class="slide-footnote slide-text-caption" opacity-40>
-      {{ footer }}
-    </div>
+    <div v-if="footerText" class="slide-footnote compare-footnote">{{ footerText }}</div>
   </div>
 </template>
 
 <style scoped>
-/* Panel card */
-.cp-panel {
-  border-radius: 16px;
-  border-width: 1px;
-  border-style: solid;
-  min-width: 0;
-}
-
-/* Panel header */
-.cp-header {
-  padding: 0.625rem 1rem;
-  border-radius: 16px 16px 0 0;
-  border-bottom-width: 1px;
-  border-bottom-style: solid;
-  flex-shrink: 0;
-}
-
-/* Mode badge (pros/cons label) */
-.cp-mode-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 1px 8px 1px 5px;
-  border-radius: 999px;
-  border-width: 1px;
-  border-style: solid;
-  font-size: var(--type-caption);
-  font-weight: 700;
-  letter-spacing: 0.03em;
-}
-
-/* Panel body (scrollable items) */
-.cp-body {
-  padding: 0.75rem;
-  overflow-y: auto;
-}
-
-/* Item row */
-.cp-item {
-  padding: 0.5rem 0.625rem;
-  border-radius: 8px;
-  border-width: 1px;
-  border-style: solid;
-  border-color: transparent;
-  transition: background 0.15s;
-}
-
-/* Conclusion footer */
-.cp-footer {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.875rem;
-  border-top-width: 1px;
-  border-top-style: solid;
-  border-radius: 0 0 16px 16px;
-  flex-shrink: 0;
-  font-size: var(--type-meta);
-}
-
-/* Versus / balance center divider */
-.cp-divider {
-  width: 3rem;
-}
-
-.cp-divider-line {
-  width: 2px;
-  flex: 1;
-  border-radius: 2px;
-  background: linear-gradient(to bottom, transparent, var(--glass-border), transparent);
-}
-
-.cp-vs-badge,
-.cp-balance-badge {
-  border-radius: 999px;
-  padding: 0.375rem 0.625rem;
-}
-
-/* Side-by-side thin separator */
-.cp-simple-divider {
-  width: 2px;
-  align-self: stretch;
-  border-radius: 2px;
-  background: linear-gradient(to bottom, transparent, var(--glass-border) 20%, var(--glass-border) 80%, transparent);
-  opacity: 0.6;
-}
+.compare-slide { display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative; z-index: 10; padding-block: 16px; }
+.compare-layout { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: var(--compare-gap); margin-top: 20px; }
+.cp-pair { display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); align-items: stretch; }
+.cp-pair > :nth-child(1) { grid-column: 1; grid-row: 1; }
+.cp-pair > :nth-child(2) { grid-column: 3; grid-row: 1; }
+.cp-pair > :nth-child(3) { grid-column: 2; grid-row: 1; }
+.cp-header { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border: 1px solid; border-radius: 10px; min-width: 0; }
+.cp-heading { font-size: calc(var(--compare-copy) * var(--type-scale) * var(--compare-fit) * 1.25); line-height: 1.25; overflow-wrap: anywhere; }
+.cp-axis-label { align-self: center; text-align: center; color: var(--text-muted); font-size: 16px; }
+.cp-mode-badge { flex-shrink: 0; font-size: 14px; padding: 2px 6px; border: 1px solid currentColor; border-radius: 4px; }
+.cp-body { flex: 1; min-height: 0; display: grid; grid-auto-rows: minmax(min-content, 1fr); gap: var(--compare-gap); }
+.cp-row { min-height: min-content; }
+.cp-item { display: flex; align-items: flex-start; gap: 10px; padding: calc(var(--compare-pad) * var(--compare-fit)) 20px; min-width: 0; border: 1px solid; border-left-width: 3px; border-radius: 10px; }
+.cp-copy { min-width: 0; width: 100%; }
+.cp-item > .cp-icon { margin-top: 5px; }
+.cp-icon { flex-shrink: 0; }
+.compare-slide .cp-label { font-size: calc(var(--compare-copy) * var(--type-scale) * var(--compare-fit) * 1.12); line-height: 1.3; overflow-wrap: anywhere; }
+.compare-slide .cp-desc { margin-top: var(--compare-desc-gap); font-size: calc(var(--compare-copy) * var(--type-scale) * var(--compare-fit)); line-height: var(--compare-leading); opacity: 0.76; overflow-wrap: anywhere; white-space: normal; }
+.cp-row-index { display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; position: relative; }
+.cp-row-index::before, .cp-row-index::after { content: ''; position: absolute; height: 1px; width: 7px; background: var(--glass-border); top: 50%; }
+.cp-row-index::before { left: 0; }
+.cp-row-index::after { right: 0; }
+.cp-item--empty { opacity: 0.4; align-items: center; justify-content: center; }
+.cp-footer { display: flex; align-items: center; gap: 10px; border: 1px solid; border-radius: 8px; padding: 12px 18px; min-width: 0; }
+.compare-slide .cp-conclusion { font-size: max(16px, calc(var(--type-caption) * var(--compare-fit))); line-height: 1.4; overflow-wrap: anywhere; }
+.cp-footer--empty { visibility: hidden; }
+.compare-footnote { flex-shrink: 0; margin-top: 14px; text-align: center; font-size: max(16px, calc(var(--type-caption) * var(--compare-fit))); line-height: 1.4; }
 </style>

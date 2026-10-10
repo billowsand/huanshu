@@ -36,6 +36,7 @@ defineProps<{
           <GlassCard
             v-for="point in points"
             :key="point.title"
+            class="focus-point"
             padding="px-4 py-3"
             flex
             items-start
@@ -49,7 +50,7 @@ defineProps<{
           </GlassCard>
       </div>
 
-      <div class="glass-card p-5 flex flex-col justify-between">
+      <div class="glass-card focus-example p-5 flex flex-col justify-between">
         <div>
           <div font-bold class="slide-card-title" text="var(--primary)" mb-3>{{ exampleTitle }}</div>
           <div class="slide-text-caption" opacity-70 leading-relaxed mb-4 v-html="exampleBody" />
@@ -59,6 +60,7 @@ defineProps<{
             <div
               v-for="item in ranking"
               :key="item.index"
+              class="focus-ranking-row"
               flex items-center gap-2
               :style="item.muted ? { opacity: 0.4 } : {}"
             >

@@ -94,13 +94,14 @@ const sideVars = computed(() => {
         <div
           v-for="panel in panels"
           :key="panel.title"
-          class="glass-card px-4 py-3"
+          class="glass-card spotlight-panel px-4 py-3"
+          :data-tone="panel.tone || 'amber'"
           :style="panel.highlight ? {
             background: toneVars(panel.tone).bg,
             border: `1px solid ${toneVars(panel.tone).border}`
           } : {}"
         >
-          <div flex items-center gap-2 mb-2>
+          <div class="spotlight-panel-heading" flex items-center gap-2 mb-2>
             <div v-if="panel.icon" :class="panel.icon" class="slide-icon-lg" :style="{ color: toneVars(panel.tone).text }" />
             <span class="slide-card-title spotlight-panel-title">{{ panel.title }}</span>
           </div>
@@ -115,7 +116,7 @@ const sideVars = computed(() => {
               <span>{{ item }}</span>
             </div>
           </div>
-          <div v-if="panel.kind === 'flow' && panel.items?.length" class="slide-meta" flex flex-col gap-2>
+          <div v-if="panel.kind === 'flow' && panel.items?.length" class="slide-meta spotlight-flow" flex flex-col gap-2>
             <template v-for="(item, idx) in panel.items" :key="item">
               <div
                 class="glass-card px-3 py-2 flex items-center gap-2"
@@ -146,7 +147,7 @@ const sideVars = computed(() => {
               </div>
             </template>
           </div>
-          <div v-if="panel.kind === 'matrix' && panel.items?.length" class="slide-meta" grid grid-cols-2 gap-2>
+          <div v-if="panel.kind === 'matrix' && panel.items?.length" class="slide-meta spotlight-matrix" grid grid-cols-2 gap-2>
             <div
               v-for="(item, idx) in panel.items"
               :key="item"
@@ -187,6 +188,7 @@ const sideVars = computed(() => {
           <div v-if="panel.steps?.length" class="slide-meta" flex flex-col gap-2>
             <div v-for="(step, idx) in panel.steps" :key="step" flex items-center gap-2>
               <div
+                class="spotlight-step-number"
                 rounded-full w-5 h-5 flex items-center justify-center slide-text-caption font-bold flex-shrink-0
                 :style="{
                   background: toneVars(panel.tone).solid,

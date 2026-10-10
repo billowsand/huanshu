@@ -368,7 +368,7 @@ const slideProps = computed(() => {
 </script>
 
 <template>
-  <div class="slide-shell" :style="shellStyle">
+  <div class="slide-shell" :data-slide-kind="slide.kind" :style="shellStyle">
     <div class="slide-shell__ambient slide-shell__ambient--left" />
     <div class="slide-shell__ambient slide-shell__ambient--right" />
     <div class="slide-shell__ambient slide-shell__ambient--bottom" />

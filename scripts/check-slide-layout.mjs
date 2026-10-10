@@ -18,6 +18,8 @@ const entry = `
       import '/node_modules/@unocss/reset/tailwind.css';
       import '/src/style.css';
       import '/src/themes/terminal.css';
+      import '/src/themes/notes.css';
+      import '/src/themes/notes-layouts.css';
       import '/src/themes/typography.css';
       import '/src/views/WorkflowView.vue?vue&type=style&index=0&lang.css';
       const slide=shallowRef({kind:'overview',title:'提纲总览',overview_items:[]});
@@ -114,7 +116,7 @@ try {
   }
   const fixtures=JSON.parse(await readFile(new URL('../fixtures/all-layout-blueprints.json',import.meta.url),'utf8'))
   let templateChecks=0
-  for (const slide of fixtures.filter(s=>roles[s.kind])) {
+  for (const slide of fixtures.filter(s=>roles[s.kind] && !process.env.ISSUE_ONLY)) {
     for (const theme of themes) {
       await page.evaluate(([s,t])=>window.renderSlide(s,t),[slide,theme])
       const [titleSelector,bodySelector]=roles[slide.kind]
@@ -129,7 +131,7 @@ try {
   }
   // Include the editor's global CSS: sidebar descriptions must not constrain slide copy.
   let processChecks = 0
-  for (const count of [2, 3, 4]) {
+  for (const count of (process.env.ISSUE_ONLY ? [] : [2, 3, 4])) {
     const slide = { kind: 'process', title: '试点安排', phases: Array.from({ length: count }, (_, i) => ({
       phase: '阶段' + (i + 1), title: '场景验证与流程校准', tone: 'blue',
       steps: [
@@ -156,7 +158,66 @@ try {
       processChecks++
     }
   }
-  console.log('PASS: '+checked+' overview cases; '+templateChecks+' template hierarchy cases; '+processChecks+' process wrapping cases; content edits reset fitting.')
+  // Issue stacks must preserve body copy instead of clipping it beneath a fixed header.
+  let issueChecks = 0
+  const issueCards = [
+    { title:'背景压力',tone:'blue',icon:'i-carbon:document',body:'行业负增长倒逼转型，政策推动从拼产能转向拼安全与效率。',items:['主业面临负增长压力','政策强制要求转型','从拼产能转向拼安全、拼效率'] },
+    { title:'核心任务',tone:'green',icon:'i-carbon:catalog',body:'减少人员暴露，在高风险场景中提升自主作业能力。',items:['减人','提效','保安全','瓦斯爆炸、顶板塌方等高风险场景自主作业'] },
+    { title:'数据挑战',tone:'amber',icon:'i-carbon:data-base',body:'现场数据质量不稳定，设备和信号条件限制模型判断。',items:['传感器噪声','设备断联','高温高压信号丢失'] },
+    { title:'可靠性要求',tone:'red',icon:'i-carbon:warning',body:'极端条件下仍需可靠判断，错误决策可能造成重大安全损失。',items:['极端条件判断可靠','系统错误代价不可接受'] },
+  ]
+  const issueFooter='采矿场景是大模型落地的特殊场景，核心价值在于极端环境下的自主决策与安全保障。'
+  for (const count of [2,3,4]) {
+    for (const aspect of ['ratio_16x9','ratio_32x9','ratio_48x9']) {
+      for (const theme of [...themes,'light-notes']) {
+        for (const subtitle of ['', '极端环境下的自主作业与安全保障']) {
+          await page.evaluate(([s,t])=>window.renderSlide(s,t),[{
+            kind:'issue_stack',section:'01',title:'采矿业：极端环境下的“特种兵”',
+            aspect_ratio:aspect,subtitle,cards:issueCards.slice(0,count),footer:issueFooter,
+          },theme])
+          const result=await page.evaluate(()=>{
+            const stack=document.querySelector('.issue-stack'),footer=document.querySelector('.issue-footer');
+            const frame=document.querySelector('.slide-shell__frame').getBoundingClientRect();
+            const cards=[...document.querySelectorAll('.issue-card')];
+            return { rows:stack.classList.contains('issue-stack--rows'),
+              footerFits:footer.getBoundingClientRect().bottom<=frame.bottom-20,
+              bounds:[stack.getBoundingClientRect().top,stack.getBoundingClientRect().bottom,footer.getBoundingClientRect().bottom,frame.bottom],
+              cards:cards.map(card=>{
+                const bounds=card.getBoundingClientRect();
+                const head=card.querySelector('.issue-card__head').getBoundingClientRect();
+                const body=card.querySelector('.issue-card__body').getBoundingClientRect();
+                return { horizontal:body.left>=head.right-1,
+                  fits:bounds.bottom<=footer.getBoundingClientRect().top &&
+                    [...card.querySelectorAll('.issue-card__eyebrow,.issue-card__summary,.issue-card__pill')].every(el=>{
+                      const r=el.getBoundingClientRect();
+                      return r.top>=bounds.top-1&&r.bottom<=bounds.bottom+1&&r.right<=bounds.right+1&&r.left>=bounds.left-1
+                        &&el.scrollWidth<=el.clientWidth+1&&el.scrollHeight<=el.clientHeight+1;
+                    }) };
+              }) };
+          })
+          const context=JSON.stringify({count,aspect,theme,subtitle,result})
+          if (process.env.ISSUE_SCREENSHOT && !result.cards.every(c=>c.fits))
+            await page.locator('#app').screenshot({path:process.env.ISSUE_SCREENSHOT})
+          assert.equal(result.rows,count===4,context)
+          assert.ok(result.footerFits,context)
+          for (const card of result.cards) {
+            assert.equal(card.horizontal,count===4,context)
+            assert.ok(card.fits,context)
+          }
+          issueChecks++
+          if (process.env.ISSUE_SCREENSHOT && count===4 && aspect==='ratio_16x9' && theme==='light-notes' && !subtitle)
+            await page.locator('#app').screenshot({path:process.env.ISSUE_SCREENSHOT})
+        }
+      }
+    }
+  }
+  // A single long keyword must wrap within the body rather than widen the card.
+  await page.evaluate(([cards,footer])=>window.renderSlide({kind:'issue_stack',title:'长关键词换行',cards:cards.map(c=>({...c,body:'一句简短说明。',items:['高风险场景中的自主作业与安全保障'.repeat(4)]})),footer},'light-notes'),[issueCards,issueFooter])
+  for (const pill of await page.locator('.issue-card__pill').evaluateAll(els=>els.map(el=>({
+    wraps:el.clientHeight>parseFloat(getComputedStyle(el).lineHeight)*1.5,
+    fits:el.scrollWidth<=el.clientWidth+1&&el.getBoundingClientRect().bottom<=el.closest('.issue-card').getBoundingClientRect().bottom,
+  })))) assert.ok(pill.wraps&&pill.fits,JSON.stringify(pill))
+  console.log('PASS: '+checked+' overview cases; '+templateChecks+' template hierarchy cases; '+processChecks+' process wrapping cases; '+issueChecks+' issue stack cases; long keywords wrap; content edits reset fitting.')
 } finally {
   await browser?.close()
   await server.close()

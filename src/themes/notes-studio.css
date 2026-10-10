@@ -1,0 +1,175 @@
+/* Page-specific controls for 便签·稿纸. All changes are opt-in. */
+[data-theme="light-notes"] {
+  --studio-warning: var(--warning);
+  --studio-warning-bg: var(--warning-bg);
+  --studio-warning-border: var(--warning-border);
+  --notes-dialog-shadow: 0 6px 12px #493b3020, 0 22px 48px -12px #493b3059;
+}
+
+/* Project library: filed sheets, paper empty state, stamped badges. */
+[data-theme="light-notes"] .home-body { padding-bottom: 2rem; }
+[data-theme="light-notes"] .project-grid { gap: 0.85rem; }
+[data-theme="light-notes"] .project-card:hover {
+  background: var(--notes-paper);
+  box-shadow: 0 3px 5px #60472b20, 0 5px 0 -1px #faf4e8,
+    0 6px 0 -1px #d5c3a9, 0 10px 16px -5px #60472b30;
+}
+[data-theme="light-notes"] :is(.bg-1, .bg-2, .bg-3) {
+  background: var(--notes-rule), var(--notes-paper);
+  border-radius: 2px;
+  opacity: 1;
+  box-shadow: var(--notes-paper-shadow);
+}
+[data-theme="light-notes"] .empty-icon-circle { box-shadow: var(--notes-paper-shadow); }
+[data-theme="light-notes"] .badge { border-radius: 3px; }
+
+/* Workflow navigation: ink rail and active notebook tab. */
+[data-theme="light-notes"] .sidebar {
+  background: var(--notes-paper);
+  box-shadow: 1px 0 4px #60472b0a;
+}
+[data-theme="light-notes"] .step-item.active {
+  background: #f4ead9;
+  box-shadow: inset 3px 0 0 var(--studio-primary);
+  border-radius: 0 4px 4px 0;
+}
+[data-theme="light-notes"] .step-circle {
+  box-shadow: inset 0 1px 0 #ffffffb3, 0 1px 1px #60472b12;
+}
+[data-theme="light-notes"] .steps-nav .step-item.active .step-circle {
+  background: var(--studio-primary);
+  color: var(--notes-paper);
+  border-color: var(--studio-primary);
+  box-shadow: 0 0 0 3px #eed9ac80;
+}
+
+/* Preparation: writing pad with an inset margin and a golden preview tray. */
+[data-theme="light-notes"] :is(.prepare-tools, .prepare-topbar, .step-prepare .step-actions, .prepare-sidebar) { background: var(--notes-paper); }
+[data-theme="light-notes"] .cm-gutters {
+  background: #f7efdf;
+  border-right: 1px solid var(--notes-margin);
+}
+[data-theme="light-notes"] .md-workbench :is(.cm-activeLine, .cm-activeLineGutter) { background: #f4ead970; }
+[data-theme="light-notes"] .md-workbench .cm-cursor { border-left-color: var(--notes-ink); }
+[data-theme="light-notes"] .md-workbench .cm-selectionBackground { background: #dcc39c80 !important; }
+[data-theme="light-notes"] :is(.gran-choice, .aspect-ratio-choice, .prepare-drop-overlay) {
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 #ffffffb3;
+}
+[data-theme="light-notes"] :is(.gran-choice.active, .aspect-ratio-choice.active) {
+  background: var(--studio-primary-bg);
+  box-shadow: inset 3px 0 0 var(--studio-primary);
+}
+
+/* Generation: filing board with distinct progress stamps. */
+[data-theme="light-notes"] :is(.gen-progress-overview, .pipeline) {
+  background: var(--notes-paper);
+  border: 1px solid var(--notes-edge);
+  border-radius: 4px;
+  box-shadow: var(--notes-paper-shadow);
+}
+[data-theme="light-notes"] .slides-grid-panel { background: var(--notes-grain), var(--notes-backing); }
+[data-theme="light-notes"] .slide-detail-panel { background: var(--notes-paper); }
+[data-theme="light-notes"] .slide-progress-card {
+  background: var(--notes-paper);
+  border-color: var(--notes-edge);
+  border-radius: 4px;
+  box-shadow: var(--notes-paper-shadow);
+}
+[data-theme="light-notes"] .slide-progress-card.status--done { border-top: 3px solid var(--success); }
+[data-theme="light-notes"] .slide-progress-card.status--active { border-top: 3px solid var(--info); }
+[data-theme="light-notes"] .slide-progress-card.status--error { border-top: 3px solid var(--danger); }
+[data-theme="light-notes"] .slide-progress-card.is-active { box-shadow: inset 0 0 0 1px var(--studio-primary), var(--notes-paper-shadow); }
+[data-theme="light-notes"] :is(.spc-status, .spc-step, .sdp-chip, .spc-layout-tag, .gpo-stage-badge) { border-radius: 2px; }
+[data-theme="light-notes"] :is(.spc-status--done, .spc-step.is-done, .sdp-chip--accent) {
+  color: var(--success); background: var(--success-bg); border-color: var(--success-border);
+}
+[data-theme="light-notes"] :is(.spc-status--active, .spc-step.is-active, .spc-layout-tag, .gpo-stage-badge) {
+  color: var(--info); background: var(--info-bg); border-color: var(--info-border);
+}
+[data-theme="light-notes"] .spc-status--error { color: var(--danger); background: var(--danger-bg); border-color: var(--danger-border); }
+[data-theme="light-notes"] :is(.spc-status--pending, .spc-layout-tag--pending) {
+  color: var(--notes-muted); background: #f5efe4; border-color: var(--notes-edge);
+}
+[data-theme="light-notes"] .gpo-stage.is-active .gpo-stage-icon { color: var(--info); border-color: var(--info); }
+[data-theme="light-notes"] :is(.spc-preview-frame, .sdp-preview-stage) {
+  background: var(--notes-paper); border: 1px solid var(--notes-edge); border-radius: 2px; box-shadow: var(--notes-paper-shadow);
+}
+[data-theme="light-notes"] :is(.spc-preview-placeholder, .sdp-preview-empty) {
+  color: var(--notes-muted); background: var(--notes-rule), #faf3e4; border: 1px dashed var(--notes-edge); border-radius: 2px;
+}
+[data-theme="light-notes"] :is(.sdp-section, .sdp-debug, .sdp-log-item) { background: #faf4e8; border-color: var(--notes-edge); border-radius: 3px; }
+[data-theme="light-notes"] .sdp-debug pre { color: var(--notes-ink); background: var(--notes-paper); border-color: var(--notes-edge); }
+[data-theme="light-notes"] :is(.progress-bar, .gpo-bar, .pres-progress) { background: #e5d4bb; box-shadow: inset 0 1px 2px #60472b12; }
+
+/* Editing: inset form sheets, a JSON writing pad, and paper template tiles. */
+[data-theme="light-notes"] .edit-preview-stage {
+  border-radius: 2px; box-shadow: 0 3px 7px #60472b20, 0 12px 24px -8px #60472b30;
+}
+[data-theme="light-notes"] :is(.ej-field, .ej-section, .ej-array-card, .ej-nested-card, .ej-icon-box) {
+  border-radius: 3px; background: #faf4e8; border-color: var(--notes-edge);
+}
+[data-theme="light-notes"] .ej-section-head { border-bottom: 1px dashed var(--notes-edge); }
+[data-theme="light-notes"] .ej-wrap { border-radius: 2px; background: var(--notes-paper); box-shadow: inset 0 1px 2px #60472b12; }
+[data-theme="light-notes"] .ej-gutter { background: #f7efdf; border-right: 1px solid var(--notes-margin); }
+[data-theme="light-notes"] :is(.kp-card, .ej-tone-chip, .ej-dir-chip, .ej-icon-chip, .ej-media-strip) { border-radius: 3px; box-shadow: var(--notes-button-shadow); }
+[data-theme="light-notes"] .kp-card--current { box-shadow: inset 3px 0 0 var(--studio-primary); }
+
+/* Settings / onboarding: file sheets and ruled font samples. */
+[data-theme="light-notes"] :is(.settings-layout, .wizard-layout) { background: var(--notes-grain), var(--notes-backing); }
+[data-theme="light-notes"] :is(.settings-card, .wizard-card) {
+  background: var(--notes-paper); border: 1px solid var(--notes-edge); border-radius: 4px; box-shadow: var(--notes-paper-shadow);
+}
+[data-theme="light-notes"] :is(.settings-brand-mark, .wizard-logo-mark, .done-icon-badge) {
+  background: linear-gradient(#806b56, #68503c); border: 1px solid #594332; border-radius: 5px; box-shadow: var(--notes-button-shadow);
+}
+[data-theme="light-notes"] :is(.service-panel, .model-config-panel) {
+  background: #faf4e8; border-radius: 3px; border-color: var(--notes-edge); box-shadow: inset 0 3px 0 var(--notes-edge);
+}
+[data-theme="light-notes"] .model-header { border-bottom: 1px dashed var(--notes-edge); padding-bottom: 0.5rem; }
+[data-theme="light-notes"] :is(.font-panel, .font-popover) { background: var(--notes-paper); border-radius: 3px; border-color: var(--notes-edge); }
+[data-theme="light-notes"] :is(.font-sample, .font-preview) {
+  background: var(--notes-rule), #faf4e8; border: 1px solid var(--notes-edge); border-radius: 2px;
+}
+[data-theme="light-notes"] .font-trigger { background: linear-gradient(#fffdf7, #f4ede1); box-shadow: var(--notes-button-shadow); }
+[data-theme="light-notes"] .font-option.active { background: var(--studio-primary-bg); box-shadow: inset 2px 0 0 var(--studio-primary); }
+[data-theme="light-notes"] :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--studio-primary); box-shadow: none; }
+[data-theme="light-notes"] .wizard-steps-indicator .step-dot.active {
+  background: var(--studio-primary); color: var(--notes-paper); box-shadow: 0 0 0 3px #eed9ac80;
+}
+[data-theme="light-notes"] .done-summary { background: var(--notes-rule), #faf4e8; border: 1px solid var(--notes-edge); border-radius: 2px; }
+
+/* Dialogs: paper sheet on a translucent cocoa backdrop. */
+[data-theme="light-notes"] :is(.modal-overlay, .kp-backdrop) { background: #493b3059; backdrop-filter: blur(2px); }
+[data-theme="light-notes"] :is(.modal-box, .kp-box, .theme-popover) { border-radius: 4px; background: var(--notes-paper); box-shadow: var(--notes-dialog-shadow); }
+[data-theme="light-notes"] .modal-icon {
+  color: var(--studio-primary); background: var(--studio-primary-bg); border: 3px double var(--notes-edge); border-radius: 4px;
+}
+[data-theme="light-notes"] .modal-icon.encrypt { color: var(--success); background: var(--success-bg); border-color: var(--success-border); }
+[data-theme="light-notes"] .modal-icon.decrypt { color: var(--info); background: var(--info-bg); border-color: var(--info-border); }
+[data-theme="light-notes"] .option-card { background: #faf4e8; border-color: var(--notes-edge); border-radius: 3px; box-shadow: var(--notes-button-shadow); }
+[data-theme="light-notes"] .option-card.active { border-color: var(--studio-primary); background: var(--studio-primary-bg); box-shadow: inset 0 3px 0 var(--studio-primary); }
+[data-theme="light-notes"] .encrypt-panel { background: #faf4e8; border-color: var(--notes-edge); border-radius: 3px; }
+[data-theme="light-notes"] :is(.field-error, .submit-error) { color: var(--danger); }
+[data-theme="light-notes"] .submit-error { background: var(--danger-bg); }
+[data-theme="light-notes"] .form-input.error { border-color: var(--danger); }
+[data-theme="light-notes"] .strength-bar { --notes-strength: var(--danger); }
+[data-theme="light-notes"] :is(.strength-bar[data-strength="2"], .strength-bar[data-strength="3"]) { --notes-strength: var(--warning); }
+[data-theme="light-notes"] :is(.strength-bar[data-strength="4"], .strength-bar[data-strength="5"]) { --notes-strength: var(--success); }
+[data-theme="light-notes"] .strength-fill { background: var(--notes-strength) !important; }
+[data-theme="light-notes"] .strength-label { color: var(--notes-strength) !important; }
+
+/* Presentation: paper tray, numbered tabs, bordered overview sheets. */
+[data-theme="light-notes"] :is(.pres-overview-card, .shortcut-hint) {
+  background: var(--notes-paper); border-color: var(--notes-edge); border-radius: 4px; box-shadow: var(--notes-paper-shadow);
+}
+[data-theme="light-notes"] .pres-overview-card.active { background: var(--notes-paper); box-shadow: inset 0 0 0 2px var(--studio-primary), var(--notes-paper-shadow); }
+[data-theme="light-notes"] .filmstrip-item { background: var(--notes-paper); border-radius: 3px; box-shadow: var(--notes-button-shadow); }
+[data-theme="light-notes"] .filmstrip-item.active { background: var(--studio-primary); border-color: var(--studio-primary); }
+[data-theme="light-notes"] .filmstrip-item.active .filmstrip-num { color: var(--notes-paper); }
+[data-theme="light-notes"] .pres-nav { background: var(--notes-paper); color: var(--notes-ink); border-color: var(--notes-edge); border-radius: 4px; box-shadow: var(--notes-button-shadow); }
+[data-theme="light-notes"] .pres-controls--floating { background: #fffdf7f2 !important; border: 1px solid var(--notes-edge); box-shadow: var(--notes-paper-shadow); backdrop-filter: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="light-notes"] .home-layout .project-card { animation: none; opacity: 1; transform: none; }
+}

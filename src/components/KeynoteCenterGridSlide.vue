@@ -33,6 +33,8 @@ defineProps<{
       <GlassCard
         v-for="item in items"
         :key="item.title"
+        class="center-grid-card"
+        :data-tone="item.tone || 'amber'"
         padding="px-4 py-4"
         flex
         flex-col

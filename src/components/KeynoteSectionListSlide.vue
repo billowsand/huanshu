@@ -31,6 +31,7 @@ defineProps<{
         <GlassCard
           v-for="item in items"
           :key="item.title"
+          class="section-list-card"
           padding="px-5 py-4"
           flex
           items-start

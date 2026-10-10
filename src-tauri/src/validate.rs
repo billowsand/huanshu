@@ -147,12 +147,13 @@ pub fn validate_blueprints(
         if slide.kind == SlideKind::IssueStack && slide.cards.len() > 4 {
             issues.push(issue(idx, "issue stack supports at most 4 cards"));
         }
-        if slide.kind == SlideKind::SectionIntro && slide.cards.len() > 4 * cols_multiplier {
+        let section_intro_limit = if cols_multiplier == 1 { 6 } else { 4 * cols_multiplier };
+        if slide.kind == SlideKind::SectionIntro && slide.cards.len() > section_intro_limit {
             issues.push(issue(
                 idx,
                 format!(
                     "section intro supports at most {} cards for this aspect ratio",
-                    4 * cols_multiplier
+                    section_intro_limit
                 ),
             ));
         }

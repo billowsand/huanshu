@@ -70,6 +70,7 @@ const cardGap = computed(() => ({ normal: '1rem', compact: '0.75rem', mini: '0.5
         overflow
         text-center
         class="outcome-card"
+        :data-tone="card.tone || 'amber'"
       >
         <div class="outcome-top-bar" h-1 :class="card.topBarClass || card.top_bar_class" />
         <div class="outcome-content" :style="bodyStyle">

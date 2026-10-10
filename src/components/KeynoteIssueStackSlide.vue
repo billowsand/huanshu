@@ -20,25 +20,26 @@ defineProps<{
 <template>
   <div v-if="section" class="section-num">{{ section }}</div>
 
-  <div relative z-10 flex flex-col h-full py-4>
+  <div class="issue-slide">
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
     <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3">{{ subtitle }}</TagBadge>
 
-    <div class="issue-stack" flex-1 min-h-0 flex flex-col gap-4 mt-5>
+    <div class="issue-stack" :class="{ 'issue-stack--rows': cards.length >= 4 }">
       <GlassCard
         v-for="(card, idx) in cards"
         :key="`${card.title}-${idx}`"
-        overflow
+        no-padding
         class="issue-card"
+        :data-tone="card.tone || 'blue'"
       >
         <div
           class="issue-card__head"
           :style="{
             background: toneVars(card.tone || 'blue').bg,
-            borderBottom: `1px solid ${toneVars(card.tone || 'blue').border}`,
+            '--issue-border': toneVars(card.tone || 'blue').border,
           }"
         >
           <div class="issue-card__head-inner">
@@ -68,15 +69,30 @@ defineProps<{
       </GlassCard>
     </div>
 
-    <div v-if="footer" mt-4 text-center class="slide-footnote slide-text-caption" opacity-40>
+    <div v-if="footer" class="issue-footer slide-footnote slide-text-caption">
       {{ footer }}
     </div>
   </div>
 </template>
 
 <style scoped>
-.issue-stack {
+.issue-slide {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   min-height: 0;
+  padding: 1rem 0;
+}
+
+.issue-stack {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
 }
 
 .issue-card {
@@ -84,11 +100,13 @@ defineProps<{
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .issue-card__head {
   flex: none;
-  padding: 0.6rem 1.2rem 0.55rem;
+  padding: 0.4rem 1.2rem;
+  border-bottom: 1px solid var(--issue-border);
 }
 
 .issue-card__head-inner {
@@ -97,33 +115,36 @@ defineProps<{
   gap: 0.55rem;
 }
 
+.issue-card__head-inner .slide-icon-sm {
+  flex-shrink: 0;
+}
+
 .issue-card__eyebrow {
   font-size: calc(var(--type-body) * 1.25);
   font-weight: 600;
   letter-spacing: 0.01em;
   opacity: 0.94;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .issue-card__body {
   flex: 1 1 auto;
-  min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 0.65rem;
-  padding: 0.8rem 1.25rem 0.85rem;
+  gap: 0.4rem;
+  padding: 0.55rem 1.25rem;
   color: var(--text);
-  overflow: hidden;
 }
 
 .issue-card__summary {
   margin: 0;
   font-size: var(--type-body);
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  flex-shrink: 0;
 }
 
 .issue-card__meta {
@@ -142,5 +163,42 @@ defineProps<{
   font-size: var(--type-caption);
   line-height: 1.2;
   opacity: 0.88;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.issue-stack--rows .issue-card {
+  display: grid;
+  grid-template-columns: minmax(0, 22fr) minmax(0, 78fr);
+}
+
+.issue-stack--rows .issue-card__head {
+  display: flex;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  border-bottom: 0;
+  border-right: 1px solid var(--issue-border);
+}
+
+.issue-stack--rows .issue-card__body {
+  gap: 0.4rem;
+  padding: 0.65rem 1.1rem;
+}
+
+.issue-stack--rows .issue-card__summary {
+  line-height: 1.35;
+}
+
+.issue-stack--rows .issue-card__meta {
+  gap: 0.35rem 0.45rem;
+}
+
+.issue-footer {
+  flex: none;
+  margin-top: 0.85rem;
+  text-align: left;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 </style>

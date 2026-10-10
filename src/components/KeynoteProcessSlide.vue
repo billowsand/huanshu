@@ -68,6 +68,7 @@ const processDensityClass = computed(() => {
         v-for="(phase, phaseIdx) in phases"
         :key="phase.phase"
         class="phase-col phase-col-animated"
+        :data-tone="phase.tone || 'amber'"
         flex flex-col
         :style="{ animationDelay: `${phaseIdx * 80 + 100}ms`, '--phase-solid': toneVars(phase.tone).solid }"
       >
