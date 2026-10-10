@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::generator::utils::{sorted_assets, write_debug};
+use crate::generator::utils::{slide_kind_name, sorted_assets, write_debug};
 
 // ---------------------------------------------------------------------------
 // Public stage entry points (called by Tauri commands)
@@ -909,6 +909,10 @@ pub async fn layout_one_page(
     used_layouts: &[(usize, String)],
     debug_dir: &Path,
 ) -> LayoutPlan {
+    if let Some(forced) = forced_layout(page_plan) {
+        return forced;
+    }
+
     let idx = page_plan.page_id.parse::<usize>().unwrap_or(0);
     let prefix = format!("02-layout-{:02}", idx);
 
@@ -953,11 +957,7 @@ pub async fn layout_one_page(
                         let chosen = select_layout_with_diversity(&resp.candidates, used_layouts);
                         return LayoutPlan {
                             page_id: page_plan.page_id.clone(),
-                            kind: if page_plan.page_role.as_deref() == Some("section_summary") {
-                                SlideKind::SectionIntro
-                            } else {
-                                chosen.kind.clone()
-                            },
+                            kind: chosen.kind.clone(),
                             title: page_plan.page_title.clone(),
                             subtitle: None,
                             section_label: None,
@@ -983,6 +983,37 @@ pub async fn layout_one_page(
         subtitle: None,
         section_label: None,
         reason: "deterministic fallback (LLM layout failed)".to_string(),
+    }
+}
+
+/// Layouts that are fully determined by the page plan and need no LLM call.
+/// `section_summary` pages always render as `SectionIntro`.
+fn forced_layout(page_plan: &PagePlan) -> Option<LayoutPlan> {
+    if page_plan.page_role.as_deref() != Some("section_summary") {
+        return None;
+    }
+    Some(LayoutPlan {
+        page_id: page_plan.page_id.clone(),
+        kind: SlideKind::SectionIntro,
+        title: page_plan.page_title.clone(),
+        subtitle: None,
+        section_label: None,
+        reason: "section_summary page always uses section_intro".to_string(),
+    })
+}
+
+/// Record (or overwrite) the layout kind used by `slide_index` in the shared
+/// diversity tracker. Called once after layout selection and again after repair,
+/// since the repair stage may switch the slide to a different kind.
+pub fn record_used_layout(
+    used_layouts: &mut Vec<(usize, String)>,
+    slide_index: usize,
+    kind: &SlideKind,
+) {
+    let name = slide_kind_name(kind).to_string();
+    match used_layouts.iter_mut().find(|(i, _)| *i == slide_index) {
+        Some(entry) => entry.1 = name,
+        None => used_layouts.push((slide_index, name)),
     }
 }
 
@@ -1035,8 +1066,9 @@ fn build_diversity_hint(used_layouts: &[(usize, String)]) -> String {
 /// 1. Compute usage ratio for each candidate's kind from `used_layouts`.
 /// 2. Adjust the candidate's effective score: subtract a penalty proportional to
 ///    how over-used that kind already is.
-/// 3. If the top candidate is over-used and the second candidate's raw score is
-///    within 2 points, prefer the less-used one (diversity trade-off).
+/// 3. If the top candidate is over-used, trade down to the highest-ranked
+///    alternative that is a *different* kind, is *less* used, and whose raw
+///    score is within 2 points (diversity trade-off).
 /// 4. Otherwise pick the highest effective score.
 fn select_layout_with_diversity<'a>(
     candidates: &'a [crate::types::LayoutCandidate],
@@ -1048,8 +1080,8 @@ fn select_layout_with_diversity<'a>(
 
     let total = used_layouts.len() as f32;
     let kind_count = |kind: &SlideKind| -> f32 {
-        let kind_str = format!("{:?}", kind);
-        used_layouts.iter().filter(|(_, k)| k == &kind_str).count() as f32
+        let name = slide_kind_name(kind);
+        used_layouts.iter().filter(|(_, k)| k == name).count() as f32
     };
 
     // Sort candidates by (raw_score - diversity_penalty), descending.
@@ -1066,20 +1098,24 @@ fn select_layout_with_diversity<'a>(
         .collect();
     ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-    // If the top choice has a high usage ratio and a close second exists,
-    // prefer the less-used second choice for diversity.
-    let best_idx = ranked[0].0;
-    let best_ratio = kind_count(&candidates[best_idx].kind) / total;
-    if best_ratio > 0.3 && ranked.len() >= 2 {
-        let second_idx = ranked[1].0;
-        let best_raw = candidates[best_idx].score as f32;
-        let second_raw = candidates[second_idx].score as f32;
-        if best_raw - second_raw <= 2.0 {
-            return &candidates[second_idx];
+    // If the top choice has a high usage ratio, trade down to a close alternative
+    // that is genuinely a different and less-used kind. Never switch to the same
+    // kind (duplicate candidates) or to a kind that is used even more.
+    let best = &candidates[ranked[0].0];
+    let best_ratio = kind_count(&best.kind) / total;
+    if best_ratio > 0.3 {
+        let best_raw = best.score as f32;
+        let alternative = ranked[1..].iter().map(|&(i, _)| &candidates[i]).find(|c| {
+            c.kind != best.kind
+                && kind_count(&c.kind) / total < best_ratio
+                && best_raw - c.score as f32 <= 2.0
+        });
+        if let Some(alt) = alternative {
+            return alt;
         }
     }
 
-    &candidates[best_idx]
+    best
 }
 
 fn fallback_overview_section_desc(section: &Section, page_plans: &[PagePlan]) -> String {
@@ -1112,4 +1148,154 @@ fn fallback_overview_section_desc(section: &Section, page_plans: &[PagePlan]) ->
     }
 
     summarize(&format!("核心议题：{}", section.title), 16)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input::Subsection;
+    use crate::types::LayoutCandidate;
+
+    fn cand(kind: SlideKind, score: u8) -> LayoutCandidate {
+        LayoutCandidate {
+            kind,
+            score,
+            reason: String::new(),
+        }
+    }
+
+    fn used(kinds: &[SlideKind]) -> Vec<(usize, String)> {
+        let mut out = Vec::new();
+        for (i, kind) in kinds.iter().enumerate() {
+            record_used_layout(&mut out, i, kind);
+        }
+        out
+    }
+
+    #[test]
+    fn select_returns_top_when_nothing_used() {
+        let cands = [cand(SlideKind::FeatureGrid, 9), cand(SlideKind::OutcomeGrid, 8)];
+        assert_eq!(
+            select_layout_with_diversity(&cands, &[]).kind,
+            SlideKind::FeatureGrid
+        );
+    }
+
+    #[test]
+    fn select_trades_overused_top_for_close_less_used_alternative() {
+        let history = used(&[
+            SlideKind::FeatureGrid,
+            SlideKind::FeatureGrid,
+            SlideKind::Timeline,
+        ]);
+        // FeatureGrid: 9 - 3*(2/3) = 7.0; StepFlow: 7 - 0 = 7.0 -> FeatureGrid ranks first
+        // (stable sort), is overused (0.67 > 0.3), StepFlow is within 2 points and unused.
+        let cands = [cand(SlideKind::FeatureGrid, 9), cand(SlideKind::StepFlow, 7)];
+        assert_eq!(
+            select_layout_with_diversity(&cands, &history).kind,
+            SlideKind::StepFlow
+        );
+    }
+
+    #[test]
+    fn select_never_trades_down_to_a_more_used_kind() {
+        // Regression: OutcomeGrid (ratio 0.4) ranks first; the old logic switched to
+        // FeatureGrid (ratio 0.6) just because it was "second and close".
+        let history = used(&[
+            SlideKind::FeatureGrid,
+            SlideKind::FeatureGrid,
+            SlideKind::FeatureGrid,
+            SlideKind::OutcomeGrid,
+            SlideKind::OutcomeGrid,
+        ]);
+        let cands = [cand(SlideKind::OutcomeGrid, 9), cand(SlideKind::FeatureGrid, 9)];
+        assert_eq!(
+            select_layout_with_diversity(&cands, &history).kind,
+            SlideKind::OutcomeGrid
+        );
+    }
+
+    #[test]
+    fn select_ignores_duplicate_kind_as_alternative() {
+        let history = used(&[SlideKind::FeatureGrid, SlideKind::FeatureGrid]);
+        let cands = [
+            cand(SlideKind::FeatureGrid, 9),
+            cand(SlideKind::FeatureGrid, 8),
+            cand(SlideKind::Compare, 3),
+        ];
+        // Duplicate FeatureGrid is not a real alternative; Compare is too far behind.
+        assert_eq!(
+            select_layout_with_diversity(&cands, &history).kind,
+            SlideKind::FeatureGrid
+        );
+    }
+
+    #[test]
+    fn select_skips_unsuitable_second_and_uses_third() {
+        let history = used(&[SlideKind::FeatureGrid, SlideKind::OutcomeGrid]);
+        // FeatureGrid 10-1.5=8.5, OutcomeGrid 9-1.5=7.5, StepFlow 8-0=8.0.
+        // Ranked: FeatureGrid, StepFlow, OutcomeGrid -> StepFlow is the less-used pick.
+        let cands = [
+            cand(SlideKind::FeatureGrid, 10),
+            cand(SlideKind::OutcomeGrid, 9),
+            cand(SlideKind::StepFlow, 8),
+        ];
+        assert_eq!(
+            select_layout_with_diversity(&cands, &history).kind,
+            SlideKind::StepFlow
+        );
+    }
+
+    #[test]
+    fn select_keeps_top_when_alternative_score_gap_too_large() {
+        let history = used(&[SlideKind::FeatureGrid]);
+        let cands = [cand(SlideKind::FeatureGrid, 10), cand(SlideKind::Compare, 4)];
+        assert_eq!(
+            select_layout_with_diversity(&cands, &history).kind,
+            SlideKind::FeatureGrid
+        );
+    }
+
+    #[test]
+    fn record_used_layout_uses_snake_case_and_overwrites_same_index() {
+        let mut layouts = Vec::new();
+        record_used_layout(&mut layouts, 3, &SlideKind::FeatureGrid);
+        record_used_layout(&mut layouts, 5, &SlideKind::Timeline);
+        assert_eq!(
+            layouts,
+            vec![(3, "feature_grid".to_string()), (5, "timeline".to_string())]
+        );
+
+        // Repair switched slide 3 to another kind: overwrite, don't append.
+        record_used_layout(&mut layouts, 3, &SlideKind::SectionList);
+        assert_eq!(
+            layouts,
+            vec![(3, "section_list".to_string()), (5, "timeline".to_string())]
+        );
+    }
+
+    #[test]
+    fn forced_layout_only_applies_to_section_summary_pages() {
+        let section = Section {
+            title: "实施路径".to_string(),
+            paragraphs: Vec::new(),
+            subsections: vec![
+                Subsection {
+                    title: "阶段一".to_string(),
+                    paragraphs: Vec::new(),
+                },
+                Subsection {
+                    title: "阶段二".to_string(),
+                    paragraphs: Vec::new(),
+                },
+            ],
+        };
+        let summary = build_summary_page(1, &section);
+        let forced = forced_layout(&summary).expect("section_summary must be forced");
+        assert_eq!(forced.kind, SlideKind::SectionIntro);
+        assert_eq!(forced.page_id, "1");
+
+        let content = build_content_page(2, "实施路径", None, "实施路径", &[]);
+        assert!(forced_layout(&content).is_none());
+    }
 }

@@ -293,10 +293,11 @@ pub async fn generate_single_page_pipeline(
     )
     .await;
     // Register the chosen layout immediately for diversity tracking
-    {
-        let mut layouts = used_layouts_shared.lock().await;
-        layouts.push((slide_index, format!("{:?}", layout_plan.kind)));
-    }
+    crate::generator::planning::record_used_layout(
+        &mut *used_layouts_shared.lock().await,
+        slide_index,
+        &layout_plan.kind,
+    );
 
     // Stage 3: Content generation
     on_stage(slide_index, PageStage::Content, Some("生成页面内容"));
@@ -373,6 +374,15 @@ pub async fn generate_single_page_pipeline(
         slide_index,
     )
     .await?;
+    // Repair may have switched the kind (pick_different_kind / fallback slide);
+    // keep the diversity tracker in sync with what will actually render.
+    if slide.kind != layout_plan.kind {
+        crate::generator::planning::record_used_layout(
+            &mut *used_layouts_shared.lock().await,
+            slide_index,
+            &slide.kind,
+        );
+    }
 
     on_stage(slide_index, PageStage::Done, None);
     Ok((slide, layout_plan))
