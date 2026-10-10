@@ -1,0 +1,392 @@
+/* 便签·稿纸: cocoa chrome, golden backing, clean white manuscript sheets.
+   Keep fonts and slide geometry controlled by the existing user settings. */
+[data-theme="light-notes"] {
+  color-scheme: light;
+  --notes-backing: #eed9ac;
+  --notes-paper: #fffdf7;
+  --notes-ink: #493b30;
+  --notes-muted: #756455;
+  --notes-edge: #d5c3a9;
+  --notes-grid: rgba(151, 116, 79, 0.075);
+  --notes-margin: rgba(188, 98, 87, 0.28);
+  --notes-grain: repeating-linear-gradient(90deg, transparent 0 3px, rgba(139, 101, 53, 0.025) 3px 4px, transparent 4px 9px);
+  --notes-paper-shadow: 0 2px 3px #60472b18, 0 8px 18px -8px #60472b40;
+  --notes-button-shadow: inset 0 1px 0 #ffffffb3, inset 0 -1px 0 #73563712, 0 1px 2px #60472b26;
+  --bg: var(--notes-paper);
+  --bg-gradient: var(--notes-paper);
+  --text: var(--notes-ink);
+  --text-muted: var(--notes-muted);
+  --primary: #68503c;
+  --primary-light: #594332;
+  --primary-bg: #f2e7d5;
+  --primary-border: #c6ad8d;
+  --glass: var(--notes-paper);
+  --glass-border: var(--notes-edge);
+  --glass-highlight: #ffffff;
+  --glass-sheen: transparent;
+  --glass-blur: 0px;
+  --glass-saturate: 100%;
+  --glass-shadow: var(--notes-paper-shadow);
+  --glass-shadow-strong: 0 4px 8px #60472b20, 0 12px 24px -8px #60472b40;
+  --glow: transparent;
+  --shell-frame: transparent;
+  --shell-frame-border: var(--notes-edge);
+  --shell-frame-shadow: none;
+  --section-num-stroke: #c6ad8d;
+  --success: #54633d;
+  --success-light: #54633d;
+  --success-bg: #edf0e2;
+  --success-border: #b7c1a0;
+  --success-contrast: #fffdf7;
+  --info: #4e6570;
+  --info-light: #4e6570;
+  --info-bg: #eaf0f1;
+  --info-border: #b2c3c7;
+  --info-contrast: #fffdf7;
+  --warning: #826039;
+  --warning-light: #826039;
+  --warning-bg: #f6ebd8;
+  --warning-border: #cfb489;
+  --warning-contrast: #fffdf7;
+  --danger: #9b4e43;
+  --danger-light: #9b4e43;
+  --danger-bg: #f7e9e3;
+  --danger-border: #d4b0a5;
+  --danger-contrast: #fffdf7;
+  --studio-bg: var(--notes-backing);
+  --studio-panel: var(--notes-paper);
+  --studio-panel-2: #f8f3e9;
+  --studio-surface: #f1e7d6;
+  --studio-border: var(--notes-edge);
+  --studio-border-hover: #a38767;
+  --studio-text: var(--notes-ink);
+  --studio-muted: var(--notes-muted);
+  --studio-primary: #68503c;
+  --studio-primary-light: #594332;
+  --studio-primary-bg: #f2e7d5;
+  --studio-primary-border: #b99b77;
+  --studio-primary-contrast: #fffdf7;
+  --studio-accent: var(--studio-primary);
+  --studio-hover: #f2e7d5;
+  --studio-success: var(--success);
+  --studio-success-bg: var(--success-bg);
+  --studio-error: var(--danger);
+  --studio-error-bg: var(--danger-bg);
+  --studio-error-border: var(--danger-border);
+  --slidev-code-background: #f2e7d5 !important;
+}
+
+/* The golden backing stays visible between white cards and sheets. */
+[data-theme="light-notes"] :is(.home-layout, .workflow-root, .presentation-overlay) {
+  background: var(--notes-grain), var(--notes-backing);
+}
+
+[data-theme="light-notes"] .titlebar {
+  background: linear-gradient(#806b56, #715b47);
+  border-bottom: 1px solid #594332;
+  box-shadow: inset 0 1px 0 #ffffff26, 0 2px 4px #60472b26;
+}
+
+[data-theme="light-notes"] .titlebar :is(.titlebar-title, .ctrl-btn) {
+  color: #fffdf7;
+}
+
+[data-theme="light-notes"] .titlebar .ctrl-btn:hover {
+  background: #ffffff1c;
+}
+
+[data-theme="light-notes"] .titlebar .ctrl-close:hover {
+  background: var(--danger);
+}
+
+[data-theme="light-notes"] .titlebar-brand-chip {
+  background: #fffdf71a;
+  border: 1px solid #fffdf733;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 #ffffff26;
+}
+
+[data-theme="light-notes"] .brand-mark {
+  filter: sepia(0.8) saturate(0.45);
+}
+
+[data-theme="light-notes"] :is(.top-bar, .prepare-topbar, .edit-topbar, .gen-topbar, .pres-controls) {
+  background: linear-gradient(#fffdf7, #f5efe4);
+  box-shadow: inset 0 1px 0 #fff, 0 2px 3px #60472b12;
+}
+
+[data-theme="light-notes"] :is(.btn, .pres-ctrl-btn) {
+  background: linear-gradient(#fffdf7, #f4ede1);
+  border-color: var(--notes-edge);
+  border-radius: 5px;
+  box-shadow: var(--notes-button-shadow);
+}
+
+[data-theme="light-notes"] .btn-primary {
+  background: linear-gradient(#7c644e, #604936);
+  border-color: #594332;
+  color: var(--studio-primary-contrast);
+  box-shadow: inset 0 1px 0 #ffffff30, 0 2px 3px #60472b30;
+}
+
+[data-theme="light-notes"] .btn-primary:hover:not(:disabled) {
+  background: linear-gradient(#715a45, #513d2c);
+  border-color: #513d2c;
+}
+
+[data-theme="light-notes"] .btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+[data-theme="light-notes"] :is(.btn, .pres-ctrl-btn):active:not(:disabled) {
+  box-shadow: inset 0 1px 3px #493b3033;
+}
+
+[data-theme="light-notes"] :is(input, textarea, select) {
+  background-color: var(--notes-paper);
+  box-shadow: inset 0 1px 2px #60472b0f;
+}
+
+[data-theme="light-notes"] .md-pane--editor {
+  background: var(--notes-paper);
+}
+
+[data-theme="light-notes"] .md-preview {
+  background-color: var(--notes-paper);
+  background-image: linear-gradient(90deg, transparent 31px, var(--notes-margin) 31px 32px, transparent 32px),
+    repeating-linear-gradient(0deg, transparent 0 31px, var(--notes-grid) 31px 32px);
+  box-shadow: var(--notes-paper-shadow);
+}
+
+[data-theme="light-notes"] :is(.md-pane-label, .edit-col-head) {
+  background: var(--studio-panel-2);
+}
+
+[data-theme="light-notes"] .md-preview-slide {
+  background: var(--notes-paper);
+  border: 1px solid var(--notes-edge);
+  border-radius: 2px;
+  box-shadow: var(--notes-paper-shadow);
+}
+
+[data-theme="light-notes"] .md-preview-slide-no {
+  background: var(--studio-primary-bg);
+  border-color: var(--studio-border);
+  color: var(--studio-text);
+}
+
+[data-theme="light-notes"] .md-preview :is(h2, h3, h4) {
+  color: var(--notes-ink);
+}
+
+[data-theme="light-notes"] .md-preview :is(pre, code, blockquote) {
+  background: var(--studio-primary-bg);
+  border-color: var(--studio-border);
+}
+
+[data-theme="light-notes"] .md-preview pre code {
+  background: transparent;
+}
+
+[data-theme="light-notes"] .md-workbench :is(.tok-heading, .tok-strong) {
+  color: var(--notes-ink);
+}
+
+[data-theme="light-notes"] .md-workbench :is(.tok-emphasis, .tok-link) {
+  color: #526773;
+}
+
+[data-theme="light-notes"] .md-workbench .tok-monospace {
+  color: #865137;
+}
+
+[data-theme="light-notes"] .md-workbench .tok-meta {
+  color: var(--notes-muted);
+}
+
+[data-theme="light-notes"] .md-workbench .tok-list {
+  color: #54633d;
+}
+
+[data-theme="light-notes"] .edit-json-col {
+  background: var(--notes-paper);
+}
+
+[data-theme="light-notes"] .edit-slide-row {
+  background: var(--notes-paper);
+  border: 1px solid var(--notes-edge);
+  border-radius: 3px;
+  box-shadow: 0 1px 2px #60472b15;
+}
+
+[data-theme="light-notes"] .edit-slide-row--active {
+  border-color: var(--studio-primary);
+  box-shadow: inset 3px 0 0 var(--studio-primary), 0 1px 2px #60472b15;
+}
+
+[data-theme="light-notes"] .edit-slide-row:hover {
+  background: #faf4e8;
+}
+
+[data-theme="light-notes"] .ratio-badge {
+  color: var(--studio-primary);
+  background: var(--studio-primary-bg);
+  border-color: var(--studio-primary-border);
+}
+
+[data-theme="light-notes"] :is(button, input, textarea, select):focus-visible {
+  outline: 2px solid var(--studio-primary);
+  outline-offset: 2px;
+}
+
+[data-theme="light-notes"] :is(.heading-mark, .card-icon-wrap, .empty-icon-circle) {
+  background: linear-gradient(#fffdf7, #f2e7d5);
+  border-color: var(--notes-edge);
+  border-radius: 5px;
+  box-shadow: var(--notes-button-shadow);
+}
+
+[data-theme="light-notes"] :is(.project-card, .slide-card, .modal-box, .theme-popover, .kp-box) {
+  background: var(--notes-paper);
+  border-color: var(--notes-edge);
+  border-radius: 5px;
+  box-shadow: var(--notes-paper-shadow);
+}
+
+/* Two narrow sheet edges imply a stack without changing card layout or hit areas. */
+[data-theme="light-notes"] .project-card {
+  box-shadow: 0 2px 3px #60472b18, 0 4px 0 -1px #faf4e8,
+    0 5px 0 -1px #d5c3a9, 0 8px 0 -2px #fffdf7, 0 10px 14px -5px #60472b30;
+}
+
+[data-theme="light-notes"] .project-card:hover {
+  border-color: var(--studio-border-hover);
+  transform: translateY(-2px);
+}
+
+[data-theme="light-notes"] .card-accent {
+  background: var(--studio-primary);
+}
+
+/* A sheet of manuscript paper, shared by every thumbnail and live slide.
+   Background layers do not intercept clicks or obscure slide content. */
+[data-theme="light-notes"] .slide-shell {
+  background-color: var(--notes-paper);
+  background-image: linear-gradient(90deg, transparent 45px, var(--notes-margin) 45px 46px, transparent 46px),
+    repeating-linear-gradient(0deg, transparent 0 35px, var(--notes-grid) 35px 36px),
+    repeating-linear-gradient(90deg, transparent 0 35px, var(--notes-grid) 35px 36px);
+  box-shadow: inset 0 0 0 1px var(--notes-edge);
+}
+
+[data-theme="light-notes"] .slide-shell__ambient {
+  display: none;
+}
+
+[data-theme="light-notes"] .slide-shell__frame {
+  background: transparent;
+  border: 3px double #bfa98c40;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+[data-theme="light-notes"] :is(.glass-card, .spotlight-media, .sf-hnode, .sf-vnode) {
+  background: var(--notes-paper);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  box-shadow: var(--notes-paper-shadow) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+[data-theme="light-notes"] .glass-card .glass-card {
+  box-shadow: 0 1px 2px #60472b12 !important;
+}
+
+[data-theme="light-notes"] :is(.slide-title, .cover-title, .closing-title, .slide-section-title) {
+  color: var(--notes-ink);
+  text-shadow: none;
+}
+
+[data-theme="light-notes"] :is(.slide-shell, .slidev-slide) :is(
+  .tag-pill, .tool-badge, .cp-panel, .cp-header, .cp-footer, .cp-item,
+  .cp-mode-badge, .cp-vs-badge, .cp-balance-badge, .sf-num, .tl-card, .tl-node,
+  .phase-chip, .step-dot, .swot-flag, .swot-flag-icon, .swot-summary,
+  .split-left-step, .issue-card__pill
+) {
+  border-radius: 4px;
+  box-shadow: none !important;
+  text-shadow: none;
+}
+
+[data-theme="light-notes"] :is(.amber-badge, .amber-header, .section-intro__lead, .phase-highlight) {
+  background: var(--primary-bg);
+}
+
+[data-theme="light-notes"] :is(.slide-title-divider, .divider-amber, .process-summary__line) {
+  background: var(--primary);
+  height: 1px;
+  opacity: 0.65;
+}
+
+[data-theme="light-notes"] :is(.phase-head::after, .section-intro__card::after, .phase-steps-wrap__glow) {
+  display: none;
+}
+
+[data-theme="light-notes"] :is(.section-intro__meta, .cp-divider-line, .cp-simple-divider, .tl-axis-line, .split-left-connector, .sf-track, .sf-connector) {
+  border-color: var(--glass-border);
+}
+
+[data-theme="light-notes"] :is(.section-intro__meta-label, .section-intro__card-index, .closing-subtitle, .closing-note, .closing-mark) {
+  color: var(--text-muted);
+}
+
+[data-theme="light-notes"] .section-intro__card-item {
+  color: var(--text);
+}
+
+[data-theme="light-notes"] .closing-kicker {
+  color: var(--primary);
+}
+
+[data-theme="light-notes"] .section-num {
+  color: transparent;
+  -webkit-text-stroke-color: #b99b7770;
+}
+
+[data-theme="light-notes"] .swot-flag-icon,
+[data-theme="light-notes"] .swot-flag-icon > div {
+  color: var(--quadrant-contrast);
+}
+
+[data-theme="light-notes"] .sf-num {
+  color: var(--step-contrast);
+}
+
+[data-theme="light-notes"] :is(.phase-chip, .step-dot) {
+  background: var(--phase-solid) !important;
+}
+
+[data-theme="light-notes"] .slide-card .kind-badge {
+  background: var(--studio-primary-bg) !important;
+  border-color: var(--studio-primary-border) !important;
+  color: var(--studio-primary) !important;
+}
+
+[data-theme="light-notes"] * {
+  scrollbar-color: #b99b77 transparent;
+}
+
+[data-theme="light-notes"] ::-webkit-scrollbar-thumb {
+  background: #b99b77;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="light-notes"] :is(.project-card, .btn) {
+    transition: none;
+  }
+  [data-theme="light-notes"] .project-card:hover {
+    transform: none;
+  }
+}

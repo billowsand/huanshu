@@ -19,6 +19,7 @@ const entry = `
       import '/src/style.css';
       import '/src/themes/terminal.css';
       import '/src/themes/typography.css';
+      import '/src/views/WorkflowView.vue?vue&type=style&index=0&lang.css';
       const slide=shallowRef({kind:'overview',title:'提纲总览',overview_items:[]});
       const app=createApp({render:()=>h(SlideRenderer,{slide:slide.value})});
       app.component('GlassCard',GlassCard).component('CardGrid',CardGrid).component('TagBadge',TagBadge).component('StepNumber',StepNumber).mount('#app');
@@ -126,7 +127,36 @@ try {
       templateChecks++
     }
   }
-  console.log('PASS: '+checked+' overview cases; '+templateChecks+' template hierarchy cases; content edits reset fitting.')
+  // Include the editor's global CSS: sidebar descriptions must not constrain slide copy.
+  let processChecks = 0
+  for (const count of [2, 3, 4]) {
+    const slide = { kind: 'process', title: '试点安排', phases: Array.from({ length: count }, (_, i) => ({
+      phase: '阶段' + (i + 1), title: '场景验证与流程校准', tone: 'blue',
+      steps: [
+        { label: '选取对象', desc: '选取一类通用业务场景，明确参与人员与验收标准，形成可持续推进的试点方案。' },
+        { label: '跑通流程', desc: '完整执行从需求提交到结果验收的流程，记录问题并根据反馈调整实施方案。' },
+      ], highlight: '验证技术可行性与流程完整性。',
+    })) }
+    for (const theme of themes) {
+      await page.evaluate(([s,t]) => window.renderSlide(s,t), [slide,theme])
+      const descriptions = await page.locator('.process-slide .step-desc').evaluateAll(elements => elements.map(el => {
+        const style = getComputedStyle(el), bounds = el.getBoundingClientRect()
+        const card = el.closest('.phase-steps-wrap').getBoundingClientRect()
+        return { width: bounds.width, whiteSpace: style.whiteSpace, textOverflow: style.textOverflow,
+          wraps: bounds.height > parseFloat(style.lineHeight) * 1.5,
+          fits: el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1
+            && bounds.right <= card.right && bounds.bottom <= card.bottom }
+      }))
+      assert.equal(descriptions.length, count * 2)
+      for (const desc of descriptions) {
+        const context = JSON.stringify({ count, theme, desc })
+        assert.ok(desc.width > 130 && desc.whiteSpace === 'normal' && desc.textOverflow !== 'ellipsis', context)
+        assert.ok(desc.wraps && desc.fits, context)
+      }
+      processChecks++
+    }
+  }
+  console.log('PASS: '+checked+' overview cases; '+templateChecks+' template hierarchy cases; '+processChecks+' process wrapping cases; content edits reset fitting.')
 } finally {
   await browser?.close()
   await server.close()

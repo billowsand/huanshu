@@ -10,6 +10,7 @@ import 'virtual:uno.css'
 import '@unocss/reset/tailwind.css'
 import './style.css'
 import './themes/terminal.css'
+import './themes/notes.css'
 
 // Keynote slide components
 import GlassCard from './components/GlassCard.vue'
@@ -33,7 +34,7 @@ import KeynoteCompareSlide from './components/KeynoteCompareSlide.vue'
 import KeynoteIssueStackSlide from './components/KeynoteIssueStackSlide.vue'
 import KeynoteSwotSlide from './components/KeynoteSwotSlide.vue'
 
-const KNOWN_THEMES = ['dark-yellow', 'dark-blue', 'dark-glass-blue', 'dark-terminal', 'light-terminal']
+const KNOWN_THEMES = ['dark-yellow', 'dark-blue', 'dark-glass-blue', 'dark-terminal', 'light-terminal', 'light-notes']
 const savedTheme = localStorage.getItem('app-theme')
 const theme = savedTheme && KNOWN_THEMES.includes(savedTheme) ? savedTheme : 'dark-yellow'
 document.documentElement.setAttribute('data-theme', theme)

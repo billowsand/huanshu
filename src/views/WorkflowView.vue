@@ -745,7 +745,7 @@ onMounted(() => {
 .step-item.active .step-label { color: var(--studio-text); font-weight: 600; }
 .step-item.done .step-label { color: var(--studio-text); }
 
-.step-desc {
+.steps-nav .step-desc {
   font-size: 0.7rem;
   color: var(--studio-muted);
   margin-top: 0.15rem;

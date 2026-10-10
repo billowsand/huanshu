@@ -9,3 +9,4 @@ example
 # Added by code-review-graph
 .code-review-graph/
 dist-package/
+output/

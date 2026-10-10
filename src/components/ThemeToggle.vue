@@ -7,6 +7,7 @@ const themes = [
   { id: 'dark-glass-blue', name: '暗·极光', bg: 'linear-gradient(135deg, #3b1fdc 0%, #0694a2 50%, #065f46 100%)', accent: '#BAE6FD' },
   { id: 'dark-terminal', name: '终端·墨', bg: '#151614', accent: '#ed9b62' },
   { id: 'light-terminal', name: '终端·纸', bg: '#f4f3eb', accent: '#9d4a1c' },
+  { id: 'light-notes', name: '便签·稿纸', bg: 'linear-gradient(135deg, #78634f 0% 35%, #eed9ac 35% 65%, #fffdf7 65%)', accent: '#594332' },
 ]
 
 const currentTheme = ref('dark-yellow')
