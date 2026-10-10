@@ -62,6 +62,22 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
   `#[serde(deserialize_with = "de_slide_kind")]`（未知 kind → `Cover`，与前端 `SlideRenderer.vue` 的 `?? KeynoteCoverSlide` 兜底一致），并有回归测试 `legacy_infographic_kind_degrades_without_losing_slides`。
 
 
+## 幻灯片字号体系（`--type-scale`）
+
+所有幻灯片字号都来自一套变量，**不要**在模板里写裸 `font-size: 0.Nrem`（历史上散落过 17 处，最小 0.68rem）。
+
+- 变量声明在 `.slide-shell`（`src/style.css`），**不是 `:root`**。原因：自定义属性的 `var()`
+  替换发生在「声明它的那个元素」上，只有放在 `.slide-shell`，`SlideRenderer` 才能对该元素
+  inline 覆盖 `--type-scale` 让整套字号重新求值，实现逐页自适应。想整体调力度就改这里的默认值。
+- 逐页系数在 `SlideRenderer.vue` 的 `slideTypeScale`（由 `contentLoad` 估算内容量）：
+  内容极少的页（封面/结尾）放大到 `1.425`，中等放大到 `1.325`，密集页保持 `1.25`。
+- 模板内要在**局部**收敛字号时，同样不能只覆盖 `--type-scale`——必须像
+  `KeynoteFeatureGridSlide.vue` 的 `contentVars` / `KeynoteSpotlightSlide.vue` 的 `sideVars`
+  那样，在该层把整组 `--type-*` 用 `calc(<基准> * var(--type-scale) * <系数>)` 重新声明。
+- 已知边界：`spotlight` 侧栏在「3 个面板 + 每面板多项」时放不下（实测 3 个面板各自最小高度
+  约 210/276/158px，合计已接近侧栏可用的 ~551px），原始字号下本就溢出。`normalize` 已把
+  面板条目收口到 4 项，但极端内容仍可能溢出，彻底解决需要限制面板数量或调整版式。
+
 ## 多比例幻灯片支持 (16:9 / 32:9 / 48:9)
 
 ### 功能说明

@@ -49,7 +49,7 @@ defineProps<{
 
 <style scoped>
 .closing-kicker {
-    font-size: 0.78rem;
+    font-size: var(--type-meta);
     letter-spacing: 0.52em;
     text-transform: uppercase;
     color: rgba(245, 158, 11, 0.75);
@@ -57,7 +57,7 @@ defineProps<{
 }
 
 .closing-title {
-    font-size: 2.8rem;
+    font-size: var(--type-display-title);
     line-height: 1.08;
     font-weight: 800;
     color: var(--text);
@@ -66,7 +66,7 @@ defineProps<{
 
 .closing-subtitle {
     margin-top: 1rem;
-    font-size: 1.18rem;
+    font-size: var(--type-body-strong);
     line-height: 1.7;
     color: rgba(226, 232, 240, 0.84);
     max-width: 40rem;
@@ -75,13 +75,13 @@ defineProps<{
 .closing-note {
     margin-top: 1.2rem;
     max-width: 34rem;
-    font-size: 0.94rem;
+    font-size: var(--type-body-tight);
     line-height: 1.75;
     color: rgba(148, 163, 184, 0.92);
 }
 
 .closing-mark {
-    font-size: 0.72rem;
+    font-size: var(--type-caption);
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: rgba(148, 163, 184, 0.54);

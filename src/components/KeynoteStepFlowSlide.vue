@@ -25,7 +25,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
 <template>
   <div v-if="section" class="section-num">{{ section }}</div>
 
-  <div relative z-10 py-6 flex flex-col h-full>
+  <div relative z-10 py-4 flex flex-col h-full>
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
@@ -216,7 +216,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
 }
 
 .sf-hicon {
-  font-size: 4rem;
+  font-size: var(--type-icon-hero);
   line-height: 1;
   display: flex;
   align-items: center;
@@ -229,8 +229,8 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
   position: absolute;
   top: -0.35rem;
   left: -0.35rem;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.9rem;
+  height: 1.9rem;
   border-radius: 50%;
   font-size: var(--type-caption);
   font-weight: 800;

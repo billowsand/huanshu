@@ -54,18 +54,80 @@ const density = computed(() => {
   return 'normal'
 })
 
-// Use inline styles to avoid UnoCSS static-scan limitations with dynamic classes
-const headerStyle = computed(() => ({
-  normal: { padding: '0.75rem 1rem', fontSize: 'var(--type-grid-header-normal)' },
-  compact: { padding: '0.5rem 0.75rem', fontSize: 'var(--type-grid-header-compact)' },
-  mini: { padding: '0.5rem', fontSize: 'var(--type-grid-header-mini)' },
-}[density.value]))
+// 内容量自适应：列数分档之外，再按「字段数 + 文本量」收敛。
+// 高度压力 = 字段数×固定间距 + 文本量（决定换行行数）；列越少卡片越宽，预算越高。
+const contentScale = computed(() => {
+  const strip = (value?: string) => (value ?? '').replace(/<[^>]*>/g, '')
+  const fieldCount = (card: Record<string, unknown>) => [
+    card.number, card.subtitle, card.body, (card.items as unknown[])?.length,
+    card.risk, card.conclusion, card.footerTag || card.footer_tag,
+  ].filter(Boolean).length
+  const pressure = Math.max(0, ...(props.cards ?? []).map(card =>
+    fieldCount(card as unknown as Record<string, unknown>) * 30
+    + strip(card.body).length
+    + strip(card.conclusion).length
+    + strip(card.risk).length
+    + (card.items ?? []).reduce((sum, item) => sum + strip(typeof item === 'string' ? item : item.text).length, 0),
+  ))
+  const budget = { normal: 420, compact: 190, mini: 140 }[density.value]
+  if (pressure > budget * 1.1) return 0.78
+  if (pressure > budget) return 0.92
+  return 1
+})
 
-const bodyStyle = computed(() => ({
-  normal: { padding: '1rem', fontSize: 'var(--type-grid-body-normal)' },
-  compact: { padding: '0.75rem', fontSize: 'var(--type-grid-body-compact)' },
-  mini: { padding: '0.5rem', fontSize: 'var(--type-grid-body-mini)' },
-}[density.value]))
+const isDenseContent = computed(() => contentScale.value < 1)
+
+// 局部重算字号变量：自定义属性的 var() 替换发生在「声明该属性所在的元素」，
+// 因此在后代元素上覆盖 --type-scale 不会改变已继承下来的 --type-grid-*，
+// 必须在这一层把整组字号重新声明出来。
+const contentVars = computed(() => {
+  const scale = contentScale.value
+  if (scale === 1) return {}
+  const size = (base: string) => `calc(${base} * var(--type-scale) * ${scale})`
+  return {
+    '--type-grid-header-normal': size('1.125rem'),
+    '--type-grid-header-compact': size('1rem'),
+    '--type-grid-header-mini': size('0.9375rem'),
+    '--type-grid-body-normal': size('1rem'),
+    '--type-grid-body-compact': size('0.9375rem'),
+    '--type-grid-body-mini': size('0.875rem'),
+    '--type-grid-icon-normal': size('1.25rem'),
+    '--type-grid-icon-compact': size('1.125rem'),
+    '--type-grid-icon-mini': size('1rem'),
+    '--type-grid-number-normal': size('1.5rem'),
+    '--type-grid-number-compact': size('1.25rem'),
+    '--type-grid-number-mini': size('1.125rem'),
+  }
+})
+
+// padding 是字面值，不随变量收敛，需要单独按同一系数缩放
+const scalePadding = (padding: string) => {
+  const scale = contentScale.value
+  if (scale === 1) return padding
+  return padding
+    .split(' ')
+    .map(token => (token.endsWith('rem') ? `calc(${token} * ${scale})` : token))
+    .join(' ')
+}
+
+// Use inline styles to avoid UnoCSS static-scan limitations with dynamic classes
+const headerStyle = computed(() => {
+  const base = {
+    normal: { padding: '0.75rem 1rem', fontSize: 'var(--type-grid-header-normal)' },
+    compact: { padding: '0.5rem 0.75rem', fontSize: 'var(--type-grid-header-compact)' },
+    mini: { padding: '0.5rem', fontSize: 'var(--type-grid-header-mini)' },
+  }[density.value]
+  return { padding: scalePadding(base.padding), fontSize: base.fontSize }
+})
+
+const bodyStyle = computed(() => {
+  const base = {
+    normal: { padding: '1rem', fontSize: 'var(--type-grid-body-normal)' },
+    compact: { padding: '0.75rem', fontSize: 'var(--type-grid-body-compact)' },
+    mini: { padding: '0.5rem', fontSize: 'var(--type-grid-body-mini)' },
+  }[density.value]
+  return { padding: scalePadding(base.padding), fontSize: base.fontSize }
+})
 
 const iconStyle = computed(() => ({
   normal: { fontSize: 'var(--type-grid-icon-normal)' },
@@ -79,7 +141,10 @@ const numberStyle = computed(() => ({
   mini: { fontSize: 'var(--type-grid-number-mini)' },
 }[density.value]))
 
-const cardGap = computed(() => ({ normal: '1rem', compact: '0.75rem', mini: '0.5rem' }[density.value]))
+const cardGap = computed(() => {
+  const base = { normal: 1, compact: 0.75, mini: 0.5 }[density.value]
+  return `${(base * contentScale.value).toFixed(3)}rem`
+})
 
 function normalizeItem(item: CardItem) {
   return typeof item === 'string' ? { text: item } : item
@@ -90,7 +155,7 @@ function normalizeItem(item: CardItem) {
 <template>
   <div v-if="section" class="section-num">{{ section }}</div>
 
-  <div relative z-10 flex flex-col h-full py-6>
+  <div relative z-10 flex flex-col h-full py-4>
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
@@ -100,10 +165,14 @@ function normalizeItem(item: CardItem) {
     <div flex-1 flex flex-col justify-center>
     <div
       class="feature-grid mt-4"
-      :style="{
-        gridTemplateColumns: `repeat(${effectiveCols}, minmax(0, 1fr))`,
-        gap: cardGap,
-      }"
+      :class="{ 'feature-grid--dense': isDenseContent }"
+      :style="[
+        {
+          gridTemplateColumns: `repeat(${effectiveCols}, minmax(0, 1fr))`,
+          gap: cardGap,
+        },
+        contentVars,
+      ]"
     >
       <div
         v-for="(card, cardIdx) in cards"
@@ -242,6 +311,9 @@ function normalizeItem(item: CardItem) {
 }
 
 .feature-body > * { margin-top: 0.75rem; }
+
+/* 内容超预算时同步收紧字段间距，与 contentVars 的字号收敛配合 */
+.feature-grid--dense .feature-body > * { margin-top: 0.32rem; }
 .feature-body[data-first-row="number"] > .feature-number,
 .feature-body[data-first-row="subtitle"] > .feature-subtitle,
 .feature-body[data-first-row="body"] > .feature-copy,

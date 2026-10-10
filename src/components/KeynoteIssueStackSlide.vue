@@ -20,7 +20,7 @@ defineProps<{
 <template>
   <div v-if="section" class="section-num">{{ section }}</div>
 
-  <div relative z-10 flex flex-col h-full py-6>
+  <div relative z-10 flex flex-col h-full py-4>
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
@@ -98,7 +98,7 @@ defineProps<{
 }
 
 .issue-card__eyebrow {
-  font-size: 0.98rem;
+  font-size: var(--type-body-strong);
   font-weight: 600;
   letter-spacing: 0.01em;
   opacity: 0.94;
@@ -118,7 +118,7 @@ defineProps<{
 
 .issue-card__summary {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--type-body);
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -139,7 +139,7 @@ defineProps<{
   min-height: 26px;
   padding: 0.16rem 0.65rem;
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: var(--type-caption);
   line-height: 1.2;
   opacity: 0.88;
 }

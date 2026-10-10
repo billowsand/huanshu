@@ -36,7 +36,7 @@ function summaryFirst(quadrantKey: string) {
 <template>
   <div v-if="section" class="section-num">{{ section }}</div>
 
-  <div relative z-10 py-6 flex flex-col gap-4 h-full>
+  <div relative z-10 py-4 flex flex-col gap-4 h-full>
     <div class="slide-header">
       <SlideTitle class="slide-title slide-compact-title" :title="title" />
       <div class="slide-title-divider" />

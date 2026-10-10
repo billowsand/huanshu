@@ -436,6 +436,12 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
         }
         SlideKind::Spotlight => {
             slide.panels.truncate(3);
+            // 侧栏可用高度有限，面板内条目不设上限会把整页顶出画布。
+            // 与其他卡片布局的 card.items.truncate(4) 保持同一内容规范。
+            for panel in &mut slide.panels {
+                panel.items.truncate(4);
+                panel.steps.truncate(4);
+            }
             if slide.panels.is_empty() {
                 slide.panels.push(SpotlightPanel {
                     title: "核心说明".to_string(),

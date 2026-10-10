@@ -39,7 +39,7 @@ const gridGap = computed(() => {
 <template>
   <div class="section-num">{{ section }}</div>
 
-  <div relative z-10 flex flex-col h-full py-6>
+  <div relative z-10 flex flex-col h-full py-4>
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
@@ -107,13 +107,14 @@ const gridGap = computed(() => {
 }
 
 .split-left-step {
-  min-width: 2.35rem;
-  height: 2.35rem;
+  min-width: 2.9rem;
+  height: 2.9rem;
+  padding: 0 0.4rem;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
+  font-size: var(--type-caption);
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--primary);
@@ -130,7 +131,7 @@ const gridGap = computed(() => {
 }
 
 .split-left-index {
-  font-size: 0.68rem;
+  font-size: var(--type-caption);
   letter-spacing: 0.14em;
   color: var(--text-muted);
 }
@@ -141,7 +142,7 @@ const gridGap = computed(() => {
 
 .split-left-connector {
   margin-top: 0.75rem;
-  margin-left: 1.15rem;
+  margin-left: 1.45rem;
   width: 1px;
   height: 0.8rem;
   background: linear-gradient(180deg, var(--primary), var(--glass));

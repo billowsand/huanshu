@@ -49,7 +49,7 @@ const cardGap = computed(() => ({ normal: '1rem', compact: '0.75rem', mini: '0.5
 <template>
   <div class="section-num">{{ section }}</div>
 
-  <div relative z-10 flex flex-col h-full py-6>
+  <div relative z-10 flex flex-col h-full py-4>
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />

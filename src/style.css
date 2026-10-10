@@ -15,46 +15,62 @@
   --font-code: 'Microsoft YaHei', sans-serif;
   --font-sans: var(--font-interface);
   --font-mono: var(--font-code);
-  --type-title: 2rem;
+}
+
+/* 幻灯片字号体系
+   画布逻辑尺寸 16:9 = 1280×720，1rem = 16px。原正文 1.125rem 仅占画布高的
+   2.5%，投到大屏上偏小、页面显得不饱满；×1.25 后约 3.1%，接近发布会版式观感。
+
+   这套变量声明在 .slide-shell（每张幻灯片的根容器）而不是 :root —— 自定义属性
+   的 var() 替换发生在「声明它的那个元素」上，所以只有在这一层声明，SlideRenderer
+   才可以对该元素覆盖 --type-scale（inline style 优先级最高）来让整套字号
+   针对这一页重新求值，实现逐页字号自适应。
+   全局调整力度只需改这里的默认值。 */
+.slide-shell {
+  --type-scale: 1.25;
+
+  --type-title: calc(2rem * var(--type-scale));
   --type-title-line: 1.18;
-  --type-subtitle: 1.0625rem;
-  --type-body: 1.125rem;
-  --type-body-tight: 1.0625rem;
-  --type-meta: 1rem;
-  --type-caption: 0.9375rem;
-  --type-body-strong: 1.1875rem;
-  --type-note: 1rem;
-  --type-cover-title: 3.25rem;
-  --type-cover-subtitle: 1.375rem;
-  --type-cover-en: 0.875rem;
+  --type-subtitle: calc(1.0625rem * var(--type-scale));
+  --type-body: calc(1.125rem * var(--type-scale));
+  --type-body-tight: calc(1.0625rem * var(--type-scale));
+  --type-meta: calc(1rem * var(--type-scale));
+  --type-caption: calc(0.9375rem * var(--type-scale));
+  --type-body-strong: calc(1.1875rem * var(--type-scale));
+  --type-note: calc(1rem * var(--type-scale));
+  --type-cover-title: calc(3.25rem * var(--type-scale));
+  --type-cover-subtitle: calc(1.375rem * var(--type-scale));
+  --type-cover-en: calc(0.875rem * var(--type-scale));
+  /* 展示级大标题（章节页／结尾页），比普通页标题更大一档 */
+  --type-display-title: calc(2.8rem * var(--type-scale));
 
-  --type-icon-xs: 0.875rem;
-  --type-icon-sm: 1rem;
-  --type-icon-md: 1.125rem;
-  --type-icon-lg: 1.25rem;
-  --type-icon-xl: 1.5rem;
-  --type-icon-2xl: 1.75rem;
-  --type-icon-hero: 3.75rem;
+  --type-icon-xs: calc(0.875rem * var(--type-scale));
+  --type-icon-sm: calc(1rem * var(--type-scale));
+  --type-icon-md: calc(1.125rem * var(--type-scale));
+  --type-icon-lg: calc(1.25rem * var(--type-scale));
+  --type-icon-xl: calc(1.5rem * var(--type-scale));
+  --type-icon-2xl: calc(1.75rem * var(--type-scale));
+  --type-icon-hero: calc(3.75rem * var(--type-scale));
 
-  --type-grid-header-normal: 1.125rem;
-  --type-grid-header-compact: 1rem;
-  --type-grid-header-mini: 0.9375rem;
-  --type-grid-body-normal: 1rem;
-  --type-grid-body-compact: 0.9375rem;
-  --type-grid-body-mini: 0.875rem;
-  --type-grid-icon-normal: 1.25rem;
-  --type-grid-icon-compact: 1.125rem;
-  --type-grid-icon-mini: 1rem;
-  --type-grid-number-normal: 1.5rem;
-  --type-grid-number-compact: 1.25rem;
-  --type-grid-number-mini: 1.125rem;
+  --type-grid-header-normal: calc(1.125rem * var(--type-scale));
+  --type-grid-header-compact: calc(1rem * var(--type-scale));
+  --type-grid-header-mini: calc(0.9375rem * var(--type-scale));
+  --type-grid-body-normal: calc(1rem * var(--type-scale));
+  --type-grid-body-compact: calc(0.9375rem * var(--type-scale));
+  --type-grid-body-mini: calc(0.875rem * var(--type-scale));
+  --type-grid-icon-normal: calc(1.25rem * var(--type-scale));
+  --type-grid-icon-compact: calc(1.125rem * var(--type-scale));
+  --type-grid-icon-mini: calc(1rem * var(--type-scale));
+  --type-grid-number-normal: calc(1.5rem * var(--type-scale));
+  --type-grid-number-compact: calc(1.25rem * var(--type-scale));
+  --type-grid-number-mini: calc(1.125rem * var(--type-scale));
 
-  --type-outcome-icon-normal: 2.25rem;
-  --type-outcome-icon-compact: 1.875rem;
-  --type-outcome-icon-mini: 1.5rem;
-  --type-outcome-body-normal: 1rem;
-  --type-outcome-body-compact: 0.9375rem;
-  --type-outcome-body-mini: 0.875rem;
+  --type-outcome-icon-normal: calc(2.25rem * var(--type-scale));
+  --type-outcome-icon-compact: calc(1.875rem * var(--type-scale));
+  --type-outcome-icon-mini: calc(1.5rem * var(--type-scale));
+  --type-outcome-body-normal: calc(1rem * var(--type-scale));
+  --type-outcome-body-compact: calc(0.9375rem * var(--type-scale));
+  --type-outcome-body-mini: calc(0.875rem * var(--type-scale));
 }
 
 html,
@@ -402,7 +418,8 @@ iframe {
 .footnotes > .footnotes-list {
   margin-top: 12px;
   opacity: 0.9;
-  font-size: 12px;
+  /* 幻灯片内跟随 --type-caption；studio 编辑器里的脚注没有 .slide-shell 祖先，用原值兜底 */
+  font-size: var(--type-caption, 0.9375rem);
   /* 确保脚注上的返回链接符号 ↩ 不会被 body 的 Emoji 字体覆盖渲染为 ↩️ */
   font-family: var(--font-sans);
 }
@@ -862,7 +879,7 @@ iframe {
 
 /* Large watermark section number (absolute positioned) */
 .section-num {
-  font-size: 7rem;
+  font-size: calc(7rem * var(--type-scale));
   font-family: var(--font-mono);
   font-weight: 800;
   color: transparent;

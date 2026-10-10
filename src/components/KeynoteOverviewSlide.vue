@@ -21,7 +21,7 @@ const gridCols = computed(() => props.items.length <= 2 ? 1 : 2)
 <template>
   <div class="section-num">{{ section }}</div>
 
-  <div relative z-10 flex flex-col h-full py-6>
+  <div relative z-10 flex flex-col h-full py-4>
     <div class="slide-header">
       <SlideTitle class="slide-title slide-compact-title" :title="title" />
       <div class="slide-title-divider" />

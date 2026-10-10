@@ -104,7 +104,7 @@ const cardGridGap = computed(() => {
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr);
   gap: 1.25rem;
   min-height: 100%;
-  padding: 1.25rem 0;
+  padding: 0.75rem 0;
   align-items: stretch;
 }
 
@@ -145,7 +145,7 @@ const cardGridGap = computed(() => {
 }
 
 .section-intro__meta-label {
-  font-size: 0.72rem;
+  font-size: var(--type-caption);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.42);
@@ -153,7 +153,7 @@ const cardGridGap = computed(() => {
 
 .section-intro__meta-value {
   margin-top: 0.45rem;
-  font-size: 1.25rem;
+  font-size: var(--type-body-strong);
   font-weight: 700;
   color: var(--success-light);
 }
@@ -193,7 +193,7 @@ const cardGridGap = computed(() => {
 }
 
 .section-intro__card-index {
-  font-size: 0.78rem;
+  font-size: var(--type-meta);
   font-family: var(--font-mono);
   color: rgba(255, 255, 255, 0.38);
 }
@@ -205,7 +205,7 @@ const cardGridGap = computed(() => {
 }
 
 .section-intro__card-title {
-  font-size: 1.15rem;
+  font-size: var(--type-body-strong);
   font-weight: 700;
   line-height: 1.35;
 }
@@ -221,7 +221,7 @@ const cardGridGap = computed(() => {
 }
 
 .section-intro__card-item {
-  font-size: 0.92rem;
+  font-size: var(--type-body-tight);
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.72);
 }

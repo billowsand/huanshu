@@ -17,14 +17,14 @@ const colorMap: Record<string, { bg: string; border: string; text: string }> = {
   <div
     class="step-number"
     rounded-full
-    :class="size || 'w-10 h-10'"
+    :class="size || 'w-12 h-12'"
     flex
     items-center
     justify-center
     font-mono
     font-bold
     :style="[
-      (size ? '' : 'font-size: 1.125rem;'),
+      (size ? '' : 'font-size: var(--type-body);'),
       {
         background: color ? colorMap[color]?.bg : 'var(--primary-bg)',
         border: `1px solid ${color ? colorMap[color]?.border : 'var(--primary-border)'}`,

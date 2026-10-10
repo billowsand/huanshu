@@ -134,7 +134,44 @@ const ambientPreset = computed(() => {
   return ambientPresets[pool[hashString(hashSeed) % pool.length]]
 })
 
+// 逐页字号自适应：整套字号挂在 .slide-shell 的 --type-scale 上，
+// 内容偏少的页面把它整体调大，让版面更饱满；内容多的保持基准
+// （各模板内部还有各自的内容量收敛，见 KeynoteFeatureGridSlide / KeynoteSpotlightSlide）。
+const TYPE_SCALE_BASE = 1.25
+
+const contentLoad = computed(() => {
+  let chars = 0
+  let entries = 0
+  const skipKeys = new Set(['kind', 'aspect_ratio', 'tone', 'icon', 'label_tone', 'footer_tone', 'titleTone', 'top_bar_class', 'topBarClass'])
+  const walk = (value: unknown) => {
+    if (typeof value === 'string') {
+      chars += value.replace(/<[^>]*>/g, '').length
+      return
+    }
+    if (Array.isArray(value)) {
+      entries += value.length
+      value.forEach(walk)
+      return
+    }
+    if (value && typeof value === 'object') {
+      Object.entries(value as Record<string, unknown>).forEach(([key, child]) => {
+        if (!skipKeys.has(key)) walk(child)
+      })
+    }
+  }
+  walk(props.slide)
+  return chars + entries * 10
+})
+
+const slideTypeScale = computed(() => {
+  const load = contentLoad.value
+  if (load <= 150) return TYPE_SCALE_BASE * 1.14
+  if (load <= 260) return TYPE_SCALE_BASE * 1.06
+  return TYPE_SCALE_BASE
+})
+
 const shellStyle = computed(() => ({
+  '--type-scale': String(slideTypeScale.value),
   '--ambient-primary-top': ambientPreset.value.primary.top,
   '--ambient-primary-left': ambientPreset.value.primary.left,
   '--ambient-primary-width': ambientPreset.value.primary.width,
@@ -346,7 +383,7 @@ const slideProps = computed(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 18px 20px;
+  padding: 12px 14px;
   background:
     radial-gradient(circle at 12% 18%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 30%),
     radial-gradient(circle at 84% 12%, color-mix(in srgb, var(--info) 10%, transparent), transparent 26%),
@@ -415,7 +452,7 @@ const slideProps = computed(() => {
   z-index: 1;
   width: 100%;
   height: 100%;
-  padding: 30px 36px 32px;
+  padding: 22px 28px 24px;
   border-radius: 20px;
   box-sizing: border-box;
   background: var(--shell-frame, linear-gradient(180deg, color-mix(in srgb, var(--glass) 32%, transparent), transparent 18%));

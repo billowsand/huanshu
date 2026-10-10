@@ -18,7 +18,7 @@ defineProps<{
 </script>
 
 <template>
-  <div relative z-10 flex flex-col items-center justify-center gap-5 text-center h-full py-6>
+  <div relative z-10 flex flex-col items-center justify-center gap-5 text-center h-full py-4>
     <TagBadge v-if="badge">{{ badge }}</TagBadge>
 
     <div class="slide-header center-grid-header">

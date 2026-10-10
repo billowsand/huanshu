@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import SlideTitle from './SlideTitle.vue'
 import { toneVars, type Tone } from './keynoteTheme'
 
@@ -22,10 +23,41 @@ const props = defineProps<{
   }>
 }>()
 
+// 侧栏内容量自适应：条目数与文本量共同决定高度压力，压力越大收得越紧。
+// 与 feature_grid 同理——在后代元素上覆盖 --type-scale 无法影响已经
+// 继承下来的 --type-*，所以必须在这一层重新声明字号。
+const sideScale = computed(() => {
+  const panels = props.panels ?? []
+  const items = panels.reduce((sum, panel) => sum + (panel.items?.length ?? 0) + (panel.steps?.length ?? 0), 0)
+  const chars = panels.reduce((sum, panel) =>
+    sum + (panel.body?.length ?? 0) + (panel.items ?? []).join('').length + (panel.steps ?? []).join('').length, 0)
+  const pressure = items * 26 + chars
+  if (pressure >= 460) return 0.78
+  if (pressure >= 360) return 0.86
+  if (pressure >= 270) return 0.92
+  return 1
+})
+
+const sideDense = computed(() => sideScale.value < 1)
+
+const sideVars = computed(() => {
+  const scale = sideScale.value
+  if (scale === 1) return {}
+  const size = (base: string) => `calc(${base} * var(--type-scale) * ${scale})`
+  return {
+    '--type-body': size('1.125rem'),
+    '--type-body-tight': size('1.0625rem'),
+    '--type-meta': size('1rem'),
+    '--type-caption': size('0.9375rem'),
+    '--type-icon-lg': size('1.25rem'),
+    '--type-icon-sm': size('0.875rem'),
+  }
+})
+
 </script>
 
 <template>
-  <div relative z-10 h-full flex flex-col py-6>
+  <div relative z-10 h-full flex flex-col py-4>
     <div class="slide-header spotlight-header" flex items-center gap-3 mb-4>
       <div
         class="tool-badge"
@@ -52,7 +84,11 @@ const props = defineProps<{
         </div>
       </div>
 
-      <div :class="sideWidth || 'w-72'" flex flex-col gap-3 flex-shrink-0>
+      <div
+        :class="[sideWidth || 'w-72', { 'spotlight-side--dense': sideDense }]"
+        :style="sideVars"
+        flex flex-col gap-3 flex-shrink-0
+      >
         <div
           v-for="panel in panels"
           :key="panel.title"
@@ -177,5 +213,14 @@ const props = defineProps<{
 
 .spotlight-panel-title {
   font-weight: 700;
+}
+
+/* 内容超预算时一并收紧侧栏间距与面板内边距（覆盖 UnoCSS 的 px-4 py-3） */
+.spotlight-side--dense {
+  gap: 0.5rem;
+}
+
+.spotlight-side--dense :deep(.glass-card) {
+  padding: 0.5rem 0.62rem;
 }
 </style>
