@@ -363,10 +363,22 @@ fn build_content_page(
 const WORKFLOW_PHRASES: &[&str] = &["流程", "步骤", "阶段", "workflow", "process"];
 const COMPARISON_PHRASES: &[&str] = &["对比", "比较", "优劣", "vs ", "versus"];
 const ARCHITECTURE_PHRASES: &[&str] = &[
-    "架构", "分层", "层级", "层次结构", "体系结构", "architecture", "layers",
+    "架构",
+    "分层",
+    "层级",
+    "层次结构",
+    "体系结构",
+    "architecture",
+    "layers",
 ];
 const TIMELINE_PHRASES: &[&str] = &[
-    "时间线", "时间轴", "历程", "历史", "年代", "里程碑", "timeline",
+    "时间线",
+    "时间轴",
+    "历程",
+    "历史",
+    "年代",
+    "里程碑",
+    "timeline",
 ];
 
 /// Rough amount of content in word-equivalents: Latin words plus CJK characters / 2
@@ -861,7 +873,10 @@ pub async fn layout_candidates_for_page(
     let _ = write_debug(debug_dir, &format!("{prefix}.system.txt"), &system);
     let _ = write_debug(debug_dir, &format!("{prefix}.user.txt"), &user);
 
-    match client.generate_text(&config.llm.model, &system, &user).await {
+    match client
+        .generate_text(&config.llm.model, &system, &user)
+        .await
+    {
         Ok(raw) => {
             let _ = write_debug(debug_dir, &format!("{prefix}.raw.txt"), &raw);
             match parse_layout_candidates(&raw) {
@@ -958,7 +973,13 @@ fn fallback_candidates(page_plan: &PagePlan, aspect: AspectRatio) -> Vec<LayoutC
             let why = if scored.signals.is_empty() {
                 "no specific signals".to_string()
             } else {
-                scored.signals.iter().take(3).copied().collect::<Vec<_>>().join(", ")
+                scored
+                    .signals
+                    .iter()
+                    .take(3)
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(", ")
             };
             LayoutCandidate {
                 kind: scored.kind,
@@ -1273,7 +1294,11 @@ pub fn layout_assignment_summary(
 ) -> String {
     let report = layout_assignment_report(candidates, assigned);
     let count = |key: &str| report[key].as_array().map_or(0, Vec::len);
-    let repeats = |which: &str| report["stats"][which]["adjacent_repeats"].as_u64().unwrap_or(0);
+    let repeats = |which: &str| {
+        report["stats"][which]["adjacent_repeats"]
+            .as_u64()
+            .unwrap_or(0)
+    };
     format!(
         "全局分配 {} 页布局：{}；相邻重复 {} 次（逐页首选为 {} 次），为多样性改选 {} 页，兜底 {} 页",
         assigned.len(),
@@ -1408,10 +1433,18 @@ mod tests {
 
     #[test]
     fn sanitize_keeps_section_intro_only_for_summary_pages() {
-        let out = sanitize_candidates(&summary_page(1), AspectRatio::Ratio16x9, vec![cand(SlideKind::SectionIntro, 9)]);
+        let out = sanitize_candidates(
+            &summary_page(1),
+            AspectRatio::Ratio16x9,
+            vec![cand(SlideKind::SectionIntro, 9)],
+        );
         assert_eq!(out.len(), 1);
-        assert!(sanitize_candidates(&content_page(1), AspectRatio::Ratio16x9, vec![cand(SlideKind::SectionIntro, 9)])
-            .is_empty());
+        assert!(sanitize_candidates(
+            &content_page(1),
+            AspectRatio::Ratio16x9,
+            vec![cand(SlideKind::SectionIntro, 9)]
+        )
+        .is_empty());
     }
 
     #[test]
@@ -1430,7 +1463,10 @@ mod tests {
     fn assign_alternates_when_alternatives_are_close() {
         let pages: Vec<PagePlan> = (1..=4).map(content_page).collect();
         let candidates = vec![
-            vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::OutcomeGrid, 8)];
+            vec![
+                cand(SlideKind::FeatureGrid, 9),
+                cand(SlideKind::OutcomeGrid, 8)
+            ];
             4
         ];
         let plans = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
@@ -1440,10 +1476,8 @@ mod tests {
     #[test]
     fn assign_keeps_a_strong_fit_over_a_poor_alternative() {
         let pages: Vec<PagePlan> = (1..=2).map(content_page).collect();
-        let candidates = vec![
-            vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::Compare, 2)];
-            2
-        ];
+        let candidates =
+            vec![vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::Compare, 2)]; 2];
         let plans = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
         assert_eq!(
             kinds(&plans),
@@ -1491,18 +1525,17 @@ mod tests {
         ];
         let first = kinds(&assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9));
         for _ in 0..5 {
-            assert_eq!(kinds(&assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9)), first);
+            assert_eq!(
+                kinds(&assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9)),
+                first
+            );
         }
     }
 
     #[test]
     fn assign_forces_section_intro_and_fills_missing_candidates() {
         let pages = vec![summary_page(1), content_page(2), content_page(3)];
-        let candidates = vec![
-            Vec::new(),
-            vec![cand(SlideKind::Timeline, 9)],
-            Vec::new(),
-        ];
+        let candidates = vec![Vec::new(), vec![cand(SlideKind::Timeline, 9)], Vec::new()];
         let plans = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
         assert_eq!(plans[0].kind, SlideKind::SectionIntro);
         assert_eq!(plans[1].kind, SlideKind::Timeline);
@@ -1521,7 +1554,10 @@ mod tests {
     fn assign_annotates_reason_when_not_taking_the_top_candidate() {
         let pages: Vec<PagePlan> = (1..=2).map(content_page).collect();
         let candidates = vec![
-            vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::OutcomeGrid, 8)];
+            vec![
+                cand(SlideKind::FeatureGrid, 9),
+                cand(SlideKind::OutcomeGrid, 8)
+            ];
             2
         ];
         let plans = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
@@ -1529,8 +1565,16 @@ mod tests {
             .iter()
             .find(|plan| plan.kind == SlideKind::OutcomeGrid)
             .expect("one page should trade down for variety");
-        assert!(switched.reason.contains("deck variety"), "{}", switched.reason);
-        assert!(switched.reason.contains("feature_grid"), "{}", switched.reason);
+        assert!(
+            switched.reason.contains("deck variety"),
+            "{}",
+            switched.reason
+        );
+        assert!(
+            switched.reason.contains("feature_grid"),
+            "{}",
+            switched.reason
+        );
     }
 
     #[test]
@@ -1564,13 +1608,22 @@ mod tests {
         let page = image_hungry_page();
         assert_eq!(score_kinds(&page)[0].kind, SlideKind::Spotlight);
         // No image asset -> Spotlight is not allowed.
-        assert_ne!(fallback_kind(&page, AspectRatio::Ratio16x9), SlideKind::Spotlight);
+        assert_ne!(
+            fallback_kind(&page, AspectRatio::Ratio16x9),
+            SlideKind::Spotlight
+        );
 
         let mut with_image = page.clone();
         with_image.preferred_assets = vec!["images/a.png".to_string()];
-        assert_eq!(fallback_kind(&with_image, AspectRatio::Ratio16x9), SlideKind::Spotlight);
+        assert_eq!(
+            fallback_kind(&with_image, AspectRatio::Ratio16x9),
+            SlideKind::Spotlight
+        );
         // Spotlight is blocked on wide formats even with an image.
-        assert_ne!(fallback_kind(&with_image, AspectRatio::Ratio32x9), SlideKind::Spotlight);
+        assert_ne!(
+            fallback_kind(&with_image, AspectRatio::Ratio32x9),
+            SlideKind::Spotlight
+        );
     }
 
     #[test]
@@ -1587,7 +1640,10 @@ mod tests {
             ] {
                 let kinds = eligible_fallback_kinds(page, aspect);
                 assert!(!kinds.is_empty());
-                assert!(kinds.iter().all(|k| is_eligible(k, page, aspect)), "{kinds:?}");
+                assert!(
+                    kinds.iter().all(|k| is_eligible(k, page, aspect)),
+                    "{kinds:?}"
+                );
                 for c in fallback_candidates(page, aspect) {
                     assert!(is_eligible(&c.kind, page, aspect), "{:?}", c.kind);
                 }
@@ -1672,7 +1728,10 @@ mod tests {
     fn assignment_report_compares_with_per_page_top_choice() {
         let pages: Vec<PagePlan> = (1..=3).map(content_page).collect();
         let mut candidates = vec![
-            vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::OutcomeGrid, 8)];
+            vec![
+                cand(SlideKind::FeatureGrid, 9),
+                cand(SlideKind::OutcomeGrid, 8)
+            ];
             2
         ];
         candidates.push(Vec::new()); // page 3: planning failed -> fallback
@@ -1687,14 +1746,23 @@ mod tests {
         assert_eq!(report["pages"].as_array().unwrap().len(), 3);
 
         let summary = layout_assignment_summary(&candidates, &assigned);
-        assert!(summary.contains("相邻重复 0 次（逐页首选为 1 次）"), "{summary}");
-        assert!(summary.contains("为多样性改选 1 页，兜底 1 页"), "{summary}");
+        assert!(
+            summary.contains("相邻重复 0 次（逐页首选为 1 次）"),
+            "{summary}"
+        );
+        assert!(
+            summary.contains("为多样性改选 1 页，兜底 1 页"),
+            "{summary}"
+        );
     }
 
     #[test]
     fn final_layout_report_lists_kinds_changed_after_assignment() {
         let pages: Vec<PagePlan> = (1..=2).map(content_page).collect();
-        let candidates = vec![vec![cand(SlideKind::Timeline, 9)], vec![cand(SlideKind::Compare, 9)]];
+        let candidates = vec![
+            vec![cand(SlideKind::Timeline, 9)],
+            vec![cand(SlideKind::Compare, 9)],
+        ];
         let assigned = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
         let rendered = vec![SlideKind::Timeline, SlideKind::FeatureGrid];
         let report = final_layout_report(&assigned, &rendered);
@@ -1759,7 +1827,9 @@ mod tests {
 
         let h2 = section_numbers(CHAPTERED_DOC, HeadingLevel::H2);
         assert_eq!(
-            h2.iter().map(|(_, n)| n.as_deref().unwrap()).collect::<Vec<_>>(),
+            h2.iter()
+                .map(|(_, n)| n.as_deref().unwrap())
+                .collect::<Vec<_>>(),
             vec!["01", "02", "03"]
         );
     }
@@ -1767,13 +1837,16 @@ mod tests {
     #[test]
     fn chapter_numbers_match_the_overview_slide() {
         let doc = crate::input::parse_markdown(CHAPTERED_DOC).unwrap();
-        let overview_numbers: Vec<String> =
-            (0..doc.sections.len()).map(chapter_number).collect();
-        let page_numbers: std::collections::BTreeSet<String> = derive_page_plans(&doc, HeadingLevel::H3)
-            .into_iter()
-            .filter_map(|page| page.section_number)
-            .collect();
-        assert_eq!(page_numbers.into_iter().collect::<Vec<_>>(), overview_numbers);
+        let overview_numbers: Vec<String> = (0..doc.sections.len()).map(chapter_number).collect();
+        let page_numbers: std::collections::BTreeSet<String> =
+            derive_page_plans(&doc, HeadingLevel::H3)
+                .into_iter()
+                .filter_map(|page| page.section_number)
+                .collect();
+        assert_eq!(
+            page_numbers.into_iter().collect::<Vec<_>>(),
+            overview_numbers
+        );
     }
 
     #[test]
@@ -1794,8 +1867,11 @@ mod tests {
     fn schema_hints_do_not_suggest_a_section_value() {
         for rule in crate::generator::layout_rules::LAYOUT_RULES {
             let hint = crate::generator::utils::blueprint_schema_hint(&rule.kind);
-            assert!(!hint.contains("\"section\""), "{:?} hint still has a section example", rule.kind);
+            assert!(
+                !hint.contains("\"section\""),
+                "{:?} hint still has a section example",
+                rule.kind
+            );
         }
     }
 }
-

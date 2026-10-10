@@ -540,80 +540,146 @@ pub async fn retry_generation_page(
         let db = std::sync::Arc::clone(&st.db);
         let (run, logs) = {
             let conn = db.lock().unwrap();
-            let latest_id: Option<i64> = conn.query_row(
-                "SELECT MAX(id) FROM generation_runs WHERE project_id IS ?1",
-                rusqlite::params![st.active_project_id], |row| row.get(0),
-            ).map_err(|e| e.to_string())?;
-            if latest_id != Some(run_id) { return Err("生成记录已过期，请重试当前生成记录中的页面".into()); }
-            (db::get_generation_run(&conn, run_id).map_err(|e| e.to_string())?,
-             db::get_generation_logs(&conn, run_id).map_err(|e| e.to_string())?)
+            let latest_id: Option<i64> = conn
+                .query_row(
+                    "SELECT MAX(id) FROM generation_runs WHERE project_id IS ?1",
+                    rusqlite::params![st.active_project_id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| e.to_string())?;
+            if latest_id != Some(run_id) {
+                return Err("生成记录已过期，请重试当前生成记录中的页面".into());
+            }
+            (
+                db::get_generation_run(&conn, run_id).map_err(|e| e.to_string())?,
+                db::get_generation_logs(&conn, run_id).map_err(|e| e.to_string())?,
+            )
         };
         if run.project_id != st.active_project_id {
             return Err("生成记录不属于当前项目".into());
         }
-        let assignment = logs.iter().rev().find(|log| log.detail.get("layout_plans").is_some())
+        let assignment = logs
+            .iter()
+            .rev()
+            .find(|log| log.detail.get("layout_plans").is_some())
             .ok_or("缺少页面规划，请重新生成整副幻灯片")?;
-        let pages: Vec<crate::types::PagePlan> = serde_json::from_value(assignment.detail["page_plans"].clone())
-            .map_err(|e| e.to_string())?;
-        let layouts: Vec<crate::types::LayoutPlan> = serde_json::from_value(assignment.detail["layout_plans"].clone())
-            .map_err(|e| e.to_string())?;
+        let pages: Vec<crate::types::PagePlan> =
+            serde_json::from_value(assignment.detail["page_plans"].clone())
+                .map_err(|e| e.to_string())?;
+        let layouts: Vec<crate::types::LayoutPlan> =
+            serde_json::from_value(assignment.detail["layout_plans"].clone())
+                .map_err(|e| e.to_string())?;
         let page = pages.get(page_index).cloned().ok_or("页面索引无效")?;
         let mut layout = layouts.get(page_index).cloned().ok_or("缺少该页布局")?;
         if st.blueprints.len() != pages.len() + 3 {
             return Err("整副幻灯片尚未组装完成，请使用整副重试".into());
         }
-        let ratio = st.blueprints[page_index + 2].aspect_ratio.unwrap_or(crate::types::AspectRatio::Ratio16x9);
+        let ratio = st.blueprints[page_index + 2]
+            .aspect_ratio
+            .unwrap_or(crate::types::AspectRatio::Ratio16x9);
         if let Some(kind) = layout_kind {
-            if let Some(reason) = crate::generator::layout_rules::ineligibility(&kind, &page, ratio) {
+            if let Some(reason) = crate::generator::layout_rules::ineligibility(&kind, &page, ratio)
+            {
                 return Err(format!("所选布局不适用于这一页：{reason}"));
             }
             layout.kind = kind;
             layout.reason = "用户手动选择布局进行重试".into();
         }
         st.generation_running = true;
-        (st.settings.clone(), st.project_dir.clone(), st.active_project_id, db, run, page, layout, ratio)
+        (
+            st.settings.clone(),
+            st.project_dir.clone(),
+            st.active_project_id,
+            db,
+            run,
+            page,
+            layout,
+            ratio,
+        )
     };
     let result: anyhow::Result<SlideBlueprint> = async {
         let mut config = GenerationConfig::from_settings(&settings, project_dir.clone(), ratio);
         config.frontmatter_title = run.frontmatter_title.clone();
-        config.debug_dir = std::path::PathBuf::from(&run.debug_dir)
-            .join(format!("retry-page-{}-{}", page_index + 1, std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)?.as_millis()));
+        config.debug_dir = std::path::PathBuf::from(&run.debug_dir).join(format!(
+            "retry-page-{}-{}",
+            page_index + 1,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_millis()
+        ));
         let llm = config.llm_client()?;
         let embedding = config.embedding_client()?;
         let mut doc = crate::input::parse_markdown(&run.source_markdown)?;
-        if let Some(title) = &run.frontmatter_title { doc.title = title.clone(); }
+        if let Some(title) = &run.frontmatter_title {
+            doc.title = title.clone();
+        }
         let icons = {
             let conn = db.lock().unwrap();
             IconIndex::load_with_cache(&project_dir, &config.embedding.model, &conn)?
         };
         let assets = crate::validate::collect_assets(&project_dir);
         let slide = crate::generator::slides::generate_single_page_pipeline(
-            &llm, &embedding, &config, &doc, page.clone(), layout.clone(), page_index,
-            &icons, &assets, &config.debug_dir, std::sync::Arc::new(|_, _, _| {}),
-        ).await?;
+            &llm,
+            &embedding,
+            &config,
+            &doc,
+            page.clone(),
+            layout.clone(),
+            page_index,
+            &icons,
+            &assets,
+            &config.debug_dir,
+            std::sync::Arc::new(|_, _, _| {}),
+        )
+        .await?;
         if slide.kind != layout.kind {
             anyhow::bail!("所选布局生成未成功，请选择其他布局后重试");
         }
-        let issues = crate::validate::validate_blueprints(std::slice::from_ref(&slide), &icons, &assets);
+        let issues =
+            crate::validate::validate_blueprints(std::slice::from_ref(&slide), &icons, &assets);
         if !issues.is_empty() {
-            anyhow::bail!("重试结果未通过校验：{}", issues.iter().map(|i| i.message.as_str()).collect::<Vec<_>>().join("；"));
+            anyhow::bail!(
+                "重试结果未通过校验：{}",
+                issues
+                    .iter()
+                    .map(|i| i.message.as_str())
+                    .collect::<Vec<_>>()
+                    .join("；")
+            );
         }
         let mut st = state.lock().unwrap();
-        if st.active_project_id != project_id { anyhow::bail!("当前项目已切换，重试结果未写入"); }
+        if st.active_project_id != project_id {
+            anyhow::bail!("当前项目已切换，重试结果未写入");
+        }
         let mut updated = st.blueprints.clone();
-        *updated.get_mut(page_index + 2).ok_or_else(|| anyhow::anyhow!("幻灯片列表已改变"))? = slide.clone();
+        *updated
+            .get_mut(page_index + 2)
+            .ok_or_else(|| anyhow::anyhow!("幻灯片列表已改变"))? = slide.clone();
         if let Some(pid) = project_id {
-            db::update_project_blueprints(&db.lock().unwrap(), pid, &serde_json::to_string(&updated)?)?;
+            db::update_project_blueprints(
+                &db.lock().unwrap(),
+                pid,
+                &serde_json::to_string(&updated)?,
+            )?;
         }
         st.blueprints = updated;
         Ok(slide)
-    }.await;
+    }
+    .await;
     state.lock().unwrap().generation_running = false;
     let error = result.as_ref().err().map(|e| format!("{e:#}"));
-    record_log(&app, &db, run_id, Some(page_index as i32), "content", "retry",
-        "单页重试", error.as_deref().unwrap_or("该页重试完成"),
-        json!({"page_plan": page, "layout_plan": layout, "error": error, "retry_succeeded": result.is_ok()}), true);
+    record_log(
+        &app,
+        &db,
+        run_id,
+        Some(page_index as i32),
+        "content",
+        "retry",
+        "单页重试",
+        error.as_deref().unwrap_or("该页重试完成"),
+        json!({"page_plan": page, "layout_plan": layout, "error": error, "retry_succeeded": result.is_ok()}),
+        true,
+    );
     result.map_err(|e| format!("{e:#}"))
 }
 
@@ -626,23 +692,38 @@ pub struct RetryLayoutOptions {
 /// Use the same layout eligibility table as automatic generation.
 #[tauri::command]
 pub fn get_retry_layouts(
-    state: State<'_, Mutex<AppState>>, run_id: i64, page_index: usize,
+    state: State<'_, Mutex<AppState>>,
+    run_id: i64,
+    page_index: usize,
 ) -> Result<RetryLayoutOptions, String> {
     let st = state.lock().unwrap();
     let conn = st.db.lock().unwrap();
     let run = db::get_generation_run(&conn, run_id).map_err(|e| e.to_string())?;
-    if run.project_id != st.active_project_id { return Err("生成记录不属于当前项目".into()); }
+    if run.project_id != st.active_project_id {
+        return Err("生成记录不属于当前项目".into());
+    }
     let logs = db::get_generation_logs(&conn, run_id).map_err(|e| e.to_string())?;
-    let assignment = logs.iter().rev().find(|log| log.detail.get("layout_plans").is_some())
+    let assignment = logs
+        .iter()
+        .rev()
+        .find(|log| log.detail.get("layout_plans").is_some())
         .ok_or("缺少页面布局规划")?;
-    let pages: Vec<crate::types::PagePlan> = serde_json::from_value(assignment.detail["page_plans"].clone())
-        .map_err(|e| e.to_string())?;
-    let layouts: Vec<crate::types::LayoutPlan> = serde_json::from_value(assignment.detail["layout_plans"].clone())
-        .map_err(|e| e.to_string())?;
+    let pages: Vec<crate::types::PagePlan> =
+        serde_json::from_value(assignment.detail["page_plans"].clone())
+            .map_err(|e| e.to_string())?;
+    let layouts: Vec<crate::types::LayoutPlan> =
+        serde_json::from_value(assignment.detail["layout_plans"].clone())
+            .map_err(|e| e.to_string())?;
     let page = pages.get(page_index).ok_or("页面索引无效")?;
     let layout = layouts.get(page_index).ok_or("缺少该页布局")?;
-    let ratio = logs.iter().find_map(|log| serde_json::from_value(log.detail["aspect_ratio"].clone()).ok())
-        .or_else(|| st.blueprints.get(page_index + 2).and_then(|bp| bp.aspect_ratio))
+    let ratio = logs
+        .iter()
+        .find_map(|log| serde_json::from_value(log.detail["aspect_ratio"].clone()).ok())
+        .or_else(|| {
+            st.blueprints
+                .get(page_index + 2)
+                .and_then(|bp| bp.aspect_ratio)
+        })
         .unwrap_or(crate::types::AspectRatio::Ratio16x9);
     Ok(RetryLayoutOptions {
         current_kind: layout.kind.clone(),
@@ -657,26 +738,28 @@ fn page_stage_callback(
 ) -> std::sync::Arc<dyn Fn(usize, crate::generator::slides::PageStage, Option<&str>) + Send + Sync>
 {
     use crate::generator::slides::PageStage;
-    std::sync::Arc::new(move |_slide_idx: usize, stage: PageStage, msg: Option<&str>| {
-        let stage_str = match stage {
-            PageStage::Planning => "planning",
-            PageStage::Layout => "layout",
-            PageStage::Content => "content",
-            PageStage::Normalizing => "normalizing",
-            PageStage::Validating => "validating",
-            PageStage::Done => "done",
-        };
-        let _ = app.emit(
-            "gen:page_status",
-            PageStatusEvent {
-                slide_index,
-                stage: stage_str.to_string(),
-                message: msg.map(str::to_string),
-                blueprint: None,
-                waiting: false,
-            },
-        );
-    })
+    std::sync::Arc::new(
+        move |_slide_idx: usize, stage: PageStage, msg: Option<&str>| {
+            let stage_str = match stage {
+                PageStage::Planning => "planning",
+                PageStage::Layout => "layout",
+                PageStage::Content => "content",
+                PageStage::Normalizing => "normalizing",
+                PageStage::Validating => "validating",
+                PageStage::Done => "done",
+            };
+            let _ = app.emit(
+                "gen:page_status",
+                PageStatusEvent {
+                    slide_index,
+                    stage: stage_str.to_string(),
+                    message: msg.map(str::to_string),
+                    blueprint: None,
+                    waiting: false,
+                },
+            );
+        },
+    )
 }
 
 async fn run_pipeline(
@@ -864,7 +947,8 @@ async fn run_pipeline(
     }
 
     // Phase 2b: deck-level layout assignment (deterministic, CPU only)
-    let layout_plans = planning::assign_layouts(&enriched_plans, &layout_candidates, config.aspect_ratio);
+    let layout_plans =
+        planning::assign_layouts(&enriched_plans, &layout_candidates, config.aspect_ratio);
     let assignment_report = planning::layout_assignment_report(&layout_candidates, &layout_plans);
     let _ = crate::generator::utils::write_debug(
         &config.debug_dir,
@@ -1000,9 +1084,18 @@ async fn run_pipeline(
                 }
                 Err(e) => {
                     failed_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    record_log(&app_clone, &db_clone, run_id, Some(idx as i32), "content", "page_error",
-                        "页面生成失败", &format!("{e:#}"),
-                        json!({"page_plan": page_plan_owned, "layout_plan": layout_plan, "error": format!("{e:#}")}), true);
+                    record_log(
+                        &app_clone,
+                        &db_clone,
+                        run_id,
+                        Some(idx as i32),
+                        "content",
+                        "page_error",
+                        "页面生成失败",
+                        &format!("{e:#}"),
+                        json!({"page_plan": page_plan_owned, "layout_plan": layout_plan, "error": format!("{e:#}")}),
+                        true,
+                    );
                     eprintln!("page {} pipeline failed: {e}", idx + 1);
                     let _ = app_clone.emit(
                         "gen:page_status",
@@ -1080,7 +1173,10 @@ async fn run_pipeline(
     }
 
     // Repair / fallback may have changed kinds after assignment; record what actually renders.
-    let rendered_kinds: Vec<_> = content_slides.iter().map(|slide| slide.kind.clone()).collect();
+    let rendered_kinds: Vec<_> = content_slides
+        .iter()
+        .map(|slide| slide.kind.clone())
+        .collect();
     let _ = crate::generator::utils::write_debug(
         &config.debug_dir,
         "05-layout-final.json",

@@ -37,7 +37,10 @@ mod section_intro_tests {
                 })).unwrap();
                 apply_component_defaults(&mut slide);
                 assert_eq!(slide.cards.len(), count.min(limit));
-                assert_eq!(slide.cards.last().unwrap().title, format!("子主题{}", count.min(limit)));
+                assert_eq!(
+                    slide.cards.last().unwrap().title,
+                    format!("子主题{}", count.min(limit))
+                );
             }
         }
     }
@@ -66,7 +69,11 @@ pub fn make_fallback_slide(
 
     let cards: Vec<crate::types::GridCard> = key_points
         .iter()
-        .take(if kind == SlideKind::SectionIntro { 6 } else { 4 })
+        .take(if kind == SlideKind::SectionIntro {
+            6
+        } else {
+            4
+        })
         .map(|kp| crate::types::GridCard {
             title: kp.clone(),
             tone: None,
@@ -404,7 +411,11 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
 
     match slide.kind {
         SlideKind::SectionIntro => {
-            slide.cards.truncate(if cols_multiplier == 1 { 6 } else { 4 * cols_multiplier });
+            slide.cards.truncate(if cols_multiplier == 1 {
+                6
+            } else {
+                4 * cols_multiplier
+            });
             while slide.cards.len() < 2 {
                 let idx = slide.cards.len() + 1;
                 slide.cards.push(GridCard {

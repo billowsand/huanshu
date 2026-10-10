@@ -78,59 +78,299 @@ const HISTORY_WORDS: &[&str] = &["历程", "发展", "里程碑", "历史", "演
 
 static SCORE_RULES: &[ScoreRule] = &[
     // --- content_shape: the most specific structural signal ---
-    ScoreRule { kind: SlideKind::StepFlow, weight: 3.0, signal: "content_shape=workflow", matches: |s| s.content_shape == "workflow" },
-    ScoreRule { kind: SlideKind::Process, weight: 3.0, signal: "content_shape=workflow", matches: |s| s.content_shape == "workflow" },
-    ScoreRule { kind: SlideKind::SectionList, weight: 1.5, signal: "content_shape=workflow", matches: |s| s.content_shape == "workflow" },
-    ScoreRule { kind: SlideKind::Timeline, weight: 4.0, signal: "content_shape=timeline", matches: |s| s.content_shape == "timeline" },
-    ScoreRule { kind: SlideKind::StepFlow, weight: 1.0, signal: "content_shape=timeline", matches: |s| s.content_shape == "timeline" },
-    ScoreRule { kind: SlideKind::SplitLayers, weight: 4.0, signal: "content_shape=architecture", matches: |s| s.content_shape == "architecture" },
-    ScoreRule { kind: SlideKind::Compare, weight: 4.0, signal: "content_shape=comparison", matches: |s| s.content_shape == "comparison" },
-    ScoreRule { kind: SlideKind::Swot, weight: 3.5, signal: "content_shape=matrix", matches: |s| s.content_shape == "matrix" },
-    ScoreRule { kind: SlideKind::Swot, weight: 1.0, signal: "matrix with 4 key points", matches: |s| s.content_shape == "matrix" && s.key_count == 4 },
-    ScoreRule { kind: SlideKind::FeatureGrid, weight: 0.5, signal: "content_shape=matrix", matches: |s| s.content_shape == "matrix" },
-    ScoreRule { kind: SlideKind::FeatureGrid, weight: 1.5, signal: "content_shape=overview", matches: |s| s.content_shape == "overview" },
-    ScoreRule { kind: SlideKind::OutcomeGrid, weight: 1.0, signal: "content_shape=overview", matches: |s| s.content_shape == "overview" },
-    ScoreRule { kind: SlideKind::CenterGrid, weight: 0.5, signal: "content_shape=summary", matches: |s| s.content_shape == "summary" },
-    ScoreRule { kind: SlideKind::OutcomeGrid, weight: 0.5, signal: "content_shape=summary", matches: |s| s.content_shape == "summary" },
+    ScoreRule {
+        kind: SlideKind::StepFlow,
+        weight: 3.0,
+        signal: "content_shape=workflow",
+        matches: |s| s.content_shape == "workflow",
+    },
+    ScoreRule {
+        kind: SlideKind::Process,
+        weight: 3.0,
+        signal: "content_shape=workflow",
+        matches: |s| s.content_shape == "workflow",
+    },
+    ScoreRule {
+        kind: SlideKind::SectionList,
+        weight: 1.5,
+        signal: "content_shape=workflow",
+        matches: |s| s.content_shape == "workflow",
+    },
+    ScoreRule {
+        kind: SlideKind::Timeline,
+        weight: 4.0,
+        signal: "content_shape=timeline",
+        matches: |s| s.content_shape == "timeline",
+    },
+    ScoreRule {
+        kind: SlideKind::StepFlow,
+        weight: 1.0,
+        signal: "content_shape=timeline",
+        matches: |s| s.content_shape == "timeline",
+    },
+    ScoreRule {
+        kind: SlideKind::SplitLayers,
+        weight: 4.0,
+        signal: "content_shape=architecture",
+        matches: |s| s.content_shape == "architecture",
+    },
+    ScoreRule {
+        kind: SlideKind::Compare,
+        weight: 4.0,
+        signal: "content_shape=comparison",
+        matches: |s| s.content_shape == "comparison",
+    },
+    ScoreRule {
+        kind: SlideKind::Swot,
+        weight: 3.5,
+        signal: "content_shape=matrix",
+        matches: |s| s.content_shape == "matrix",
+    },
+    ScoreRule {
+        kind: SlideKind::Swot,
+        weight: 1.0,
+        signal: "matrix with 4 key points",
+        matches: |s| s.content_shape == "matrix" && s.key_count == 4,
+    },
+    ScoreRule {
+        kind: SlideKind::FeatureGrid,
+        weight: 0.5,
+        signal: "content_shape=matrix",
+        matches: |s| s.content_shape == "matrix",
+    },
+    ScoreRule {
+        kind: SlideKind::FeatureGrid,
+        weight: 1.5,
+        signal: "content_shape=overview",
+        matches: |s| s.content_shape == "overview",
+    },
+    ScoreRule {
+        kind: SlideKind::OutcomeGrid,
+        weight: 1.0,
+        signal: "content_shape=overview",
+        matches: |s| s.content_shape == "overview",
+    },
+    ScoreRule {
+        kind: SlideKind::CenterGrid,
+        weight: 0.5,
+        signal: "content_shape=summary",
+        matches: |s| s.content_shape == "summary",
+    },
+    ScoreRule {
+        kind: SlideKind::OutcomeGrid,
+        weight: 0.5,
+        signal: "content_shape=summary",
+        matches: |s| s.content_shape == "summary",
+    },
     // --- argument_mode ---
-    ScoreRule { kind: SlideKind::FeatureGrid, weight: 2.0, signal: "argument_mode=parallel", matches: |s| s.argument_mode == "parallel" },
-    ScoreRule { kind: SlideKind::OutcomeGrid, weight: 1.5, signal: "argument_mode=parallel", matches: |s| s.argument_mode == "parallel" },
-    ScoreRule { kind: SlideKind::StepFlow, weight: 2.0, signal: "argument_mode=sequential", matches: |s| s.argument_mode == "sequential" },
-    ScoreRule { kind: SlideKind::Process, weight: 2.0, signal: "argument_mode=sequential", matches: |s| s.argument_mode == "sequential" },
-    ScoreRule { kind: SlideKind::SectionList, weight: 1.5, signal: "argument_mode=sequential", matches: |s| s.argument_mode == "sequential" },
-    ScoreRule { kind: SlideKind::SplitLayers, weight: 3.0, signal: "argument_mode=layered", matches: |s| s.argument_mode == "layered" },
-    ScoreRule { kind: SlideKind::CenterGrid, weight: 1.0, signal: "argument_mode=summary", matches: |s| s.argument_mode == "summary" },
-    ScoreRule { kind: SlideKind::OutcomeGrid, weight: 1.0, signal: "argument_mode=summary with 2-4 points", matches: |s| s.argument_mode == "summary" && (2..=4).contains(&s.key_count) },
-    ScoreRule { kind: SlideKind::OutcomeGrid, weight: 2.0, signal: "argument_mode=evidence", matches: |s| s.argument_mode == "evidence" },
-    ScoreRule { kind: SlideKind::FocusExample, weight: 1.5, signal: "argument_mode=evidence", matches: |s| s.argument_mode == "evidence" },
-    ScoreRule { kind: SlideKind::IssueStack, weight: 1.5, signal: "argument_mode=causal", matches: |s| s.argument_mode == "causal" },
-    ScoreRule { kind: SlideKind::FocusExample, weight: 1.0, signal: "argument_mode=causal", matches: |s| s.argument_mode == "causal" },
-    ScoreRule { kind: SlideKind::IssueStack, weight: 3.0, signal: "argument_mode=warning", matches: |s| s.argument_mode == "warning" },
+    ScoreRule {
+        kind: SlideKind::FeatureGrid,
+        weight: 2.0,
+        signal: "argument_mode=parallel",
+        matches: |s| s.argument_mode == "parallel",
+    },
+    ScoreRule {
+        kind: SlideKind::OutcomeGrid,
+        weight: 1.5,
+        signal: "argument_mode=parallel",
+        matches: |s| s.argument_mode == "parallel",
+    },
+    ScoreRule {
+        kind: SlideKind::StepFlow,
+        weight: 2.0,
+        signal: "argument_mode=sequential",
+        matches: |s| s.argument_mode == "sequential",
+    },
+    ScoreRule {
+        kind: SlideKind::Process,
+        weight: 2.0,
+        signal: "argument_mode=sequential",
+        matches: |s| s.argument_mode == "sequential",
+    },
+    ScoreRule {
+        kind: SlideKind::SectionList,
+        weight: 1.5,
+        signal: "argument_mode=sequential",
+        matches: |s| s.argument_mode == "sequential",
+    },
+    ScoreRule {
+        kind: SlideKind::SplitLayers,
+        weight: 3.0,
+        signal: "argument_mode=layered",
+        matches: |s| s.argument_mode == "layered",
+    },
+    ScoreRule {
+        kind: SlideKind::CenterGrid,
+        weight: 1.0,
+        signal: "argument_mode=summary",
+        matches: |s| s.argument_mode == "summary",
+    },
+    ScoreRule {
+        kind: SlideKind::OutcomeGrid,
+        weight: 1.0,
+        signal: "argument_mode=summary with 2-4 points",
+        matches: |s| s.argument_mode == "summary" && (2..=4).contains(&s.key_count),
+    },
+    ScoreRule {
+        kind: SlideKind::OutcomeGrid,
+        weight: 2.0,
+        signal: "argument_mode=evidence",
+        matches: |s| s.argument_mode == "evidence",
+    },
+    ScoreRule {
+        kind: SlideKind::FocusExample,
+        weight: 1.5,
+        signal: "argument_mode=evidence",
+        matches: |s| s.argument_mode == "evidence",
+    },
+    ScoreRule {
+        kind: SlideKind::IssueStack,
+        weight: 1.5,
+        signal: "argument_mode=causal",
+        matches: |s| s.argument_mode == "causal",
+    },
+    ScoreRule {
+        kind: SlideKind::FocusExample,
+        weight: 1.0,
+        signal: "argument_mode=causal",
+        matches: |s| s.argument_mode == "causal",
+    },
+    ScoreRule {
+        kind: SlideKind::IssueStack,
+        weight: 3.0,
+        signal: "argument_mode=warning",
+        matches: |s| s.argument_mode == "warning",
+    },
     // --- title wording ---
-    ScoreRule { kind: SlideKind::IssueStack, weight: 3.5, signal: "problem wording in title", matches: |s| s.title_has(PROBLEM_WORDS) },
-    ScoreRule { kind: SlideKind::CenterGrid, weight: 2.0, signal: "goal/vision title, light content", matches: |s| s.title_has(GOAL_WORDS) && s.density != "high" },
-    ScoreRule { kind: SlideKind::FocusExample, weight: 2.0, signal: "goal/vision title, dense content", matches: |s| s.title_has(GOAL_WORDS) && s.density == "high" },
-    ScoreRule { kind: SlideKind::Compare, weight: 2.0, signal: "comparison wording in title", matches: |s| s.title_has(COMPARE_WORDS) },
-    ScoreRule { kind: SlideKind::SplitLayers, weight: 1.5, signal: "architecture wording in title", matches: |s| s.title_has(ARCHITECTURE_WORDS) },
-    ScoreRule { kind: SlideKind::StepFlow, weight: 1.5, signal: "process wording in title", matches: |s| s.title_has(PROCESS_WORDS) },
-    ScoreRule { kind: SlideKind::Process, weight: 1.5, signal: "process wording in title", matches: |s| s.title_has(PROCESS_WORDS) },
-    ScoreRule { kind: SlideKind::Timeline, weight: 2.0, signal: "history wording in title", matches: |s| s.title_has(HISTORY_WORDS) },
+    ScoreRule {
+        kind: SlideKind::IssueStack,
+        weight: 3.5,
+        signal: "problem wording in title",
+        matches: |s| s.title_has(PROBLEM_WORDS),
+    },
+    ScoreRule {
+        kind: SlideKind::CenterGrid,
+        weight: 2.0,
+        signal: "goal/vision title, light content",
+        matches: |s| s.title_has(GOAL_WORDS) && s.density != "high",
+    },
+    ScoreRule {
+        kind: SlideKind::FocusExample,
+        weight: 2.0,
+        signal: "goal/vision title, dense content",
+        matches: |s| s.title_has(GOAL_WORDS) && s.density == "high",
+    },
+    ScoreRule {
+        kind: SlideKind::Compare,
+        weight: 2.0,
+        signal: "comparison wording in title",
+        matches: |s| s.title_has(COMPARE_WORDS),
+    },
+    ScoreRule {
+        kind: SlideKind::SplitLayers,
+        weight: 1.5,
+        signal: "architecture wording in title",
+        matches: |s| s.title_has(ARCHITECTURE_WORDS),
+    },
+    ScoreRule {
+        kind: SlideKind::StepFlow,
+        weight: 1.5,
+        signal: "process wording in title",
+        matches: |s| s.title_has(PROCESS_WORDS),
+    },
+    ScoreRule {
+        kind: SlideKind::Process,
+        weight: 1.5,
+        signal: "process wording in title",
+        matches: |s| s.title_has(PROCESS_WORDS),
+    },
+    ScoreRule {
+        kind: SlideKind::Timeline,
+        weight: 2.0,
+        signal: "history wording in title",
+        matches: |s| s.title_has(HISTORY_WORDS),
+    },
     // --- visuals ---
-    ScoreRule { kind: SlideKind::Spotlight, weight: 3.0, signal: "image wanted for a single object", matches: |s| s.visual_need.starts_with("image_") && s.object_count == "single" },
-    ScoreRule { kind: SlideKind::Spotlight, weight: 1.0, signal: "visual_need=image_required", matches: |s| s.visual_need == "image_required" },
+    ScoreRule {
+        kind: SlideKind::Spotlight,
+        weight: 3.0,
+        signal: "image wanted for a single object",
+        matches: |s| s.visual_need.starts_with("image_") && s.object_count == "single",
+    },
+    ScoreRule {
+        kind: SlideKind::Spotlight,
+        weight: 1.0,
+        signal: "visual_need=image_required",
+        matches: |s| s.visual_need == "image_required",
+    },
     // --- object count & amount of content ---
-    ScoreRule { kind: SlideKind::Compare, weight: 2.0, signal: "object_count=pair", matches: |s| s.object_count == "pair" },
-    ScoreRule { kind: SlideKind::FeatureGrid, weight: 0.5, signal: "object_count=multi", matches: |s| s.object_count == "multi" },
-    ScoreRule { kind: SlideKind::OutcomeGrid, weight: 0.5, signal: "2-4 key points", matches: |s| (2..=4).contains(&s.key_count) },
-    ScoreRule { kind: SlideKind::IssueStack, weight: 0.5, signal: "2-4 key points", matches: |s| (2..=4).contains(&s.key_count) },
-    ScoreRule { kind: SlideKind::Process, weight: 1.0, signal: "5+ key points", matches: |s| s.key_count >= 5 },
-    ScoreRule { kind: SlideKind::SectionList, weight: 0.5, signal: "5+ key points", matches: |s| s.key_count >= 5 },
-    ScoreRule { kind: SlideKind::CenterGrid, weight: 1.0, signal: "0-1 key points", matches: |s| s.key_count <= 1 },
-    ScoreRule { kind: SlideKind::FocusExample, weight: 1.0, signal: "0-1 key points", matches: |s| s.key_count <= 1 },
+    ScoreRule {
+        kind: SlideKind::Compare,
+        weight: 2.0,
+        signal: "object_count=pair",
+        matches: |s| s.object_count == "pair",
+    },
+    ScoreRule {
+        kind: SlideKind::FeatureGrid,
+        weight: 0.5,
+        signal: "object_count=multi",
+        matches: |s| s.object_count == "multi",
+    },
+    ScoreRule {
+        kind: SlideKind::OutcomeGrid,
+        weight: 0.5,
+        signal: "2-4 key points",
+        matches: |s| (2..=4).contains(&s.key_count),
+    },
+    ScoreRule {
+        kind: SlideKind::IssueStack,
+        weight: 0.5,
+        signal: "2-4 key points",
+        matches: |s| (2..=4).contains(&s.key_count),
+    },
+    ScoreRule {
+        kind: SlideKind::Process,
+        weight: 1.0,
+        signal: "5+ key points",
+        matches: |s| s.key_count >= 5,
+    },
+    ScoreRule {
+        kind: SlideKind::SectionList,
+        weight: 0.5,
+        signal: "5+ key points",
+        matches: |s| s.key_count >= 5,
+    },
+    ScoreRule {
+        kind: SlideKind::CenterGrid,
+        weight: 1.0,
+        signal: "0-1 key points",
+        matches: |s| s.key_count <= 1,
+    },
+    ScoreRule {
+        kind: SlideKind::FocusExample,
+        weight: 1.0,
+        signal: "0-1 key points",
+        matches: |s| s.key_count <= 1,
+    },
     // --- density ---
-    ScoreRule { kind: SlideKind::FocusExample, weight: 0.5, signal: "density=high", matches: |s| s.density == "high" },
-    ScoreRule { kind: SlideKind::SectionList, weight: 0.5, signal: "density=high", matches: |s| s.density == "high" },
-    ScoreRule { kind: SlideKind::CenterGrid, weight: 0.5, signal: "density=low", matches: |s| s.density == "low" },
+    ScoreRule {
+        kind: SlideKind::FocusExample,
+        weight: 0.5,
+        signal: "density=high",
+        matches: |s| s.density == "high",
+    },
+    ScoreRule {
+        kind: SlideKind::SectionList,
+        weight: 0.5,
+        signal: "density=high",
+        matches: |s| s.density == "high",
+    },
+    ScoreRule {
+        kind: SlideKind::CenterGrid,
+        weight: 0.5,
+        signal: "density=low",
+        matches: |s| s.density == "low",
+    },
 ];
 
 #[derive(Debug, Clone)]
@@ -225,31 +465,67 @@ mod tests {
     fn specific_shape_beats_generic_summary_signals() {
         // Old if-chain: "summary + 2-4 points → outcome_grid" fired before the workflow and
         // timeline branches, so these pages all became outcome_grid.
-        assert_eq!(top(&page("实施安排", "workflow", "summary", 3)), SlideKind::StepFlow);
-        assert_eq!(top(&page("实施安排", "workflow", "summary", 5)), SlideKind::Process);
-        assert_eq!(top(&page("发展脉络", "timeline", "summary", 3)), SlideKind::Timeline);
-        assert_eq!(top(&page("总体设计", "architecture", "summary", 3)), SlideKind::SplitLayers);
+        assert_eq!(
+            top(&page("实施安排", "workflow", "summary", 3)),
+            SlideKind::StepFlow
+        );
+        assert_eq!(
+            top(&page("实施安排", "workflow", "summary", 5)),
+            SlideKind::Process
+        );
+        assert_eq!(
+            top(&page("发展脉络", "timeline", "summary", 3)),
+            SlideKind::Timeline
+        );
+        assert_eq!(
+            top(&page("总体设计", "architecture", "summary", 3)),
+            SlideKind::SplitLayers
+        );
     }
 
     #[test]
     fn problem_wording_beats_generic_summary_signals() {
         // Old if-chain returned outcome_grid here (summary branch came first).
-        assert_eq!(top(&page("主要风险", "summary", "summary", 3)), SlideKind::IssueStack);
-        assert_eq!(top(&page("现状", "summary", "warning", 3)), SlideKind::IssueStack);
+        assert_eq!(
+            top(&page("主要风险", "summary", "summary", 3)),
+            SlideKind::IssueStack
+        );
+        assert_eq!(
+            top(&page("现状", "summary", "warning", 3)),
+            SlideKind::IssueStack
+        );
     }
 
     #[test]
     fn generic_pages_keep_previous_defaults() {
-        assert_eq!(top(&page("背景", "summary", "summary", 1)), SlideKind::CenterGrid);
-        assert_eq!(top(&page("核心能力", "summary", "parallel", 3)), SlideKind::FeatureGrid);
-        assert_eq!(top(&page("建设成效", "summary", "evidence", 3)), SlideKind::OutcomeGrid);
-        assert_eq!(top(&page("总体目标", "summary", "summary", 1)), SlideKind::CenterGrid);
+        assert_eq!(
+            top(&page("背景", "summary", "summary", 1)),
+            SlideKind::CenterGrid
+        );
+        assert_eq!(
+            top(&page("核心能力", "summary", "parallel", 3)),
+            SlideKind::FeatureGrid
+        );
+        assert_eq!(
+            top(&page("建设成效", "summary", "evidence", 3)),
+            SlideKind::OutcomeGrid
+        );
+        assert_eq!(
+            top(&page("总体目标", "summary", "summary", 1)),
+            SlideKind::CenterGrid
+        );
     }
 
     #[test]
     fn pair_and_matrix_signals_pick_their_layouts() {
-        assert_eq!(top(&page("方案选择", "comparison", "parallel", 2)), SlideKind::Compare);
-        assert_eq!(top(&page("态势分析", "matrix", "parallel", 4)), SlideKind::Swot);
+        assert_eq!(
+            top(&page("方案选择", "comparison", "parallel", 2)),
+            SlideKind::Compare
+        );
+        assert_eq!(
+            top(&page("态势分析", "matrix", "parallel", 4)),
+            SlideKind::Swot
+        );
     }
 
     #[test]
@@ -262,7 +538,10 @@ mod tests {
     #[test]
     fn scores_explain_themselves() {
         let scored = score_kinds(&page("主要风险", "summary", "warning", 3));
-        let issue = scored.iter().find(|s| s.kind == SlideKind::IssueStack).unwrap();
+        let issue = scored
+            .iter()
+            .find(|s| s.kind == SlideKind::IssueStack)
+            .unwrap();
         assert_eq!(issue.signals[0], "problem wording in title");
         assert!(issue.signals.contains(&"argument_mode=warning"));
         assert!(scored.windows(2).all(|w| w[0].score >= w[1].score));

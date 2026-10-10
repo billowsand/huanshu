@@ -104,8 +104,10 @@ fn salvage_entries(raw: &str) -> Vec<Value> {
             .unwrap()
     });
     let score_re = SCORE.get_or_init(|| {
-        Regex::new(r#"["']?(?:score|fitness|confidence|rating)["']?\s*:\s*["']?([0-9]+(?:\.[0-9]+)?)"#)
-            .unwrap()
+        Regex::new(
+            r#"["']?(?:score|fitness|confidence|rating)["']?\s*:\s*["']?([0-9]+(?:\.[0-9]+)?)"#,
+        )
+        .unwrap()
     });
 
     let kinds: Vec<(usize, &str)> = kind_re
@@ -116,9 +118,9 @@ fn salvage_entries(raw: &str) -> Vec<Value> {
         .iter()
         .enumerate()
         .map(|(i, (after_kind, kind))| {
-            let segment_end = kinds
-                .get(i + 1)
-                .map_or(raw.len(), |(next_end, next_kind)| next_end - next_kind.len());
+            let segment_end = kinds.get(i + 1).map_or(raw.len(), |(next_end, next_kind)| {
+                next_end - next_kind.len()
+            });
             let segment = &raw[*after_kind..segment_end.max(*after_kind)];
             let mut entry = Map::new();
             entry.insert("kind".to_string(), Value::String(kind.to_string()));
@@ -161,7 +163,8 @@ fn parse_entry(entry: &Value, rank: usize) -> Result<LayoutCandidate, String> {
 }
 
 fn first_str<'a>(map: &'a Map<String, Value>, keys: &[&str]) -> Option<&'a str> {
-    keys.iter().find_map(|key| map.get(*key).and_then(Value::as_str))
+    keys.iter()
+        .find_map(|key| map.get(*key).and_then(Value::as_str))
 }
 
 /// Map a model-written kind name onto `SlideKind`, accepting snake_case, kebab-case,
@@ -247,7 +250,10 @@ mod tests {
         let kinds: Vec<SlideKind> = parsed.candidates.iter().map(|c| c.kind.clone()).collect();
         assert_eq!(kinds, vec![SlideKind::FeatureGrid, SlideKind::Timeline]);
         assert_eq!(parsed.candidates[0].reason, "parallel");
-        assert_eq!(parsed.dropped, vec![r#"#2: unknown kind "two_column""#.to_string()]);
+        assert_eq!(
+            parsed.dropped,
+            vec![r#"#2: unknown kind "two_column""#.to_string()]
+        );
     }
 
     #[test]
@@ -262,7 +268,11 @@ mod tests {
             "KeynoteFeatureGridSlide",
             "FEATURE_GRID",
         ] {
-            assert_eq!(parse_kind_name(name), Some(SlideKind::FeatureGrid), "{name}");
+            assert_eq!(
+                parse_kind_name(name),
+                Some(SlideKind::FeatureGrid),
+                "{name}"
+            );
         }
         assert_eq!(parse_kind_name("SWOT"), Some(SlideKind::Swot));
         assert_eq!(parse_kind_name("IssueStack"), Some(SlideKind::IssueStack));
@@ -372,8 +382,11 @@ mod tests {
   ]
 }"#;
         let parsed = parse_layout_candidates(raw).unwrap();
-        let got: Vec<(SlideKind, u8)> =
-            parsed.candidates.iter().map(|c| (c.kind.clone(), c.score)).collect();
+        let got: Vec<(SlideKind, u8)> = parsed
+            .candidates
+            .iter()
+            .map(|c| (c.kind.clone(), c.score))
+            .collect();
         assert_eq!(
             got,
             vec![
@@ -385,4 +398,3 @@ mod tests {
         assert!(parsed.dropped[0].contains("salvaged 3 entries"));
     }
 }
-

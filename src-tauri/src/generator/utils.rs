@@ -256,16 +256,16 @@ pub fn strip_markdown(text: &str) -> String {
 
     // 标题 / 引用 / 无序列表 / 有序列表 / 任务列表，可叠加（如 `> - [x] 1. ...`）
     let block_prefix = BLOCK_PREFIX.get_or_init(|| {
-        Regex::new(r"^(?:#{1,6}\s+|>\s?|[-*+]\s+|[•·▪●]\s*|\d{1,2}[.)、]\s+|\[[ xX]\]\s+)+").unwrap()
+        Regex::new(r"^(?:#{1,6}\s+|>\s?|[-*+]\s+|[•·▪●]\s*|\d{1,2}[.)、]\s+|\[[ xX]\]\s+)+")
+            .unwrap()
     });
     let hrule = HRULE.get_or_init(|| Regex::new(r"^\s*(?:[-*_]\s*){3,}$").unwrap());
     let image = IMAGE.get_or_init(|| Regex::new(r"!\[([^\]]*)\]\([^)]*\)").unwrap());
     let link = LINK.get_or_init(|| Regex::new(r"\[([^\]]+)\]\([^)]*\)").unwrap());
     let star_em = STAR_EM.get_or_init(|| Regex::new(r"\*([^*\s](?:[^*]*[^*\s])?)\*").unwrap());
-    let underscore_strong =
-        UNDERSCORE_STRONG.get_or_init(|| Regex::new(r"__([^_]+)__").unwrap());
-    let html_emphasis = HTML_EMPHASIS
-        .get_or_init(|| Regex::new(r"(?i)</?(?:strong|b|em|i|u|mark|code)>").unwrap());
+    let underscore_strong = UNDERSCORE_STRONG.get_or_init(|| Regex::new(r"__([^_]+)__").unwrap());
+    let html_emphasis =
+        HTML_EMPHASIS.get_or_init(|| Regex::new(r"(?i)</?(?:strong|b|em|i|u|mark|code)>").unwrap());
 
     let mut merged = String::new();
     for raw_line in text.lines() {
@@ -1177,14 +1177,20 @@ mod tests {
             clean_model_text("- 降低成本\n- **提升效率**\n1. 缩短周期"),
             "降低成本；提升效率；缩短周期"
         );
-        assert_eq!(clean_model_text("## 背景\n> 引用内容。\n---\n结论"), "背景；引用内容。结论");
+        assert_eq!(
+            clean_model_text("## 背景\n> 引用内容。\n---\n结论"),
+            "背景；引用内容。结论"
+        );
         assert_eq!(clean_model_text("第一点<br>第二点"), "第一点；第二点");
         assert_eq!(clean_model_text("- Fast\n- Cheap"), "Fast; Cheap");
     }
 
     #[test]
     fn keeps_plain_symbols_intact() {
-        assert_eq!(clean_model_text("增长 3.5 倍，5 * 3 = 15"), "增长 3.5 倍，5 * 3 = 15");
+        assert_eq!(
+            clean_model_text("增长 3.5 倍，5 * 3 = 15"),
+            "增长 3.5 倍，5 * 3 = 15"
+        );
         assert_eq!(clean_model_text("-5% 同比"), "-5% 同比");
         assert_eq!(clean_model_text("snake_case_name"), "snake_case_name");
     }

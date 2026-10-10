@@ -103,14 +103,18 @@ pub static LAYOUT_RULES: &[LayoutRule] = &[
     LayoutRule {
         kind: SlideKind::Compare,
         use_when: "EXACTLY two alternatives side by side",
-        requirement: Some("exactly two alternatives (object_count=pair or content_shape=comparison)"),
+        requirement: Some(
+            "exactly two alternatives (object_count=pair or content_shape=comparison)",
+        ),
         blocked_aspects: ULTRA_WIDE,
         check: is_pairwise,
     },
     LayoutRule {
         kind: SlideKind::IssueStack,
         use_when: "2-4 stacked problems, challenges, or risks",
-        requirement: Some("problem/challenge/risk content (argument_mode=warning/causal or problem wording)"),
+        requirement: Some(
+            "problem/challenge/risk content (argument_mode=warning/causal or problem wording)",
+        ),
         blocked_aspects: &[],
         check: is_problem_content,
     },
@@ -151,7 +155,10 @@ pub fn ineligibility(kind: &SlideKind, page: &PagePlan, aspect: AspectRatio) -> 
         return Some(format!("unsuitable for {} format", aspect_label(aspect)));
     }
     if !(rule.check)(page) {
-        return Some(format!("needs {}", rule.requirement.unwrap_or("different content")));
+        return Some(format!(
+            "needs {}",
+            rule.requirement.unwrap_or("different content")
+        ));
     }
     None
 }
@@ -309,7 +316,10 @@ mod tests {
             SlideKind::Swot,
         ];
         for kind in &kinds {
-            let count = LAYOUT_RULES.iter().filter(|rule| &rule.kind == kind).count();
+            let count = LAYOUT_RULES
+                .iter()
+                .filter(|rule| &rule.kind == kind)
+                .count();
             assert_eq!(count, 1, "{kind:?}");
         }
         assert_eq!(LAYOUT_RULES.len(), kinds.len());
@@ -340,9 +350,21 @@ mod tests {
     fn section_summary_pages_only_allow_section_intro() {
         let mut summary = page();
         summary.page_role = Some("section_summary".to_string());
-        assert!(is_eligible(&SlideKind::SectionIntro, &summary, AspectRatio::Ratio16x9));
-        assert!(!is_eligible(&SlideKind::FeatureGrid, &summary, AspectRatio::Ratio16x9));
-        assert!(!is_eligible(&SlideKind::SectionIntro, &page(), AspectRatio::Ratio16x9));
+        assert!(is_eligible(
+            &SlideKind::SectionIntro,
+            &summary,
+            AspectRatio::Ratio16x9
+        ));
+        assert!(!is_eligible(
+            &SlideKind::FeatureGrid,
+            &summary,
+            AspectRatio::Ratio16x9
+        ));
+        assert!(!is_eligible(
+            &SlideKind::SectionIntro,
+            &page(),
+            AspectRatio::Ratio16x9
+        ));
     }
 
     #[test]
@@ -393,10 +415,26 @@ mod tests {
         let mut with_image = page();
         with_image.preferred_assets = vec!["images/arch.png".to_string()];
         with_image.object_count = Some("pair".to_string());
-        assert!(!is_eligible(&SlideKind::Spotlight, &with_image, AspectRatio::Ratio32x9));
-        assert!(is_eligible(&SlideKind::Compare, &with_image, AspectRatio::Ratio32x9));
-        assert!(!is_eligible(&SlideKind::Compare, &with_image, AspectRatio::Ratio48x9));
-        assert!(!is_eligible(&SlideKind::FocusExample, &with_image, AspectRatio::Ratio48x9));
+        assert!(!is_eligible(
+            &SlideKind::Spotlight,
+            &with_image,
+            AspectRatio::Ratio32x9
+        ));
+        assert!(is_eligible(
+            &SlideKind::Compare,
+            &with_image,
+            AspectRatio::Ratio32x9
+        ));
+        assert!(!is_eligible(
+            &SlideKind::Compare,
+            &with_image,
+            AspectRatio::Ratio48x9
+        ));
+        assert!(!is_eligible(
+            &SlideKind::FocusExample,
+            &with_image,
+            AspectRatio::Ratio48x9
+        ));
     }
 
     #[test]
@@ -405,9 +443,15 @@ mod tests {
         assert!(rules.allowed_names.contains(&"feature_grid"));
         assert!(!rules.allowed_names.contains(&"compare"));
         assert!(!rules.allowed_names.contains(&"section_intro"));
-        assert!(rules.rules_text.contains("- feature_grid: 3+ parallel items"));
-        assert!(rules.rules_text.contains("- compare: unsuitable for 48:9 format"));
-        assert!(rules.rules_text.contains("- process: needs key_points >= 5"));
+        assert!(rules
+            .rules_text
+            .contains("- feature_grid: 3+ parallel items"));
+        assert!(rules
+            .rules_text
+            .contains("- compare: unsuitable for 48:9 format"));
+        assert!(rules
+            .rules_text
+            .contains("- process: needs key_points >= 5"));
         assert!(!rules.rules_text.contains("section_intro"));
         assert!(rules.rules_text.contains("ULTRA-WIDE FORMAT"));
     }

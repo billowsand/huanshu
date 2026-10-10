@@ -29,7 +29,9 @@ use crate::input::parse_markdown;
 use crate::types::AspectRatio;
 
 fn env_path(key: &str, default: impl FnOnce() -> PathBuf) -> PathBuf {
-    std::env::var_os(key).map(PathBuf::from).unwrap_or_else(default)
+    std::env::var_os(key)
+        .map(PathBuf::from)
+        .unwrap_or_else(default)
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -42,7 +44,9 @@ async fn layout_probe() {
         PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default())
             .join("auto-slidev-studio/settings.json")
     });
-    let out = env_path("LAYOUT_PROBE_OUT", || std::env::temp_dir().join("layout-probe"));
+    let out = env_path("LAYOUT_PROBE_OUT", || {
+        std::env::temp_dir().join("layout-probe")
+    });
     let aspect = match std::env::var("LAYOUT_PROBE_ASPECT").as_deref() {
         Ok("32x9") => AspectRatio::Ratio32x9,
         Ok("48x9") => AspectRatio::Ratio48x9,
@@ -116,14 +120,21 @@ async fn layout_probe() {
     )
     .expect("write report");
 
-    println!("\n{:<4} {:<14} {:<34} {}", "page", "assigned", "LLM candidates (score)", "title");
+    println!(
+        "\n{:<4} {:<14} {:<34} {}",
+        "page", "assigned", "LLM candidates (score)", "title"
+    );
     for ((plan, cands), page) in assigned.iter().zip(&candidates).zip(&plans) {
         let listed = cands
             .iter()
             .map(|c| format!("{}:{}", slide_kind_name(&c.kind), c.score))
             .collect::<Vec<_>>()
             .join(" ");
-        let marker = if cands.first().map(|c| &c.kind) == Some(&plan.kind) { " " } else { "*" };
+        let marker = if cands.first().map(|c| &c.kind) == Some(&plan.kind) {
+            " "
+        } else {
+            "*"
+        };
         println!(
             "{:<4} {}{:<13} {:<34} {}",
             plan.page_id,
