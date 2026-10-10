@@ -82,7 +82,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
             }"
           >
             <div
-              font-bold class="slide-text-caption sf-htitle" leading-snug
+              font-bold class="slide-card-title sf-htitle" leading-snug
               :style="{ color: toneVars(step.tone || 'blue').text }"
             >{{ step.title }}</div>
             <div v-if="step.body" class="slide-text-caption sf-hbody" opacity-60 leading-relaxed mt-1>
@@ -147,7 +147,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
                   :style="{ color: toneVars(step.tone || 'blue').text }"
                 />
                 <div
-                  font-bold class="slide-text-meta"
+                  font-bold class="slide-card-title"
                   :style="{ color: toneVars(step.tone || 'blue').text }"
                 >{{ step.title }}</div>
               </div>

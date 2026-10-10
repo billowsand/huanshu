@@ -39,7 +39,7 @@ defineProps<{
           <StepNumber v-if="item.step" :num="item.step" />
           <div v-else-if="item.icon" :class="item.icon" class="slide-icon-2xl" text="var(--primary)" mt-1 flex-shrink-0 />
           <div>
-            <div font-bold mb-1>{{ item.title }}</div>
+            <div class="slide-card-title" mb-1>{{ item.title }}</div>
             <div class="slide-text-meta" opacity-70 v-html="item.body" />
           </div>
         </GlassCard>

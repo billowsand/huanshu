@@ -310,19 +310,19 @@ const processDensityClass = computed(() => {
 
 .phase-head__title {
   margin-top: 0.7rem;
-  font-size: var(--type-body-strong);
+  font-size: var(--type-card-title);
   font-weight: 700;
   line-height: 1.15;
 }
 
 .process-slide--compact .phase-head__title {
   margin-top: 0.58rem;
-  font-size: calc(var(--type-body-strong) * 0.96);
+  font-size: calc(var(--type-card-title) * 0.96);
 }
 
 .process-slide--dense .phase-head__title {
   margin-top: 0.48rem;
-  font-size: calc(var(--type-body-strong) * 0.9);
+  font-size: calc(var(--type-card-title) * 0.9);
   line-height: 1.12;
 }
 

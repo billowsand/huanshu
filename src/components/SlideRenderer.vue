@@ -234,7 +234,7 @@ const slideProps = computed(() => {
     case 'closing':
       return { badges: s.badges, title: s.title, subtitle: s.subtitle, note: s.note ?? '' }
     case 'overview':
-      return { section: s.section ?? '00', title: s.title, items: s.overview_items ?? [], note: s.note ?? '' }
+      return { section: s.section ?? '00', title: s.title, items: s.overview_items ?? [], note: s.note ?? '', aspectRatio: s.aspect_ratio }
     case 'section_intro':
       return {
         section: s.section ?? '',

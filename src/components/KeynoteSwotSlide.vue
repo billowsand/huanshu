@@ -202,7 +202,7 @@ function summaryFirst(quadrantKey: string) {
 }
 
 .swot-flag-text {
-  font-size: var(--type-body);
+  font-size: calc(var(--type-body) * 1.25);
   font-weight: 700;
   line-height: 1.05;
   white-space: nowrap;

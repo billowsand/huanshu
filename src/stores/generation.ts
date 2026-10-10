@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import type { SlideBlueprint, AspectRatio } from '../components/types'
+import type { PageProgressStatus } from '../utils/generationProgress'
+import { countReadyBlueprints } from '../utils/generationProgress'
 export type { SlideBlueprint, AspectRatio } from '../components/types'
 
 export type GenStage =
@@ -23,6 +25,7 @@ export interface PageStatusEvent {
   stage: PageStage
   message?: string
   blueprint?: unknown
+  waiting?: boolean
 }
 
 export interface GenEvent {
@@ -83,10 +86,10 @@ export const useGenerationStore = defineStore('generation', () => {
   const logs = ref<GenerationLogEntry[]>([])
   const currentRun = ref<GenerationRun | null>(null)
   const activeProjectId = ref<number | null>(null)
-  const pageStatuses = ref<Map<number, { stage: PageStage, message?: string }>>(new Map())
+  const pageStatuses = ref<Map<number, PageProgressStatus>>(new Map())
 
   const stageLabel = computed(() => STAGE_LABELS[stage.value] ?? stage.value)
-  const slideCount = computed(() => blueprints.value.length)
+  const slideCount = computed(() => countReadyBlueprints(blueprints.value))
 
   let unlistenProgress: (() => void) | null = null
   let unlistenSlide: (() => void) | null = null
@@ -160,9 +163,12 @@ export const useGenerationStore = defineStore('generation', () => {
 
     unlistenPageStatus = await listen<PageStatusEvent>('gen:page_status', (e) => {
       const ev = e.payload
+      const previous = pageStatuses.value.get(ev.slide_index)
       pageStatuses.value.set(ev.slide_index, {
         stage: ev.stage,
         message: ev.message ?? undefined,
+        waiting: ev.waiting ?? false,
+        previousStage: ev.stage === 'error' ? (previous?.stage === 'error' ? previous.previousStage : previous?.stage) : undefined,
       })
       // Also update blueprints if a blueprint is provided
       if (ev.blueprint) {
@@ -227,6 +233,8 @@ export const useGenerationStore = defineStore('generation', () => {
       // After generation, load final blueprints
       const final = await invoke<SlideBlueprint[]>('get_blueprints')
       blueprints.value = final
+      completedSlides.value = new Set(final.map((_, index) => index))
+      pageStatuses.value = new Map(final.map((_, index) => [index, { stage: 'done' }]))
       stage.value = 'done'
       progress.value = 1
       message.value = `生成完成，共 ${count} 张幻灯片`
@@ -265,6 +273,8 @@ export const useGenerationStore = defineStore('generation', () => {
     try {
       const parsed = JSON.parse(json) as SlideBlueprint[]
       blueprints.value = parsed
+      completedSlides.value = new Set(parsed.map((_, index) => index))
+      pageStatuses.value = new Map(parsed.map((_, index) => [index, { stage: 'done' }]))
       stage.value = 'done'
       progress.value = 1
       message.value = `已加载 ${parsed.length} 张幻灯片`

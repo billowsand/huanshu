@@ -72,7 +72,7 @@ defineProps<{
                       :style="{ color: toneVars(evt.tone).text }"
                     />
                     <div
-                      font-bold class="slide-text-caption" leading-snug mb-1
+                      font-bold class="slide-card-title" leading-snug mb-1
                       :style="{ color: toneVars(evt.tone).text }"
                     >{{ evt.title }}</div>
                     <div class="slide-text-caption" opacity-60 leading-snug>{{ evt.body }}</div>
@@ -148,7 +148,7 @@ defineProps<{
                       :style="{ color: toneVars(evt.tone).text }"
                     />
                     <div
-                      font-bold class="slide-text-caption" leading-snug mb-1
+                      font-bold class="slide-card-title" leading-snug mb-1
                       :style="{ color: toneVars(evt.tone).text }"
                     >{{ evt.title }}</div>
                     <div class="slide-text-caption" opacity-60 leading-snug>{{ evt.body }}</div>

@@ -77,7 +77,7 @@ defineProps<{
               <span>优势</span>
             </div>
             <span
-              font-bold class="slide-text-meta"
+              font-bold class="slide-card-title"
               :style="{ color: toneVars(left.tone || 'blue').text }"
             >{{ left.title }}</span>
           </div>
@@ -197,7 +197,7 @@ defineProps<{
               <span>劣势</span>
             </div>
             <span
-              font-bold class="slide-text-meta"
+              font-bold class="slide-card-title"
               :style="{ color: toneVars(right.tone || 'amber').text }"
             >{{ right.title }}</span>
           </div>

@@ -41,7 +41,7 @@ defineProps<{
         text-center
       >
         <div :class="item.icon" class="slide-icon-2xl" :style="{ color: toneVars(item.tone).solid }" />
-        <div class="slide-body-tight center-grid-item-title">{{ item.title }}</div>
+        <div class="slide-card-title center-grid-item-title">{{ item.title }}</div>
         <div class="slide-meta" opacity-60>{{ item.desc }}</div>
       </GlassCard>
     </CardGrid>

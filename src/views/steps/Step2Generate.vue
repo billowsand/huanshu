@@ -4,6 +4,8 @@ import SlideRenderer from '../../components/SlideRenderer.vue'
 import type { SlideBlueprint, AspectRatio } from '../../components/types'
 import { ASPECT_DIMENSIONS } from '../../components/types'
 import type { GenerationLogEntry } from '../../stores/generation'
+import { PAGE_STAGES, pageStepState, resolveProgressStage, summarizeProgress } from '../../utils/generationProgress'
+import type { PageProgressStatus, PipelineStage } from '../../utils/generationProgress'
 
 type PagePlan = {
   page_id?: string
@@ -46,7 +48,7 @@ const props = defineProps<{
   mediaMap: Record<string, string>
   logs: GenerationLogEntry[]
   selectedSlideIndex: number | null
-  pageStatuses: Map<number, { stage: string, message?: string }>
+  pageStatuses: Map<number, PageProgressStatus>
 }>()
 
 const emit = defineEmits<{
@@ -88,25 +90,8 @@ const KIND_LABELS: Record<string, string> = {
   swot: 'SWOT',
 }
 
-type PageStageKey = 'pending' | 'planning' | 'layout' | 'content' | 'normalizing' | 'validating' | 'done' | 'error'
-
-const PAGE_STAGE_META: Array<{ key: PageStageKey, label: string }> = [
-  { key: 'planning', label: '页面规划' },
-  { key: 'layout', label: '布局排版' },
-  { key: 'content', label: '内容生成' },
-  { key: 'normalizing', label: '规范修复' },
-  { key: 'validating', label: '校验修复' },
-]
-
-const PAGE_STAGE_PROGRESS_ORDER: PageStageKey[] = [
-  'pending',
-  'planning',
-  'layout',
-  'content',
-  'normalizing',
-  'validating',
-  'done',
-]
+const PAGE_STAGE_META = PAGE_STAGES
+const progressDetailsOpen = ref(false)
 
 function detailText(value: unknown): string {
   if (value === null || value === undefined)
@@ -191,8 +176,8 @@ const slideItems = computed<SlideProgressItem[]>(() => {
   const total = Math.max(
     pagePlans.value.length,
     layoutPlans.value.length,
-    contentLogBySlideIndex.value.size,
-    props.pageStatuses.size,
+    ...Array.from(contentLogBySlideIndex.value.keys(), index => index + 1),
+    ...Array.from(props.pageStatuses.keys(), index => index + 1),
     props.blueprints.length,
     props.slideCount,
   )
@@ -279,42 +264,6 @@ function kindLabel(kind?: string | null): string {
   return KIND_LABELS[kind] ?? kind
 }
 
-function resolvePageStage(item: SlideProgressItem): PageStageKey {
-  // Priority 1: Use per-page status from gen:page_status events
-  const ps = props.pageStatuses.get(item.index)
-  if (ps?.stage) {
-    if (['planning', 'layout', 'content', 'normalizing', 'validating', 'done', 'error', 'pending'].includes(ps.stage))
-      return ps.stage as PageStageKey
-  }
-
-  // Priority 2: Fallback for backward compatibility when pageStatuses is not available
-  // Determine stage based on what has been completed, not what is about to start
-  if (item.blueprint)
-    return 'done'
-
-  // Has layout plan: page has completed layout stage
-  if (item.layoutPlan) {
-    // If global stage is still 'generating', treat as content phase
-    if (props.stage === 'generating')
-      return 'content'
-    return 'layout'
-  }
-
-  // Has page plan: page has completed planning stage
-  if (item.pagePlan) {
-    // If global stage is still in planning phase, keep it as 'planning'
-    if (props.stage === 'page_plan')
-      return 'planning'
-    // Otherwise, it's ready for layout
-    return 'layout'
-  }
-
-  // Nothing completed yet: determine based on global stage
-  if (props.stage === 'page_plan')
-    return 'planning'
-  return 'pending'
-}
-
 function logStageLabel(stage: string): string {
   return LOG_STAGE_LABELS[stage] ?? stage
 }
@@ -330,123 +279,21 @@ function slideStatus(item: SlideProgressItem): { tone: string, label: string } {
     return { tone: 'error', label: '生成中断' }
   }
 
-  // Use per-page status from gen:page_status events
   const ps = props.pageStatuses.get(item.index)
-  if (ps) {
-    const stageLabelMap: Record<string, string> = {
-      planning: '页面规划中',
-      layout: '布局排版中',
-      content: '内容生成中',
-      normalizing: '规范修复中',
-      validating: '校验修复中',
-      done: '已完成',
-      error: '生成失败',
-      pending: '等待开始',
-    }
-    const toneMap: Record<string, string> = {
-      planning: 'active',
-      layout: 'active',
-      content: 'active',
-      normalizing: 'active',
-      validating: 'active',
-      done: 'done',
-      error: 'error',
-      pending: 'pending',
-    }
-    return {
-      tone: toneMap[ps.stage] ?? 'active',
-      label: stageLabelMap[ps.stage] ?? ps.stage,
-    }
-  }
-
-  // Fallback for backward compatibility (no page_status events)
-  if (props.stage === 'done' && item.blueprint)
-    return { tone: 'done', label: '已完成' }
-  if (item.blueprint)
-    return { tone: 'done', label: '内容已生成' }
-  if (props.stage === 'generating')
-    return { tone: 'active', label: '生成中' }
-  if (props.stage === 'page_plan')
-    return { tone: 'active', label: '规划中' }
-  return { tone: 'pending', label: '等待开始' }
+  const stage = resolveProgressStage(item, ps)
+  if (stage === 'done') return { tone: 'done', label: '已完成' }
+  if (stage === 'error') return { tone: 'error', label: '生成失败' }
+  if (!props.running && stage !== 'pending') return { tone: 'pending', label: '已中断' }
+  if (ps?.waiting || stage === 'pending') return { tone: 'pending', label: ps?.message || '等待开始' }
+  const label = PAGE_STAGES.find(s => s.key === stage)?.label
+  return { tone: 'active', label: `${label ?? '生成'}中` }
 }
 
-function stageStepState(item: SlideProgressItem, key: 'planning' | 'layout' | 'content' | 'normalizing' | 'validating'): 'done' | 'active' | 'pending' {
-  // Use per-page status from gen:page_status events
-  const ps = props.pageStatuses.get(item.index)
-  if (ps) {
-    const stageOrder = ['planning', 'layout', 'content', 'normalizing', 'validating', 'done']
-    const keyIdx = stageOrder.indexOf(key)
-    const psIdx = stageOrder.indexOf(ps.stage)
-    if (ps.stage === 'error' || ps.stage === 'pending') return 'pending'
-    if (psIdx >= stageOrder.indexOf('done')) return 'done'
-    if (psIdx > keyIdx) return 'done'
-    if (psIdx === keyIdx) return 'active'
-    return 'pending'
-  }
-
-  // Fallback for backward compatibility
-  if (key === 'planning') {
-    if (item.pagePlan) return 'done'
-    return props.stage === 'page_plan' ? 'active' : 'pending'
-  }
-  if (key === 'layout') {
-    if (item.layoutPlan) return 'done'
-    if (item.pagePlan) return 'active'
-    return 'pending'
-  }
-  if (item.blueprint) return 'done'
-  if (item.layoutPlan && props.stage === 'generating') return 'active'
-  return 'pending'
+function stageStepState(item: SlideProgressItem, key: PipelineStage) {
+  return pageStepState(item, props.pageStatuses.get(item.index), key, props.running)
 }
 
-const progressSummary = computed(() => {
-  const counts: Record<PageStageKey, number> = {
-    pending: 0,
-    planning: 0,
-    layout: 0,
-    content: 0,
-    normalizing: 0,
-    validating: 0,
-    done: 0,
-    error: 0,
-  }
-
-  for (const item of slideItems.value) {
-    counts[resolvePageStage(item)] += 1
-  }
-
-  const total = slideItems.value.length
-  const done = counts.done
-  const error = counts.error
-  const active = counts.planning + counts.layout + counts.content + counts.normalizing + counts.validating
-  const pending = counts.pending
-  const percent = total > 0 ? Math.round((done / total) * 100) : 0
-  const stageRank = Object.fromEntries(PAGE_STAGE_PROGRESS_ORDER.map((key, index) => [key, index])) as Record<PageStageKey, number>
-  const effectiveStages = slideItems.value.map(item => resolvePageStage(item) === 'error' ? 'pending' : resolvePageStage(item))
-
-  return {
-    total,
-    done,
-    error,
-    active,
-    pending,
-    percent,
-    doneWidth: total > 0 ? `${(done / total) * 100}%` : '0%',
-    errorWidth: total > 0 ? `${(error / total) * 100}%` : '0%',
-    activeWidth: total > 0 ? `${(active / total) * 100}%` : '0%',
-    stageCards: PAGE_STAGE_META.map(stage => ({
-      ...stage,
-      reached: effectiveStages.filter(current => stageRank[current] >= stageRank[stage.key]).length,
-      percent: total > 0
-        ? Math.round((effectiveStages.filter(current => stageRank[current] >= stageRank[stage.key]).length / total) * 100)
-        : 0,
-      width: total > 0
-        ? `${(effectiveStages.filter(current => stageRank[current] >= stageRank[stage.key]).length / total) * 100}%`
-        : '0%',
-    })),
-  }
-})
+const progressSummary = computed(() => summarizeProgress(slideItems.value, props.pageStatuses, props.running))
 
 function selectedDebugText(key: string): string {
   const detail = selectedSlide.value?.contentLog?.detail
@@ -515,40 +362,49 @@ onBeforeUnmount(() => {
         </div>
         <div class="gen-stat-chip">
           <span class="gen-stat-n gen-stat-n--accent">{{ promptLogCount }}</span>
-          <span class="gen-stat-lbl">LLM 调用</span>
+          <span class="gen-stat-lbl">生成记录</span>
         </div>
       </div>
     </div>
 
-    <div class="gen-progress-overview">
+    <section class="gen-progress-overview" aria-label="幻灯片生成进度">
       <div class="gpo-summary">
         <div class="gpo-main">
-          <div class="gpo-title">整体进度</div>
-          <div class="gpo-meta">
-            已完成 {{ progressSummary.done }} / {{ progressSummary.total }}
-            <span v-if="progressSummary.error > 0">· 失败 {{ progressSummary.error }}</span>
-            <span v-else-if="progressSummary.active > 0">· 进行中 {{ progressSummary.active }}</span>
-            <span v-else-if="progressSummary.pending > 0">· 待开始 {{ progressSummary.pending }}</span>
-          </div>
+          <span class="gpo-title">整体进度</span>
+          <span class="gpo-meta">已完成 {{ progressSummary.done }}/{{ progressSummary.total }}</span>
+          <span v-if="progressSummary.active" class="gpo-meta">进行中 {{ progressSummary.active }}</span>
+          <span v-if="progressSummary.error" class="gpo-meta gpo-error">失败 {{ progressSummary.error }}</span>
+          <span v-if="progressSummary.interrupted" class="gpo-meta">已中断 {{ progressSummary.interrupted }}</span>
         </div>
-        <div class="gpo-percent">{{ progressSummary.percent }}%</div>
-      </div>
-      <div class="gpo-bar" aria-hidden="true">
-        <span class="gpo-bar-segment is-done" :style="{ width: progressSummary.doneWidth }" />
-        <span class="gpo-bar-segment is-active" :style="{ width: progressSummary.activeWidth }" />
-        <span class="gpo-bar-segment is-error" :style="{ width: progressSummary.errorWidth }" />
-      </div>
-      <div class="gpo-stage-grid">
-        <div v-for="stage in progressSummary.stageCards" :key="stage.key" class="gpo-stage-card" :class="`is-${stage.key}`">
-          <div class="gpo-stage-count">{{ stage.percent }}%</div>
-          <div class="gpo-stage-label">{{ stage.label }}</div>
-          <div class="gpo-stage-meta">{{ stage.reached }} / {{ progressSummary.total }}</div>
-          <div class="gpo-stage-bar" aria-hidden="true">
-            <span class="gpo-stage-bar-fill" :style="{ width: stage.width }" />
-          </div>
+        <div class="gpo-actions">
+          <span class="gpo-percent">{{ progressSummary.percent }}%</span>
+          <button type="button" class="gpo-toggle" :aria-expanded="progressDetailsOpen" aria-controls="generation-progress-details" @click="progressDetailsOpen = !progressDetailsOpen">
+            {{ progressDetailsOpen ? '收起详情' : '查看详情' }}
+            <span class="i-carbon:chevron-down" :class="{ 'is-open': progressDetailsOpen }" />
+          </button>
         </div>
       </div>
-    </div>
+      <div class="gpo-bar" role="progressbar" aria-label="已完成幻灯片比例" :aria-valuenow="progressSummary.percent" :aria-valuetext="`已完成 ${progressSummary.done}/${progressSummary.total}`" :aria-valuemin="0" :aria-valuemax="100">
+        <span class="gpo-bar-fill" :style="{ width: progressSummary.doneWidth }" />
+      </div>
+      <ol class="gpo-stages" aria-label="生成阶段">
+        <li v-for="stage in progressSummary.stageCards" :key="stage.key" class="gpo-stage" :class="`is-${stage.state}`">
+          <span class="gpo-stage-icon" aria-hidden="true"><span v-if="stage.state === 'done'" class="i-carbon:checkmark" /><span v-else-if="stage.state === 'active'" class="gpo-stage-dot" /></span>
+          <div class="gpo-stage-body">
+            <div class="gpo-stage-heading"><span>{{ stage.label }}</span><span v-if="stage.active" class="gpo-stage-badge">进行中</span><span v-else-if="stage.state === 'done'" class="sr-only">已完成</span></div>
+            <span v-if="stage.completed || stage.active" class="gpo-stage-meta">{{ stage.completed }}/{{ progressSummary.total }}</span>
+          </div>
+        </li>
+      </ol>
+      <div v-if="progressDetailsOpen" id="generation-progress-details" class="gpo-details">
+        <p>完成数仅统计已通过该阶段的页面；整体进度按全部阶段完成的页面计算。</p>
+        <p>共 {{ progressSummary.total }} 页 · 已完成 {{ progressSummary.done }} · 进行中 {{ progressSummary.active }} · 等待 {{ progressSummary.pending }} · 失败 {{ progressSummary.error }} · 已中断 {{ progressSummary.interrupted }}</p>
+        <div class="gpo-detail-table" role="table" aria-label="各阶段进度">
+          <div class="gpo-detail-row" role="row"><span role="columnheader">阶段</span><span role="columnheader">已完成</span><span role="columnheader">进行中</span><span role="columnheader">完成比例</span></div>
+          <div v-for="stage in progressSummary.stageCards" :key="stage.key" class="gpo-detail-row" role="row"><span role="cell">{{ stage.label }}</span><span role="cell">{{ stage.completed }}/{{ progressSummary.total }}</span><span role="cell">{{ stage.active }}</span><span role="cell">{{ stage.percent }}%</span></div>
+        </div>
+      </div>
+    </section>
 
     <div class="slides-workbench">
       <div class="slides-grid-panel">
@@ -735,138 +591,39 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.gen-progress-overview {
-  border: 1px solid var(--studio-border);
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)),
-    var(--studio-surface);
-  padding: 1rem 1.1rem;
-  margin-bottom: 1rem;
-}
-
-.gpo-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.gpo-main {
-  min-width: 0;
-}
-
-.gpo-title {
-  font-size: 0.84rem;
-  font-weight: 700;
-}
-
-.gpo-meta {
-  margin-top: 0.28rem;
-  font-size: 0.8rem;
-  color: var(--studio-muted);
-}
-
-.gpo-percent {
-  flex-shrink: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.gpo-bar {
-  margin-top: 0.9rem;
-  height: 10px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(255,255,255,0.06);
-  display: flex;
-}
-
-.gpo-bar-segment {
-  height: 100%;
-  transition: width 0.2s ease;
-}
-
-.gpo-bar-segment.is-done {
-  background: linear-gradient(90deg, rgba(16, 185, 129, 0.92), rgba(52, 211, 153, 0.92));
-}
-
-.gpo-bar-segment.is-active {
-  background: linear-gradient(90deg, rgba(59, 130, 246, 0.92), rgba(96, 165, 250, 0.92));
-}
-
-.gpo-bar-segment.is-error {
-  background: linear-gradient(90deg, rgba(239, 68, 68, 0.92), rgba(248, 113, 113, 0.92));
-}
-
-.gpo-stage-grid {
-  margin-top: 0.95rem;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.gpo-stage-card {
-  border: 1px solid var(--studio-border);
-  border-radius: 14px;
-  background: rgba(255,255,255,0.02);
-  padding: 0.8rem 0.9rem;
-}
-
-.gpo-stage-card.is-planning {
-  background: rgba(251, 191, 36, 0.08);
-}
-
-.gpo-stage-card.is-layout {
-  background: rgba(56, 189, 248, 0.08);
-}
-
-.gpo-stage-card.is-content {
-  background: rgba(59, 130, 246, 0.1);
-}
-
-.gpo-stage-card.is-normalizing {
-  background: rgba(168, 85, 247, 0.08);
-}
-
-.gpo-stage-card.is-validating {
-  background: rgba(16, 185, 129, 0.08);
-}
-
-.gpo-stage-count {
-  font-size: 1.25rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.gpo-stage-label {
-  margin-top: 0.2rem;
-  font-size: 0.78rem;
-  color: var(--studio-muted);
-}
-
-.gpo-stage-meta {
-  margin-top: 0.18rem;
-  font-size: 0.72rem;
-  color: var(--studio-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.gpo-stage-bar {
-  margin-top: 0.55rem;
-  height: 6px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(255,255,255,0.08);
-}
-
-.gpo-stage-bar-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: rgba(255,255,255,0.72);
-}
+.gen-progress-overview { border: 1px solid var(--studio-border); border-radius: 14px; background: var(--studio-surface); padding: 0.9rem 1.1rem; margin-bottom: 1rem; flex-shrink: 0; }
+.gpo-summary, .gpo-main, .gpo-actions { display: flex; align-items: center; gap: 1rem; }
+.gpo-summary { justify-content: space-between; }
+.gpo-main { min-width: 0; flex-wrap: wrap; gap: 0.45rem 1rem; }
+.gpo-title { font-size: 0.88rem; font-weight: 700; }
+.gpo-meta, .gpo-toggle { font-size: 0.78rem; color: var(--studio-muted); }
+.gpo-error { color: var(--studio-error); }
+.gpo-actions { flex-shrink: 0; }
+.gpo-percent { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gpo-toggle { display: flex; align-items: center; gap: 0.4rem; background: transparent; border: 0; border-left: 1px solid var(--studio-border); padding: 0.3rem 0 0.3rem 1rem; cursor: pointer; }
+.gpo-toggle:hover { color: var(--studio-text); }
+.gpo-toggle:focus-visible { outline: 2px solid var(--studio-primary); outline-offset: 4px; border-radius: 3px; }
+.gpo-toggle .is-open { transform: rotate(180deg); }
+.gpo-bar { margin-top: 0.6rem; height: 4px; border-radius: 999px; overflow: hidden; background: var(--studio-border); }
+.gpo-bar-fill { display: block; height: 100%; background: var(--studio-primary); transition: width 0.2s ease; }
+.gpo-stages { list-style: none; margin: 0.85rem 0 0; padding: 0; display: flex; gap: 1rem; }
+.gpo-stage { display: flex; align-items: center; gap: 0.6rem; flex: 1; min-width: 0; color: var(--studio-muted); }
+.gpo-stage:not(:last-child)::after { content: ''; flex: 1; min-width: 12px; height: 1px; margin-left: 0.25rem; background: var(--studio-border); }
+.gpo-stage-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--studio-border-hover); border-radius: 50%; flex-shrink: 0; }
+.gpo-stage.is-done .gpo-stage-icon { background: var(--studio-success); color: var(--studio-surface); border-color: var(--studio-success); }
+.gpo-stage.is-active .gpo-stage-icon { border-color: #3b82f6; color: #3b82f6; }
+.gpo-stage-dot { width: 12px; height: 12px; border-radius: 50%; background: currentColor; }
+.gpo-stage.is-done, .gpo-stage.is-active { color: var(--studio-text); }
+.gpo-stage-body { flex-shrink: 0; }
+.gpo-stage-heading { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; white-space: nowrap; }
+.gpo-stage-badge { font-size: 0.65rem; color: #3b82f6; background: rgba(59,130,246,0.1); border-radius: 5px; padding: 0.12rem 0.3rem; }
+.gpo-stage-meta { display: block; margin-top: 0.16rem; font-size: 0.72rem; color: var(--studio-muted); font-variant-numeric: tabular-nums; }
+.gpo-details { margin-top: 0.85rem; border-top: 1px solid var(--studio-border); padding-top: 0.6rem; color: var(--studio-muted); font-size: 0.75rem; }
+.gpo-details p { margin: 0.3rem 0 0.6rem; }
+.gpo-detail-row { display: grid; grid-template-columns: 1.5fr repeat(3, 1fr); gap: 0.5rem; padding: 0.4rem 0; font-variant-numeric: tabular-nums; }
+.gpo-detail-row:first-child { font-weight: 600; color: var(--studio-text); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+@media (max-width: 1050px) { .gpo-stages { overflow-x: auto; padding-bottom: 0.25rem; } .gpo-stage { flex: 0 0 auto; } .gpo-stage:not(:last-child)::after { width: 20px; } }
 
 .slides-workbench {
   display: grid;
@@ -1295,10 +1052,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1200px) {
-  .gpo-stage-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .slides-workbench {
     grid-template-columns: 1fr;
   }
@@ -1312,10 +1065,6 @@ onBeforeUnmount(() => {
   .gpo-summary {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .gpo-stage-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .slides-grid {

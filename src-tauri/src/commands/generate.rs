@@ -28,6 +28,7 @@ pub struct PageStatusEvent {
     pub stage: String,
     pub message: Option<String>,
     pub blueprint: Option<SlideBlueprint>,
+    pub waiting: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -536,6 +537,7 @@ fn page_stage_callback(
                 stage: stage_str.to_string(),
                 message: msg.map(str::to_string),
                 blueprint: None,
+                waiting: false,
             },
         );
     })
@@ -760,7 +762,7 @@ async fn run_pipeline(
                 .collect::<Vec<_>>()
                 .join(" → ")
         ),
-        json!({ "assignment": assignment_report }),
+        json!({ "assignment": assignment_report, "page_plans": enriched_plans, "layout_plans": layout_plans }),
         true,
     );
     emit_progress(
@@ -773,6 +775,20 @@ async fn run_pipeline(
     );
 
     // Phase 2c: content → normalize → validate + repair (concurrent)
+    // Layout assignment has finished for all pages. Only pages that acquire a
+    // semaphore permit are actively generating; the others are queued.
+    for idx in 0..total {
+        let _ = app.emit(
+            "gen:page_status",
+            PageStatusEvent {
+                slide_index: idx,
+                stage: "content".to_string(),
+                message: Some("等待内容生成".to_string()),
+                blueprint: None,
+                waiting: true,
+            },
+        );
+    }
     let blueprints_arc =
         std::sync::Arc::new(tokio::sync::Mutex::new(vec![None::<SlideBlueprint>; total]));
     let completed_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0usize));
@@ -832,6 +848,7 @@ async fn run_pipeline(
                             stage: "done".to_string(),
                             message: Some(format!("幻灯片 {}/{} 完成", idx + 1, total)),
                             blueprint: Some(blueprint.clone()),
+                            waiting: false,
                         },
                     );
                     // Also emit gen:slide_ready for backward compatibility
@@ -873,6 +890,7 @@ async fn run_pipeline(
                             stage: "error".to_string(),
                             message: Some(format!("幻灯片 {} 生成失败: {e}", idx + 1)),
                             blueprint: None,
+                            waiting: false,
                         },
                     );
                 }

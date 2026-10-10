@@ -46,6 +46,7 @@ const sideVars = computed(() => {
   const size = (base: string) => `calc(${base} * var(--type-scale) * ${scale})`
   return {
     '--type-body': size('1.125rem'),
+    '--type-card-title': size('1.25rem'),
     '--type-body-tight': size('1.0625rem'),
     '--type-meta': size('1rem'),
     '--type-caption': size('0.9375rem'),
@@ -85,6 +86,7 @@ const sideVars = computed(() => {
       </div>
 
       <div
+        class="spotlight-side"
         :class="[sideWidth || 'w-72', { 'spotlight-side--dense': sideDense }]"
         :style="sideVars"
         flex flex-col gap-3 flex-shrink-0
@@ -100,7 +102,7 @@ const sideVars = computed(() => {
         >
           <div flex items-center gap-2 mb-2>
             <div v-if="panel.icon" :class="panel.icon" class="slide-icon-lg" :style="{ color: toneVars(panel.tone).text }" />
-            <span class="slide-body-tight spotlight-panel-title">{{ panel.title }}</span>
+            <span class="slide-card-title spotlight-panel-title">{{ panel.title }}</span>
           </div>
           <div v-if="panel.body" class="slide-meta" opacity-70 v-html="panel.body" />
           <div

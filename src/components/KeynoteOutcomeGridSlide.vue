@@ -74,7 +74,7 @@ const cardGap = computed(() => ({ normal: '1rem', compact: '0.75rem', mini: '0.5
         <div class="outcome-top-bar" h-1 :class="card.topBarClass || card.top_bar_class" />
         <div class="outcome-content" :style="bodyStyle">
           <div class="outcome-icon" :class="card.icon" :style="{ ...iconStyle, color: toneVars(card.tone).text }" />
-          <div class="outcome-title" font-bold :style="{ fontSize: bodyStyle.fontSize }">{{ card.title }}</div>
+          <div class="outcome-title slide-card-title" font-bold :style="{ fontSize: `calc(${bodyStyle.fontSize} * 1.25)` }">{{ card.title }}</div>
           <div class="outcome-copy" opacity-60 leading-relaxed :style="{ fontSize: bodyStyle.fontSize }" v-html="card.body" />
           <TagBadge :color="card.tone" inline class="outcome-tag">{{ card.tag }}</TagBadge>
         </div>

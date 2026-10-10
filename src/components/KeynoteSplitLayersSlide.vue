@@ -61,7 +61,7 @@ const gridGap = computed(() => {
             <div :class="item.icon" class="slide-icon-2xl" text="var(--primary)" mt-1 flex-shrink-0 />
             <div class="min-w-0">
               <div class="split-left-title-row">
-                <div font-bold class="slide-text-meta">{{ item.title }}</div>
+                <div font-bold class="slide-card-title">{{ item.title }}</div>
                 <div class="split-left-index">{{ String(idx + 1).padStart(2, '0') }}</div>
               </div>
               <div class="slide-text-caption split-left-body" opacity-78 v-html="item.body" />
@@ -72,7 +72,7 @@ const gridGap = computed(() => {
       </div>
 
       <div class="glass-card split-right-card p-4 flex flex-col gap-3 min-h-0">
-        <div font-bold class="slide-text-meta" text="var(--primary)" mb-1>{{ layersTitle || '架构层次' }}</div>
+        <div font-bold class="slide-card-title" text="var(--primary)" mb-1>{{ layersTitle || '架构层次' }}</div>
         <div flex flex-col gap-2 class="slide-text-caption">
           <template v-for="(layer, idx) in layers" :key="layer.title">
             <div

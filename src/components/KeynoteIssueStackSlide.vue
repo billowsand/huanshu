@@ -98,7 +98,7 @@ defineProps<{
 }
 
 .issue-card__eyebrow {
-  font-size: var(--type-body-strong);
+  font-size: calc(var(--type-body) * 1.25);
   font-weight: 600;
   letter-spacing: 0.01em;
   opacity: 0.94;

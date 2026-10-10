@@ -85,9 +85,9 @@ const contentVars = computed(() => {
   if (scale === 1) return {}
   const size = (base: string) => `calc(${base} * var(--type-scale) * ${scale})`
   return {
-    '--type-grid-header-normal': size('1.125rem'),
-    '--type-grid-header-compact': size('1rem'),
-    '--type-grid-header-mini': size('0.9375rem'),
+    '--type-grid-header-normal': size('1.25rem'),
+    '--type-grid-header-compact': size('1.171875rem'),
+    '--type-grid-header-mini': size('1.09375rem'),
     '--type-grid-body-normal': size('1rem'),
     '--type-grid-body-compact': size('0.9375rem'),
     '--type-grid-body-mini': size('0.875rem'),

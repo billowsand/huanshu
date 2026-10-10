@@ -11,7 +11,7 @@
   font-family: var(--font-body);
 }
 
-:is(.slide-title, .cover-title, .closing-title, .slide-section-title, .slide-compact-title),
+:is(.slide-title, .cover-title, .closing-title, .slide-section-title, .slide-compact-title, .slide-card-title),
 :is(.slide-shell, .slidev-slide, .md-preview) :is(h1, h2, h3, h4, h5, h6) {
   font-family: var(--font-title) !important;
 }

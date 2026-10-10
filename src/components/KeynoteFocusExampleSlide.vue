@@ -43,7 +43,7 @@ defineProps<{
           >
             <div :class="point.icon" class="slide-icon-2xl" text="var(--primary)" mt-1 flex-shrink-0 />
             <div>
-              <div font-bold class="slide-text-meta" text="var(--primary-light)">{{ point.title }}</div>
+              <div font-bold class="slide-card-title" text="var(--primary-light)">{{ point.title }}</div>
               <div class="slide-text-caption" opacity-70 mt-1 v-html="point.body" />
             </div>
           </GlassCard>
@@ -51,7 +51,7 @@ defineProps<{
 
       <div class="glass-card p-5 flex flex-col justify-between">
         <div>
-          <div font-bold class="slide-text-meta" text="var(--primary)" mb-3>{{ exampleTitle }}</div>
+          <div font-bold class="slide-card-title" text="var(--primary)" mb-3>{{ exampleTitle }}</div>
           <div class="slide-text-caption" opacity-70 leading-relaxed mb-4 v-html="exampleBody" />
           <div class="divider-amber" mb-4 />
           <div font-bold class="slide-text-meta" mb-2>正确的关注顺序：</div>
