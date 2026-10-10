@@ -219,6 +219,69 @@ pub fn normalize_lengths(slide: &mut SlideBlueprint) {
         layer.title = summarize(&clean_model_text(&layer.title), 16);
         layer.meta = summarize(&clean_model_text(&layer.meta), 36);
     }
+
+    clean_remaining_text(slide);
+}
+
+/// 上面只对有长度预算的字段做了「清洗 + 截断」；其余用户可见文本字段同样可能带
+/// Markdown 残留（`**`、`- `、换行列表），这里只清洗、不截断，避免改变既有版式行为。
+fn clean_remaining_text(slide: &mut SlideBlueprint) {
+    fn clean(text: &mut String) {
+        *text = clean_model_text(text);
+    }
+    fn clean_opt(text: &mut Option<String>) {
+        if let Some(value) = text {
+            clean(value);
+        }
+    }
+
+    clean_opt(&mut slide.badge);
+    clean_opt(&mut slide.accent);
+    slide.badges.iter_mut().for_each(clean);
+    for item in &mut slide.overview_items {
+        clean(&mut item.title);
+        clean(&mut item.desc);
+    }
+    for card in &mut slide.cards {
+        clean_opt(&mut card.footer_tag);
+        clean_opt(&mut card.risk);
+        clean_opt(&mut card.tag);
+    }
+    for panel in &mut slide.panels {
+        clean_opt(&mut panel.highlight);
+    }
+    for item in &mut slide.ranking {
+        clean(&mut item.label);
+        clean(&mut item.meta);
+    }
+    for event in &mut slide.timeline_events {
+        clean(&mut event.date);
+        clean(&mut event.title);
+        clean(&mut event.body);
+    }
+    for step in &mut slide.steps {
+        clean(&mut step.title);
+        clean_opt(&mut step.body);
+    }
+    for phase in &mut slide.phases {
+        clean(&mut phase.phase);
+        clean(&mut phase.title);
+        clean_opt(&mut phase.highlight);
+        for step in &mut phase.steps {
+            clean(&mut step.label);
+            clean_opt(&mut step.desc);
+        }
+    }
+    if let Some(compare) = &mut slide.compare_data {
+        for side in [&mut compare.left, &mut compare.right] {
+            clean(&mut side.title);
+            clean_opt(&mut side.conclusion);
+            for item in &mut side.items {
+                clean(&mut item.label);
+                clean_opt(&mut item.desc);
+            }
+        }
+    }
 }
 
 pub fn normalize_tones(slide: &mut SlideBlueprint) {
@@ -921,7 +984,7 @@ pub async fn repair_one_slide(
                 "component_schema": schema,
             })];
 
-            let system = "You repair an invalid Slidev slide blueprint. Fix only what is necessary to satisfy validation while preserving the content intent. Return strict JSON. IMPORTANT: all icon fields must use the i-carbon: prefix (e.g. \"i-carbon:chart-line\"). Never use i-mdi:, i-fa:, or any other prefix.";
+            let system = "You repair an invalid Slidev slide blueprint. Fix only what is necessary to satisfy validation while preserving the content intent. Return strict JSON. IMPORTANT: all icon fields must use the i-carbon: prefix (e.g. \"i-carbon:chart-line\"). Never use i-mdi:, i-fa:, or any other prefix. All text fields are plain text: never use Markdown or HTML syntax (**bold**, list markers, # headings, `code`, links) or line breaks inside a field.";
             let user = format!(
                 "Document title: {}\n\nFailing slide with its plan and schema:\n{}\n\nValidation issues:\n{}\n\nReturn ONLY the corrected slide as JSON: {{\"slides\": [<corrected blueprint>]}}.",
                 doc.title,

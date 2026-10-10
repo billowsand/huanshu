@@ -231,13 +231,72 @@ pub fn summarize(text: &str, max_chars: usize) -> String {
 
 pub fn clean_model_text(text: &str) -> String {
     let cleaned = text
-        .replace("<br>", "；")
-        .replace("<br/>", "；")
-        .replace("<br />", "；")
-        .replace('\n', " ")
-        .trim()
-        .to_string();
+        .replace("<br>", "\n")
+        .replace("<br/>", "\n")
+        .replace("<br />", "\n");
+    let cleaned = strip_markdown(&cleaned);
     strip_english_only_clauses(&cleaned)
+}
+
+/// 幻灯片字段都是纯文本（多数模板用 `{{ }}` 插值，少数用 `v-html`），LLM 常把源
+/// Markdown 的 `**加粗**`、`- 列表`、`1. 编号`、`# 标题`、`` `代码` ``、`[链接](url)`
+/// 原样抄进字段，渲染时就成了裸符号。这里把它们还原成纯文本：行首块级标记去掉，
+/// 多行（通常是被塞进一个字段的列表）用「；」合并成一句，行内强调/代码/链接只留文字。
+pub fn strip_markdown(text: &str) -> String {
+    use regex::Regex;
+    use std::sync::OnceLock;
+
+    static BLOCK_PREFIX: OnceLock<Regex> = OnceLock::new();
+    static HRULE: OnceLock<Regex> = OnceLock::new();
+    static IMAGE: OnceLock<Regex> = OnceLock::new();
+    static LINK: OnceLock<Regex> = OnceLock::new();
+    static STAR_EM: OnceLock<Regex> = OnceLock::new();
+    static UNDERSCORE_STRONG: OnceLock<Regex> = OnceLock::new();
+    static HTML_EMPHASIS: OnceLock<Regex> = OnceLock::new();
+
+    // 标题 / 引用 / 无序列表 / 有序列表 / 任务列表，可叠加（如 `> - [x] 1. ...`）
+    let block_prefix = BLOCK_PREFIX.get_or_init(|| {
+        Regex::new(r"^(?:#{1,6}\s+|>\s?|[-*+]\s+|[•·▪●]\s*|\d{1,2}[.)、]\s+|\[[ xX]\]\s+)+").unwrap()
+    });
+    let hrule = HRULE.get_or_init(|| Regex::new(r"^\s*(?:[-*_]\s*){3,}$").unwrap());
+    let image = IMAGE.get_or_init(|| Regex::new(r"!\[([^\]]*)\]\([^)]*\)").unwrap());
+    let link = LINK.get_or_init(|| Regex::new(r"\[([^\]]+)\]\([^)]*\)").unwrap());
+    let star_em = STAR_EM.get_or_init(|| Regex::new(r"\*([^*\s](?:[^*]*[^*\s])?)\*").unwrap());
+    let underscore_strong =
+        UNDERSCORE_STRONG.get_or_init(|| Regex::new(r"__([^_]+)__").unwrap());
+    let html_emphasis = HTML_EMPHASIS
+        .get_or_init(|| Regex::new(r"(?i)</?(?:strong|b|em|i|u|mark|code)>").unwrap());
+
+    let mut merged = String::new();
+    for raw_line in text.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with("```") || hrule.is_match(line) {
+            continue;
+        }
+        let line = block_prefix.replace(line, "");
+        let line = image.replace_all(&line, "$1");
+        let line = link.replace_all(&line, "$1");
+        let line = line.replace("**", "").replace("~~", "").replace('`', "");
+        let line = underscore_strong.replace_all(&line, "$1");
+        let line = star_em.replace_all(&line, "$1");
+        let line = html_emphasis.replace_all(&line, "");
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if let Some(prev) = merged.chars().last() {
+            let cjk_context = is_cjk(prev) || line.chars().next().is_some_and(is_cjk);
+            let ends_with_punct = "。！？；;，,：:、".contains(prev);
+            match (ends_with_punct, cjk_context) {
+                (true, true) => {}
+                (true, false) => merged.push(' '),
+                (false, true) => merged.push('；'),
+                (false, false) => merged.push_str("; "),
+            }
+        }
+        merged.push_str(line);
+    }
+    merged
 }
 
 pub fn strip_english_only_clauses(text: &str) -> String {
@@ -258,12 +317,14 @@ pub fn strip_english_only_clauses(text: &str) -> String {
         if cjk == 0 && ascii_alpha >= 12 {
             continue;
         }
-        kept.push(trimmed.to_string());
+        // 保留原始片段（含分隔符与空白）直接拼接：按 `.` 切分会把 `3.5` 拆开，
+        // 若用空格 join 就会变成 `3. 5`，「；」后也会多出空格。
+        kept.push(segment);
     }
     if kept.is_empty() {
         text.to_string()
     } else {
-        kept.join(" ")
+        kept.concat().trim().to_string()
     }
 }
 
@@ -1107,4 +1168,37 @@ pub fn infer_asset_from_text(
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strips_inline_markdown() {
+        assert_eq!(
+            clean_model_text("**核心**能力：`RAG` 与 *检索* 结合，见[文档](https://x.y)"),
+            "核心能力：RAG 与 检索 结合，见文档"
+        );
+        assert_eq!(clean_model_text("__重点__ ~~旧方案~~"), "重点 旧方案");
+        assert_eq!(clean_model_text("<strong>加粗</strong>说明"), "加粗说明");
+    }
+
+    #[test]
+    fn flattens_block_markdown_into_one_sentence() {
+        assert_eq!(
+            clean_model_text("- 降低成本\n- **提升效率**\n1. 缩短周期"),
+            "降低成本；提升效率；缩短周期"
+        );
+        assert_eq!(clean_model_text("## 背景\n> 引用内容。\n---\n结论"), "背景；引用内容。结论");
+        assert_eq!(clean_model_text("第一点<br>第二点"), "第一点；第二点");
+        assert_eq!(clean_model_text("- Fast\n- Cheap"), "Fast; Cheap");
+    }
+
+    #[test]
+    fn keeps_plain_symbols_intact() {
+        assert_eq!(clean_model_text("增长 3.5 倍，5 * 3 = 15"), "增长 3.5 倍，5 * 3 = 15");
+        assert_eq!(clean_model_text("-5% 同比"), "-5% 同比");
+        assert_eq!(clean_model_text("snake_case_name"), "snake_case_name");
+    }
 }
