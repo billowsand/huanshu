@@ -134,9 +134,15 @@ onBeforeUnmount(() => {
 })
 
 // Auto-advance after generation completes
-watch(() => gen.stage, (stage) => {
-  if (stage === 'done' && currentStep.value === 2) {
-    setTimeout(() => { currentStep.value = 3 }, 800)
+watch(() => [gen.stage, gen.retryingPages.size,
+  Array.from(gen.pageStatuses.values()).some(status => status.stage === 'error')] as const,
+([stage, retrying, failed], _, onCleanup) => {
+  if (stage === 'done' && !retrying && !failed && currentStep.value === 2) {
+    const timer = setTimeout(() => {
+      if (currentStep.value === 2 && gen.stage === 'done' && !gen.retryingPages.size)
+        currentStep.value = 3
+    }, 800)
+    onCleanup(() => clearTimeout(timer))
   }
 })
 
@@ -328,7 +334,7 @@ const steps = computed(() => [
     status: currentStep.value > 3 ? 'done'
       : currentStep.value === 3 ? 'active'
       : 'pending',
-    clickable: gen.blueprints.length > 0,
+    clickable: gen.blueprints.length > 0 && gen.retryingPages.size === 0,
   },
 ])
 
@@ -340,7 +346,7 @@ function goStep(n: number) {
 const canGenerate = computed(() =>
   mdContent.value.trim().length > 0 &&
   projectName.value.trim().length > 0 &&
-  !gen.running
+  !gen.running && gen.retryingPages.size === 0
 )
 
 // ── Name editing ────────────────────────────────────────────────────────────────
@@ -481,10 +487,13 @@ onMounted(() => {
         :logs="gen.logs"
         :selected-slide-index="selectedSlideIndex"
         :page-statuses="gen.pageStatuses"
+        :retrying-pages="gen.retryingPages"
+        :run-id="gen.currentRun?.id"
         @update:selected-slide-index="selectedSlideIndex = $event"
         @go-to-step-3="currentStep = 3"
         @go-to-step-1="currentStep = 1"
         @retry="onStep1StartGenerate"
+        @retry-page="gen.retryPage"
       />
 
       <!-- Step 3 -->
@@ -582,7 +591,7 @@ onMounted(() => {
 }
 
 .sidebar-header {
-  padding: 0.875rem 1rem 0.75rem;
+  padding: 0 1rem;
   border-bottom: 1px solid var(--studio-border);
   display: flex;
   align-items: center;
@@ -638,9 +647,12 @@ onMounted(() => {
 
 .step-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.75rem;
-  padding: 0 0.25rem;
+  min-height: 72px;
+  padding: 0.5rem 0.75rem;
+  position: relative;
+  flex-shrink: 0;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -678,7 +690,6 @@ onMounted(() => {
   background: var(--studio-primary-bg);
   color: var(--studio-primary);
   box-shadow: 0 0 0 4px var(--studio-primary-bg), 0 0 16px var(--studio-primary-bg);
-  transform: scale(1.1);
 }
 
 .step-item.done .step-circle {
@@ -703,12 +714,14 @@ onMounted(() => {
 
 .step-line {
   width: 2px;
-  height: 32px;
+  height: calc(100% - 40px);
   background: var(--studio-border);
-  margin: 2px 0;
+  margin: 0;
   transition: background 0.4s ease;
   border-radius: 1px;
-  position: relative;
+  position: absolute;
+  left: calc(0.75rem + 15px);
+  top: calc(50% + 20px);
   overflow: hidden;
 }
 
@@ -731,8 +744,7 @@ onMounted(() => {
 }
 
 .step-text {
-  padding-top: 4px;
-  padding-bottom: 30px;
+  min-width: 0;
 }
 
 .step-label {
@@ -1781,6 +1793,13 @@ onMounted(() => {
 }
 
 /* ── Step 3: Editor ──────────────────────────────────────────────────────── */
+.sidebar-header, .edit-col-head {
+  box-sizing: border-box;
+  height: var(--workflow-header-height, 3.5rem);
+  min-height: var(--workflow-header-height, 3.5rem);
+  flex-shrink: 0;
+}
+
 .edit-three-col {
   flex: 1;
   display: grid;
@@ -1801,7 +1820,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0 0.75rem;
   background: var(--studio-panel-2);
   border-bottom: 1px solid var(--studio-border);
   font-size: 0.68rem;

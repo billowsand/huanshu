@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SlideRenderer from '../../components/SlideRenderer.vue'
-import type { SlideBlueprint, AspectRatio } from '../../components/types'
+import RetryLayoutDialog from '../../components/RetryLayoutDialog.vue'
+import type { SlideBlueprint, AspectRatio, SlideKind } from '../../components/types'
 import { ASPECT_DIMENSIONS } from '../../components/types'
 import type { GenerationLogEntry } from '../../stores/generation'
 import { PAGE_STAGES, pageStepState, resolveProgressStage, summarizeProgress } from '../../utils/generationProgress'
@@ -49,6 +50,8 @@ const props = defineProps<{
   logs: GenerationLogEntry[]
   selectedSlideIndex: number | null
   pageStatuses: Map<number, PageProgressStatus>
+  retryingPages: Set<number>
+  runId?: number
 }>()
 
 const emit = defineEmits<{
@@ -56,6 +59,7 @@ const emit = defineEmits<{
   'go-to-step-3': []
   'go-to-step-1': []
   'retry': []
+  'retry-page': [index: number, kind: SlideKind]
 }>()
 
 const LOG_STAGE_LABELS: Record<string, string> = {
@@ -92,6 +96,7 @@ const KIND_LABELS: Record<string, string> = {
 
 const PAGE_STAGE_META = PAGE_STAGES
 const progressDetailsOpen = ref(false)
+const retryLayoutDialog = ref<InstanceType<typeof RetryLayoutDialog> | null>(null)
 
 function detailText(value: unknown): string {
   if (value === null || value === undefined)
@@ -173,13 +178,16 @@ const promptLogCount = computed(() => props.logs.filter(log => ['input', 'prompt
 const recentLogs = computed(() => props.logs.slice(-10).reverse())
 
 const slideItems = computed<SlideProgressItem[]>(() => {
+  // Progress indices refer to content pages, while the assembled deck starts
+  // with a cover and overview and ends with a closing slide.
+  const contentBlueprints = props.blueprints[0]?.kind === 'cover'
+    ? props.blueprints.slice(2, -1) : props.blueprints
   const total = Math.max(
     pagePlans.value.length,
     layoutPlans.value.length,
     ...Array.from(contentLogBySlideIndex.value.keys(), index => index + 1),
     ...Array.from(props.pageStatuses.keys(), index => index + 1),
-    props.blueprints.length,
-    props.slideCount,
+    contentBlueprints.length,
   )
 
   return Array.from({ length: total }, (_, index) => {
@@ -188,7 +196,7 @@ const slideItems = computed<SlideProgressItem[]>(() => {
       index,
       pagePlan: pagePlans.value[index] ?? extractPagePlanFromLog(contentLog),
       layoutPlan: layoutPlans.value[index] ?? extractLayoutPlanFromLog(contentLog),
-      blueprint: props.blueprints[index] ?? extractBlueprintFromLog(contentLog),
+      blueprint: contentBlueprints[index] ?? extractBlueprintFromLog(contentLog),
       contentLog,
     }
   })
@@ -269,6 +277,8 @@ function logStageLabel(stage: string): string {
 }
 
 function slideStatus(item: SlideProgressItem): { tone: string, label: string } {
+  if (props.retryingPages.has(item.index))
+    return { tone: 'active', label: props.running ? '等待重试' : '重试中' }
   if (props.stage === 'error') {
     // Check if this specific page had an error
     const ps = props.pageStatuses.get(item.index)
@@ -290,10 +300,10 @@ function slideStatus(item: SlideProgressItem): { tone: string, label: string } {
 }
 
 function stageStepState(item: SlideProgressItem, key: PipelineStage) {
-  return pageStepState(item, props.pageStatuses.get(item.index), key, props.running)
+  return pageStepState(item, props.pageStatuses.get(item.index), key, props.running || props.retryingPages.size > 0)
 }
 
-const progressSummary = computed(() => summarizeProgress(slideItems.value, props.pageStatuses, props.running))
+const progressSummary = computed(() => summarizeProgress(slideItems.value, props.pageStatuses, props.running || props.retryingPages.size > 0))
 
 function selectedDebugText(key: string): string {
   const detail = selectedSlide.value?.contentLog?.detail
@@ -449,7 +459,7 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="spc-summary">
-              <span v-if="item.layoutPlan" class="spc-layout-tag">{{ kindLabel(item.layoutPlan.kind) }}</span>
+              <span v-if="item.layoutPlan" class="spc-layout-tag">{{ kindLabel(item.blueprint?.kind ?? item.layoutPlan.kind) }}</span>
               <span v-else class="spc-layout-tag spc-layout-tag--pending">等待布局排版结果</span>
             </div>
 
@@ -484,7 +494,7 @@ onBeforeUnmount(() => {
             <div class="sdp-title">{{ selectedSlide.pagePlan?.page_title || selectedSlide.layoutPlan?.title || selectedSlide.blueprint?.title || '待生成幻灯片' }}</div>
             <div class="sdp-meta">
               <span class="sdp-chip">{{ slideStatus(selectedSlide).label }}</span>
-              <span v-if="selectedSlide.layoutPlan?.kind" class="sdp-chip sdp-chip--accent">{{ kindLabel(selectedSlide.layoutPlan.kind) }}</span>
+              <span v-if="selectedSlide.layoutPlan?.kind" class="sdp-chip sdp-chip--accent">{{ kindLabel(selectedSlide.blueprint?.kind ?? selectedSlide.layoutPlan.kind) }}</span>
               <span v-if="selectedSlide.pagePlan?.section_title" class="sdp-chip">{{ selectedSlide.pagePlan.section_title }}</span>
             </div>
           </div>
@@ -507,6 +517,14 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="sdp-body">
+            <section v-if="props.pageStatuses.get(selectedSlide.index)?.stage === 'error' || props.retryingPages.has(selectedSlide.index)" class="sdp-section">
+              <div class="sdp-section-title">生成失败，可单独重试</div>
+              <p class="sdp-text" role="status">{{ props.retryingPages.has(selectedSlide.index) ? (props.running ? '已排队，其他页面生成结束后重试。' : '正在重新生成这一页…') : props.pageStatuses.get(selectedSlide.index)?.message }}</p>
+              <button type="button" class="btn btn-primary" :disabled="props.retryingPages.has(selectedSlide.index) || (!props.running && props.retryingPages.size > 0)" @click="retryLayoutDialog?.open(props.runId, selectedSlide.index)">
+                <span class="i-carbon:renew" /> {{ props.retryingPages.has(selectedSlide.index) ? '重试处理中' : '重试这一页' }}
+              </button>
+              <p v-if="selectedSlide.blueprint" class="sdp-note">当前保留简化内容，可继续编辑，也可重试生成。</p>
+            </section>
             <section class="sdp-section">
               <div class="sdp-section-title">规划页面</div>
               <p v-if="selectedSlide.pagePlan?.objective" class="sdp-text">{{ selectedSlide.pagePlan.objective }}</p>
@@ -520,8 +538,9 @@ onBeforeUnmount(() => {
             <section class="sdp-section">
               <div class="sdp-section-title">布局排版</div>
               <p v-if="selectedSlide.layoutPlan" class="sdp-text">
-                <strong>{{ kindLabel(selectedSlide.layoutPlan.kind) }}</strong>
-                <span v-if="selectedSlide.layoutPlan.reason"> · {{ selectedSlide.layoutPlan.reason }}</span>
+                <strong>{{ kindLabel(selectedSlide.blueprint?.kind ?? selectedSlide.layoutPlan.kind) }}</strong>
+                <span v-if="selectedSlide.blueprint && selectedSlide.blueprint.kind !== selectedSlide.layoutPlan.kind"> · 已调整布局</span>
+                <span v-else-if="selectedSlide.layoutPlan.reason"> · {{ selectedSlide.layoutPlan.reason }}</span>
               </p>
               <p v-if="selectedSlide.layoutPlan?.subtitle" class="sdp-note">{{ selectedSlide.layoutPlan.subtitle }}</p>
               <p v-if="!selectedSlide.layoutPlan" class="sdp-empty-hint">这一页还没有布局方案。</p>
@@ -577,17 +596,18 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="!props.running" class="step-actions">
-      <button v-if="props.stage === 'done'" class="btn btn-primary" @click="$emit('go-to-step-3')">
+      <button v-if="props.stage === 'done'" class="btn btn-primary" :disabled="props.retryingPages.size > 0" @click="$emit('go-to-step-3')">
         <span class="i-carbon:edit" /> 前往编辑
       </button>
       <button v-if="props.stage === 'error'" class="btn" @click="$emit('go-to-step-1')">
         <span class="i-carbon:arrow-left" /> 返回修改
       </button>
-      <button v-if="props.stage === 'error'" class="btn btn-primary" @click="$emit('retry')">
-        <span class="i-carbon:renew" /> 重试
+      <button v-if="props.stage === 'error'" class="btn btn-primary" :disabled="props.retryingPages.size > 0" @click="$emit('retry')">
+        <span class="i-carbon:renew" /> 重新生成全部
       </button>
     </div>
   </div>
+    <RetryLayoutDialog ref="retryLayoutDialog" @confirm="(index, kind) => emit('retry-page', index, kind)" />
 </template>
 
 <style scoped>

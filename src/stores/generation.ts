@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import type { SlideBlueprint, AspectRatio } from '../components/types'
+import type { SlideBlueprint, AspectRatio, SlideKind } from '../components/types'
 import type { PageProgressStatus } from '../utils/generationProgress'
 import { countReadyBlueprints } from '../utils/generationProgress'
 export type { SlideBlueprint, AspectRatio } from '../components/types'
@@ -87,6 +87,9 @@ export const useGenerationStore = defineStore('generation', () => {
   const currentRun = ref<GenerationRun | null>(null)
   const activeProjectId = ref<number | null>(null)
   const pageStatuses = ref<Map<number, PageProgressStatus>>(new Map())
+  const retryingPages = ref<Set<number>>(new Set())
+  const queuedRetries = new Map<number, SlideKind | undefined>()
+  let generationVersion = 0
 
   const stageLabel = computed(() => STAGE_LABELS[stage.value] ?? stage.value)
   const slideCount = computed(() => countReadyBlueprints(blueprints.value))
@@ -209,6 +212,8 @@ export const useGenerationStore = defineStore('generation', () => {
   }
 
   async function generate(mdContent: string, frontmatterTitle?: string, granularity?: string, aspectRatio?: AspectRatio, projectId?: number | null) {
+    if (running.value || retryingPages.value.size > 0) return
+    generationVersion++
     running.value = true
     lastError.value = ''
     blueprints.value = []
@@ -234,7 +239,9 @@ export const useGenerationStore = defineStore('generation', () => {
       const final = await invoke<SlideBlueprint[]>('get_blueprints')
       blueprints.value = final
       completedSlides.value = new Set(final.map((_, index) => index))
-      pageStatuses.value = new Map(final.map((_, index) => [index, { stage: 'done' }]))
+      // Keep errors visible even when the final deck contains fallback slides.
+      pageStatuses.value = new Map(Array.from(pageStatuses.value, ([index, status]) =>
+        [index, status.stage === 'error' ? status : { stage: 'done' }]))
       stage.value = 'done'
       progress.value = 1
       message.value = `生成完成，共 ${count} 张幻灯片`
@@ -245,7 +252,46 @@ export const useGenerationStore = defineStore('generation', () => {
     } finally {
       running.value = false
       stopListening()
+      for (const [index, layoutKind] of queuedRetries) {
+        queuedRetries.delete(index)
+        await executePageRetry(index, layoutKind)
+      }
     }
+  }
+
+  async function executePageRetry(index: number, layoutKind?: SlideKind) {
+    const version = generationVersion
+    const previous = pageStatuses.value.get(index)
+    pageStatuses.value.set(index, { stage: 'content', message: '正在重试该页' })
+    try {
+      if (!currentRun.value) throw new Error('缺少生成记录，请重新生成')
+      const slide = await invoke<SlideBlueprint>('retry_generation_page', {
+        runId: currentRun.value.id, pageIndex: index, layoutKind,
+      })
+      if (version !== generationVersion) return
+      blueprints.value[index + 2] = slide
+      completedSlides.value.add(index + 2)
+      pageStatuses.value.set(index, { stage: 'done', message: '重试完成' })
+      message.value = '该页重试完成，可继续编辑'
+    } catch (error) {
+      if (version !== generationVersion) return
+      pageStatuses.value.set(index, {
+        stage: 'error', previousStage: previous?.previousStage ?? 'content', message: String(error),
+      })
+    } finally {
+      if (version === generationVersion) retryingPages.value.delete(index)
+    }
+  }
+
+  async function retryPage(index: number, layoutKind?: SlideKind) {
+    if (retryingPages.value.has(index) || (!running.value && retryingPages.value.size > 0)
+      || pageStatuses.value.get(index)?.stage !== 'error') return
+    retryingPages.value.add(index)
+    if (running.value) {
+      queuedRetries.set(index, layoutKind)
+      return
+    }
+    await executePageRetry(index, layoutKind)
   }
 
   async function repairSlide(index: number, feedback: string) {
@@ -255,6 +301,7 @@ export const useGenerationStore = defineStore('generation', () => {
   }
 
   function reset() {
+    generationVersion++
     stopListening()
     stage.value = 'idle'
     message.value = ''
@@ -267,14 +314,20 @@ export const useGenerationStore = defineStore('generation', () => {
     currentRun.value = null
     activeProjectId.value = null
     pageStatuses.value = new Map()
+    queuedRetries.clear()
+    retryingPages.value = new Set()
   }
 
   function loadFromJson(json: string) {
     try {
       const parsed = JSON.parse(json) as SlideBlueprint[]
+      generationVersion++
+      queuedRetries.clear()
+      retryingPages.value = new Set()
       blueprints.value = parsed
       completedSlides.value = new Set(parsed.map((_, index) => index))
-      pageStatuses.value = new Map(parsed.map((_, index) => [index, { stage: 'done' }]))
+      const contentPages = parsed[0]?.kind === 'cover' ? parsed.slice(2, -1) : parsed
+      pageStatuses.value = new Map(contentPages.map((_, index) => [index, { stage: 'done' }]))
       stage.value = 'done'
       progress.value = 1
       message.value = `已加载 ${parsed.length} 张幻灯片`
@@ -292,6 +345,17 @@ export const useGenerationStore = defineStore('generation', () => {
       return null
     }
     logs.value = await invoke<GenerationLogEntry[]>('get_generation_logs', { runId: run.id })
+    // Recover failed/fixed content-page statuses after reopening the project.
+    for (const log of logs.value) {
+      if (typeof log.slide_index !== 'number') continue
+      if (log.kind === 'page_error') {
+        pageStatuses.value.set(log.slide_index, { stage: 'error', previousStage: 'content', message: log.summary })
+      } else if (log.kind === 'retry') {
+        pageStatuses.value.set(log.slide_index, log.detail?.retry_succeeded
+          ? { stage: 'done', message: '重试完成' }
+          : { stage: 'error', previousStage: 'content', message: log.summary })
+      }
+    }
     if (run.status === 'running') {
       running.value = true
       stage.value = (run.current_stage as GenStage) ?? 'start'
@@ -311,7 +375,7 @@ export const useGenerationStore = defineStore('generation', () => {
   return {
     stage, message, progress, blueprints, completedSlides,
     running, lastError, logs, currentRun, stageLabel, slideCount,
-    activeProjectId, pageStatuses,
-    generate, repairSlide, reset, loadFromJson, loadLatestRun,
+    activeProjectId, pageStatuses, retryingPages,
+    generate, retryPage, repairSlide, reset, loadFromJson, loadLatestRun,
   }
 })

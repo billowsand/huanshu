@@ -467,6 +467,15 @@ pub fn get_generation_logs(conn: &Connection, run_id: i64) -> Result<Vec<Generat
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
 
+pub fn get_generation_run(conn: &Connection, run_id: i64) -> Result<GenerationRun> {
+    Ok(conn.query_row(
+        "SELECT id, project_id, status, current_stage, source_markdown, frontmatter_title,
+                debug_dir, created_at, updated_at, finished_at FROM generation_runs WHERE id=?1",
+        params![run_id],
+        map_generation_run,
+    )?)
+}
+
 // ---------------------------------------------------------------------------
 // App settings (key-value store)
 // ---------------------------------------------------------------------------

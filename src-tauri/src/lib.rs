@@ -265,6 +265,8 @@ pub fn run() {
             commands::generate::get_latest_generation_run,
             commands::generate::get_generation_logs,
             commands::generate::repair_slide,
+            commands::generate::retry_generation_page,
+            commands::generate::get_retry_layouts,
             commands::generate::ensure_icon_embeddings,
             commands::generate::recommend_icons_for_query,
             commands::settings::get_settings,
