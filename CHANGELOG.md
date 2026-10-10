@@ -7,14 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **失败页手动重试**：生成详情新增“重试这一页”，弹框选择可用布局后使用原文重新生成、校验并保存单页；其他页仍在生成时先排队，保留人工所选布局，支持再次失败后继续重试。保留兜底页和错误状态，可手动前往编辑；存在失败页时不再自动跳转。
+
+- **便签·稿纸主题**：新增「便签·稿纸」，应用界面用牛皮纸金底 + 白色稿纸卡片，幻灯片统一渲染为带竖向装订线、方格网纹与双线边框的稿纸；标题、标签、步骤点等复用既有配色变量，预览、缩略图与播放共用样式。
+
+### Fixed
+
+- **流程页步骤说明被截断**：`WorkflowView` 的侧栏描述类名 `.step-desc` 与 `Process` 幻灯片的步骤说明同名，全局样式让幻灯片文案被限宽省略号截断；改为 `.steps-nav .step-desc` 只约束侧栏，幻灯片内步骤说明恢复完整换行。新增 `scripts/check-notes-theme.mjs` 与 `check-slide-layout.mjs` 的 Process 换行断言守护该回归。
+
 ### Removed
 
 - **四套亮色主题**：删除「亮·蓝图」「亮·翠绿」「亮·晨曦」「亮·多巴胺」及其 slide/studio 变量块；
   `localStorage` 中残留的旧主题 id 启动时自动回退到「暗·琥珀」。剩余主题：暗·琥珀、暗·星图、暗·极光、终端·墨、终端·纸。
 
-### Added
+## [0.2.0] - 2026-10-10
 
-- **失败页手动重试**：生成详情新增“重试这一页”，弹框选择可用布局后使用原文重新生成、校验并保存单页；其他页仍在生成时先排队，保留人工所选布局，支持再次失败后继续重试。保留兜底页和错误状态，可手动前往编辑；存在失败页时不再自动跳转。
+### Added
 
 - **字体与个性化**：设置页新增字体面板，界面 / 标题 / 副标题 / 正文 / 注释 / 数字 / 代码 七类角色可各自指定字体，
   支持按中文名或英文名搜索本机字体（Rust 侧用 DirectWrite 枚举系统字体族）、一键应用到全部角色与恢复默认，
@@ -22,8 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   幻灯片组件同步补充 `slide-subtitle` / `slide-number` / `slide-footnote` 等语义类，使主题与字体角色解耦。
 
 - **终端明暗主题**：新增「终端·墨」与「终端·纸」，应用界面与全部 17 种幻灯片模板统一使用暖黑 / 纸白底色、细线边框、近直角卡片和等宽标签；预览、缩略图与播放共用样式。
-
-- **便签·稿纸主题**：新增「便签·稿纸」，应用界面用牛皮纸金底 + 白色稿纸卡片，幻灯片统一渲染为带竖向装订线、方格网纹与双线边框的稿纸；标题、标签、步骤点等复用既有配色变量，预览、缩略图与播放共用样式。
 
 - **模型服务 SOCKS5 代理**：大语言模型 / 向量模型 / 多模态模型可各自启用 SOCKS5 代理，
   支持用户名密码认证（支持 `socks5://` / `socks5h://`），模型域名由代理解析；
@@ -33,8 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Spotlight 面板条目上限**：`normalize` 对每个面板的 `items` / `steps` 收口为最多 4 项（原先无上限），
   与 FeatureGrid / IssueStack 既有的 `card.items.truncate(4)` 保持同一内容规范。
-
-- **流程页步骤说明被截断**：`WorkflowView` 的侧栏描述类名 `.step-desc` 与 `Process` 幻灯片的步骤说明同名，全局样式让幻灯片文案被限宽省略号截断；改为 `.steps-nav .step-desc` 只约束侧栏，幻灯片内步骤说明恢复完整换行。新增 `scripts/check-notes-theme.mjs` 与 `check-slide-layout.mjs` 的 Process 换行断言守护该回归。
 
 - **标题按词换行**：全部幻灯片主标题使用 Rust jieba 分词，保持词语与标点完整，均衡多行长度，并保留手动换行，避免长标题末尾单字孤行。
 

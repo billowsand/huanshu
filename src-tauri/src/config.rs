@@ -183,5 +183,4 @@ impl GenerationConfig {
     pub fn embedding_client(&self) -> anyhow::Result<crate::lmstudio::LmStudioClient> {
         crate::lmstudio::LmStudioClient::from_service(&self.embedding)
     }
-
 }

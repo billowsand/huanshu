@@ -140,24 +140,27 @@ mod typography_tests {
 
     #[test]
     fn legacy_settings_default_to_yahei() {
-        let settings: AppGlobalSettings = serde_json::from_str(r#"{
+        let settings: AppGlobalSettings = serde_json::from_str(
+            r#"{
             "data_dir": "data", "media_dir": "media",
             "llm_configured": false, "embeddings_ready": false
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
         assert_eq!(settings.fonts, FontSettings::default());
     }
 
     #[test]
     fn partial_fonts_preserve_customization_and_roundtrip() {
-        let mut fonts: FontSettings = serde_json::from_str(
-            r#"{"title":"  KaiTi  ","body":"思源黑体","code":" "}"#
-        ).unwrap();
+        let mut fonts: FontSettings =
+            serde_json::from_str(r#"{"title":"  KaiTi  ","body":"思源黑体","code":" "}"#).unwrap();
         fonts.normalize();
         assert_eq!(fonts.title, "KaiTi");
         assert_eq!(fonts.body, "思源黑体");
         assert_eq!(fonts.interface, "Microsoft YaHei");
         assert_eq!(fonts.code, "Microsoft YaHei");
-        let restored: FontSettings = serde_json::from_str(&serde_json::to_string(&fonts).unwrap()).unwrap();
+        let restored: FontSettings =
+            serde_json::from_str(&serde_json::to_string(&fonts).unwrap()).unwrap();
         assert_eq!(restored, fonts);
     }
 }
