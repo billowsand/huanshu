@@ -73,6 +73,11 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
    提示词只列出本页**可用**的 kind（并说明其余 kind 为何不可用），候选再经 `sanitize_candidates`
    按同一张适用条件表过滤（见下）；`section_summary` 页不调 LLM，直接 `section_intro`；
    LLM 失败时用 `fallback_candidates`（两个不同的可用 kind）。
+   LLM 回复由 `generator/candidate_parsing.rs` **逐条宽松解析**（不要改回直接反序列化
+   `Vec<LayoutCandidate>`：一条坏条目会让整份回复作废）：容忍 kind 拼写漂移（`FeatureGrid` /
+   `feature-grid` / `KeynoteFeatureGridSlide`）、分数格式（`"8"`、`8.6`、`"7/10"`、百分制、小数）、
+   外层结构漂移（顶层数组、`layouts` 键、单个对象、多包一层）；缺分数按排名给 8、7、6…。
+   解析只管语法，能否使用仍由 `sanitize_candidates` 判定；丢弃的条目写进 `02-layout-NN.parsed.json` 的 `dropped`。
 2. **2b 全局分配**（`planning::assign_layouts`，纯 CPU、确定性）：最大化
    `Σ score − 3·相邻同款 − 1·隔页同款 − 2·超出上限的次数`，单一 kind 上限为内容页数的 30%（至少 2）。
    先 Viterbi 精确求解相邻项，再做单页交换的局部搜索处理全局项。结果只取决于候选，与并发数无关；

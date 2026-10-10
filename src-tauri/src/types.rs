@@ -480,12 +480,9 @@ pub struct SwotData {
     pub strategy: Option<String>,
 }
 
-/// Top-K ranked layout candidates returned by the LLM for diversity-aware selection.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LayoutCandidateResponse {
-    pub candidates: Vec<LayoutCandidate>,
-}
-
+/// One ranked layout option for a page. The LLM response is parsed leniently by
+/// `generator::candidate_parsing` (not by deserializing this type directly), then filtered
+/// by `planning::sanitize_candidates` before deck-level assignment.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutCandidate {
     pub kind: SlideKind,

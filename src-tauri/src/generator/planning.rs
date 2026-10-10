@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
 
+use crate::generator::candidate_parsing::parse_layout_candidates;
 use crate::generator::layout_rules::{
     ineligibility, is_eligible, prompt_rules, UNIVERSAL_CONTENT_KINDS,
 };
@@ -845,16 +846,24 @@ pub async fn layout_candidates_for_page(
     match client.generate_text(&config.llm.model, &system, &user).await {
         Ok(raw) => {
             let _ = write_debug(debug_dir, &format!("{prefix}.raw.txt"), &raw);
-            match crate::generator::utils::parse_json_with_extraction::<LayoutCandidateResponse>(
-                &raw,
-            ) {
-                Ok(resp) => {
+            match parse_layout_candidates(&raw) {
+                Ok(parsed) => {
                     let _ = write_debug(
                         debug_dir,
                         &format!("{prefix}.parsed.json"),
-                        &serde_json::to_string_pretty(&resp).unwrap_or_default(),
+                        &serde_json::to_string_pretty(&serde_json::json!({
+                            "candidates": parsed.candidates,
+                            "dropped": parsed.dropped,
+                        }))
+                        .unwrap_or_default(),
                     );
-                    let candidates = sanitize_candidates(page_plan, aspect, resp.candidates);
+                    for note in &parsed.dropped {
+                        eprintln!(
+                            "page {}: unparseable layout candidate {note}",
+                            page_plan.page_id
+                        );
+                    }
+                    let candidates = sanitize_candidates(page_plan, aspect, parsed.candidates);
                     if !candidates.is_empty() {
                         return candidates;
                     }
