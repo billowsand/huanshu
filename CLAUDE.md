@@ -49,7 +49,7 @@
 
 Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 struct 字面量编译不过）：
 6. `src-tauri/src/types.rs`：`SlideKind` 变体 + `SlideBlueprint` 字段
-7. `src-tauri/src/generator/planning.rs`：`layout_one_page` 的 system 提示词白名单与规则文案、`safe_fallback_kind` / `variety_fallback_kind` / `pick_different_kind` 候选列表、各 `SlideBlueprint { .. }` 字面量
+7. `src-tauri/src/generator/planning.rs`：`layout_candidates_for_page` 的 system 提示词白名单与规则文案、`safe_fallback_kind` / `variety_fallback_kind` / `pick_different_kind` 候选列表、各 `SlideBlueprint { .. }` 字面量
 8. `src-tauri/src/generator/slides.rs`：内容生成提示词的字段要求
 9. `src-tauri/src/generator/utils.rs`：`slide_kind_name`（`SlideKind → snake_case`）映射、`blueprint_schema_hint`
 10. `src-tauri/src/generator/normalize.rs`：默认值修复分支 + 字面量
@@ -61,6 +61,24 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
 - **旧数据兼容**：`SlideKind` 是 `#[serde(rename_all = "snake_case")]` 外部标签枚举，删变体后 DB / `.keynn` 里带旧 kind 的牌组会**整体反序列化失败**，而 `commands/projects.rs` 用的是 `unwrap_or_default()` → 项目静默变空。所以 `SlideBlueprint.kind` 挂了
   `#[serde(deserialize_with = "de_slide_kind")]`（未知 kind → `Cover`，与前端 `SlideRenderer.vue` 的 `?? KeynoteCoverSlide` 兜底一致），并有回归测试 `legacy_infographic_kind_degrades_without_losing_slides`。
 
+
+## 布局选择：候选 + 全局分配
+
+生成流水线（`commands/generate.rs` 的 `run_pipeline`）分三段，布局**不再逐页即时决定**：
+
+1. **2a 并发规划**（`slides.rs::plan_single_page`）：每页 enrich + `planning::layout_candidates_for_page`，
+   LLM 只按「本页适配度」给 2-3 个候选打分，**提示词里不要再加多样性信息**。
+   候选经 `sanitize_candidates` 过滤：Cover/Overview/Closing 永不入选，`section_intro` 只给
+   `section_summary` 页（这类页不调 LLM，直接强制）；LLM 失败时用 `fallback_candidates`（两个不同 kind）。
+2. **2b 全局分配**（`planning::assign_layouts`，纯 CPU、确定性）：最大化
+   `Σ score − 3·相邻同款 − 1·隔页同款 − 2·超出上限的次数`，单一 kind 上限为内容页数的 30%（至少 2）。
+   先 Viterbi 精确求解相邻项，再做单页交换的局部搜索处理全局项。结果只取决于候选，与并发数无关；
+   分配明细写入调试目录 `02-layout-assignment.json`。权重常量在 `planning.rs` 的 `ADJACENT_SAME_PENALTY` 等。
+3. **2c 并发生成**（`slides.rs::generate_single_page_pipeline`）：content → normalize → validate/repair。
+   repair 最后一轮仍可能用 `pick_different_kind` 换模板，此时不会回头重排其他页（少见，可接受）。
+
+新增模板时：提示词白名单在 `layout_candidates_for_page`；若是像 `section_intro` 那样有结构性
+使用条件的模板，同步改 `is_assignable_kind`。
 
 ## 幻灯片字号体系（`--type-scale`）
 

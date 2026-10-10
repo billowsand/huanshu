@@ -246,28 +246,20 @@ pub enum PageStage {
     Done,
 }
 
-/// Run the full pipeline for a single page:
-/// enrich → layout → content → normalize → validate + repair
-///
-/// This is the core function of the per-page concurrent architecture.
-/// Each page runs independently; the `used_layouts` parameter carries
-/// information about already-completed pages for layout diversity.
-pub async fn generate_single_page_pipeline(
+/// Phase A of the per-page pipeline: enrich the page plan and collect ranked
+/// layout candidates. Runs concurrently across pages and never fails (each step
+/// has a deterministic fallback). The final kind is chosen deck-wide by
+/// `planning::assign_layouts` once every page has been planned.
+pub async fn plan_single_page(
     llm_client: &LmStudioClient,
-    embedding_client: &LmStudioClient,
     config: &GenerationConfig,
     doc: &ParsedDocument,
     base_page_plan: PagePlan,
     slide_index: usize,
-    _total_slides: usize,
-    used_layouts_shared: std::sync::Arc<tokio::sync::Mutex<Vec<(usize, String)>>>,
-    icon_index: &IconIndex,
     asset_paths: &HashSet<String>,
     debug_dir: &Path,
     on_stage: std::sync::Arc<dyn Fn(usize, PageStage, Option<&str>) + Send + Sync>,
-) -> Result<(SlideBlueprint, LayoutPlan)> {
-    let page_id = base_page_plan.page_id.clone();
-
+) -> (PagePlan, Vec<LayoutCandidate>) {
     // Stage 1: Enrich page plan
     on_stage(slide_index, PageStage::Planning, Some("丰富页面规划"));
     let page_plan = crate::generator::planning::enrich_one_page_plan(
@@ -280,24 +272,32 @@ pub async fn generate_single_page_pipeline(
     )
     .await;
 
-    // Stage 2: Layout selection
-    on_stage(slide_index, PageStage::Layout, Some("选择布局模板"));
-    // Snapshot layouts right before selection (not at task spawn time)
-    let layouts_snapshot = used_layouts_shared.lock().await.clone();
-    let layout_plan = crate::generator::planning::layout_one_page(
-        llm_client,
-        config,
-        &page_plan,
-        &layouts_snapshot,
-        debug_dir,
+    // Stage 2: Layout candidates (assignment happens deck-wide afterwards)
+    on_stage(slide_index, PageStage::Layout, Some("评估候选布局"));
+    let candidates = crate::generator::planning::layout_candidates_for_page(
+        llm_client, config, &page_plan, debug_dir,
     )
     .await;
-    // Register the chosen layout immediately for diversity tracking
-    crate::generator::planning::record_used_layout(
-        &mut *used_layouts_shared.lock().await,
-        slide_index,
-        &layout_plan.kind,
-    );
+
+    (page_plan, candidates)
+}
+
+/// Phase B of the per-page pipeline, run after deck-level layout assignment:
+/// content → normalize → validate + repair.
+pub async fn generate_single_page_pipeline(
+    llm_client: &LmStudioClient,
+    embedding_client: &LmStudioClient,
+    config: &GenerationConfig,
+    doc: &ParsedDocument,
+    page_plan: PagePlan,
+    layout_plan: LayoutPlan,
+    slide_index: usize,
+    icon_index: &IconIndex,
+    asset_paths: &HashSet<String>,
+    debug_dir: &Path,
+    on_stage: std::sync::Arc<dyn Fn(usize, PageStage, Option<&str>) + Send + Sync>,
+) -> Result<SlideBlueprint> {
+    let page_id = page_plan.page_id.clone();
 
     // Stage 3: Content generation
     on_stage(slide_index, PageStage::Content, Some("生成页面内容"));
@@ -374,16 +374,7 @@ pub async fn generate_single_page_pipeline(
         slide_index,
     )
     .await?;
-    // Repair may have switched the kind (pick_different_kind / fallback slide);
-    // keep the diversity tracker in sync with what will actually render.
-    if slide.kind != layout_plan.kind {
-        crate::generator::planning::record_used_layout(
-            &mut *used_layouts_shared.lock().await,
-            slide_index,
-            &slide.kind,
-        );
-    }
 
     on_stage(slide_index, PageStage::Done, None);
-    Ok((slide, layout_plan))
+    Ok(slide)
 }

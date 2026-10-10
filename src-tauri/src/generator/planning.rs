@@ -899,24 +899,23 @@ pub async fn enrich_one_page_plan(
     base_plan.clone()
 }
 
-/// Choose a layout kind for a single page via LLM, with deterministic fallback.
-/// `used_layouts` contains (slide_index, kind_label) of already-generated pages
-/// to help the LLM maintain deck variety.
-pub async fn layout_one_page(
+/// Ask the LLM to rank layout candidates for a single page, judged on per-page fit only.
+///
+/// Deck-level variety is decided afterwards by [`assign_layouts`], which sees every page's
+/// candidates at once. Never fails: on LLM/parse failure, or when every returned candidate is
+/// unusable, deterministic fallback candidates are returned instead.
+pub async fn layout_candidates_for_page(
     client: &LmStudioClient,
     config: &GenerationConfig,
     page_plan: &PagePlan,
-    used_layouts: &[(usize, String)],
     debug_dir: &Path,
-) -> LayoutPlan {
-    if let Some(forced) = forced_layout(page_plan) {
-        return forced;
+) -> Vec<LayoutCandidate> {
+    if forced_kind(page_plan).is_some() {
+        return fallback_candidates(page_plan);
     }
 
     let idx = page_plan.page_id.parse::<usize>().unwrap_or(0);
     let prefix = format!("02-layout-{:02}", idx);
-
-    let diversity_hint = build_diversity_hint(used_layouts);
 
     let aspect_constraint = match config.aspect_ratio {
         crate::types::AspectRatio::Ratio16x9 => "",
@@ -925,15 +924,14 @@ pub async fn layout_one_page(
              Avoid spotlight. Use focus_example/compare only when content truly demands two-panel layout."
         }
         crate::types::AspectRatio::Ratio48x9 => {
-            "\n\nULTRA-WIDE FORMAT (48:9): Strongly prefer step_flow/timeline/process/feature_grid/outcome_grid/section_intro. \
+            "\n\nULTRA-WIDE FORMAT (48:9): Strongly prefer step_flow/timeline/process/feature_grid/outcome_grid. \
              AVOID focus_example, compare, spotlight — these fixed two-panel or single-image layouts create extreme whitespace at panoramic width."
         }
     };
-    let system = "You choose the best Slidev component kinds for a single slide page. Use only: section_intro, feature_grid, spotlight, split_layers, section_list, focus_example, outcome_grid, center_grid, timeline, step_flow, process, compare, issue_stack, swot. Return strict JSON.";
+    let system = "You choose the best Slidev component kinds for a single slide page. Use only: feature_grid, spotlight, split_layers, section_list, focus_example, outcome_grid, center_grid, timeline, step_flow, process, compare, issue_stack, swot. Return strict JSON.";
     let user = format!(
-        "Page plan:\n{}{}{}\n\nRank 2-3 suitable component kinds for this page, ordered by fitness.\n\nRules:\n- section_intro: only for section_summary pages that preview sub-topics.\n- feature_grid: 3+ parallel items of equal weight.\n- spotlight: single-object focus with image.\n- split_layers: layered/architectural content.\n- section_list: strict order-dependent steps.\n- focus_example: central thesis + example.\n- outcome_grid: 2-4 parallel deliverables/results.\n- center_grid: compact closing summary or goal.\n- timeline: chronological events with dates.\n- step_flow: 2-4 step linear process.\n- process: 5+ steps grouped into phases.\n- compare: EXACTLY two alternatives.\n- issue_stack: 2-4 stacked problems, challenges, or risks; argument_mode=warning or causal, or page content discusses failures/obstacles.\n- swot: four-quadrant matrix.\n\nHard constraints:\n- step_flow when key_points <= 4; process when >= 5.\n- compare ONLY for exactly two alternatives.\n- issue_stack ONLY for problem/challenge/risk content with 2-4 items.\n- swot ONLY for four-quadrant matrices.\n\n\nReturn JSON:\n{{\"candidates\": [{{\"kind\": \"...\", \"score\": 1-10, \"reason\": \"...\"}}, ...]}}",
+        "Page plan:\n{}{}\n\nRank 3 distinct suitable component kinds for this page, ordered by fitness.\nScore each kind only by how well it fits THIS page. Deck-level variety is handled separately, so do not lower a good fit's score just to vary layouts, and give honest scores to the 2nd and 3rd choices.\n\nRules:\n- feature_grid: 3+ parallel items of equal weight.\n- spotlight: single-object focus with image.\n- split_layers: layered/architectural content.\n- section_list: strict order-dependent steps.\n- focus_example: central thesis + example.\n- outcome_grid: 2-4 parallel deliverables/results.\n- center_grid: compact closing summary or goal.\n- timeline: chronological events with dates.\n- step_flow: 2-4 step linear process.\n- process: 5+ steps grouped into phases.\n- compare: EXACTLY two alternatives.\n- issue_stack: 2-4 stacked problems, challenges, or risks; argument_mode=warning or causal, or page content discusses failures/obstacles.\n- swot: four-quadrant matrix.\n\nHard constraints:\n- step_flow when key_points <= 4; process when >= 5.\n- compare ONLY for exactly two alternatives.\n- issue_stack ONLY for problem/challenge/risk content with 2-4 items.\n- swot ONLY for four-quadrant matrices.\n\n\nReturn JSON:\n{{\"candidates\": [{{\"kind\": \"...\", \"score\": 1-10, \"reason\": \"...\"}}, ...]}}",
         serde_json::to_string_pretty(page_plan).unwrap_or_default(),
-        diversity_hint,
         aspect_constraint,
     );
 
@@ -943,27 +941,23 @@ pub async fn layout_one_page(
     match client.generate_text(&config.llm.model, system, &user).await {
         Ok(raw) => {
             let _ = write_debug(debug_dir, &format!("{prefix}.raw.txt"), &raw);
-            match crate::generator::utils::parse_json_with_extraction::<
-                crate::types::LayoutCandidateResponse,
-            >(&raw)
-            {
+            match crate::generator::utils::parse_json_with_extraction::<LayoutCandidateResponse>(
+                &raw,
+            ) {
                 Ok(resp) => {
                     let _ = write_debug(
                         debug_dir,
                         &format!("{prefix}.parsed.json"),
                         &serde_json::to_string_pretty(&resp).unwrap_or_default(),
                     );
-                    if !resp.candidates.is_empty() {
-                        let chosen = select_layout_with_diversity(&resp.candidates, used_layouts);
-                        return LayoutPlan {
-                            page_id: page_plan.page_id.clone(),
-                            kind: chosen.kind.clone(),
-                            title: page_plan.page_title.clone(),
-                            subtitle: None,
-                            section_label: None,
-                            reason: chosen.reason.clone(),
-                        };
+                    let candidates = sanitize_candidates(page_plan, resp.candidates);
+                    if !candidates.is_empty() {
+                        return candidates;
                     }
+                    eprintln!(
+                        "no usable layout candidates for page {}, using fallback",
+                        page_plan.page_id
+                    );
                 }
                 Err(e) => eprintln!(
                     "parse error layout candidates page {}: {e}",
@@ -974,148 +968,253 @@ pub async fn layout_one_page(
         Err(e) => eprintln!("LLM error layout page {}: {e}", page_plan.page_id),
     }
 
-    // Deterministic fallback
-    let kind = safe_fallback_kind(page_plan);
-    LayoutPlan {
-        page_id: page_plan.page_id.clone(),
-        kind,
-        title: page_plan.page_title.clone(),
-        subtitle: None,
-        section_label: None,
-        reason: "deterministic fallback (LLM layout failed)".to_string(),
-    }
+    fallback_candidates(page_plan)
 }
 
-/// Layouts that are fully determined by the page plan and need no LLM call.
+/// Kinds fully determined by the page plan, needing no LLM call.
 /// `section_summary` pages always render as `SectionIntro`.
-fn forced_layout(page_plan: &PagePlan) -> Option<LayoutPlan> {
-    if page_plan.page_role.as_deref() != Some("section_summary") {
-        return None;
-    }
-    Some(LayoutPlan {
-        page_id: page_plan.page_id.clone(),
-        kind: SlideKind::SectionIntro,
-        title: page_plan.page_title.clone(),
-        subtitle: None,
-        section_label: None,
-        reason: "section_summary page always uses section_intro".to_string(),
-    })
+fn forced_kind(page_plan: &PagePlan) -> Option<SlideKind> {
+    (page_plan.page_role.as_deref() == Some("section_summary")).then_some(SlideKind::SectionIntro)
 }
 
-/// Record (or overwrite) the layout kind used by `slide_index` in the shared
-/// diversity tracker. Called once after layout selection and again after repair,
-/// since the repair stage may switch the slide to a different kind.
-pub fn record_used_layout(
-    used_layouts: &mut Vec<(usize, String)>,
-    slide_index: usize,
-    kind: &SlideKind,
-) {
-    let name = slide_kind_name(kind).to_string();
-    match used_layouts.iter_mut().find(|(i, _)| *i == slide_index) {
-        Some(entry) => entry.1 = name,
-        None => used_layouts.push((slide_index, name)),
+/// Whether `kind` may be assigned to this page at all.
+/// Cover/Overview/Closing are deck furniture; SectionIntro is reserved for summary pages.
+fn is_assignable_kind(page_plan: &PagePlan, kind: &SlideKind) -> bool {
+    match kind {
+        SlideKind::Cover | SlideKind::Overview | SlideKind::Closing => false,
+        SlideKind::SectionIntro => forced_kind(page_plan).is_some(),
+        _ => true,
     }
 }
 
-/// Build a diversity hint string describing already-used layouts and overuse warnings.
-fn build_diversity_hint(used_layouts: &[(usize, String)]) -> String {
-    if used_layouts.is_empty() {
-        return String::new();
-    }
-    let kind_counts: std::collections::BTreeMap<&str, usize> = {
-        let mut m = std::collections::BTreeMap::new();
-        for (_, k) in used_layouts {
-            *m.entry(k.as_str()).or_insert(0) += 1;
+/// Drop unassignable kinds, collapse duplicate kinds (keeping the higher score),
+/// clamp scores into 1..=10 and order by score (stable, so LLM order breaks ties).
+fn sanitize_candidates(page_plan: &PagePlan, raw: Vec<LayoutCandidate>) -> Vec<LayoutCandidate> {
+    let mut out: Vec<LayoutCandidate> = Vec::new();
+    for mut candidate in raw {
+        if !is_assignable_kind(page_plan, &candidate.kind) {
+            continue;
         }
-        m
-    };
-    let total = used_layouts.len();
-    let overused: Vec<String> = kind_counts
-        .iter()
-        .filter(|(_, &count)| count as f32 / total as f32 > 0.5)
-        .map(|(kind, count)| format!("{} ({}/{})", kind, count, total))
-        .collect();
-    if overused.is_empty() {
-        format!(
-            "\n\nPreviously used layouts ({} pages generated so far): {}",
-            total,
-            used_layouts
-                .iter()
-                .map(|(i, k)| format!("#{}: {}", i + 1, k))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
-    } else {
-        format!(
-            "\n\nIMPORTANT diversity constraint — previously used layouts: {}\nThese layouts are over-represented (>{:.0}%). Prefer NOT using: {}.\nRank alternative layout types higher to ensure visual variety.",
-            used_layouts
-                .iter()
-                .map(|(i, k)| format!("#{}: {}", i + 1, k))
-                .collect::<Vec<_>>()
-                .join(", "),
-            50.0,
-            overused.join(", ")
-        )
+        candidate.score = candidate.score.clamp(1, 10);
+        match out.iter_mut().find(|c| c.kind == candidate.kind) {
+            Some(existing) if candidate.score > existing.score => *existing = candidate,
+            Some(_) => {}
+            None => out.push(candidate),
+        }
     }
+    out.sort_by(|a, b| b.score.cmp(&a.score));
+    out
 }
 
-/// Select the best layout candidate from an LLM-ordered list, trading off score
-/// against already-used layout diversity.
-///
-/// Logic:
-/// 1. Compute usage ratio for each candidate's kind from `used_layouts`.
-/// 2. Adjust the candidate's effective score: subtract a penalty proportional to
-///    how over-used that kind already is.
-/// 3. If the top candidate is over-used, trade down to the highest-ranked
-///    alternative that is a *different* kind, is *less* used, and whose raw
-///    score is within 2 points (diversity trade-off).
-/// 4. Otherwise pick the highest effective score.
-fn select_layout_with_diversity<'a>(
-    candidates: &'a [crate::types::LayoutCandidate],
-    used_layouts: &[(usize, String)],
-) -> &'a crate::types::LayoutCandidate {
-    if candidates.len() == 1 || used_layouts.is_empty() {
-        return candidates.first().expect("candidates must be non-empty");
+/// Deterministic candidates for pages the LLM is not asked about (section_summary) or gave
+/// nothing usable for: the signal-based pick plus one guaranteed-different alternative so the
+/// deck-level assigner still has room to avoid repeats.
+fn fallback_candidates(page_plan: &PagePlan) -> Vec<LayoutCandidate> {
+    if let Some(kind) = forced_kind(page_plan) {
+        return vec![LayoutCandidate {
+            kind,
+            score: 10,
+            reason: "section_summary page always uses section_intro".to_string(),
+        }];
     }
+    let primary = safe_fallback_kind(page_plan);
+    let alternative = pick_different_kind(page_plan, &primary);
+    vec![
+        LayoutCandidate {
+            kind: primary,
+            score: 6,
+            reason: "deterministic fallback (LLM layout failed)".to_string(),
+        },
+        LayoutCandidate {
+            kind: alternative,
+            score: 4,
+            reason: "deterministic fallback alternative".to_string(),
+        },
+    ]
+}
 
-    let total = used_layouts.len() as f32;
-    let kind_count = |kind: &SlideKind| -> f32 {
-        let name = slide_kind_name(kind);
-        used_layouts.iter().filter(|(_, k)| k == name).count() as f32
-    };
+// ---------------------------------------------------------------------------
+// Deck-level layout assignment
+// ---------------------------------------------------------------------------
 
-    // Sort candidates by (raw_score - diversity_penalty), descending.
-    // penalty = 3 * (usage_ratio). So a kind used 50%+ gets -1.5 penalty.
-    let mut ranked: Vec<(usize, f32)> = candidates
+/// Penalty when a page repeats the previous page's kind.
+const ADJACENT_SAME_PENALTY: f32 = 3.0;
+/// Penalty when a page repeats the kind from two pages back (A-B-A rhythm).
+const GAP2_SAME_PENALTY: f32 = 1.0;
+/// Penalty per use of a kind beyond the deck-wide cap.
+const OVERUSE_PENALTY: f32 = 2.0;
+/// Share of content pages a single kind may take before the overuse penalty applies.
+const MAX_KIND_SHARE: f32 = 0.3;
+/// Upper bound on local-search sweeps (it converges in a handful in practice).
+const MAX_LOCAL_SEARCH_SWEEPS: usize = 32;
+
+/// Choose one layout per page for the whole deck at once.
+///
+/// `candidates[i]` is the ranked candidate list for `page_plans[i]`, in slide order. The
+/// assignment maximizes
+///
+/// ```text
+///   Σ score − ADJACENT·[same kind as page i−1] − GAP2·[same kind as page i−2]
+///           − OVERUSE·Σ_kind max(0, count − cap)
+/// ```
+///
+/// An exact Viterbi pass optimizes score + adjacency, then a deterministic local search
+/// (single-page swaps) handles the remaining terms. The result depends only on the
+/// candidates, never on generation concurrency or completion order.
+pub fn assign_layouts(
+    page_plans: &[PagePlan],
+    candidates: &[Vec<LayoutCandidate>],
+) -> Vec<LayoutPlan> {
+    let cands: Vec<Vec<LayoutCandidate>> = page_plans
         .iter()
         .enumerate()
-        .map(|(i, c)| {
-            let raw = c.score as f32;
-            let ratio = kind_count(&c.kind) / total;
-            let penalty = 3.0 * ratio;
-            (i, raw - penalty)
+        .map(|(i, page)| match candidates.get(i) {
+            Some(list) if !list.is_empty() => list.clone(),
+            _ => fallback_candidates(page),
         })
         .collect();
-    ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-    // If the top choice has a high usage ratio, trade down to a close alternative
-    // that is genuinely a different and less-used kind. Never switch to the same
-    // kind (duplicate candidates) or to a kind that is used even more.
-    let best = &candidates[ranked[0].0];
-    let best_ratio = kind_count(&best.kind) / total;
-    if best_ratio > 0.3 {
-        let best_raw = best.score as f32;
-        let alternative = ranked[1..].iter().map(|&(i, _)| &candidates[i]).find(|c| {
-            c.kind != best.kind
-                && kind_count(&c.kind) / total < best_ratio
-                && best_raw - c.score as f32 <= 2.0
-        });
-        if let Some(alt) = alternative {
-            return alt;
+    // SectionIntro pages are structural, so the cap is based on the remaining pages.
+    let content_pages = page_plans
+        .iter()
+        .filter(|page| forced_kind(page).is_none())
+        .count();
+    let cap = overuse_cap(content_pages);
+
+    let mut choice = viterbi_choice(&cands);
+    let mut current = deck_objective(&cands, &choice, cap);
+    for _ in 0..MAX_LOCAL_SEARCH_SWEEPS {
+        let mut improved = false;
+        for i in 0..cands.len() {
+            for j in 0..cands[i].len() {
+                if j == choice[i] {
+                    continue;
+                }
+                let previous = choice[i];
+                choice[i] = j;
+                let value = deck_objective(&cands, &choice, cap);
+                if value > current + 1e-4 {
+                    current = value;
+                    improved = true;
+                } else {
+                    choice[i] = previous;
+                }
+            }
+        }
+        if !improved {
+            break;
         }
     }
 
-    best
+    page_plans
+        .iter()
+        .zip(&cands)
+        .zip(&choice)
+        .map(|((page, list), &j)| {
+            let chosen = &list[j];
+            let reason = if j == 0 {
+                chosen.reason.clone()
+            } else {
+                format!(
+                    "{} [deck variety: candidate #{} of {}, over {}]",
+                    chosen.reason,
+                    j + 1,
+                    list.len(),
+                    slide_kind_name(&list[0].kind)
+                )
+            };
+            LayoutPlan {
+                page_id: page.page_id.clone(),
+                kind: chosen.kind.clone(),
+                title: page.page_title.clone(),
+                subtitle: None,
+                section_label: None,
+                reason,
+            }
+        })
+        .collect()
+}
+
+fn overuse_cap(content_pages: usize) -> usize {
+    ((content_pages as f32 * MAX_KIND_SHARE).ceil() as usize).max(2)
+}
+
+/// Exact maximization of Σ score − ADJACENT·[same kind as previous page].
+/// Ties resolve to the earlier (higher-ranked) candidate, keeping the result deterministic.
+fn viterbi_choice(cands: &[Vec<LayoutCandidate>]) -> Vec<usize> {
+    let n = cands.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let mut best: Vec<Vec<f32>> = Vec::with_capacity(n);
+    let mut back: Vec<Vec<usize>> = Vec::with_capacity(n);
+    best.push(cands[0].iter().map(|c| c.score as f32).collect());
+    back.push(vec![0; cands[0].len()]);
+
+    for i in 1..n {
+        let mut row = Vec::with_capacity(cands[i].len());
+        let mut back_row = Vec::with_capacity(cands[i].len());
+        for candidate in &cands[i] {
+            let mut top = f32::NEG_INFINITY;
+            let mut arg = 0;
+            for (k, prev) in cands[i - 1].iter().enumerate() {
+                let penalty = if prev.kind == candidate.kind {
+                    ADJACENT_SAME_PENALTY
+                } else {
+                    0.0
+                };
+                let value = best[i - 1][k] - penalty;
+                if value > top {
+                    top = value;
+                    arg = k;
+                }
+            }
+            row.push(top + candidate.score as f32);
+            back_row.push(arg);
+        }
+        best.push(row);
+        back.push(back_row);
+    }
+
+    let last = &best[n - 1];
+    let mut j = 0;
+    for (k, &value) in last.iter().enumerate() {
+        if value > last[j] {
+            j = k;
+        }
+    }
+    let mut choice = vec![0; n];
+    for i in (0..n).rev() {
+        choice[i] = j;
+        j = back[i][j];
+    }
+    choice
+}
+
+/// Full deck objective (higher is better); see [`assign_layouts`].
+fn deck_objective(cands: &[Vec<LayoutCandidate>], choice: &[usize], cap: usize) -> f32 {
+    let kind = |i: usize| &cands[i][choice[i]].kind;
+    let mut total = 0.0;
+    let mut counts: std::collections::HashMap<&'static str, usize> =
+        std::collections::HashMap::new();
+    for i in 0..choice.len() {
+        total += cands[i][choice[i]].score as f32;
+        if i >= 1 && kind(i) == kind(i - 1) {
+            total -= ADJACENT_SAME_PENALTY;
+        }
+        if i >= 2 && kind(i) == kind(i - 2) {
+            total -= GAP2_SAME_PENALTY;
+        }
+        if *kind(i) != SlideKind::SectionIntro {
+            *counts.entry(slide_kind_name(kind(i))).or_insert(0) += 1;
+        }
+    }
+    for &count in counts.values() {
+        if count > cap {
+            total -= OVERUSE_PENALTY * (count - cap) as f32;
+        }
+    }
+    total
 }
 
 fn fallback_overview_section_desc(section: &Section, page_plans: &[PagePlan]) -> String {
@@ -1154,148 +1253,192 @@ fn fallback_overview_section_desc(section: &Section, page_plans: &[PagePlan]) ->
 mod tests {
     use super::*;
     use crate::input::Subsection;
-    use crate::types::LayoutCandidate;
 
     fn cand(kind: SlideKind, score: u8) -> LayoutCandidate {
         LayoutCandidate {
             kind,
             score,
-            reason: String::new(),
+            reason: format!("fit {score}"),
         }
     }
 
-    fn used(kinds: &[SlideKind]) -> Vec<(usize, String)> {
-        let mut out = Vec::new();
-        for (i, kind) in kinds.iter().enumerate() {
-            record_used_layout(&mut out, i, kind);
-        }
-        out
+    fn content_page(idx: usize) -> PagePlan {
+        build_content_page(idx, "章节", None, &format!("页面{idx}"), &[])
     }
 
-    #[test]
-    fn select_returns_top_when_nothing_used() {
-        let cands = [cand(SlideKind::FeatureGrid, 9), cand(SlideKind::OutcomeGrid, 8)];
-        assert_eq!(
-            select_layout_with_diversity(&cands, &[]).kind,
-            SlideKind::FeatureGrid
-        );
-    }
-
-    #[test]
-    fn select_trades_overused_top_for_close_less_used_alternative() {
-        let history = used(&[
-            SlideKind::FeatureGrid,
-            SlideKind::FeatureGrid,
-            SlideKind::Timeline,
-        ]);
-        // FeatureGrid: 9 - 3*(2/3) = 7.0; StepFlow: 7 - 0 = 7.0 -> FeatureGrid ranks first
-        // (stable sort), is overused (0.67 > 0.3), StepFlow is within 2 points and unused.
-        let cands = [cand(SlideKind::FeatureGrid, 9), cand(SlideKind::StepFlow, 7)];
-        assert_eq!(
-            select_layout_with_diversity(&cands, &history).kind,
-            SlideKind::StepFlow
-        );
-    }
-
-    #[test]
-    fn select_never_trades_down_to_a_more_used_kind() {
-        // Regression: OutcomeGrid (ratio 0.4) ranks first; the old logic switched to
-        // FeatureGrid (ratio 0.6) just because it was "second and close".
-        let history = used(&[
-            SlideKind::FeatureGrid,
-            SlideKind::FeatureGrid,
-            SlideKind::FeatureGrid,
-            SlideKind::OutcomeGrid,
-            SlideKind::OutcomeGrid,
-        ]);
-        let cands = [cand(SlideKind::OutcomeGrid, 9), cand(SlideKind::FeatureGrid, 9)];
-        assert_eq!(
-            select_layout_with_diversity(&cands, &history).kind,
-            SlideKind::OutcomeGrid
-        );
-    }
-
-    #[test]
-    fn select_ignores_duplicate_kind_as_alternative() {
-        let history = used(&[SlideKind::FeatureGrid, SlideKind::FeatureGrid]);
-        let cands = [
-            cand(SlideKind::FeatureGrid, 9),
-            cand(SlideKind::FeatureGrid, 8),
-            cand(SlideKind::Compare, 3),
-        ];
-        // Duplicate FeatureGrid is not a real alternative; Compare is too far behind.
-        assert_eq!(
-            select_layout_with_diversity(&cands, &history).kind,
-            SlideKind::FeatureGrid
-        );
-    }
-
-    #[test]
-    fn select_skips_unsuitable_second_and_uses_third() {
-        let history = used(&[SlideKind::FeatureGrid, SlideKind::OutcomeGrid]);
-        // FeatureGrid 10-1.5=8.5, OutcomeGrid 9-1.5=7.5, StepFlow 8-0=8.0.
-        // Ranked: FeatureGrid, StepFlow, OutcomeGrid -> StepFlow is the less-used pick.
-        let cands = [
-            cand(SlideKind::FeatureGrid, 10),
-            cand(SlideKind::OutcomeGrid, 9),
-            cand(SlideKind::StepFlow, 8),
-        ];
-        assert_eq!(
-            select_layout_with_diversity(&cands, &history).kind,
-            SlideKind::StepFlow
-        );
-    }
-
-    #[test]
-    fn select_keeps_top_when_alternative_score_gap_too_large() {
-        let history = used(&[SlideKind::FeatureGrid]);
-        let cands = [cand(SlideKind::FeatureGrid, 10), cand(SlideKind::Compare, 4)];
-        assert_eq!(
-            select_layout_with_diversity(&cands, &history).kind,
-            SlideKind::FeatureGrid
-        );
-    }
-
-    #[test]
-    fn record_used_layout_uses_snake_case_and_overwrites_same_index() {
-        let mut layouts = Vec::new();
-        record_used_layout(&mut layouts, 3, &SlideKind::FeatureGrid);
-        record_used_layout(&mut layouts, 5, &SlideKind::Timeline);
-        assert_eq!(
-            layouts,
-            vec![(3, "feature_grid".to_string()), (5, "timeline".to_string())]
-        );
-
-        // Repair switched slide 3 to another kind: overwrite, don't append.
-        record_used_layout(&mut layouts, 3, &SlideKind::SectionList);
-        assert_eq!(
-            layouts,
-            vec![(3, "section_list".to_string()), (5, "timeline".to_string())]
-        );
-    }
-
-    #[test]
-    fn forced_layout_only_applies_to_section_summary_pages() {
+    fn summary_page(idx: usize) -> PagePlan {
         let section = Section {
             title: "实施路径".to_string(),
             paragraphs: Vec::new(),
-            subsections: vec![
-                Subsection {
-                    title: "阶段一".to_string(),
+            subsections: ["阶段一", "阶段二"]
+                .iter()
+                .map(|title| Subsection {
+                    title: title.to_string(),
                     paragraphs: Vec::new(),
-                },
-                Subsection {
-                    title: "阶段二".to_string(),
-                    paragraphs: Vec::new(),
-                },
-            ],
+                })
+                .collect(),
         };
-        let summary = build_summary_page(1, &section);
-        let forced = forced_layout(&summary).expect("section_summary must be forced");
-        assert_eq!(forced.kind, SlideKind::SectionIntro);
-        assert_eq!(forced.page_id, "1");
+        build_summary_page(idx, &section)
+    }
 
-        let content = build_content_page(2, "实施路径", None, "实施路径", &[]);
-        assert!(forced_layout(&content).is_none());
+    fn kinds(plans: &[LayoutPlan]) -> Vec<SlideKind> {
+        plans.iter().map(|plan| plan.kind.clone()).collect()
+    }
+
+    fn assert_no_adjacent_repeats(kinds: &[SlideKind]) {
+        for pair in kinds.windows(2) {
+            assert_ne!(pair[0], pair[1], "adjacent repeat in {kinds:?}");
+        }
+    }
+
+    #[test]
+    fn sanitize_drops_unassignable_dedups_clamps_and_sorts() {
+        let page = content_page(1);
+        let raw = vec![
+            cand(SlideKind::Cover, 10),
+            cand(SlideKind::FeatureGrid, 6),
+            cand(SlideKind::SectionIntro, 9),
+            cand(SlideKind::Timeline, 0),
+            cand(SlideKind::FeatureGrid, 8),
+            cand(SlideKind::OutcomeGrid, 7),
+            cand(SlideKind::Closing, 10),
+        ];
+        let out = sanitize_candidates(&page, raw);
+        let summary: Vec<(SlideKind, u8)> = out.iter().map(|c| (c.kind.clone(), c.score)).collect();
+        assert_eq!(
+            summary,
+            vec![
+                (SlideKind::FeatureGrid, 8),
+                (SlideKind::OutcomeGrid, 7),
+                (SlideKind::Timeline, 1),
+            ]
+        );
+    }
+
+    #[test]
+    fn sanitize_keeps_section_intro_only_for_summary_pages() {
+        let out = sanitize_candidates(&summary_page(1), vec![cand(SlideKind::SectionIntro, 9)]);
+        assert_eq!(out.len(), 1);
+        assert!(sanitize_candidates(&content_page(1), vec![cand(SlideKind::SectionIntro, 9)])
+            .is_empty());
+    }
+
+    #[test]
+    fn fallback_candidates_offer_two_distinct_kinds_for_content_pages() {
+        let out = fallback_candidates(&content_page(1));
+        assert_eq!(out.len(), 2);
+        assert_ne!(out[0].kind, out[1].kind);
+        assert!(out[0].score > out[1].score);
+
+        let forced = fallback_candidates(&summary_page(1));
+        assert_eq!(forced.len(), 1);
+        assert_eq!(forced[0].kind, SlideKind::SectionIntro);
+    }
+
+    #[test]
+    fn assign_alternates_when_alternatives_are_close() {
+        let pages: Vec<PagePlan> = (1..=4).map(content_page).collect();
+        let candidates = vec![
+            vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::OutcomeGrid, 8)];
+            4
+        ];
+        let plans = assign_layouts(&pages, &candidates);
+        assert_no_adjacent_repeats(&kinds(&plans));
+    }
+
+    #[test]
+    fn assign_keeps_a_strong_fit_over_a_poor_alternative() {
+        let pages: Vec<PagePlan> = (1..=2).map(content_page).collect();
+        let candidates = vec![
+            vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::Compare, 2)];
+            2
+        ];
+        let plans = assign_layouts(&pages, &candidates);
+        assert_eq!(
+            kinds(&plans),
+            vec![SlideKind::FeatureGrid, SlideKind::FeatureGrid]
+        );
+    }
+
+    #[test]
+    fn assign_respects_deck_wide_overuse_cap() {
+        // Every page prefers FeatureGrid. Plain alternation would still use it 3 times;
+        // with 6 content pages the cap is 2, so the assigner must spread it out further.
+        let alternatives = [
+            SlideKind::OutcomeGrid,
+            SlideKind::Timeline,
+            SlideKind::StepFlow,
+            SlideKind::CenterGrid,
+            SlideKind::SectionList,
+            SlideKind::IssueStack,
+        ];
+        let pages: Vec<PagePlan> = (1..=6).map(content_page).collect();
+        let candidates: Vec<Vec<LayoutCandidate>> = alternatives
+            .iter()
+            .map(|alt| vec![cand(SlideKind::FeatureGrid, 9), cand(alt.clone(), 8)])
+            .collect();
+        let chosen = kinds(&assign_layouts(&pages, &candidates));
+        let feature_grids = chosen
+            .iter()
+            .filter(|kind| **kind == SlideKind::FeatureGrid)
+            .count();
+        assert!(feature_grids <= overuse_cap(6), "{chosen:?}");
+        assert_no_adjacent_repeats(&chosen);
+    }
+
+    #[test]
+    fn assign_is_independent_of_how_many_pages_ran_concurrently() {
+        // Same candidates must always produce the same deck (no hidden ordering state).
+        let pages: Vec<PagePlan> = (1..=5).map(content_page).collect();
+        let candidates = vec![
+            vec![
+                cand(SlideKind::FeatureGrid, 9),
+                cand(SlideKind::OutcomeGrid, 8),
+                cand(SlideKind::StepFlow, 7),
+            ];
+            5
+        ];
+        let first = kinds(&assign_layouts(&pages, &candidates));
+        for _ in 0..5 {
+            assert_eq!(kinds(&assign_layouts(&pages, &candidates)), first);
+        }
+    }
+
+    #[test]
+    fn assign_forces_section_intro_and_fills_missing_candidates() {
+        let pages = vec![summary_page(1), content_page(2), content_page(3)];
+        let candidates = vec![
+            Vec::new(),
+            vec![cand(SlideKind::Timeline, 9)],
+            Vec::new(),
+        ];
+        let plans = assign_layouts(&pages, &candidates);
+        assert_eq!(plans[0].kind, SlideKind::SectionIntro);
+        assert_eq!(plans[1].kind, SlideKind::Timeline);
+        let fallback: Vec<SlideKind> = fallback_candidates(&pages[2])
+            .into_iter()
+            .map(|c| c.kind)
+            .collect();
+        assert!(fallback.contains(&plans[2].kind));
+        assert_eq!(
+            plans.iter().map(|p| p.page_id.as_str()).collect::<Vec<_>>(),
+            vec!["1", "2", "3"]
+        );
+    }
+
+    #[test]
+    fn assign_annotates_reason_when_not_taking_the_top_candidate() {
+        let pages: Vec<PagePlan> = (1..=2).map(content_page).collect();
+        let candidates = vec![
+            vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::OutcomeGrid, 8)];
+            2
+        ];
+        let plans = assign_layouts(&pages, &candidates);
+        let switched = plans
+            .iter()
+            .find(|plan| plan.kind == SlideKind::OutcomeGrid)
+            .expect("one page should trade down for variety");
+        assert!(switched.reason.contains("deck variety"), "{}", switched.reason);
+        assert!(switched.reason.contains("feature_grid"), "{}", switched.reason);
     }
 }

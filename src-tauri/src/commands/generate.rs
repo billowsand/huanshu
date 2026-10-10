@@ -513,6 +513,34 @@ pub async fn repair_slide(
 // Internal pipeline
 // ---------------------------------------------------------------------------
 
+/// Per-page stage callback that forwards progress to the frontend as `gen:page_status`.
+fn page_stage_callback(
+    app: AppHandle,
+    slide_index: usize,
+) -> std::sync::Arc<dyn Fn(usize, crate::generator::slides::PageStage, Option<&str>) + Send + Sync>
+{
+    use crate::generator::slides::PageStage;
+    std::sync::Arc::new(move |_slide_idx: usize, stage: PageStage, msg: Option<&str>| {
+        let stage_str = match stage {
+            PageStage::Planning => "planning",
+            PageStage::Layout => "layout",
+            PageStage::Content => "content",
+            PageStage::Normalizing => "normalizing",
+            PageStage::Validating => "validating",
+            PageStage::Done => "done",
+        };
+        let _ = app.emit(
+            "gen:page_status",
+            PageStatusEvent {
+                slide_index,
+                stage: stage_str.to_string(),
+                message: msg.map(str::to_string),
+                blueprint: None,
+            },
+        );
+    })
+}
+
 async fn run_pipeline(
     app: AppHandle,
     config: &GenerationConfig,
@@ -521,7 +549,7 @@ async fn run_pipeline(
     run_id: i64,
 ) -> anyhow::Result<Vec<SlideBlueprint>> {
     use crate::generator::planning;
-    use crate::generator::slides::{generate_single_page_pipeline, PageStage};
+    use crate::generator::slides::{generate_single_page_pipeline, plan_single_page};
     use crate::icon::IconIndex;
     use crate::input::parse_markdown;
     use crate::validate::collect_assets;
@@ -643,21 +671,116 @@ async fn run_pipeline(
         &db,
         run_id,
         "generating",
-        format!("并发生成 {total} 张幻灯片...").as_str(),
+        format!("并发规划 {total} 个页面并评估候选布局...").as_str(),
         0.2,
     );
 
+    let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(config.concurrency.max(1)));
+
+    // Phase 2a: enrich page plans + collect layout candidates (concurrent, never fails)
+    let mut plan_handles = Vec::with_capacity(total);
+    for (idx, page_plan) in page_plans.iter().enumerate() {
+        let llm_client_clone = llm_client.clone();
+        let config_clone = config.clone();
+        let doc_clone = doc.clone();
+        let page_plan_owned = page_plan.clone();
+        let asset_paths_clone = asset_paths.clone();
+        let debug_dir_owned = config.debug_dir.clone();
+        let sem_clone = sem.clone();
+        let on_stage_cb = page_stage_callback(app.clone(), idx);
+
+        plan_handles.push(tokio::task::spawn(async move {
+            let _permit = sem_clone.acquire().await.unwrap();
+            plan_single_page(
+                &llm_client_clone,
+                &config_clone,
+                &doc_clone,
+                page_plan_owned,
+                idx,
+                &asset_paths_clone,
+                &debug_dir_owned,
+                on_stage_cb,
+            )
+            .await
+        }));
+    }
+
+    let mut enriched_plans = Vec::with_capacity(total);
+    let mut layout_candidates = Vec::with_capacity(total);
+    for (handle, base_plan) in plan_handles.into_iter().zip(&page_plans) {
+        match handle.await {
+            Ok((plan, candidates)) => {
+                enriched_plans.push(plan);
+                layout_candidates.push(candidates);
+            }
+            Err(e) => {
+                eprintln!(
+                    "page {} planning task panicked or was cancelled: {e}",
+                    base_plan.page_id
+                );
+                enriched_plans.push(base_plan.clone());
+                // Empty list: assign_layouts substitutes deterministic fallback candidates.
+                layout_candidates.push(Vec::new());
+            }
+        }
+    }
+
+    // Phase 2b: deck-level layout assignment (deterministic, CPU only)
+    let layout_plans = planning::assign_layouts(&enriched_plans, &layout_candidates);
+    let assignment_report = json!(layout_plans
+        .iter()
+        .zip(&layout_candidates)
+        .map(|(layout, candidates)| json!({
+            "page_id": layout.page_id,
+            "title": layout.title,
+            "kind": crate::generator::utils::slide_kind_name(&layout.kind),
+            "reason": layout.reason,
+            "candidates": candidates,
+        }))
+        .collect::<Vec<_>>());
+    let _ = crate::generator::utils::write_debug(
+        &config.debug_dir,
+        "02-layout-assignment.json",
+        &serde_json::to_string_pretty(&assignment_report).unwrap_or_default(),
+    );
+    record_log(
+        &app,
+        &db,
+        run_id,
+        None,
+        "layout_plan",
+        "status",
+        "布局分配",
+        &format!(
+            "全局分配 {} 页布局：{}",
+            layout_plans.len(),
+            layout_plans
+                .iter()
+                .map(|layout| crate::generator::utils::slide_kind_name(&layout.kind))
+                .collect::<Vec<_>>()
+                .join(" → ")
+        ),
+        json!({ "assignment": assignment_report }),
+        true,
+    );
+    emit_progress(
+        &app,
+        &db,
+        run_id,
+        "generating",
+        format!("布局分配完成，并发生成 {total} 张幻灯片内容...").as_str(),
+        0.3,
+    );
+
+    // Phase 2c: content → normalize → validate + repair (concurrent)
     let blueprints_arc =
         std::sync::Arc::new(tokio::sync::Mutex::new(vec![None::<SlideBlueprint>; total]));
-    let used_layouts_arc: std::sync::Arc<tokio::sync::Mutex<Vec<(usize, String)>>> =
-        std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new()));
-    let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(config.concurrency.max(1)));
     let completed_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0usize));
     let failed_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0usize));
 
     let mut handles = Vec::with_capacity(total);
 
-    for (idx, page_plan) in page_plans.iter().enumerate() {
+    for (idx, (page_plan, layout_plan)) in enriched_plans.iter().zip(&layout_plans).enumerate() {
         let app_clone = app.clone();
         let db_clone = db.clone();
         let llm_client_clone = llm_client.clone();
@@ -665,43 +788,18 @@ async fn run_pipeline(
         let config_clone = config.clone();
         let doc_clone = doc.clone();
         let page_plan_owned = page_plan.clone();
+        let layout_plan = layout_plan.clone();
         let icon_index_clone = icon_index.clone();
         let asset_paths_clone = asset_paths.clone();
         let debug_dir_owned = config.debug_dir.clone();
         let blueprints_ref = blueprints_arc.clone();
-        let used_layouts_ref = used_layouts_arc.clone();
         let sem_clone = sem.clone();
         let completed_ref = completed_count.clone();
         let failed_ref = failed_count.clone();
+        let on_stage_cb = page_stage_callback(app.clone(), idx);
 
         let handle = tokio::task::spawn(async move {
             let _permit = sem_clone.acquire().await.unwrap();
-
-            // Emit page status event
-            let emit_stage_app = app_clone.clone();
-            let emit_stage_idx = idx;
-            let on_stage_cb: std::sync::Arc<dyn Fn(usize, PageStage, Option<&str>) + Send + Sync> =
-                std::sync::Arc::new(
-                    move |_slide_idx: usize, stage: PageStage, msg: Option<&str>| {
-                        let stage_str = match stage {
-                            PageStage::Planning => "planning",
-                            PageStage::Layout => "layout",
-                            PageStage::Content => "content",
-                            PageStage::Normalizing => "normalizing",
-                            PageStage::Validating => "validating",
-                            PageStage::Done => "done",
-                        };
-                        let _ = emit_stage_app.emit(
-                            "gen:page_status",
-                            PageStatusEvent {
-                                slide_index: emit_stage_idx,
-                                stage: stage_str.to_string(),
-                                message: msg.map(str::to_string),
-                                blueprint: None,
-                            },
-                        );
-                    },
-                );
 
             match generate_single_page_pipeline(
                 &llm_client_clone,
@@ -709,9 +807,8 @@ async fn run_pipeline(
                 &config_clone,
                 &doc_clone,
                 page_plan_owned.clone(),
+                layout_plan.clone(),
                 idx,
-                total,
-                used_layouts_ref.clone(),
                 &icon_index_clone,
                 &asset_paths_clone,
                 &debug_dir_owned,
@@ -719,7 +816,7 @@ async fn run_pipeline(
             )
             .await
             {
-                Ok((blueprint, layout_plan)) => {
+                Ok(blueprint) => {
                     let kind_str = format!("{:?}", layout_plan.kind);
                     let title_str = page_plan_owned.page_title.clone();
                     // Store the result
@@ -745,7 +842,7 @@ async fn run_pipeline(
                         GenerationEvent {
                             stage: "content".to_string(),
                             message: format!("幻灯片 {}/{} 完成", idx + 1, total),
-                            progress: Some(0.2 + 0.65 * done_count as f32 / total as f32),
+                            progress: Some(0.3 + 0.55 * done_count as f32 / total as f32),
                             slide_index: Some(idx),
                             blueprint: Some(blueprint),
                         },
@@ -818,7 +915,7 @@ async fn run_pipeline(
     // Collect results, fill gaps with fallback slides
     let mut content_slides: Vec<SlideBlueprint> = {
         let bp = blueprints_arc.lock().await;
-        page_plans
+        enriched_plans
             .iter()
             .enumerate()
             .map(|(idx, page)| {
