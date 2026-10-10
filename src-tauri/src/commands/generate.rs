@@ -726,7 +726,7 @@ async fn run_pipeline(
     }
 
     // Phase 2b: deck-level layout assignment (deterministic, CPU only)
-    let layout_plans = planning::assign_layouts(&enriched_plans, &layout_candidates);
+    let layout_plans = planning::assign_layouts(&enriched_plans, &layout_candidates, config.aspect_ratio);
     let assignment_report = json!(layout_plans
         .iter()
         .zip(&layout_candidates)

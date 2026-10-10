@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
 
+use crate::generator::layout_rules::{
+    ineligibility, is_eligible, prompt_rules, UNIVERSAL_CONTENT_KINDS,
+};
 use crate::generator::utils::{slide_kind_name, sorted_assets, write_debug};
 
 // ---------------------------------------------------------------------------
@@ -575,25 +578,11 @@ pub fn variety_fallback_kind(page: &PagePlan) -> SlideKind {
     SlideKind::SectionList
 }
 
-/// Pick a valid kind that differs from `current_kind`.
-/// Used in the last-resort repair round to actually switch the component.
-pub fn pick_different_kind(page: &PagePlan, current_kind: &SlideKind) -> SlideKind {
-    if page.page_role.as_deref() == Some("section_summary") {
-        return SlideKind::SectionIntro;
-    }
-    // Try the signal-based fallback first; if it happens to equal the current kind, escalate.
-    let candidate = safe_fallback_kind(page);
-    if &candidate != current_kind {
-        return candidate;
-    }
-    let variety = variety_fallback_kind(page);
-    if &variety != current_kind {
-        return variety;
-    }
-    // Brute-force: cycle through all content kinds in priority order until we find one
-    // that differs from current_kind. Cover all 12 content kinds so even "hard" kinds
-    // like Swot/Compare/Process are reachable when both signal-based paths failed.
-    for kind in &[
+/// Signal-based preference order for deterministic fallbacks: the heuristic picks first,
+/// then every content kind (universal kinds early) so an eligible kind is always reachable.
+fn fallback_kind_order(page: &PagePlan) -> Vec<SlideKind> {
+    let mut order = vec![safe_fallback_kind(page), variety_fallback_kind(page)];
+    order.extend([
         SlideKind::SectionList,
         SlideKind::OutcomeGrid,
         SlideKind::FeatureGrid,
@@ -607,13 +596,56 @@ pub fn pick_different_kind(page: &PagePlan, current_kind: &SlideKind) -> SlideKi
         SlideKind::Compare,
         SlideKind::IssueStack,
         SlideKind::Swot,
-    ] {
-        if kind != current_kind {
-            return kind.clone();
+    ]);
+    let mut deduped: Vec<SlideKind> = Vec::with_capacity(order.len());
+    for kind in order {
+        if !deduped.contains(&kind) {
+            deduped.push(kind);
         }
     }
-    // Unreachable: the list covers all content kinds.
-    SlideKind::SectionList
+    deduped
+}
+
+/// Kinds this page may use, in fallback preference order. Never empty: section_summary
+/// pages get `SectionIntro`, content pages always include the universal kinds.
+pub fn eligible_fallback_kinds(page: &PagePlan, aspect: AspectRatio) -> Vec<SlideKind> {
+    if let Some(kind) = forced_kind(page) {
+        return vec![kind];
+    }
+    fallback_kind_order(page)
+        .into_iter()
+        .filter(|kind| is_eligible(kind, page, aspect))
+        .collect()
+}
+
+/// Best deterministic kind for this page (used for fallback slides).
+pub fn fallback_kind(page: &PagePlan, aspect: AspectRatio) -> SlideKind {
+    eligible_fallback_kinds(page, aspect)
+        .into_iter()
+        .next()
+        .unwrap_or(SlideKind::FeatureGrid)
+}
+
+/// Pick an eligible kind that differs from `current_kind`.
+/// Used in the last-resort repair round to actually switch the component.
+pub fn pick_different_kind(
+    page: &PagePlan,
+    current_kind: &SlideKind,
+    aspect: AspectRatio,
+) -> SlideKind {
+    if let Some(kind) = forced_kind(page) {
+        return kind;
+    }
+    eligible_fallback_kinds(page, aspect)
+        .into_iter()
+        .find(|kind| kind != current_kind)
+        .unwrap_or_else(|| {
+            UNIVERSAL_CONTENT_KINDS
+                .iter()
+                .find(|kind| *kind != current_kind)
+                .cloned()
+                .unwrap_or(SlideKind::FeatureGrid)
+        })
 }
 
 pub async fn assemble_slides(
@@ -910,35 +942,31 @@ pub async fn layout_candidates_for_page(
     page_plan: &PagePlan,
     debug_dir: &Path,
 ) -> Vec<LayoutCandidate> {
+    let aspect = config.aspect_ratio;
     if forced_kind(page_plan).is_some() {
-        return fallback_candidates(page_plan);
+        return fallback_candidates(page_plan, aspect);
     }
 
     let idx = page_plan.page_id.parse::<usize>().unwrap_or(0);
     let prefix = format!("02-layout-{:02}", idx);
 
-    let aspect_constraint = match config.aspect_ratio {
-        crate::types::AspectRatio::Ratio16x9 => "",
-        crate::types::AspectRatio::Ratio32x9 => {
-            "\n\nWIDE FORMAT (32:9): Prefer step_flow/timeline/process/feature_grid/outcome_grid. \
-             Avoid spotlight. Use focus_example/compare only when content truly demands two-panel layout."
-        }
-        crate::types::AspectRatio::Ratio48x9 => {
-            "\n\nULTRA-WIDE FORMAT (48:9): Strongly prefer step_flow/timeline/process/feature_grid/outcome_grid. \
-             AVOID focus_example, compare, spotlight — these fixed two-panel or single-image layouts create extreme whitespace at panoramic width."
-        }
-    };
-    let system = "You choose the best Slidev component kinds for a single slide page. Use only: feature_grid, spotlight, split_layers, section_list, focus_example, outcome_grid, center_grid, timeline, step_flow, process, compare, issue_stack, swot. Return strict JSON.";
+    // Whitelist and per-kind guidance come from the shared eligibility table, so the LLM is
+    // only offered kinds that `sanitize_candidates` would accept anyway.
+    let rules = prompt_rules(page_plan, aspect);
+    let system = format!(
+        "You choose the best Slidev component kinds for a single slide page. Use only: {}. Return strict JSON.",
+        rules.allowed_names.join(", ")
+    );
     let user = format!(
-        "Page plan:\n{}{}\n\nRank 3 distinct suitable component kinds for this page, ordered by fitness.\nScore each kind only by how well it fits THIS page. Deck-level variety is handled separately, so do not lower a good fit's score just to vary layouts, and give honest scores to the 2nd and 3rd choices.\n\nRules:\n- feature_grid: 3+ parallel items of equal weight.\n- spotlight: single-object focus with image.\n- split_layers: layered/architectural content.\n- section_list: strict order-dependent steps.\n- focus_example: central thesis + example.\n- outcome_grid: 2-4 parallel deliverables/results.\n- center_grid: compact closing summary or goal.\n- timeline: chronological events with dates.\n- step_flow: 2-4 step linear process.\n- process: 5+ steps grouped into phases.\n- compare: EXACTLY two alternatives.\n- issue_stack: 2-4 stacked problems, challenges, or risks; argument_mode=warning or causal, or page content discusses failures/obstacles.\n- swot: four-quadrant matrix.\n\nHard constraints:\n- step_flow when key_points <= 4; process when >= 5.\n- compare ONLY for exactly two alternatives.\n- issue_stack ONLY for problem/challenge/risk content with 2-4 items.\n- swot ONLY for four-quadrant matrices.\n\n\nReturn JSON:\n{{\"candidates\": [{{\"kind\": \"...\", \"score\": 1-10, \"reason\": \"...\"}}, ...]}}",
+        "Page plan:\n{}\n\nRank up to 3 distinct suitable component kinds for this page, ordered by fitness, choosing only from the allowed kinds.\nScore each kind only by how well it fits THIS page. Deck-level variety is handled separately, so do not lower a good fit's score just to vary layouts, and give honest scores to the 2nd and 3rd choices.\n\n{}\n\nReturn JSON:\n{{\"candidates\": [{{\"kind\": \"...\", \"score\": 1-10, \"reason\": \"...\"}}, ...]}}",
         serde_json::to_string_pretty(page_plan).unwrap_or_default(),
-        aspect_constraint,
+        rules.rules_text,
     );
 
-    let _ = write_debug(debug_dir, &format!("{prefix}.system.txt"), system);
+    let _ = write_debug(debug_dir, &format!("{prefix}.system.txt"), &system);
     let _ = write_debug(debug_dir, &format!("{prefix}.user.txt"), &user);
 
-    match client.generate_text(&config.llm.model, system, &user).await {
+    match client.generate_text(&config.llm.model, &system, &user).await {
         Ok(raw) => {
             let _ = write_debug(debug_dir, &format!("{prefix}.raw.txt"), &raw);
             match crate::generator::utils::parse_json_with_extraction::<LayoutCandidateResponse>(
@@ -950,7 +978,7 @@ pub async fn layout_candidates_for_page(
                         &format!("{prefix}.parsed.json"),
                         &serde_json::to_string_pretty(&resp).unwrap_or_default(),
                     );
-                    let candidates = sanitize_candidates(page_plan, resp.candidates);
+                    let candidates = sanitize_candidates(page_plan, aspect, resp.candidates);
                     if !candidates.is_empty() {
                         return candidates;
                     }
@@ -968,7 +996,7 @@ pub async fn layout_candidates_for_page(
         Err(e) => eprintln!("LLM error layout page {}: {e}", page_plan.page_id),
     }
 
-    fallback_candidates(page_plan)
+    fallback_candidates(page_plan, aspect)
 }
 
 /// Kinds fully determined by the page plan, needing no LLM call.
@@ -977,22 +1005,21 @@ fn forced_kind(page_plan: &PagePlan) -> Option<SlideKind> {
     (page_plan.page_role.as_deref() == Some("section_summary")).then_some(SlideKind::SectionIntro)
 }
 
-/// Whether `kind` may be assigned to this page at all.
-/// Cover/Overview/Closing are deck furniture; SectionIntro is reserved for summary pages.
-fn is_assignable_kind(page_plan: &PagePlan, kind: &SlideKind) -> bool {
-    match kind {
-        SlideKind::Cover | SlideKind::Overview | SlideKind::Closing => false,
-        SlideKind::SectionIntro => forced_kind(page_plan).is_some(),
-        _ => true,
-    }
-}
-
-/// Drop unassignable kinds, collapse duplicate kinds (keeping the higher score),
-/// clamp scores into 1..=10 and order by score (stable, so LLM order breaks ties).
-fn sanitize_candidates(page_plan: &PagePlan, raw: Vec<LayoutCandidate>) -> Vec<LayoutCandidate> {
+/// Drop kinds the eligibility table rules out, collapse duplicate kinds (keeping the higher
+/// score), clamp scores into 1..=10 and order by score (stable, so LLM order breaks ties).
+fn sanitize_candidates(
+    page_plan: &PagePlan,
+    aspect: AspectRatio,
+    raw: Vec<LayoutCandidate>,
+) -> Vec<LayoutCandidate> {
     let mut out: Vec<LayoutCandidate> = Vec::new();
     for mut candidate in raw {
-        if !is_assignable_kind(page_plan, &candidate.kind) {
+        if let Some(reason) = ineligibility(&candidate.kind, page_plan, aspect) {
+            eprintln!(
+                "page {}: dropping layout candidate {}: {reason}",
+                page_plan.page_id,
+                slide_kind_name(&candidate.kind)
+            );
             continue;
         }
         candidate.score = candidate.score.clamp(1, 10);
@@ -1007,9 +1034,9 @@ fn sanitize_candidates(page_plan: &PagePlan, raw: Vec<LayoutCandidate>) -> Vec<L
 }
 
 /// Deterministic candidates for pages the LLM is not asked about (section_summary) or gave
-/// nothing usable for: the signal-based pick plus one guaranteed-different alternative so the
-/// deck-level assigner still has room to avoid repeats.
-fn fallback_candidates(page_plan: &PagePlan) -> Vec<LayoutCandidate> {
+/// nothing usable for: the best eligible signal-based pick plus one different eligible
+/// alternative so the deck-level assigner still has room to avoid repeats.
+fn fallback_candidates(page_plan: &PagePlan, aspect: AspectRatio) -> Vec<LayoutCandidate> {
     if let Some(kind) = forced_kind(page_plan) {
         return vec![LayoutCandidate {
             kind,
@@ -1017,20 +1044,19 @@ fn fallback_candidates(page_plan: &PagePlan) -> Vec<LayoutCandidate> {
             reason: "section_summary page always uses section_intro".to_string(),
         }];
     }
-    let primary = safe_fallback_kind(page_plan);
-    let alternative = pick_different_kind(page_plan, &primary);
-    vec![
-        LayoutCandidate {
-            kind: primary,
-            score: 6,
-            reason: "deterministic fallback (LLM layout failed)".to_string(),
-        },
-        LayoutCandidate {
-            kind: alternative,
-            score: 4,
-            reason: "deterministic fallback alternative".to_string(),
-        },
-    ]
+    eligible_fallback_kinds(page_plan, aspect)
+        .into_iter()
+        .take(2)
+        .zip([
+            (6, "deterministic fallback (LLM layout failed)"),
+            (4, "deterministic fallback alternative"),
+        ])
+        .map(|(kind, (score, reason))| LayoutCandidate {
+            kind,
+            score,
+            reason: reason.to_string(),
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -1064,13 +1090,14 @@ const MAX_LOCAL_SEARCH_SWEEPS: usize = 32;
 pub fn assign_layouts(
     page_plans: &[PagePlan],
     candidates: &[Vec<LayoutCandidate>],
+    aspect: AspectRatio,
 ) -> Vec<LayoutPlan> {
     let cands: Vec<Vec<LayoutCandidate>> = page_plans
         .iter()
         .enumerate()
         .map(|(i, page)| match candidates.get(i) {
             Some(list) if !list.is_empty() => list.clone(),
-            _ => fallback_candidates(page),
+            _ => fallback_candidates(page, aspect),
         })
         .collect();
 
@@ -1303,7 +1330,7 @@ mod tests {
             cand(SlideKind::OutcomeGrid, 7),
             cand(SlideKind::Closing, 10),
         ];
-        let out = sanitize_candidates(&page, raw);
+        let out = sanitize_candidates(&page, AspectRatio::Ratio16x9, raw);
         let summary: Vec<(SlideKind, u8)> = out.iter().map(|c| (c.kind.clone(), c.score)).collect();
         assert_eq!(
             summary,
@@ -1317,20 +1344,20 @@ mod tests {
 
     #[test]
     fn sanitize_keeps_section_intro_only_for_summary_pages() {
-        let out = sanitize_candidates(&summary_page(1), vec![cand(SlideKind::SectionIntro, 9)]);
+        let out = sanitize_candidates(&summary_page(1), AspectRatio::Ratio16x9, vec![cand(SlideKind::SectionIntro, 9)]);
         assert_eq!(out.len(), 1);
-        assert!(sanitize_candidates(&content_page(1), vec![cand(SlideKind::SectionIntro, 9)])
+        assert!(sanitize_candidates(&content_page(1), AspectRatio::Ratio16x9, vec![cand(SlideKind::SectionIntro, 9)])
             .is_empty());
     }
 
     #[test]
     fn fallback_candidates_offer_two_distinct_kinds_for_content_pages() {
-        let out = fallback_candidates(&content_page(1));
+        let out = fallback_candidates(&content_page(1), AspectRatio::Ratio16x9);
         assert_eq!(out.len(), 2);
         assert_ne!(out[0].kind, out[1].kind);
         assert!(out[0].score > out[1].score);
 
-        let forced = fallback_candidates(&summary_page(1));
+        let forced = fallback_candidates(&summary_page(1), AspectRatio::Ratio16x9);
         assert_eq!(forced.len(), 1);
         assert_eq!(forced[0].kind, SlideKind::SectionIntro);
     }
@@ -1342,7 +1369,7 @@ mod tests {
             vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::OutcomeGrid, 8)];
             4
         ];
-        let plans = assign_layouts(&pages, &candidates);
+        let plans = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
         assert_no_adjacent_repeats(&kinds(&plans));
     }
 
@@ -1353,7 +1380,7 @@ mod tests {
             vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::Compare, 2)];
             2
         ];
-        let plans = assign_layouts(&pages, &candidates);
+        let plans = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
         assert_eq!(
             kinds(&plans),
             vec![SlideKind::FeatureGrid, SlideKind::FeatureGrid]
@@ -1370,14 +1397,14 @@ mod tests {
             SlideKind::StepFlow,
             SlideKind::CenterGrid,
             SlideKind::SectionList,
-            SlideKind::IssueStack,
+            SlideKind::SplitLayers,
         ];
         let pages: Vec<PagePlan> = (1..=6).map(content_page).collect();
         let candidates: Vec<Vec<LayoutCandidate>> = alternatives
             .iter()
             .map(|alt| vec![cand(SlideKind::FeatureGrid, 9), cand(alt.clone(), 8)])
             .collect();
-        let chosen = kinds(&assign_layouts(&pages, &candidates));
+        let chosen = kinds(&assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9));
         let feature_grids = chosen
             .iter()
             .filter(|kind| **kind == SlideKind::FeatureGrid)
@@ -1398,9 +1425,9 @@ mod tests {
             ];
             5
         ];
-        let first = kinds(&assign_layouts(&pages, &candidates));
+        let first = kinds(&assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9));
         for _ in 0..5 {
-            assert_eq!(kinds(&assign_layouts(&pages, &candidates)), first);
+            assert_eq!(kinds(&assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9)), first);
         }
     }
 
@@ -1412,10 +1439,10 @@ mod tests {
             vec![cand(SlideKind::Timeline, 9)],
             Vec::new(),
         ];
-        let plans = assign_layouts(&pages, &candidates);
+        let plans = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
         assert_eq!(plans[0].kind, SlideKind::SectionIntro);
         assert_eq!(plans[1].kind, SlideKind::Timeline);
-        let fallback: Vec<SlideKind> = fallback_candidates(&pages[2])
+        let fallback: Vec<SlideKind> = fallback_candidates(&pages[2], AspectRatio::Ratio16x9)
             .into_iter()
             .map(|c| c.kind)
             .collect();
@@ -1433,12 +1460,81 @@ mod tests {
             vec![cand(SlideKind::FeatureGrid, 9), cand(SlideKind::OutcomeGrid, 8)];
             2
         ];
-        let plans = assign_layouts(&pages, &candidates);
+        let plans = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
         let switched = plans
             .iter()
             .find(|plan| plan.kind == SlideKind::OutcomeGrid)
             .expect("one page should trade down for variety");
         assert!(switched.reason.contains("deck variety"), "{}", switched.reason);
         assert!(switched.reason.contains("feature_grid"), "{}", switched.reason);
+    }
+
+    #[test]
+    fn sanitize_drops_candidates_the_eligibility_table_rules_out() {
+        // A plain content page: no pair, no problem wording, no image, 0 key points.
+        let page = content_page(1);
+        let raw = vec![
+            cand(SlideKind::Compare, 10),
+            cand(SlideKind::Spotlight, 9),
+            cand(SlideKind::Process, 9),
+            cand(SlideKind::StepFlow, 7),
+        ];
+        let kept: Vec<SlideKind> = sanitize_candidates(&page, AspectRatio::Ratio16x9, raw)
+            .into_iter()
+            .map(|c| c.kind)
+            .collect();
+        assert_eq!(kept, vec![SlideKind::StepFlow]);
+    }
+
+    fn image_hungry_page() -> PagePlan {
+        // Signals that make safe_fallback_kind return Spotlight.
+        let mut page = content_page(1);
+        page.argument_mode = Some("parallel".to_string());
+        page.visual_need = Some("image_required".to_string());
+        page.object_count = Some("single".to_string());
+        page
+    }
+
+    #[test]
+    fn fallback_kind_skips_ineligible_heuristic_picks() {
+        let page = image_hungry_page();
+        assert_eq!(safe_fallback_kind(&page), SlideKind::Spotlight);
+        // No image asset -> Spotlight is not allowed.
+        assert_ne!(fallback_kind(&page, AspectRatio::Ratio16x9), SlideKind::Spotlight);
+
+        let mut with_image = page.clone();
+        with_image.preferred_assets = vec!["images/a.png".to_string()];
+        assert_eq!(fallback_kind(&with_image, AspectRatio::Ratio16x9), SlideKind::Spotlight);
+        // Spotlight is blocked on wide formats even with an image.
+        assert_ne!(fallback_kind(&with_image, AspectRatio::Ratio32x9), SlideKind::Spotlight);
+    }
+
+    #[test]
+    fn every_fallback_path_returns_eligible_kinds() {
+        let mut pair = content_page(2);
+        pair.object_count = Some("pair".to_string());
+        pair.content_shape = Some("comparison".to_string());
+        let pages = vec![content_page(1), image_hungry_page(), pair, summary_page(4)];
+        for page in &pages {
+            for aspect in [
+                AspectRatio::Ratio16x9,
+                AspectRatio::Ratio32x9,
+                AspectRatio::Ratio48x9,
+            ] {
+                let kinds = eligible_fallback_kinds(page, aspect);
+                assert!(!kinds.is_empty());
+                assert!(kinds.iter().all(|k| is_eligible(k, page, aspect)), "{kinds:?}");
+                for c in fallback_candidates(page, aspect) {
+                    assert!(is_eligible(&c.kind, page, aspect), "{:?}", c.kind);
+                }
+                let current = fallback_kind(page, aspect);
+                assert!(is_eligible(&current, page, aspect));
+                let switched = pick_different_kind(page, &current, aspect);
+                assert!(is_eligible(&switched, page, aspect), "{switched:?}");
+                if forced_kind(page).is_none() {
+                    assert_ne!(switched, current);
+                }
+            }
+        }
     }
 }

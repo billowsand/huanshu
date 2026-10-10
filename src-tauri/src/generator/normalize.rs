@@ -15,19 +15,20 @@ use crate::generator::utils::{
 /// Build a minimal valid slide deterministically from a PagePlan.
 /// Used as a last-resort fallback when all LLM repair rounds fail.
 ///
-/// Uses `safe_fallback_kind` for full 12-kind coverage. Required fields for each
-/// kind are guaranteed by the `apply_component_defaults` call in the caller; this
-/// function only pre-fills the five kinds it can meaningfully populate from
-/// key_points (SectionIntro, FeatureGrid, OutcomeGrid, SectionList, StepFlow).
+/// Uses `planning::fallback_kind`, i.e. the best signal-based kind that the
+/// `layout_rules` eligibility table allows for this page and aspect ratio. Required
+/// fields for each kind are guaranteed by the `apply_component_defaults` call in the
+/// caller; this function only pre-fills the five kinds it can meaningfully populate
+/// from key_points (SectionIntro, FeatureGrid, OutcomeGrid, SectionList, StepFlow).
 pub fn make_fallback_slide(
     page: &PagePlan,
     layout: Option<&LayoutPlan>,
     aspect_ratio: AspectRatio,
 ) -> SlideBlueprint {
-    use crate::generator::planning::safe_fallback_kind;
+    use crate::generator::planning::fallback_kind;
     // Deliberately ignore the layout plan's kind — it's the one that failed.
     let _ = layout;
-    let kind = safe_fallback_kind(page);
+    let kind = fallback_kind(page, aspect_ratio);
 
     // Build minimal cards / list_items from key_points
     let key_points = &page.key_points;
@@ -934,7 +935,7 @@ pub async fn repair_one_slide(
         if is_last_round {
             // Final round: switch kind deterministically and regenerate
             use crate::generator::planning::pick_different_kind;
-            let new_kind = pick_different_kind(page_plan, &slide.kind);
+            let new_kind = pick_different_kind(page_plan, &slide.kind, config.aspect_ratio);
             eprintln!(
                 "repair_one_slide: slide {} switching {:?} → {:?}",
                 slide_idx + 1,

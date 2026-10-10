@@ -7,11 +7,12 @@
    新建 `KeynoteXxxSlide.vue`，Props 设计需清楚。
 2. `src-tauri/src/types.rs`
    新增 `SlideKind` 枚举项，以及该模板对应的数据结构。
-3. `src-tauri/src/generator/planning.rs`
-   在 layout plan 提示词里写清楚：
-   - 什么时候应该选这个模板
-   - 什么时候不能选这个模板
-   - 它和相邻模板的边界是什么
+3. `src-tauri/src/generator/layout_rules.rs`
+   在 `LAYOUT_RULES` 表里加一行（布局提示词由这张表生成，代码过滤也用它）：
+   - `use_when`：什么时候应该选这个模板、它和相邻模板的边界是什么
+   - `requirement` + `check`：什么时候**不能**选（硬条件，宜宽松，多个信号取 OR）
+   - `blocked_aspects`：哪些比例下版式会崩（如超宽下的双栏/单图）
+   另在 `planning.rs::fallback_kind_order` 的兜底列表里加上该 kind。
 4. `src-tauri/src/generator/utils.rs`
    在 `blueprint_schema_hint()` 里加入严格 JSON 示例。
 5. `src-tauri/src/generator/slides.rs`
@@ -49,7 +50,7 @@
 
 Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 struct 字面量编译不过）：
 6. `src-tauri/src/types.rs`：`SlideKind` 变体 + `SlideBlueprint` 字段
-7. `src-tauri/src/generator/planning.rs`：`layout_candidates_for_page` 的 system 提示词白名单与规则文案、`safe_fallback_kind` / `variety_fallback_kind` / `pick_different_kind` 候选列表、各 `SlideBlueprint { .. }` 字面量
+7. `src-tauri/src/generator/layout_rules.rs`：`LAYOUT_RULES` 中该模板的行（提示词白名单与规则文案由它生成）；`src-tauri/src/generator/planning.rs`：`safe_fallback_kind` / `variety_fallback_kind` / `fallback_kind_order` 候选列表、各 `SlideBlueprint { .. }` 字面量
 8. `src-tauri/src/generator/slides.rs`：内容生成提示词的字段要求
 9. `src-tauri/src/generator/utils.rs`：`slide_kind_name`（`SlideKind → snake_case`）映射、`blueprint_schema_hint`
 10. `src-tauri/src/generator/normalize.rs`：默认值修复分支 + 字面量
@@ -68,8 +69,9 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
 
 1. **2a 并发规划**（`slides.rs::plan_single_page`）：每页 enrich + `planning::layout_candidates_for_page`，
    LLM 只按「本页适配度」给 2-3 个候选打分，**提示词里不要再加多样性信息**。
-   候选经 `sanitize_candidates` 过滤：Cover/Overview/Closing 永不入选，`section_intro` 只给
-   `section_summary` 页（这类页不调 LLM，直接强制）；LLM 失败时用 `fallback_candidates`（两个不同 kind）。
+   提示词只列出本页**可用**的 kind（并说明其余 kind 为何不可用），候选再经 `sanitize_candidates`
+   按同一张适用条件表过滤（见下）；`section_summary` 页不调 LLM，直接 `section_intro`；
+   LLM 失败时用 `fallback_candidates`（两个不同的可用 kind）。
 2. **2b 全局分配**（`planning::assign_layouts`，纯 CPU、确定性）：最大化
    `Σ score − 3·相邻同款 − 1·隔页同款 − 2·超出上限的次数`，单一 kind 上限为内容页数的 30%（至少 2）。
    先 Viterbi 精确求解相邻项，再做单页交换的局部搜索处理全局项。结果只取决于候选，与并发数无关；
@@ -77,8 +79,21 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
 3. **2c 并发生成**（`slides.rs::generate_single_page_pipeline`）：content → normalize → validate/repair。
    repair 最后一轮仍可能用 `pick_different_kind` 换模板，此时不会回头重排其他页（少见，可接受）。
 
-新增模板时：提示词白名单在 `layout_candidates_for_page`；若是像 `section_intro` 那样有结构性
-使用条件的模板，同步改 `is_assignable_kind`。
+### 适用条件表（`generator/layout_rules.rs`）
+
+`LAYOUT_RULES` 是「模板何时可用」的唯一来源，以下全部从它派生，**不要再在别处手写模板白名单或硬约束**：
+- 布局提示词（`prompt_rules`：可用 kind 白名单 + `use_when` 文案 + 不可用 kind 的原因 + 超宽比例的软偏好）
+- LLM 候选过滤（`sanitize_candidates`，丢弃时 `eprintln` 原因）
+- 所有确定性兜底：`fallback_candidates`、repair 最后一轮的 `pick_different_kind`、`make_fallback_slide`
+  都走 `planning::eligible_fallback_kinds`，只会返回可用 kind
+
+现有硬条件：`step_flow` 要点 ≤4 / `process` 要点 ≥5；`compare` 需 pair 或 comparison；
+`issue_stack` 需 warning/causal 或问题类措辞；`swot` 需 matrix 或 SWOT 措辞；`spotlight` 需
+`preferred_assets` 非空；32:9 禁 `spotlight`，48:9 禁 `spotlight`/`compare`/`focus_example`；
+`section_intro` 仅且必须用于 `section_summary` 页；Cover/Overview/Closing 不在表中，永不可选。
+
+不变量：`UNIVERSAL_CONTENT_KINDS`（`feature_grid`、`section_list`）对任何内容页、任何比例都可用，
+兜底链依赖它保证总能找到可用 kind——给这两个模板加硬条件前先改兜底逻辑（有单测守护）。
 
 ## 幻灯片字号体系（`--type-scale`）
 
@@ -130,7 +145,7 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
 | `src/style.css` | `.pres-slide, .slidev-slide` 的 width/height 改为 CSS 变量 |
 
 ### 实现要点
-1. **生成时**：planning.rs 的提示词会根据比例告诉 LLM 调整布局（如 FeatureGrid 用更多列）
+1. **生成时**：`layout_rules.rs` 按比例屏蔽不适合的模板（`blocked_aspects`）并在布局提示词里加入软偏好
 2. **normalize 时**：`apply_component_defaults` 根据比例调整各项数量限制（如 `cards.truncate(4 * cols_multiplier)`）
 3. **播放时**：PresentationOverlay 计算 `stretchScale = { scaleX: vw/slideW, scaleY: vh/slideH }`，对幻灯片进行非等比缩放到全屏
 
