@@ -12,7 +12,8 @@
    - `use_when`：什么时候应该选这个模板、它和相邻模板的边界是什么
    - `requirement` + `check`：什么时候**不能**选（硬条件，宜宽松，多个信号取 OR）
    - `blocked_aspects`：哪些比例下版式会崩（如超宽下的双栏/单图）
-   另在 `planning.rs::fallback_kind_order` 的兜底列表里加上该 kind。
+   另在 `src-tauri/src/generator/layout_scoring.rs` 的 `PRIORS` 加一行先验分，并在 `SCORE_RULES`
+   写上哪些页面信号该给它加分（LLM 失败时的兜底排序靠这张表）。
 4. `src-tauri/src/generator/utils.rs`
    在 `blueprint_schema_hint()` 里加入严格 JSON 示例。
 5. `src-tauri/src/generator/slides.rs`
@@ -50,7 +51,7 @@
 
 Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 struct 字面量编译不过）：
 6. `src-tauri/src/types.rs`：`SlideKind` 变体 + `SlideBlueprint` 字段
-7. `src-tauri/src/generator/layout_rules.rs`：`LAYOUT_RULES` 中该模板的行（提示词白名单与规则文案由它生成）；`src-tauri/src/generator/planning.rs`：`safe_fallback_kind` / `variety_fallback_kind` / `fallback_kind_order` 候选列表、各 `SlideBlueprint { .. }` 字面量
+7. `src-tauri/src/generator/layout_rules.rs`：`LAYOUT_RULES` 中该模板的行（提示词白名单与规则文案由它生成）；`src-tauri/src/generator/layout_scoring.rs`：`PRIORS` 与 `SCORE_RULES` 中该模板的行；`src-tauri/src/generator/planning.rs`：各 `SlideBlueprint { .. }` 字面量
 8. `src-tauri/src/generator/slides.rs`：内容生成提示词的字段要求
 9. `src-tauri/src/generator/utils.rs`：`slide_kind_name`（`SlideKind → snake_case`）映射、`blueprint_schema_hint`
 10. `src-tauri/src/generator/normalize.rs`：默认值修复分支 + 字面量
@@ -86,6 +87,23 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
 - LLM 候选过滤（`sanitize_candidates`，丢弃时 `eprintln` 原因）
 - 所有确定性兜底：`fallback_candidates`、repair 最后一轮的 `pick_different_kind`、`make_fallback_slide`
   都走 `planning::eligible_fallback_kinds`，只会返回可用 kind
+
+### 兜底打分表（`generator/layout_scoring.rs`）
+
+LLM 没给出可用候选、repair 最后一轮换模板、生成兜底页时，用这张表给所有内容模板打分排序，
+再经上面的适用条件表过滤。它取代了旧的 `safe_fallback_kind` if 链（旧链规则顺序会让
+「summary + 2-4 要点 → outcome_grid」抢先截走 timeline/workflow/问题类页面）。
+
+- `PRIORS`：每个内容模板一行先验分（平局时偏向通用模板），单测要求恰好覆盖 13 个内容模板
+- `SCORE_RULES`：每行「信号命中 → 给某模板加权重」，带 `signal` 标签；兜底候选的 `reason`
+  会列出命中的前 3 个信号，可在 `02-layout-assignment.json` 里看到
+- 权重约定：具体结构信号（content_shape、warning、问题措辞）3-4，辅助信号 1.5-2，
+  泛化提示（要点数、密度）0.5-1。调权重后跑 `layout_scoring` 的单测，它们固定了典型页面的首选
+- `PROBLEM_WORDS` 由 `layout_rules` 导出，两张表共用
+
+页面初始信号来自 `planning.rs::infer_signals`：关键词用多字词组（`ARCHITECTURE_PHRASES` 等），
+**不要**再用单字「层」或泛词「时间」；density 用 `content_units`（拉丁词数 + 汉字数/2），
+因为中文没有空格，按空白分词会让几乎所有中文页都判成 low。
 
 现有硬条件：`step_flow` 要点 ≤4 / `process` 要点 ≥5；`compare` 需 pair 或 comparison；
 `issue_stack` 需 warning/causal 或问题类措辞；`swot` 需 matrix 或 SWOT 措辞；`spotlight` 需

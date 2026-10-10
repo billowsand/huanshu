@@ -236,7 +236,8 @@ fn is_pairwise(page: &PagePlan) -> bool {
         || page.content_shape.as_deref() == Some("comparison")
 }
 
-const PROBLEM_WORDS: &[&str] = &[
+/// Problem/risk wording; shared with `layout_scoring`.
+pub(crate) const PROBLEM_WORDS: &[&str] = &[
     "问题", "挑战", "难点", "障碍", "风险", "痛点", "瓶颈", "不足", "隐患", "困境",
 ];
 

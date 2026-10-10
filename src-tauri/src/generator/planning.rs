@@ -10,6 +10,7 @@ use std::path::Path;
 use crate::generator::layout_rules::{
     ineligibility, is_eligible, prompt_rules, UNIVERSAL_CONTENT_KINDS,
 };
+use crate::generator::layout_scoring::{score_kinds, ScoredKind};
 use crate::generator::utils::{slide_kind_name, sorted_assets, write_debug};
 
 // ---------------------------------------------------------------------------
@@ -338,36 +339,41 @@ fn build_content_page(
     }
 }
 
+/// Phrases that mark a structural content shape. Multi-character phrases on purpose:
+/// single characters like 「层」 or generic words like 「时间」 also match 基层/层面/时间成本.
+const WORKFLOW_PHRASES: &[&str] = &["流程", "步骤", "阶段", "workflow", "process"];
+const COMPARISON_PHRASES: &[&str] = &["对比", "比较", "优劣", "vs ", "versus"];
+const ARCHITECTURE_PHRASES: &[&str] = &[
+    "架构", "分层", "层级", "层次结构", "体系结构", "architecture", "layers",
+];
+const TIMELINE_PHRASES: &[&str] = &[
+    "时间线", "时间轴", "历程", "历史", "年代", "里程碑", "timeline",
+];
+
+/// Rough amount of content in word-equivalents: Latin words plus CJK characters / 2
+/// (Chinese has no spaces, so a plain whitespace word count is ~1 per paragraph).
+fn content_units(text: &str) -> usize {
+    use crate::generator::utils::is_cjk;
+    let cjk_chars = text.chars().filter(|c| is_cjk(*c)).count();
+    let latin_words = text
+        .split(|c: char| c.is_whitespace() || is_cjk(c))
+        .filter(|token| token.chars().any(|c| c.is_alphanumeric()))
+        .count();
+    latin_words + cjk_chars / 2
+}
+
 /// Infer content_shape, argument_mode, density, object_count from paragraph text.
 fn infer_signals(paragraphs: &[String]) -> (String, String, String, String) {
     let text = paragraphs.join("\n").to_lowercase();
-    let word_count = text.split_whitespace().count();
+    let has_any = |phrases: &[&str]| phrases.iter().any(|phrase| text.contains(phrase));
 
-    let content_shape = if text.contains("流程")
-        || text.contains("步骤")
-        || text.contains("阶段")
-        || text.contains("workflow")
-        || text.contains("process")
-    {
+    let content_shape = if has_any(WORKFLOW_PHRASES) {
         "workflow"
-    } else if text.contains("对比")
-        || text.contains("比较")
-        || text.contains("vs ")
-        || text.contains("versus")
-        || text.contains("优劣")
-    {
+    } else if has_any(COMPARISON_PHRASES) {
         "comparison"
-    } else if text.contains("架构")
-        || text.contains("层")
-        || text.contains("architecture")
-        || text.contains("layer")
-    {
+    } else if has_any(ARCHITECTURE_PHRASES) {
         "architecture"
-    } else if text.contains("时间")
-        || text.contains("历史")
-        || text.contains("timeline")
-        || text.contains("年代")
-    {
+    } else if has_any(TIMELINE_PHRASES) {
         "timeline"
     } else {
         "summary"
@@ -397,9 +403,10 @@ fn infer_signals(paragraphs: &[String]) -> (String, String, String, String) {
         "summary"
     };
 
-    let density = if word_count > 200 {
+    let units = content_units(&text);
+    let density = if units > 200 {
         "high"
-    } else if word_count > 60 {
+    } else if units > 60 {
         "medium"
     } else {
         "low"
@@ -462,159 +469,28 @@ fn object_count_label(n: usize) -> String {
     .to_string()
 }
 
-pub fn safe_fallback_kind(page: &PagePlan) -> SlideKind {
-    if page.page_role.as_deref() == Some("section_summary") {
-        return SlideKind::SectionIntro;
-    }
-    let am = page.argument_mode.as_deref().unwrap_or("");
-    let cs = page.content_shape.as_deref().unwrap_or("");
-    let vn = page.visual_need.as_deref().unwrap_or("");
-    let density = page.density.as_deref().unwrap_or("");
-    let key_count = page.key_points.len();
-    let title = page.page_title.as_str();
-
-    // Text-only central thesis: specific Chinese page archetypes
-    if vn == "text_only"
-        && (title.contains("目标")
-            || title.contains("思路")
-            || title.contains("转变")
-            || title.contains("方向")
-            || title.contains("愿景"))
-    {
-        return if density == "low" || density == "medium" {
-            SlideKind::CenterGrid
-        } else {
-            SlideKind::FocusExample
-        };
-    }
-
-    if (am == "summary" || am == "evidence") && (2..=4).contains(&key_count) {
-        return SlideKind::OutcomeGrid;
-    }
-    if (title.contains("问题")
-        || title.contains("挑战")
-        || title.contains("难点")
-        || title.contains("障碍")
-        || title.contains("风险"))
-        && (2..=4).contains(&key_count)
-    {
-        return SlideKind::IssueStack;
-    }
-    if cs == "matrix" && key_count == 4 {
-        return SlideKind::Swot;
-    }
-    if vn == "image_required" || vn == "image_optional" {
-        if page.object_count.as_deref() == Some("single") {
-            return SlideKind::Spotlight;
-        }
-    }
-    if am == "summary" && density != "high" {
-        return SlideKind::CenterGrid;
-    }
-    if cs == "timeline" || (am == "sequential" && cs == "timeline") {
-        return SlideKind::Timeline;
-    }
-    // workflow content: use process/step_flow regardless of argument_mode
-    if cs == "workflow" {
-        return if key_count >= 5 {
-            SlideKind::Process
-        } else {
-            SlideKind::StepFlow
-        };
-    }
-    if am == "sequential" && cs == "architecture" {
-        return SlideKind::SplitLayers;
-    }
-    if am == "sequential" {
-        return if key_count <= 4 {
-            SlideKind::StepFlow
-        } else {
-            SlideKind::SectionList
-        };
-    }
-    SlideKind::FeatureGrid
-}
-
-/// Pick a non-FeatureGrid fallback for deck variety violations.
-/// When the deck has too many FeatureGrids, we need guaranteed alternatives.
-pub fn variety_fallback_kind(page: &PagePlan) -> SlideKind {
-    let kind = safe_fallback_kind(page);
-    if kind != SlideKind::FeatureGrid {
-        return kind;
-    }
-    // safe_fallback_kind still returned FeatureGrid — force an alternative
-    // based on whatever signals we have.
-    let am = page.argument_mode.as_deref().unwrap_or("");
-    let key_count = page.key_points.len();
-    let density = page.density.as_deref().unwrap_or("");
-    let is_summary_page = page.page_role.as_deref() == Some("section_summary");
-    let title = page.page_title.as_str();
-
-    if is_summary_page && (2..=4).contains(&key_count) {
-        return SlideKind::OutcomeGrid;
-    }
-    if am == "parallel" && (2..=4).contains(&key_count) {
-        return SlideKind::OutcomeGrid;
-    }
-    // Content-shape signals that safe_fallback_kind may have missed due to argument_mode mismatch.
-    let cs = page.content_shape.as_deref().unwrap_or("");
-    if cs == "comparison" {
-        return SlideKind::Compare;
-    }
-    if title.contains("问题")
-        || title.contains("挑战")
-        || title.contains("难点")
-        || title.contains("障碍")
-        || title.contains("风险")
-    {
-        return SlideKind::IssueStack;
-    }
-    if cs == "architecture" {
-        return SlideKind::SplitLayers;
-    }
-    if density == "low" || density == "medium" {
-        return SlideKind::FocusExample;
-    }
-    SlideKind::SectionList
-}
-
-/// Signal-based preference order for deterministic fallbacks: the heuristic picks first,
-/// then every content kind (universal kinds early) so an eligible kind is always reachable.
-fn fallback_kind_order(page: &PagePlan) -> Vec<SlideKind> {
-    let mut order = vec![safe_fallback_kind(page), variety_fallback_kind(page)];
-    order.extend([
-        SlideKind::SectionList,
-        SlideKind::OutcomeGrid,
-        SlideKind::FeatureGrid,
-        SlideKind::StepFlow,
-        SlideKind::CenterGrid,
-        SlideKind::FocusExample,
-        SlideKind::Spotlight,
-        SlideKind::SplitLayers,
-        SlideKind::Timeline,
-        SlideKind::Process,
-        SlideKind::Compare,
-        SlideKind::IssueStack,
-        SlideKind::Swot,
-    ]);
-    let mut deduped: Vec<SlideKind> = Vec::with_capacity(order.len());
-    for kind in order {
-        if !deduped.contains(&kind) {
-            deduped.push(kind);
-        }
-    }
-    deduped
-}
-
-/// Kinds this page may use, in fallback preference order. Never empty: section_summary
-/// pages get `SectionIntro`, content pages always include the universal kinds.
-pub fn eligible_fallback_kinds(page: &PagePlan, aspect: AspectRatio) -> Vec<SlideKind> {
+/// Eligible kinds for this page with their fallback scores, best first. Never empty:
+/// section_summary pages get `SectionIntro`; for content pages `layout_scoring` ranks every
+/// content kind, so the universal kinds always survive the eligibility filter.
+pub fn eligible_fallback_scores(page: &PagePlan, aspect: AspectRatio) -> Vec<ScoredKind> {
     if let Some(kind) = forced_kind(page) {
-        return vec![kind];
+        return vec![ScoredKind {
+            kind,
+            score: 10.0,
+            signals: vec!["section_summary page"],
+        }];
     }
-    fallback_kind_order(page)
+    score_kinds(page)
         .into_iter()
-        .filter(|kind| is_eligible(kind, page, aspect))
+        .filter(|scored| is_eligible(&scored.kind, page, aspect))
+        .collect()
+}
+
+/// Kinds this page may use, in fallback preference order (see [`eligible_fallback_scores`]).
+pub fn eligible_fallback_kinds(page: &PagePlan, aspect: AspectRatio) -> Vec<SlideKind> {
+    eligible_fallback_scores(page, aspect)
+        .into_iter()
+        .map(|scored| scored.kind)
         .collect()
 }
 
@@ -1044,17 +920,24 @@ fn fallback_candidates(page_plan: &PagePlan, aspect: AspectRatio) -> Vec<LayoutC
             reason: "section_summary page always uses section_intro".to_string(),
         }];
     }
-    eligible_fallback_kinds(page_plan, aspect)
+    eligible_fallback_scores(page_plan, aspect)
         .into_iter()
         .take(2)
         .zip([
             (6, "deterministic fallback (LLM layout failed)"),
             (4, "deterministic fallback alternative"),
         ])
-        .map(|(kind, (score, reason))| LayoutCandidate {
-            kind,
-            score,
-            reason: reason.to_string(),
+        .map(|(scored, (score, label))| {
+            let why = if scored.signals.is_empty() {
+                "no specific signals".to_string()
+            } else {
+                scored.signals.iter().take(3).copied().collect::<Vec<_>>().join(", ")
+            };
+            LayoutCandidate {
+                kind: scored.kind,
+                score,
+                reason: format!("{label}: {why}"),
+            }
         })
         .collect()
 }
@@ -1487,7 +1370,7 @@ mod tests {
     }
 
     fn image_hungry_page() -> PagePlan {
-        // Signals that make safe_fallback_kind return Spotlight.
+        // Signals for which the fallback scoring table ranks Spotlight first.
         let mut page = content_page(1);
         page.argument_mode = Some("parallel".to_string());
         page.visual_need = Some("image_required".to_string());
@@ -1498,7 +1381,7 @@ mod tests {
     #[test]
     fn fallback_kind_skips_ineligible_heuristic_picks() {
         let page = image_hungry_page();
-        assert_eq!(safe_fallback_kind(&page), SlideKind::Spotlight);
+        assert_eq!(score_kinds(&page)[0].kind, SlideKind::Spotlight);
         // No image asset -> Spotlight is not allowed.
         assert_ne!(fallback_kind(&page, AspectRatio::Ratio16x9), SlideKind::Spotlight);
 
@@ -1537,4 +1420,44 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn fallback_candidates_explain_their_signals() {
+        let mut page = content_page(1);
+        page.page_title = "主要风险".to_string();
+        page.key_points = vec!["一".into(), "二".into(), "三".into()];
+        page.argument_mode = Some("warning".to_string());
+        let candidates = fallback_candidates(&page, AspectRatio::Ratio16x9);
+        assert_eq!(candidates[0].kind, SlideKind::IssueStack);
+        assert!(
+            candidates[0].reason.contains("problem wording in title"),
+            "{}",
+            candidates[0].reason
+        );
+    }
+
+    fn shape_of(text: &str) -> String {
+        infer_signals(&[text.to_string()]).0
+    }
+
+    #[test]
+    fn infer_signals_ignores_loose_single_character_matches() {
+        // 「层」 and 「时间」 used to classify these as architecture / timeline.
+        assert_eq!(shape_of("加强基层治理，提升服务层面的响应能力"), "summary");
+        assert_eq!(shape_of("压缩审批时间，降低时间成本"), "summary");
+        assert_eq!(shape_of("采用分层架构，数据层与应用层解耦"), "architecture");
+        assert_eq!(shape_of("回顾项目发展历程与关键里程碑"), "timeline");
+        assert_eq!(shape_of("按三个阶段推进实施"), "workflow");
+    }
+
+    #[test]
+    fn infer_signals_measures_density_for_chinese_text() {
+        let density = |text: &str| infer_signals(&[text.to_string()]).2;
+        // ~150 CJK chars ≈ 75 units -> medium; plain whitespace counting said "low".
+        assert_eq!(density(&"数字化转型".repeat(30)), "medium");
+        assert_eq!(density(&"数字化转型".repeat(90)), "high");
+        assert_eq!(density("简短说明"), "low");
+        assert_eq!(density(&"word ".repeat(70)), "medium");
+    }
 }
+
