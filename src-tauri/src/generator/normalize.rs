@@ -12,6 +12,15 @@ use crate::generator::utils::{
     clean_model_text, format_issue_block, infer_asset_from_text, write_debug,
 };
 
+/// Overwrite the slide's chapter number with the one derived from the document structure.
+/// The LLM is not told the real chapter, so whatever it wrote (often a value copied from the
+/// schema example, or the page index) must not survive.
+pub fn stamp_section_number(slide: &mut SlideBlueprint, page: &PagePlan) {
+    if let Some(number) = &page.section_number {
+        slide.section = Some(number.clone());
+    }
+}
+
 /// Build a minimal valid slide deterministically from a PagePlan.
 /// Used as a last-resort fallback when all LLM repair rounds fail.
 ///
@@ -67,7 +76,8 @@ pub fn make_fallback_slide(
     SlideBlueprint {
         kind: kind.clone(),
         aspect_ratio: Some(aspect_ratio),
-        section: Some(page.page_id.clone()),
+        // Chapter number, not page_id (the global page index).
+        section: page.section_number.clone(),
         title: page.page_title.clone(),
         subtitle: None,
         badge: None,

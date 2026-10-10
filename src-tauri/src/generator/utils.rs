@@ -832,7 +832,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::SectionIntro => {
             r#"{
   "kind": "section_intro",
-  "section": "01",
   "badge": "章节导览",
   "title": "...",
   "subtitle": "...",
@@ -847,7 +846,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::FeatureGrid => {
             r#"{
   "kind": "feature_grid",
-  "section": "01",
   "title": "...",
   "subtitle": "...",
   "note": "...",
@@ -861,7 +859,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::Spotlight => {
             r#"{
   "kind": "spotlight",
-  "section": "02",
   "title": "...",
   "label": "...",
   "label_tone": "blue",
@@ -875,7 +872,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::SplitLayers => {
             r#"{
   "kind": "split_layers",
-  "section": "03",
   "title": "...",
   "subtitle": "...",
   "left_items": [
@@ -890,7 +886,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::SectionList => {
             r#"{
   "kind": "section_list",
-  "section": "04",
   "title": "...",
   "subtitle": "...",
   "list_items": [
@@ -901,7 +896,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::FocusExample => {
             r#"{
   "kind": "focus_example",
-  "section": "05",
   "title": "...",
   "subtitle": "...",
   "points": [
@@ -917,7 +911,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::OutcomeGrid => {
             r#"{
   "kind": "outcome_grid",
-  "section": "06",
   "title": "...",
   "subtitle": "...",
   "note": "...",
@@ -941,7 +934,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::Timeline => {
             r#"{
   "kind": "timeline",
-  "section": "07",
   "title": "...",
   "subtitle": "...",
   "timeline_events": [
@@ -955,7 +947,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::StepFlow => {
             r#"{
   "kind": "step_flow",
-  "section": "08",
   "title": "...",
   "subtitle": "...",
   "direction": "horizontal",
@@ -970,7 +961,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::Process => {
             r#"{
   "kind": "process",
-  "section": "09",
   "title": "...",
   "subtitle": "...",
   "phases": [
@@ -992,7 +982,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::Compare => {
             r#"{
   "kind": "compare",
-  "section": "10",
   "title": "...",
   "subtitle": "...",
   "compare_data": {
@@ -1024,7 +1013,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::IssueStack => {
             r#"{
   "kind": "issue_stack",
-  "section": "11",
   "title": "...",
   "subtitle": "...",
   "cards": [
@@ -1038,7 +1026,6 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
         SlideKind::Swot => {
             r#"{
   "kind": "swot",
-  "section": "11",
   "title": "...",
   "subtitle": "...",
   "swot_data": {

@@ -280,6 +280,7 @@ mod tests {
             source_excerpt: None,
             preferred_assets: Vec::new(),
             page_role: Some("content".to_string()),
+            section_number: Some("01".to_string()),
         }
     }
 

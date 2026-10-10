@@ -60,7 +60,8 @@ pub fn derive_page_plans(doc: &ParsedDocument, granularity: HeadingLevel) -> Vec
 
     match granularity {
         HeadingLevel::H2 => {
-            for sec in &doc.sections {
+            for (chapter, sec) in doc.sections.iter().enumerate() {
+                let first = pages.len();
                 pages.push(build_content_page(
                     global_idx,
                     &sec.title,
@@ -69,10 +70,12 @@ pub fn derive_page_plans(doc: &ParsedDocument, granularity: HeadingLevel) -> Vec
                     &sec.paragraphs,
                 ));
                 global_idx += 1;
+                stamp_chapter(&mut pages[first..], chapter);
             }
         }
         HeadingLevel::H3 => {
-            for sec in &doc.sections {
+            for (chapter, sec) in doc.sections.iter().enumerate() {
+                let first = pages.len();
                 if sec.subsections.is_empty() {
                     // H2 with no children → single content slide
                     pages.push(build_content_page(
@@ -111,11 +114,24 @@ pub fn derive_page_plans(doc: &ParsedDocument, granularity: HeadingLevel) -> Vec
                         global_idx += 1;
                     }
                 }
+                stamp_chapter(&mut pages[first..], chapter);
             }
         }
     }
 
     pages
+}
+
+/// Chapter number label for the `index`-th H2 section (0-based) → "01", "02", …
+/// Shared by page derivation and the overview slide so the numbers always agree.
+pub fn chapter_number(index: usize) -> String {
+    format!("{:02}", index + 1)
+}
+
+fn stamp_chapter(pages: &mut [PagePlan], chapter: usize) {
+    for page in pages {
+        page.section_number = Some(chapter_number(chapter));
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -307,6 +323,7 @@ fn build_summary_page(idx: usize, sec: &Section) -> PagePlan {
         },
         preferred_assets: Vec::new(),
         page_role: Some("section_summary".to_string()),
+        section_number: None,
     }
 }
 
@@ -337,6 +354,7 @@ fn build_content_page(
         source_excerpt: if text.is_empty() { None } else { Some(text) },
         preferred_assets: Vec::new(),
         page_role: Some("content".to_string()),
+        section_number: None,
     }
 }
 
@@ -598,7 +616,7 @@ pub async fn make_overview_slide(
         .iter()
         .enumerate()
         .map(|(idx, section)| OverviewItem {
-            number: format!("{:02}", idx + 1),
+            number: chapter_number(idx),
             title: summarize(&section.title, 18),
             desc: summarize(
                 &clean_model_text(
@@ -1689,6 +1707,95 @@ mod tests {
                 "rendered": "feature_grid",
             }])
         );
+    }
+
+    fn section_numbers(md: &str, granularity: HeadingLevel) -> Vec<(String, Option<String>)> {
+        let doc = crate::input::parse_markdown(md).unwrap();
+        derive_page_plans(&doc, granularity)
+            .into_iter()
+            .map(|page| (page.page_title, page.section_number))
+            .collect()
+    }
+
+    const CHAPTERED_DOC: &str = "# 标题
+
+## 背景
+
+背景说明。
+
+## 方案
+
+### 方案一
+
+内容。
+
+### 方案二
+
+内容。
+
+## 计划
+
+### 近期
+
+内容。
+";
+
+    #[test]
+    fn pages_carry_their_chapter_number_not_the_page_index() {
+        // Regression: slides showed page indexes / schema example values as chapter numbers.
+        let numbers = section_numbers(CHAPTERED_DOC, HeadingLevel::H3);
+        let expected: Vec<(String, Option<String>)> = [
+            ("背景", "01"),
+            ("方案", "02"), // section_summary page of chapter 2
+            ("方案一", "02"),
+            ("方案二", "02"),
+            ("计划", "03"),
+            ("近期", "03"),
+        ]
+        .iter()
+        .map(|(title, n)| (title.to_string(), Some(n.to_string())))
+        .collect();
+        assert_eq!(numbers, expected);
+
+        let h2 = section_numbers(CHAPTERED_DOC, HeadingLevel::H2);
+        assert_eq!(
+            h2.iter().map(|(_, n)| n.as_deref().unwrap()).collect::<Vec<_>>(),
+            vec!["01", "02", "03"]
+        );
+    }
+
+    #[test]
+    fn chapter_numbers_match_the_overview_slide() {
+        let doc = crate::input::parse_markdown(CHAPTERED_DOC).unwrap();
+        let overview_numbers: Vec<String> =
+            (0..doc.sections.len()).map(chapter_number).collect();
+        let page_numbers: std::collections::BTreeSet<String> = derive_page_plans(&doc, HeadingLevel::H3)
+            .into_iter()
+            .filter_map(|page| page.section_number)
+            .collect();
+        assert_eq!(page_numbers.into_iter().collect::<Vec<_>>(), overview_numbers);
+    }
+
+    #[test]
+    fn llm_section_values_are_overwritten_by_the_chapter_number() {
+        let mut page = content_page(7);
+        page.section_number = Some("03".to_string());
+        let mut slide =
+            crate::generator::normalize::make_fallback_slide(&page, None, AspectRatio::Ratio16x9);
+        // Fallback slides use the chapter number, not page_id ("7").
+        assert_eq!(slide.section.as_deref(), Some("03"));
+
+        slide.section = Some("09".to_string()); // e.g. copied from a schema example
+        crate::generator::normalize::stamp_section_number(&mut slide, &page);
+        assert_eq!(slide.section.as_deref(), Some("03"));
+    }
+
+    #[test]
+    fn schema_hints_do_not_suggest_a_section_value() {
+        for rule in crate::generator::layout_rules::LAYOUT_RULES {
+            let hint = crate::generator::utils::blueprint_schema_hint(&rule.kind);
+            assert!(!hint.contains("\"section\""), "{:?} hint still has a section example", rule.kind);
+        }
     }
 }
 

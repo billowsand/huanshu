@@ -372,6 +372,8 @@ export const KIND_DEFAULTS: Record<SlideKind, Partial<SlideBlueprint>> = {
   },
 }
 
+const NON_CHAPTER_KINDS: SlideKind[] = ['cover', 'overview', 'closing']
+
 const SHARED_TEMPLATE_FIELDS: (keyof SlideBlueprint)[] = [
   'section', 'title', 'subtitle', 'badge', 'accent', 'note', 'label', 'label_tone',
   'image', 'images', 'placeholder', 'side_width', 'badges', 'footer', 'aspect_ratio',
@@ -545,6 +547,12 @@ export function useSlideEditor(options: {
       hasUnsavedChanges.value = true
     } else {
       const newSlide = createKindBlueprint(kind)
+      // A new slide joins the chapter of the slide it is inserted after; KIND_DEFAULTS only
+      // carries a sample number. Cover/overview/closing are not chapters, so leave it empty.
+      const prev = genStore.blueprints[options.activeSlide()] as SlideBlueprint | undefined
+      newSlide.section = prev && !NON_CHAPTER_KINDS.includes(prev.kind as SlideKind)
+        ? prev.section
+        : undefined
       const at = options.activeSlide() + 1
       genStore.blueprints.splice(at, 0, newSlide as unknown as SlideBlueprint)
       options.setActiveSlide(at)

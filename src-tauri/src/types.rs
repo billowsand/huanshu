@@ -536,6 +536,11 @@ pub struct PagePlan {
     /// "content" or "section_summary" — set by deterministic page derivation
     #[serde(default)]
     pub page_role: Option<String>,
+    /// Chapter number shown on the slide ("01", "02", …): 1-based index of the page's H2
+    /// section, matching the overview slide. Set by deterministic page derivation and
+    /// stamped onto the generated slide by code; the LLM never decides it.
+    #[serde(default)]
+    pub section_number: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

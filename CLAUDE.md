@@ -33,6 +33,10 @@
 - schema hint 不完整，导致 LLM 输出字段漂移
 - 没有 normalize/validate，偶发坏 JSON 会直接进渲染阶段
 - 没有写"不要使用此模板"的规则，导致模板被误选
+- 在 schema hint 里写 `"section": "NN"` 示例值：LLM 会照抄（历史上 process 页全是 09、section_intro 全是 01）。
+  章节号（幻灯片上的大号 `.section-num`）由代码决定：`derive_page_plans` 按 H2 序号写入
+  `PagePlan.section_number`（与提纲总览共用 `planning::chapter_number`），流水线末尾和兜底页用
+  `normalize::stamp_section_number` 覆盖 LLM 输出；按反馈修复单页时保留原章节号
 
 
 ## 移除一个 Slide 模板（反流程）

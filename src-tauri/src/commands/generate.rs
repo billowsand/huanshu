@@ -490,7 +490,7 @@ pub async fn repair_slide(
     };
     let asset_paths = crate::validate::collect_assets(&project_dir);
 
-    let repaired = crate::generator::slides::repair_single_slide(
+    let mut repaired = crate::generator::slides::repair_single_slide(
         &config,
         &blueprint,
         &feedback,
@@ -499,6 +499,10 @@ pub async fn repair_slide(
     )
     .await
     .map_err(|e| e.to_string())?;
+    // Feedback repair rewrites content, not the slide's place in the deck: keep its chapter number.
+    if blueprint.section.is_some() {
+        repaired.section = blueprint.section.clone();
+    }
 
     {
         let mut st = state.lock().unwrap();
