@@ -51,9 +51,9 @@ const slide=shallowRef({kind:'cover',title:'便签·稿纸'});
 const gallery=shallowRef(null),generation=shallowRef(null);
 const labels={cover:'封面',overview:'目录',feature_grid:'功能卡片',outcome_grid:'成果卡片',center_grid:'中心网格',section_list:'章节列表',focus_example:'重点示例',split_layers:'分层说明',spotlight:'重点页',timeline:'时间线',step_flow:'步骤流程',process:'阶段流程',compare:'对比',swot:'SWOT分析',section_intro:'章节导览',issue_stack:'问题批注',closing:'结束页'};
 createApp({render:()=>generation.value?h(Step2Generate,generation.value):gallery.value?
- h('div',{style:'display:grid;grid-template-columns:repeat(4,400px);gap:20px;padding:24px;background:#eed9ac'},gallery.value.map(s=>
+ h('div',{style:'display:grid;grid-template-columns:repeat(4,400px);gap:20px;padding:24px;background:var(--notes-grain),var(--notes-backing)'},gallery.value.map(s=>
   h('div',{style:'width:400px;height:254px'},[
-   h('div',{style:'height:28px;color:#493b30;font-size:14px'},labels[s.kind]||s.kind),
+   h('div',{style:'height:28px;color:var(--notes-ink);font-size:14px'},labels[s.kind]||s.kind),
    h('div',{style:'width:400px;height:225px;overflow:hidden;box-shadow:0 3px 8px #60472b26'},[
     h('div',{style:'width:1280px;height:720px;transform:scale(.3125);transform-origin:top left'},[h(SlideRenderer,{slide:s})])
    ])
@@ -72,16 +72,18 @@ window.renderGallery=async(values)=>{
  gallery.value=values;await nextTick();await document.fonts.ready;
 };
 window.renderGeneration=async(values)=>{
- document.querySelector('#app').style.cssText='width:1440px;height:960px;background:#eed9ac';
+ document.querySelector('#app').style.cssText='width:1440px;height:960px;background:var(--notes-grain),var(--notes-backing)';
  generation.value={stage:'content',stageLabel:'生成中',running:true,message:'正在整理页面内容',slideCount:4,
-  blueprints:values.slice(0,2),mediaMap:{},logs:[],selectedSlideIndex:0,
+  blueprints:values.slice(0,2),mediaMap:{},logs:[],selectedSlideIndex:0,retryingPages:new Set(),
   pageStatuses:new Map([[0,{stage:'done'}],[1,{stage:'content'}],[2,{stage:'error',previousStage:'layout'}],[3,{stage:'pending'}]])};
  await nextTick();await document.fonts.ready;
 };`
 const server = await createServer({
   cacheDir: join(tmpdir(), 'huanshu-notes-vite-cache'),
   optimizeDeps: { entries: [], include: ['vue'], noDiscovery: true },
-  server: { host: '127.0.0.1', port: 5182, strictPort: false, hmr: false },
+  server: { host: '127.0.0.1', port: 5182, strictPort: false, hmr: false,
+    watch: { ignored: ['**/target/**', '**/src-tauri/dist-studio/**'] },
+  },
   plugins: [{ name: 'notes-preview',
     resolveId(id) { if (id === '/__notes-entry.js') return id },
     load(id) { if (id === '/__notes-entry.js') return entry },
@@ -144,7 +146,7 @@ try {
     const style = getComputedStyle(document.documentElement)
     return ['--studio-bg', '--studio-panel', '--studio-text'].map(key => style.getPropertyValue(key).trim())
   })
-  assert.deepEqual(palette, ['#eed9ac', '#fffdf7', '#493b30'])
+  assert.deepEqual(palette, ['#f1debd', '#fbf7ec', '#786051'])
   await page.screenshot({ path: new URL('home.png', output).pathname.replace(/^\/(\w:)/, '$1') })
   await page.locator('.project-card').first().getByTitle('导出为 .keynn').click()
   await page.locator('.export-modal').waitFor()
@@ -175,7 +177,7 @@ try {
   await page.goto(base + '#/settings')
   await page.locator('.font-trigger').first().waitFor()
   await page.locator('.font-trigger').first().click()
-  await page.locator('.font-popover').first().waitFor()
+  await page.locator('.font-dialog').first().waitFor()
   await page.screenshot({ path: fileURLToPath(new URL('settings.png', output)), fullPage: true })
   await page.goto(base + '#/wizard')
   await page.locator('.wizard-card').waitFor()
@@ -190,13 +192,15 @@ try {
         const style = getComputedStyle(el)
         const frame = el.querySelector('.slide-shell__frame')
         return { background: style.backgroundColor, grid: style.backgroundImage,
-          color: style.color, radius: getComputedStyle(frame).borderRadius,
+          color: style.color, radius: getComputedStyle(frame).borderRadius, frameBorder: getComputedStyle(frame).borderTopWidth,
           overflow: el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1 }
       })
-      assert.equal(result.background, 'rgb(255, 253, 247)', slide.kind)
-      assert.equal(result.color, 'rgb(73, 59, 48)', slide.kind)
+      assert.equal(result.background, 'rgb(251, 247, 236)', slide.kind)
+      assert.equal(result.color, 'rgb(120, 96, 81)', slide.kind)
       assert.ok(result.grid.includes('repeating-linear-gradient'), slide.kind)
+      assert.equal((result.grid.match(/repeating-linear-gradient/g) || []).length, 1, 'Paper uses horizontal rules, without a square grid')
       assert.equal(result.radius, '0px', slide.kind)
+      assert.equal(result.frameBorder, '0px', 'No decorative double frame')
       assert.equal(result.overflow, false, slide.kind)
       if (slide.kind === 'overview') {
         const fits = await page.locator('.overview-card').evaluateAll(cards => cards.every(card => {

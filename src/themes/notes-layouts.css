@@ -1,18 +1,18 @@
 /* Layout-specific stationery for 便签·稿纸. Geometry and font roles remain
    driven by slide content; decorative edges never consume grid tracks. */
 [data-theme="light-notes"] {
-  --notes-tone: #68503c;
-  --notes-tone-bg: #f2e7d5;
-  --notes-tone-border: #c6ad8d;
-  --notes-rule: repeating-linear-gradient(0deg, transparent 0 31px, #99784f0c 31px 32px);
+  --notes-tone: #746254;
+  --notes-tone-bg: #eee7da;
+  --notes-tone-border: #c8bbaa;
+  --notes-rule: repeating-linear-gradient(0deg, transparent 0 31px, var(--notes-grid) 31px 32px);
 }
 
 /* Muted ink families. Each card can carry its own tone without recoloring
    neighbouring cards or losing semantic warning/success/error distinctions. */
 [data-theme="light-notes"] [data-tone="neutral"] {
-  --notes-tone: #68503c;
-  --notes-tone-bg: #f2e7d5;
-  --notes-tone-border: #c6ad8d;
+  --notes-tone: #746254;
+  --notes-tone-bg: #eee7da;
+  --notes-tone-border: #c8bbaa;
 }
 [data-theme="light-notes"] :is([data-tone="blue"], [data-tone="indigo"], [data-tone="purple"], [data-tone="violet"]) {
   --notes-tone: #4e6570;
@@ -68,7 +68,7 @@
   width: 6rem;
   height: 1.35rem;
   background: #e9d5af8c;
-  border-inline: 1px dashed #b99b7759;
+  border-inline: 1px dashed #b6a49259;
   transform: rotate(-3deg);
   box-shadow: 0 1px 1px #60472b10;
   pointer-events: none;
@@ -154,7 +154,7 @@
 /* Outcome: certificate-like cards; centered grid: compact memo tiles. */
 [data-theme="light-notes"] .outcome-card {
   border-color: var(--notes-tone-border) !important;
-  outline: 1px solid #b99b7733;
+  outline: 1px solid #b6a49233;
   outline-offset: -5px;
 }
 [data-theme="light-notes"] .outcome-top-bar {
@@ -183,7 +183,7 @@
   background: #faf3e4 !important;
   border: 3px double var(--notes-edge);
   border-radius: 2px;
-  box-shadow: 0 4px 0 -2px #fffdf7, 0 8px 15px -8px #60472b40 !important;
+  box-shadow: 0 4px 0 -2px #fbf7ec, 0 8px 15px -8px #60472b40 !important;
 }
 [data-theme="light-notes"] .focus-ranking-row {
   border-bottom: 1px dashed var(--notes-edge);
@@ -216,18 +216,18 @@
 
 /* Section intro: a cocoa chapter divider and indexed white summary cards. */
 [data-theme="light-notes"] .slide-shell .section-intro__badge {
-  background: #f2e7d5 !important;
+  background: #eee7da !important;
   border-color: #d6c0a2 !important;
-  color: #68503c !important;
+  color: #746254 !important;
 }
 [data-theme="light-notes"] .section-intro__lead {
-  background: linear-gradient(135deg, #806b56, #68503c) !important;
-  color: #fffdf7;
-  border-color: #594332;
+  background: linear-gradient(135deg, #7f6f60, #746254) !important;
+  color: #fbf7ec;
+  border-color: #655547;
   border-radius: 3px;
 }
 [data-theme="light-notes"] .section-intro__lead :is(.section-intro__title, .section-intro__meta-value) {
-  color: #fffdf7;
+  color: #fbf7ec;
 }
 [data-theme="light-notes"] .section-intro__lead :is(.section-intro__subtitle, .section-intro__note, .section-intro__meta-label) {
   color: #efe2cd;
@@ -236,7 +236,7 @@
   background: #efe2cd;
 }
 [data-theme="light-notes"] .section-intro__meta {
-  border-color: #fffdf738;
+  border-color: #fbf7ec38;
 }
 [data-theme="light-notes"] .section-intro__note {
   border-color: #d6c0a2;

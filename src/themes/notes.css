@@ -1,25 +1,28 @@
-/* 便签·稿纸: cocoa chrome, golden backing, clean white manuscript sheets.
+/* 便签·稿纸: sampled Smartisan warm-brown chrome, pale wood, cream paper.
    Keep fonts and slide geometry controlled by the existing user settings. */
 [data-theme="light-notes"] {
   color-scheme: light;
-  --notes-backing: #eed9ac;
-  --notes-paper: #fffdf7;
-  --notes-ink: #493b30;
-  --notes-muted: #756455;
-  --notes-edge: #d5c3a9;
-  --notes-grid: rgba(151, 116, 79, 0.075);
-  --notes-margin: rgba(188, 98, 87, 0.28);
-  --notes-grain: repeating-linear-gradient(90deg, transparent 0 3px, rgba(139, 101, 53, 0.025) 3px 4px, transparent 4px 9px);
-  --notes-paper-shadow: 0 2px 3px #60472b18, 0 8px 18px -8px #60472b40;
+  --notes-backing: #f1debd;
+  --notes-paper: #fbf7ec;
+  --notes-card: #fefbf5;
+  --notes-ink: #786051;
+  --notes-muted: #89786b;
+  --notes-edge: #ded5c7;
+  --notes-chrome: #746254;
+  --notes-chrome-light: #7f6f60;
+  --notes-grid: rgba(170, 146, 125, 0.16);
+  --notes-margin: rgba(116, 98, 82, 0.18);
+  --notes-grain: url('./notes-wood.svg'), repeating-linear-gradient(90deg, transparent 0 3px, rgba(159, 120, 66, 0.018) 3px 4px, transparent 4px 9px);
+  --notes-paper-shadow: 0 1px 2px #7462541c, 0 4px 8px -5px #74625438;
   --notes-button-shadow: inset 0 1px 0 #ffffffb3, inset 0 -1px 0 #73563712, 0 1px 2px #60472b26;
   --bg: var(--notes-paper);
   --bg-gradient: var(--notes-paper);
   --text: var(--notes-ink);
   --text-muted: var(--notes-muted);
-  --primary: #68503c;
-  --primary-light: #594332;
-  --primary-bg: #f2e7d5;
-  --primary-border: #c6ad8d;
+  --primary: #746254;
+  --primary-light: #655547;
+  --primary-bg: #eee7da;
+  --primary-border: #c8bbaa;
   --glass: var(--notes-paper);
   --glass-border: var(--notes-edge);
   --glass-highlight: #ffffff;
@@ -32,27 +35,27 @@
   --shell-frame: transparent;
   --shell-frame-border: var(--notes-edge);
   --shell-frame-shadow: none;
-  --section-num-stroke: #c6ad8d;
+  --section-num-stroke: #c8bbaa;
   --success: #54633d;
   --success-light: #54633d;
   --success-bg: #edf0e2;
   --success-border: #b7c1a0;
-  --success-contrast: #fffdf7;
+  --success-contrast: #fbf7ec;
   --info: #4e6570;
   --info-light: #4e6570;
   --info-bg: #eaf0f1;
   --info-border: #b2c3c7;
-  --info-contrast: #fffdf7;
+  --info-contrast: #fbf7ec;
   --warning: #826039;
   --warning-light: #826039;
   --warning-bg: #f6ebd8;
   --warning-border: #cfb489;
-  --warning-contrast: #fffdf7;
+  --warning-contrast: #fbf7ec;
   --danger: #9b4e43;
   --danger-light: #9b4e43;
   --danger-bg: #f7e9e3;
   --danger-border: #d4b0a5;
-  --danger-contrast: #fffdf7;
+  --danger-contrast: #fbf7ec;
   --studio-bg: var(--notes-backing);
   --studio-panel: var(--notes-paper);
   --studio-panel-2: #f8f3e9;
@@ -61,34 +64,34 @@
   --studio-border-hover: #a38767;
   --studio-text: var(--notes-ink);
   --studio-muted: var(--notes-muted);
-  --studio-primary: #68503c;
-  --studio-primary-light: #594332;
-  --studio-primary-bg: #f2e7d5;
-  --studio-primary-border: #b99b77;
-  --studio-primary-contrast: #fffdf7;
+  --studio-primary: #746254;
+  --studio-primary-light: #655547;
+  --studio-primary-bg: #eee7da;
+  --studio-primary-border: #b6a492;
+  --studio-primary-contrast: #fbf7ec;
   --studio-accent: var(--studio-primary);
-  --studio-hover: #f2e7d5;
+  --studio-hover: #eee7da;
   --studio-success: var(--success);
   --studio-success-bg: var(--success-bg);
   --studio-error: var(--danger);
   --studio-error-bg: var(--danger-bg);
   --studio-error-border: var(--danger-border);
-  --slidev-code-background: #f2e7d5 !important;
+  --slidev-code-background: #eee7da !important;
 }
 
-/* The golden backing stays visible between white cards and sheets. */
+/* Pale wood stays visible between the cream sheets. */
 [data-theme="light-notes"] :is(.home-layout, .workflow-root, .presentation-overlay) {
   background: var(--notes-grain), var(--notes-backing);
 }
 
 [data-theme="light-notes"] .titlebar {
-  background: linear-gradient(#806b56, #715b47);
-  border-bottom: 1px solid #594332;
+  background: linear-gradient(var(--notes-chrome-light), var(--notes-chrome));
+  border-bottom: 1px solid #655547;
   box-shadow: inset 0 1px 0 #ffffff26, 0 2px 4px #60472b26;
 }
 
 [data-theme="light-notes"] .titlebar :is(.titlebar-title, .ctrl-btn) {
-  color: #fffdf7;
+  color: #fbf7ec;
 }
 
 [data-theme="light-notes"] .titlebar .ctrl-btn:hover {
@@ -100,8 +103,8 @@
 }
 
 [data-theme="light-notes"] .titlebar-brand-chip {
-  background: #fffdf71a;
-  border: 1px solid #fffdf733;
+  background: #fbf7ec1a;
+  border: 1px solid #fbf7ec33;
   border-radius: 4px;
   box-shadow: inset 0 1px 0 #ffffff26;
 }
@@ -111,27 +114,27 @@
 }
 
 [data-theme="light-notes"] :is(.top-bar, .prepare-topbar, .edit-topbar, .gen-topbar, .pres-controls) {
-  background: linear-gradient(#fffdf7, #f5efe4);
+  background: linear-gradient(#fbf7ec, #f1ebdf);
   box-shadow: inset 0 1px 0 #fff, 0 2px 3px #60472b12;
 }
 
 [data-theme="light-notes"] :is(.btn, .pres-ctrl-btn) {
-  background: linear-gradient(#fffdf7, #f4ede1);
+  background: linear-gradient(#fbf7ec, #eee8dc);
   border-color: var(--notes-edge);
   border-radius: 5px;
   box-shadow: var(--notes-button-shadow);
 }
 
 [data-theme="light-notes"] .btn-primary {
-  background: linear-gradient(#7c644e, #604936);
-  border-color: #594332;
+  background: linear-gradient(#807060, #746254);
+  border-color: #655547;
   color: var(--studio-primary-contrast);
   box-shadow: inset 0 1px 0 #ffffff30, 0 2px 3px #60472b30;
 }
 
 [data-theme="light-notes"] .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(#715a45, #513d2c);
-  border-color: #513d2c;
+  background: linear-gradient(#736252, #655547);
+  border-color: #655547;
 }
 
 [data-theme="light-notes"] .btn-ghost {
@@ -141,7 +144,7 @@
 }
 
 [data-theme="light-notes"] :is(.btn, .pres-ctrl-btn):active:not(:disabled) {
-  box-shadow: inset 0 1px 3px #493b3033;
+  box-shadow: inset 0 1px 3px #78605133;
 }
 
 [data-theme="light-notes"] :is(input, textarea, select) {
@@ -242,7 +245,7 @@
 }
 
 [data-theme="light-notes"] :is(.heading-mark, .card-icon-wrap, .empty-icon-circle) {
-  background: linear-gradient(#fffdf7, #f2e7d5);
+  background: linear-gradient(#fbf7ec, #eee7da);
   border-color: var(--notes-edge);
   border-radius: 5px;
   box-shadow: var(--notes-button-shadow);
@@ -257,8 +260,9 @@
 
 /* Two narrow sheet edges imply a stack without changing card layout or hit areas. */
 [data-theme="light-notes"] .project-card {
+  background: var(--notes-card);
   box-shadow: 0 2px 3px #60472b18, 0 4px 0 -1px #faf4e8,
-    0 5px 0 -1px #d5c3a9, 0 8px 0 -2px #fffdf7, 0 10px 14px -5px #60472b30;
+    0 5px 0 -1px #ded5c7, 0 8px 0 -2px #fbf7ec, 0 10px 14px -5px #60472b30;
 }
 
 [data-theme="light-notes"] .project-card:hover {
@@ -274,9 +278,8 @@
    Background layers do not intercept clicks or obscure slide content. */
 [data-theme="light-notes"] .slide-shell {
   background-color: var(--notes-paper);
-  background-image: linear-gradient(90deg, transparent 45px, var(--notes-margin) 45px 46px, transparent 46px),
-    repeating-linear-gradient(0deg, transparent 0 35px, var(--notes-grid) 35px 36px),
-    repeating-linear-gradient(90deg, transparent 0 35px, var(--notes-grid) 35px 36px);
+  background-image: linear-gradient(90deg, #eee8dc99 0 45px, var(--notes-margin) 45px 46px, transparent 46px),
+    repeating-linear-gradient(0deg, transparent 0 35px, var(--notes-grid) 35px 36px);
   box-shadow: inset 0 0 0 1px var(--notes-edge);
 }
 
@@ -286,7 +289,7 @@
 
 [data-theme="light-notes"] .slide-shell__frame {
   background: transparent;
-  border: 3px double #bfa98c40;
+  border: 0;
   border-radius: 0;
   box-shadow: none;
 }
@@ -352,7 +355,7 @@
 
 [data-theme="light-notes"] .section-num {
   color: transparent;
-  -webkit-text-stroke-color: #b99b7770;
+  -webkit-text-stroke-color: #b6a49270;
 }
 
 [data-theme="light-notes"] .swot-flag-icon,
@@ -375,11 +378,11 @@
 }
 
 [data-theme="light-notes"] * {
-  scrollbar-color: #b99b77 transparent;
+  scrollbar-color: #b6a492 transparent;
 }
 
 [data-theme="light-notes"] ::-webkit-scrollbar-thumb {
-  background: #b99b77;
+  background: #b6a492;
 }
 
 @media (prefers-reduced-motion: reduce) {
