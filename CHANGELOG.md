@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **四套亮色主题**：删除「亮·蓝图」「亮·翠绿」「亮·晨曦」「亮·多巴胺」及其 slide/studio 变量块；
+  `localStorage` 中残留的旧主题 id 启动时自动回退到「暗·琥珀」。剩余主题：暗·琥珀、暗·星图、暗·极光、终端·墨、终端·纸。
+
 ### Added
 
 - **字体与个性化**：设置页新增字体面板，界面 / 标题 / 副标题 / 正文 / 注释 / 数字 / 代码 七类角色可各自指定字体，

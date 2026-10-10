@@ -33,8 +33,10 @@ import KeynoteCompareSlide from './components/KeynoteCompareSlide.vue'
 import KeynoteIssueStackSlide from './components/KeynoteIssueStackSlide.vue'
 import KeynoteSwotSlide from './components/KeynoteSwotSlide.vue'
 
-const savedTheme = localStorage.getItem('app-theme') || 'dark-yellow'
-document.documentElement.setAttribute('data-theme', savedTheme)
+const KNOWN_THEMES = ['dark-yellow', 'dark-blue', 'dark-glass-blue', 'dark-terminal', 'light-terminal']
+const savedTheme = localStorage.getItem('app-theme')
+const theme = savedTheme && KNOWN_THEMES.includes(savedTheme) ? savedTheme : 'dark-yellow'
+document.documentElement.setAttribute('data-theme', theme)
 
 const router = createRouter({
   history: createWebHashHistory(),
