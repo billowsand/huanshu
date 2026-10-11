@@ -6,12 +6,12 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+use crate::assets::AssetCatalog;
 use crate::generator::candidate_parsing::parse_layout_candidates;
 use crate::generator::layout_rules::{
     ineligibility, is_eligible, prompt_rules, UNIVERSAL_CONTENT_KINDS,
 };
 use crate::generator::layout_scoring::{score_kinds, ScoredKind};
-use crate::assets::AssetCatalog;
 use crate::generator::utils::{slide_kind_name, write_debug};
 
 // ---------------------------------------------------------------------------
@@ -242,8 +242,7 @@ fn merge_page_signal_patch(
     merged.density = normalized_enum(patch.density.as_deref(), &["low", "medium", "high"])
         .map(str::to_string)
         .or_else(|| merged.density.clone());
-    merged.preferred_assets =
-        normalize_preferred_assets(patch.preferred_assets.as_deref(), assets);
+    merged.preferred_assets = normalize_preferred_assets(patch.preferred_assets.as_deref(), assets);
     if merged.preferred_assets.is_empty() {
         // The placement pass already read the article together with each image. When the
         // model named no asset for this page, fall back to the ones matched to it.
@@ -1938,9 +1937,11 @@ mod tests {
             std::path::Path::new("no-such-project-dir"),
             &[media_asset(5)],
         );
-        assert!(merge_page_signal_patch(&page, &silent, &catalog_without_match)
-            .preferred_assets
-            .is_empty());
+        assert!(
+            merge_page_signal_patch(&page, &silent, &catalog_without_match)
+                .preferred_assets
+                .is_empty()
+        );
     }
 
     #[test]

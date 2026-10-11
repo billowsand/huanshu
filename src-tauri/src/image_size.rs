@@ -38,15 +38,21 @@ fn dims(width: u32, height: u32) -> Option<(u32, u32)> {
 }
 
 fn be_u32(bytes: &[u8], offset: usize) -> Option<u32> {
-    Some(u32::from_be_bytes(bytes.get(offset..offset + 4)?.try_into().ok()?))
+    Some(u32::from_be_bytes(
+        bytes.get(offset..offset + 4)?.try_into().ok()?,
+    ))
 }
 
 fn be_u16(bytes: &[u8], offset: usize) -> Option<u16> {
-    Some(u16::from_be_bytes(bytes.get(offset..offset + 2)?.try_into().ok()?))
+    Some(u16::from_be_bytes(
+        bytes.get(offset..offset + 2)?.try_into().ok()?,
+    ))
 }
 
 fn le_u16(bytes: &[u8], offset: usize) -> Option<u16> {
-    Some(u16::from_le_bytes(bytes.get(offset..offset + 2)?.try_into().ok()?))
+    Some(u16::from_le_bytes(
+        bytes.get(offset..offset + 2)?.try_into().ok()?,
+    ))
 }
 
 fn le_u24(bytes: &[u8], offset: usize) -> Option<u32> {
@@ -178,7 +184,12 @@ fn svg_length_attribute(text: &str, cache: &OnceLock<Regex>, name: &str) -> Opti
     let pattern = cache.get_or_init(|| {
         Regex::new(&format!(r#"(?i)(?:^|[\s;]){name}\s*=\s*["']([^"']*)["']"#)).unwrap()
     });
-    let raw = pattern.captures(text)?.get(1)?.as_str().trim().to_ascii_lowercase();
+    let raw = pattern
+        .captures(text)?
+        .get(1)?
+        .as_str()
+        .trim()
+        .to_ascii_lowercase();
     let numeric = raw.strip_suffix("px").unwrap_or(&raw).trim();
     if numeric.contains('%') {
         return None;

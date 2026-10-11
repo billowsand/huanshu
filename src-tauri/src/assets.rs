@@ -45,7 +45,11 @@ pub struct AssetEntry {
 impl AssetEntry {
     fn describe(&self) -> String {
         let mut line = format!("- {}", self.reference);
-        if let Some(label) = self.label.as_deref().filter(|label| !label.trim().is_empty()) {
+        if let Some(label) = self
+            .label
+            .as_deref()
+            .filter(|label| !label.trim().is_empty())
+        {
             line.push_str(&format!(" | {label}"));
         }
         if let (Some(width), Some(height)) = (self.width, self.height) {
@@ -197,7 +201,9 @@ impl AssetCatalog {
         if let Some(page_id) = page_id {
             let matched = self.placements_for(page_id);
             if !matched.is_empty() {
-                section.push_str("\n\nMatched to this page by reading the article together with the image");
+                section.push_str(
+                    "\n\nMatched to this page by reading the article together with the image",
+                );
                 section.push_str(" (prefer these when they fit the layout):");
                 for placement in matched {
                     section.push_str(&format!(

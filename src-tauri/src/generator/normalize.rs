@@ -1,3 +1,4 @@
+use crate::assets::AssetCatalog;
 use crate::config::GenerationConfig;
 use crate::icon::IconIndex;
 use crate::input::ParsedDocument;
@@ -5,7 +6,6 @@ use crate::lmstudio::LmStudioClient;
 use crate::types::*;
 use crate::validate::validate_blueprints;
 use anyhow::Result;
-use crate::assets::AssetCatalog;
 use std::path::Path;
 
 use crate::generator::utils::{

@@ -1163,7 +1163,10 @@ mod tests {
         let retry = root.join("retry-page-12");
         write_debug(&retry, "slide-12.system.txt", "prompt").unwrap();
         write_debug(&retry, "slide-12.raw.txt", "response").unwrap();
-        assert_eq!(fs::read_to_string(retry.join("slide-12.system.txt")).unwrap(), "prompt");
+        assert_eq!(
+            fs::read_to_string(retry.join("slide-12.system.txt")).unwrap(),
+            "prompt"
+        );
         fs::remove_dir_all(root).unwrap();
     }
 

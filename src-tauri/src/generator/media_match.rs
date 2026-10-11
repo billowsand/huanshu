@@ -159,11 +159,7 @@ pub(crate) fn page_outline(pages: &[PagePlan]) -> String {
 }
 
 /// Prompt for one image: the article outline, the image, and what we want back from it.
-pub(crate) fn build_placement_prompt(
-    doc_title: &str,
-    outline: &str,
-    asset: &MediaAsset,
-) -> String {
+pub(crate) fn build_placement_prompt(doc_title: &str, outline: &str, asset: &MediaAsset) -> String {
     let caption = asset
         .caption
         .as_deref()
@@ -266,11 +262,17 @@ mod tests {
             page("2", "总体架构", &["三层解耦", "统一入口"]),
             page("3", "实施路径", &[]),
         ];
-        let prompt =
-            build_placement_prompt("智慧园区方案", &page_outline(&pages), &asset(7, Some("一张架构图")));
+        let prompt = build_placement_prompt(
+            "智慧园区方案",
+            &page_outline(&pages),
+            &asset(7, Some("一张架构图")),
+        );
 
         assert!(prompt.contains("智慧园区方案"), "{prompt}");
-        assert!(prompt.contains("- page_id=2 | 页标题：总体架构"), "{prompt}");
+        assert!(
+            prompt.contains("- page_id=2 | 页标题：总体架构"),
+            "{prompt}"
+        );
         assert!(prompt.contains("章节：总体设计"), "{prompt}");
         assert!(prompt.contains("要点：三层解耦；统一入口"), "{prompt}");
         assert!(prompt.contains("一张架构图"), "{prompt}");
