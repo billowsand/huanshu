@@ -207,7 +207,7 @@
   .section-intro__meta-label, .section-intro__card-index,
   .phase-chip, .phase-steps-wrap__title, .split-left-index, .issue-card__eyebrow
 ) {
-  font-family: var(--font-mono);
+  /* 字体由 typography.css 的角色分组决定，主题只调字距 */
   letter-spacing: 0.06em;
 }
 

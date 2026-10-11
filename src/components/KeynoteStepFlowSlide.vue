@@ -86,7 +86,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
               font-bold class="slide-card-title sf-htitle" leading-snug
               :style="{ color: toneVars(step.tone || 'blue').text }"
             >{{ step.title }}</div>
-            <div v-if="step.body" class="slide-text-caption sf-hbody" opacity-60 leading-relaxed mt-1>
+            <div v-if="step.body" class="slide-text-caption slide-font-body sf-hbody" opacity-60 leading-relaxed mt-1>
               {{ step.body }}
             </div>
           </GlassCard>
@@ -115,7 +115,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
             >
               <span
                 class="slide-text-caption slide-number"
-                font-bold font-mono
+                font-bold
                 :style="{ color: toneVars(step.tone || 'blue').text }"
               >{{ idx + 1 }}</span>
             </div>
@@ -153,7 +153,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
                   :style="{ color: toneVars(step.tone || 'blue').text }"
                 >{{ step.title }}</div>
               </div>
-              <div v-if="step.body" class="slide-text-caption" opacity-70 leading-relaxed>
+              <div v-if="step.body" class="slide-text-caption slide-font-body" opacity-70 leading-relaxed>
                 {{ step.body }}
               </div>
             </GlassCard>
@@ -236,7 +236,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
   border-radius: 50%;
   font-size: var(--type-caption);
   font-weight: 800;
-  font-family: var(--font-mono);
+  font-family: var(--font-number);
   display: flex;
   align-items: center;
   justify-content: center;

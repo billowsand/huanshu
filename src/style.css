@@ -160,7 +160,8 @@ body {
 /* Default h1 in slides */
 .slidev-slide h1,
 .slide-title {
-  font-family: var(--font-sans);
+  /* 字体由 themes/typography.css 的「标题」角色决定（只作用于幻灯片内）；这里不写
+     font-family，否则 Studio 里同名的 .slide-title（SlideCard）也会被换成标题字体 */
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text);
@@ -242,7 +243,7 @@ body {
 
 /* Cover slide special title */
 .cover-title {
-  font-family: var(--font-sans);
+  font-family: var(--font-title);
   font-size: var(--type-cover-title);
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -260,7 +261,8 @@ body {
 
 .cover-en-title {
   font-size: var(--type-cover-en);
-  font-family: var(--font-mono);
+  /* 英文副标题属于「副标题」角色，不再借用代码字体 */
+  font-family: var(--font-subtitle);
   opacity: 0.35;
   margin-top: 0.5rem;
   letter-spacing: 0.05em;
@@ -431,8 +433,9 @@ iframe {
   opacity: 0.9;
   /* 幻灯片内跟随 --type-caption；studio 编辑器里的脚注没有 .slide-shell 祖先，用原值兜底 */
   font-size: var(--type-caption, 0.9375rem);
-  /* 确保脚注上的返回链接符号 ↩ 不会被 body 的 Emoji 字体覆盖渲染为 ↩️ */
-  font-family: var(--font-sans);
+  /* 确保脚注上的返回链接符号 ↩ 不会被 body 的 Emoji 字体覆盖渲染为 ↩️；
+     脚注属于「注释与标签」角色 */
+  font-family: var(--font-caption);
 }
 
 .footnotes > .footnotes-list p {
@@ -592,7 +595,7 @@ iframe {
 /* Large watermark section number (absolute positioned) */
 .section-num {
   font-size: calc(7rem * var(--type-scale));
-  font-family: var(--font-mono);
+  font-family: var(--font-number);
   font-weight: 800;
   color: transparent;
   -webkit-text-stroke: 1px var(--section-num-stroke);

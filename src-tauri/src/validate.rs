@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct ValidationIssue {
+    /// Index of the offending slide within the validated slice.
+    pub slide_index: usize,
     pub message: String,
 }
 
@@ -298,6 +300,7 @@ fn parse_media_ref(value: &str) -> Option<i64> {
 
 fn issue(slide_idx: usize, message: impl Into<String>) -> ValidationIssue {
     ValidationIssue {
+        slide_index: slide_idx,
         message: format!("slide {}: {}", slide_idx + 1, message.into()),
     }
 }

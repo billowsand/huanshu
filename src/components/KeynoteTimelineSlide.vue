@@ -76,7 +76,7 @@ defineProps<{
                       font-bold class="slide-card-title" leading-snug mb-1
                       :style="{ color: toneVars(evt.tone).text }"
                     >{{ evt.title }}</div>
-                    <div class="slide-text-caption" opacity-60 leading-snug>{{ evt.body }}</div>
+                    <div class="slide-text-caption slide-font-body" opacity-60 leading-snug>{{ evt.body }}</div>
                   </GlassCard>
                 </div>
                 <!-- Stem: card → node -->
@@ -152,7 +152,7 @@ defineProps<{
                       font-bold class="slide-card-title" leading-snug mb-1
                       :style="{ color: toneVars(evt.tone).text }"
                     >{{ evt.title }}</div>
-                    <div class="slide-text-caption" opacity-60 leading-snug>{{ evt.body }}</div>
+                    <div class="slide-text-caption slide-font-body" opacity-60 leading-snug>{{ evt.body }}</div>
                   </GlassCard>
                 </div>
               </template>
@@ -225,7 +225,7 @@ defineProps<{
 /* Date label */
 .tl-date {
   font-size: var(--type-caption);
-  font-family: var(--font-mono);
+  font-family: var(--font-number);
   opacity: 0.5;
   text-align: center;
   white-space: nowrap;

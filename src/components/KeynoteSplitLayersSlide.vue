@@ -64,7 +64,7 @@ const gridGap = computed(() => {
                 <div font-bold class="slide-card-title">{{ item.title }}</div>
                 <div class="split-left-index">{{ String(idx + 1).padStart(2, '0') }}</div>
               </div>
-              <div class="slide-text-caption split-left-body" opacity-78 v-html="item.body" />
+              <div class="slide-text-caption slide-font-body split-left-body" opacity-78 v-html="item.body" />
             </div>
           </div>
           <div v-if="idx < leftItems.length - 1" class="split-left-connector" />
@@ -73,7 +73,7 @@ const gridGap = computed(() => {
 
       <div class="glass-card split-right-card p-4 flex flex-col gap-3 min-h-0">
         <div font-bold class="slide-card-title" text="var(--primary)" mb-1>{{ layersTitle || '架构层次' }}</div>
-        <div flex flex-col gap-2 class="slide-text-caption">
+        <div flex flex-col gap-2 class="slide-text-caption slide-font-body">
           <template v-for="(layer, idx) in layers" :key="layer.title">
             <div
               class="split-layer"
@@ -85,7 +85,7 @@ const gridGap = computed(() => {
               }"
             >
               <span font-semibold>{{ layer.title }}</span>
-              <span opacity-50>{{ layer.meta }}</span>
+              <span opacity-50 class="slide-font-caption">{{ layer.meta }}</span>
             </div>
             <div v-if="idx < layers.length - 1" class="slide-icon-xl" text-center opacity-30 :style="{ color: toneVars(layers[idx + 1].tone).text }">↑</div>
           </template>

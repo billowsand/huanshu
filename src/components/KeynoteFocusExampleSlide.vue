@@ -45,7 +45,7 @@ defineProps<{
             <div :class="point.icon" class="slide-icon-2xl" text="var(--primary)" mt-1 flex-shrink-0 />
             <div>
               <div font-bold class="slide-card-title" text="var(--primary-light)">{{ point.title }}</div>
-              <div class="slide-text-caption" opacity-70 mt-1 v-html="point.body" />
+              <div class="slide-text-caption slide-font-body" opacity-70 mt-1 v-html="point.body" />
             </div>
           </GlassCard>
       </div>
@@ -53,10 +53,10 @@ defineProps<{
       <div class="glass-card focus-example p-5 flex flex-col justify-between">
         <div>
           <div font-bold class="slide-card-title" text="var(--primary)" mb-3>{{ exampleTitle }}</div>
-          <div class="slide-text-caption" opacity-70 leading-relaxed mb-4 v-html="exampleBody" />
+          <div class="slide-text-caption slide-font-body" opacity-70 leading-relaxed mb-4 v-html="exampleBody" />
           <div class="divider-amber" mb-4 />
           <div font-bold class="slide-text-meta" mb-2>正确的关注顺序：</div>
-          <div flex flex-col gap-2 class="slide-text-caption">
+          <div flex flex-col gap-2 class="slide-text-caption slide-font-body">
             <div
               v-for="item in ranking"
               :key="item.index"
@@ -64,7 +64,7 @@ defineProps<{
               flex items-center gap-2
               :style="item.muted ? { opacity: 0.4 } : {}"
             >
-              <div class="slide-number" :style="{ color: item.muted ? 'var(--text-muted)' : 'var(--primary)' }" font-mono>{{ item.index }}</div>
+              <div class="slide-number" :style="{ color: item.muted ? 'var(--text-muted)' : 'var(--primary)' }">{{ item.index }}</div>
               <span>
                 {{ item.label }}
                 <span opacity-50>（{{ item.meta }}）</span>

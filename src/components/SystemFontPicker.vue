@@ -155,7 +155,7 @@ function onPanelKeydown(event: KeyboardEvent) {
 .font-trigger-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .font-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
 .font-default, .font-current { color: var(--studio-muted); font-size: 11px; flex-shrink: 0; }
-.font-overlay { position: fixed; inset: var(--titlebar-height, 36px) 0 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: #0007; backdrop-filter: blur(4px); font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif; font-size: 13px; color: var(--studio-text); }
+.font-overlay { position: fixed; inset: var(--titlebar-height, 36px) 0 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: #0007; backdrop-filter: blur(4px); font-family: var(--font-sans); font-size: 13px; color: var(--studio-text); }
 .font-overlay .font-option.active { box-shadow: none; }
 .font-dialog { display: flex; flex-direction: column; width: min(760px, 100%); max-height: calc(100dvh - var(--titlebar-height, 36px) - 48px); overflow: hidden; border: 1px solid var(--studio-border); border-radius: 16px; background: var(--studio-panel); box-shadow: 0 24px 80px #0004; }
 .font-dialog-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--studio-border); }

@@ -205,11 +205,11 @@ function normalizeItem(item: CardItem) {
             }"
           >
             <div v-if="card.icon" :class="card.icon" :style="{ ...iconStyle, color: toneVars(card.titleTone || card.tone).text }" />
-            <span font-bold :style="{ fontSize: headerStyle.fontSize, color: toneVars(card.titleTone || card.tone).text }">{{ card.title }}</span>
+            <span class="slide-font-title" font-bold :style="{ fontSize: headerStyle.fontSize, color: toneVars(card.titleTone || card.tone).text }">{{ card.title }}</span>
           </div>
 
           <div class="feature-body" :data-first-row="firstBodyRow" :style="bodyStyle">
-            <div v-if="card.number" class="slide-number feature-number" font-mono :style="{ ...numberStyle, color: toneVars(card.tone).solid, opacity: 0.5 }">
+            <div v-if="card.number" class="slide-number feature-number" :style="{ ...numberStyle, color: toneVars(card.tone).solid, opacity: 0.5 }">
               {{ card.number }}
             </div>
             <div v-if="card.subtitle" class="feature-subtitle" opacity-60>{{ card.subtitle }}</div>

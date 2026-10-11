@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
                 class="slide-icon-sm cp-icon" :style="{ color: toneVars(sides[sideIndex].tone).text }" />
               <div class="cp-copy">
                 <div class="slide-text-meta cp-label">{{ item.label }}</div>
-                <div v-if="item.desc" class="slide-text-caption cp-desc">{{ item.desc }}</div>
+                <div v-if="item.desc" class="slide-text-caption slide-font-body cp-desc">{{ item.desc }}</div>
               </div>
             </template>
             <span v-else class="cp-empty">—</span>

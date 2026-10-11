@@ -80,7 +80,7 @@ const sideVars = computed(() => {
         <div v-else class="glass-card w-full h-full flex items-center justify-center">
           <div flex flex-col items-center gap-3 opacity-40>
             <div i-carbon:image class="slide-icon-hero" />
-            <div class="slide-meta" text-mono>{{ placeholder || '图片待补充' }}</div>
+            <div class="slide-meta slide-font-caption">{{ placeholder || '图片待补充' }}</div>
           </div>
         </div>
       </div>
@@ -141,7 +141,7 @@ const sideVars = computed(() => {
               <div
                 v-if="idx < panel.items.length - 1"
                 class="slide-caption"
-                text-center opacity-30 font-mono
+                text-center opacity-30
               >
                 ↓
               </div>

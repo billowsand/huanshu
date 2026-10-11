@@ -211,7 +211,7 @@ const cardGridGap = computed(() => {
 
 .section-intro__card-index {
   font-size: var(--type-meta);
-  font-family: var(--font-mono);
+  font-family: var(--font-number);
   color: var(--intro-tone);
   align-self: start;
 }

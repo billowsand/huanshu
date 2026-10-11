@@ -63,6 +63,17 @@ export interface GenerationLogEntry {
   created_at: number
 }
 
+/** Result of `retry_generation_page`: the page is saved even while other pages still fail. */
+export interface RetryPageResult {
+  slide: SlideBlueprint
+  /** Whole deck passes validation; the run is now done. */
+  deck_ready: boolean
+  /** What still blocks the deck when it is not ready. */
+  remaining: string
+  /** Content pages that still fail validation. */
+  invalid_pages: number[]
+}
+
 const STAGE_LABELS: Record<string, string> = {
   idle: '等待',
   start: '初始化',
@@ -275,19 +286,32 @@ export const useGenerationStore = defineStore('generation', () => {
     pageStatuses.value.set(index, { stage: 'content', message: '正在重试该页' })
     try {
       if (!currentRun.value) throw new Error('缺少生成记录，请重新生成')
-      const slide = await invoke<SlideBlueprint>('retry_generation_page', {
+      const result = await invoke<RetryPageResult>('retry_generation_page', {
         runId: currentRun.value.id, pageIndex: index, layoutKind,
       })
       if (version !== generationVersion) return
-      blueprints.value[index + 2] = slide
+      blueprints.value[index + 2] = result.slide
       completedSlides.value.add(index + 2)
       pageStatuses.value.set(index, { stage: 'done', message: '重试完成' })
-      stage.value = 'done'
-      progress.value = 1
-      lastError.value = ''
-      const now = Math.floor(Date.now() / 1000)
-      currentRun.value = { ...currentRun.value!, status: 'done', current_stage: 'done', updated_at: now, finished_at: now }
-      message.value = '该页重试完成，可继续编辑'
+      // The page is saved either way; the run only completes once the whole deck validates.
+      if (result.deck_ready) {
+        stage.value = 'done'
+        progress.value = 1
+        lastError.value = ''
+        const now = Math.floor(Date.now() / 1000)
+        if (currentRun.value) {
+          currentRun.value = { ...currentRun.value, status: 'done', current_stage: 'done', updated_at: now, finished_at: now }
+        }
+        message.value = '该页重试完成，可继续编辑'
+      } else {
+        for (const page of result.invalid_pages) {
+          if (pageStatuses.value.get(page)?.stage !== 'error') {
+            pageStatuses.value.set(page, { stage: 'error', previousStage: 'content', message: '未通过最终校验' })
+          }
+        }
+        lastError.value = result.remaining
+        message.value = `该页已更新；${result.remaining}`
+      }
     } catch (error) {
       if (version !== generationVersion) return
       pageStatuses.value.set(index, {

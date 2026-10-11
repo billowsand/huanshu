@@ -107,7 +107,7 @@ const processDensityClass = computed(() => {
           <div class="phase-steps-wrap__glow" :style="{ background: toneVars(phase.tone).solid }" />
           <div class="phase-steps-wrap__title">
             <span>关键动作</span>
-            <span>{{ phase.steps.length.toString().padStart(2, '0') }}</span>
+            <span class="slide-font-number">{{ phase.steps.length.toString().padStart(2, '0') }}</span>
           </div>
           <div class="phase-steps" flex-1 flex flex-col>
             <div
@@ -415,7 +415,7 @@ const processDensityClass = computed(() => {
   border: 1px solid transparent;
   font-size: var(--type-caption);
   font-weight: 800;
-  font-family: var(--font-mono);
+  font-family: var(--font-number);
   display: flex;
   align-items: center;
   justify-content: center;

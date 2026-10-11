@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
             no-padding
             class="overview-card"
           >
-            <div class="overview-number slide-number" font-mono text="var(--primary)">{{ item.number }}</div>
+            <div class="overview-number slide-number" text="var(--primary)">{{ item.number }}</div>
             <div class="overview-copy">
               <h2 class="overview-title slide-card-title">{{ item.title }}</h2>
               <div v-if="item.desc" class="overview-desc">{{ item.desc }}</div>

@@ -530,6 +530,18 @@ pub async fn repair_slide(
 // Internal pipeline
 // ---------------------------------------------------------------------------
 
+/// Outcome of a single-page retry.
+#[derive(serde::Serialize)]
+pub struct RetryPageResult {
+    slide: SlideBlueprint,
+    /// Whether the whole deck now passes validation (the run is then marked done).
+    deck_ready: bool,
+    /// What still blocks the deck when it is not ready; empty otherwise.
+    remaining: String,
+    /// Content pages that still fail validation.
+    invalid_pages: Vec<usize>,
+}
+
 /// Retry a content page using its original source and assigned layout.
 /// The assembled deck has two leading slides (cover and overview).
 #[tauri::command]
@@ -539,7 +551,7 @@ pub async fn retry_generation_page(
     run_id: i64,
     page_index: usize,
     layout_kind: Option<crate::types::SlideKind>,
-) -> Result<SlideBlueprint, String> {
+) -> Result<RetryPageResult, String> {
     let (settings, project_dir, project_id, db, run, page, layout, ratio) = {
         let mut st = state.lock().unwrap();
         if st.generation_running {
@@ -605,7 +617,7 @@ pub async fn retry_generation_page(
             ratio,
         )
     };
-    let result: anyhow::Result<SlideBlueprint> = async {
+    let result: anyhow::Result<RetryPageResult> = async {
         let mut config = GenerationConfig::from_settings(&settings, project_dir.clone(), ratio);
         config.frontmatter_title = run.frontmatter_title.clone();
         config.debug_dir = std::path::PathBuf::from(&run.debug_dir).join(format!(
@@ -643,8 +655,11 @@ pub async fn retry_generation_page(
         if slide.kind != layout.kind {
             anyhow::bail!("所选布局生成未成功，请选择其他布局后重试");
         }
-        let issues =
-            crate::validate::validate_blueprints(std::slice::from_ref(&slide), &icons, assets.refs());
+        let issues = crate::validate::validate_blueprints(
+            std::slice::from_ref(&slide),
+            &icons,
+            assets.refs(),
+        );
         if !issues.is_empty() {
             anyhow::bail!(
                 "重试结果未通过校验：{}",
@@ -663,28 +678,35 @@ pub async fn retry_generation_page(
         *updated
             .get_mut(page_index + 2)
             .ok_or_else(|| anyhow::anyhow!("幻灯片列表已改变"))? = slide.clone();
-        // A recovered run may only become editable after the assembled deck passes validation.
+        // The page passed on its own, so keep it even when other pages are still broken:
+        // requiring a clean deck here would make a deck with two bad pages unrecoverable.
+        // The run only becomes "done" once the whole deck validates.
         let issues = crate::validate::validate_blueprints(&updated, &icons, assets.refs());
-        if !issues.is_empty() {
-            anyhow::bail!(
-                "整副幻灯片未通过校验：{}",
-                issues.iter().map(|i| i.message.as_str()).collect::<Vec<_>>().join("；")
-            );
-        }
+        let invalid_pages = invalid_content_pages(&issues, updated.len())
+            .into_keys()
+            .collect::<Vec<_>>();
+        let remaining = if issues.is_empty() {
+            String::new()
+        } else {
+            describe_deck_issues(&invalid_pages, &issues, updated.len())
+        };
         let mut conn = db.lock().unwrap();
         let tx = conn.transaction()?;
         if let Some(pid) = project_id {
-            db::update_project_blueprints(
-                &tx,
-                pid,
-                &serde_json::to_string(&updated)?,
-            )?;
+            db::update_project_blueprints(&tx, pid, &serde_json::to_string(&updated)?)?;
         }
-        db::finish_generation_run(&tx, run_id, "done", Some("done"))?;
+        if issues.is_empty() {
+            db::finish_generation_run(&tx, run_id, "done", Some("done"))?;
+        }
         tx.commit()?;
         st.blueprints = updated;
-        st.last_error = None;
-        Ok(slide)
+        st.last_error = (!issues.is_empty()).then(|| remaining.clone());
+        Ok(RetryPageResult {
+            slide,
+            deck_ready: issues.is_empty(),
+            remaining,
+            invalid_pages,
+        })
     }
     .await;
     state.lock().unwrap().generation_running = false;
@@ -698,7 +720,14 @@ pub async fn retry_generation_page(
         "retry",
         "单页重试",
         error.as_deref().unwrap_or("该页重试完成"),
-        json!({"page_plan": page, "layout_plan": layout, "error": error, "retry_succeeded": result.is_ok()}),
+        json!({
+            "page_plan": page,
+            "layout_plan": layout,
+            "error": error,
+            "retry_succeeded": result.is_ok(),
+            "deck_ready": result.as_ref().is_ok_and(|r| r.deck_ready),
+            "remaining": result.as_ref().map(|r| r.remaining.as_str()).unwrap_or_default(),
+        }),
         true,
     );
     result.map_err(|e| format!("{e:#}"))
@@ -870,6 +899,93 @@ fn summarize_placements(
     } else {
         format!("{}/{} 张素材已配对：{}", matched, placements.len(), detail)
     }
+}
+
+/// Content-page index for a slide of the assembled deck. Cover and overview lead the
+/// deck and the closing slide ends it; those three have no content page.
+fn content_page_of(deck_index: usize, deck_len: usize) -> Option<usize> {
+    (deck_index >= 2 && deck_index + 1 < deck_len).then(|| deck_index - 2)
+}
+
+/// Validation messages of the assembled deck, grouped by content page.
+fn invalid_content_pages(
+    issues: &[crate::validate::ValidationIssue],
+    deck_len: usize,
+) -> std::collections::BTreeMap<usize, Vec<String>> {
+    let mut pages = std::collections::BTreeMap::<usize, Vec<String>>::new();
+    for issue in issues {
+        if let Some(page) = content_page_of(issue.slide_index, deck_len) {
+            pages.entry(page).or_default().push(issue.message.clone());
+        }
+    }
+    pages
+}
+
+/// Flag every content page that failed final validation as a page error (log + live
+/// status), the same way a failed content generation is flagged, so the page can be
+/// retried. Returns the flagged content-page indices.
+fn report_invalid_pages(
+    app: &AppHandle,
+    db: &std::sync::Arc<std::sync::Mutex<Connection>>,
+    run_id: i64,
+    issues: &[crate::validate::ValidationIssue],
+    deck_len: usize,
+) -> Vec<usize> {
+    let pages = invalid_content_pages(issues, deck_len);
+    for (&page, messages) in &pages {
+        let summary = messages.join("；");
+        record_log(
+            app,
+            db,
+            run_id,
+            Some(page as i32),
+            "validate",
+            "page_error",
+            "页面未通过最终校验",
+            &summary,
+            json!({ "issues": messages }),
+            true,
+        );
+        let _ = app.emit(
+            "gen:page_status",
+            PageStatusEvent {
+                slide_index: page,
+                stage: "error".to_string(),
+                message: Some(format!("未通过最终校验：{summary}")),
+                blueprint: None,
+                waiting: false,
+            },
+        );
+    }
+    pages.into_keys().collect()
+}
+
+/// Human-readable account of what still blocks the deck: retryable content pages, and
+/// problems on cover/overview/closing that a page retry cannot fix.
+fn describe_deck_issues(
+    pages: &[usize],
+    issues: &[crate::validate::ValidationIssue],
+    deck_len: usize,
+) -> String {
+    let frame_issues = issues
+        .iter()
+        .filter(|issue| content_page_of(issue.slide_index, deck_len).is_none())
+        .count();
+    let mut parts = Vec::new();
+    if !pages.is_empty() {
+        let list = pages
+            .iter()
+            .map(|page| (page + 1).to_string())
+            .collect::<Vec<_>>()
+            .join("、");
+        parts.push(format!("第 {list} 页需要重试"));
+    }
+    if frame_issues > 0 {
+        parts.push(format!(
+            "封面、目录或结尾有 {frame_issues} 处问题，需整副重新生成或手动编辑"
+        ));
+    }
+    parts.join("；")
 }
 
 async fn run_pipeline(
@@ -1395,12 +1511,14 @@ async fn run_pipeline(
             json!({ "issues": issue_messages }),
             true,
         );
-        let msg = issues
-            .iter()
-            .map(|i| i.message.as_str())
-            .collect::<Vec<_>>()
-            .join("; ");
-        return Err(anyhow::anyhow!("validation failed: {msg}"));
+        // Mark each offending content page as failed so it can be retried on its own;
+        // otherwise only pages that failed during content generation are retryable.
+        let pages = report_invalid_pages(&app, &db, run_id, &issues, final_slides.len());
+        return Err(anyhow::anyhow!(
+            "最终校验未通过：{}。{}",
+            describe_deck_issues(&pages, &issues, final_slides.len()),
+            issue_messages.join("; ")
+        ));
     }
     record_log(
         &app,
@@ -1537,4 +1655,41 @@ pub async fn recommend_icons_for_query(
         .into_iter()
         .map(|icon| icon.full_name)
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate::ValidationIssue;
+
+    fn issue(slide_index: usize) -> ValidationIssue {
+        ValidationIssue {
+            slide_index,
+            message: format!("slide {}: broken", slide_index + 1),
+        }
+    }
+
+    #[test]
+    fn content_pages_exclude_cover_overview_and_closing() {
+        // cover, overview, 3 content pages, closing
+        let len = 6;
+        assert_eq!(content_page_of(0, len), None);
+        assert_eq!(content_page_of(1, len), None);
+        assert_eq!(content_page_of(2, len), Some(0));
+        assert_eq!(content_page_of(4, len), Some(2));
+        assert_eq!(content_page_of(5, len), None);
+    }
+
+    #[test]
+    fn issues_group_by_content_page_and_frame_issues_are_reported_separately() {
+        let issues = vec![issue(2), issue(4), issue(4), issue(0)];
+        let pages = invalid_content_pages(&issues, 6);
+        assert_eq!(pages.keys().copied().collect::<Vec<_>>(), vec![0, 2]);
+        assert_eq!(pages[&2].len(), 2);
+
+        let keys = pages.into_keys().collect::<Vec<_>>();
+        let text = describe_deck_issues(&keys, &issues, 6);
+        assert!(text.contains("第 1、3 页需要重试"), "{text}");
+        assert!(text.contains("1 处问题"), "{text}");
+    }
 }

@@ -134,7 +134,7 @@ function summaryFirst(quadrantKey: string) {
 
     <SlideReveal v-if="strategy" :delay="600" class="glass-card px-5 py-3 flex items-center gap-3">
       <div i-carbon:direction-loop-right class="slide-icon-xl" text="var(--primary)" />
-      <span class="slide-text-note" leading-relaxed>{{ strategy }}</span>
+      <span class="slide-text-note slide-font-body" leading-relaxed>{{ strategy }}</span>
     </SlideReveal>
   </div>
 </template>

@@ -204,6 +204,41 @@ caption 只说图片「是什么」，说不出它「该放哪」。所以 `gene
   约 210/276/158px，合计已接近侧栏可用的 ~551px），原始字号下本就溢出。`normalize` 已把
   面板条目收口到 4 项，但极端内容仍可能溢出，彻底解决需要限制面板数量或调整版式。
 
+## 幻灯片字体角色（`src/themes/typography.css`）
+
+字号之外还有一套**字体角色**：用户在「设置 → 外观与字体」里独立选择的 6 类字体，幻灯片里
+每一处文字都必须落到其中一类（界面字体 `--font-interface` 只服务 Studio 外壳，绝不出现在幻灯片里）：
+
+| 角色 | 变量 | 钩子类 | 典型元素 |
+|---|---|---|---|
+| 标题 | `--font-title` | `.slide-font-title` | 页面标题、封面/结尾标题、卡片/象限/阶段标题 |
+| 副标题 | `--font-subtitle` | `.slide-font-subtitle` | 封面副标题、英文副标题、章节说明、卡片副标题 |
+| 正文 | `--font-body` | `.slide-font-body` | 卡片描述、条目、摘要、结论（**默认角色**） |
+| 注释与标签 | `--font-caption` | `.slide-font-caption` | 脚注、页尾、眉标、标签 pill、模式徽章、占位提示 |
+| 数字与序号 | `--font-number` | `.slide-font-number` | 章节号、步骤号、卡片编号、时间轴日期 |
+| 代码与编辑器 | `--font-code` | `.slide-font-code` | `code`/`pre`/`kbd`/`samp`、Markdown 编辑器 |
+
+- 规划表只有一个：`src/themes/typography.css`（由 `App.vue` 引入）。**不要**在模板 scoped style
+  或 `style.css` 里写 `font-family: var(--font-sans)`——标题、封面、章节号、脚注曾经都误指向
+  界面/代码字体，现已全部改掉。
+- 解析分四层，**书写顺序即优先级**（特异性相同时后写的胜出）：① 默认角色 = 正文
+  （`.slide-shell` / `.slidev-slide` / `.md-preview` 内一切文字先算正文，所以漏归类的元素只会
+  退化成正文，不会掉进界面字体）→ ② 语义类名分组（`.slide-title`… 与各模板自有类名
+  `.phase-head__title`…）→ ③ `.slide-font-*` 钩子（模板里逐个打标，用于没有语义类可挂、或需要
+  用正文压过某个字号类默认归组的元素）→ ④ `code`/`pre`/`kbd`/`samp` 永远是代码字体。
+- 判断依据是「这段话在版式里扮演什么角色」，**不是字号大小**。`.slide-text-caption` / `.slide-meta`
+  只是字号类，不在注释分组里，挂在正文上本来就是正文；模板里给它们补 `.slide-font-body` 只是显式标注。
+  真正必须挂钩子的是**被分组接管的类**借作他用时：例如 `.slide-text-note`、`.slide-caption` 属于
+  「注释与标签」组，SWOT 的策略结论借用 `.slide-text-note` 字号时必须再挂 `.slide-font-body`；
+  注释标题里的计数（Process「关键动作 03」）要挂 `.slide-font-number`。同一个元素只挂一个钩子。
+- 所有分组都写成 `:is(.slide-shell, .slidev-slide[, .md-preview]) :is(...)`，特异性一致，书写顺序
+  才等于优先级；也保证 Studio 外壳里同名类（如 `SlideCard` 的 `.slide-title`）不受影响。
+  主题样式（如 `terminal.css`）只调字距/字号，不写 `font-family`——写了也会被角色分组的 `!important` 覆盖。
+- 新增模板时的必查项：模板里每个文本元素要么有上面表格里的语义类名，要么显式挂 `.slide-font-*`，
+  然后在 `typography.css` 第 2 层补一行；`grep -rn "font-mono" src/components/Keynote*.vue`
+  应 0 命中（数字用 `--font-number` 或 `.slide-number`，`font-mono`/`font-sans` 会被角色组的
+  `!important` 覆盖成死代码，只会误导后来人）。
+
 ## 多比例幻灯片支持 (16:9 / 32:9 / 48:9)
 
 ### 功能说明

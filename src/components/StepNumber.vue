@@ -22,7 +22,6 @@ const colorMap: Record<string, { bg: string; border: string; text: string }> = {
     flex
     items-center
     justify-center
-    font-mono
     font-bold
     :style="[
       (size ? '' : 'font-size: var(--type-body);'),
