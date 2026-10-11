@@ -928,7 +928,7 @@
     "layers": [
       {
         "title": "第 1 层：较长的层级名称",
-        "meta": "Meta Component Name",
+        "meta": "说明写成了一整句长话，比标题长得多，标题不能被挤成一字一行，说明本身应当换行。",
         "tone": "red"
       },
       {

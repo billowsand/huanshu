@@ -275,6 +275,9 @@ JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍
     裁切时内层块必须拿到实测的完整高度并设为 `breakable: false`，否则可分页的子块会被拆成片段叠在一起。
   - 布局参数**不要命名成 `h` / `v`**：会遮蔽 Typst 的 `h()` / `v()` 函数（报错 `expected function, found length`）。
   - 代码块里，**以 `+` 开头的续行会被当成新语句**（报错 `cannot join length with length`），多行算式要用括号包起来。
+  - 屏幕版的 `flex justify-between` 两端文字**不要译成 `grid(columns: (1fr, auto))`**：`auto` 列先拿走右侧文字的
+    完整自然宽度，右侧一长，左侧就被挤成一字一行（`split_layers` 层级条曾因此出错）。按 CSS `flex-shrink` 的
+    做法实测两侧自然宽度、按比例收缩（见 `split-layers.typ` 的 `layer-row`）。`auto` 列只放图标、序号这类定宽内容。
   - 局部辅助函数**不要命名成 `center` / `left` / `top` 等对齐值**：会遮蔽内置的对齐常量，`align(center, …)`
     随即报错 `expected content, found function`。
   - 比例一律用 `aspect-of(ctx)`（由画布宽度推出），**不要读页面自己的 `aspect_ratio` 字段**：旧数据或手改过的

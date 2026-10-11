@@ -86,12 +86,37 @@
     stroke: (left: 3 * px + tone.solid, rest: 1 * px + tone.border),
     radius: 2 * px,
     inset: (left: 14 * px, right: 12 * px, y: 8 * px * f),
-    grid(
-      columns: (1fr, auto),
-      column-gutter: 12 * px * f,
-      txt(ctx, "body", size, 1.5, layer.at("title", default: "")),
-      txt(ctx, "caption", size, 1.5, str(layer.at("meta", default: "")), fill: th.muted),
-    ),
+    layout(region => {
+      let title = txt(ctx, "body", size, 1.5, layer.at("title", default: ""))
+      let meta = txt(ctx, "caption", size, 1.5, str(layer.at("meta", default: "")), fill: th.muted)
+      let gap = 12 * px * f
+      // `flex justify-between`: both spans keep their natural width when they
+      // fit; otherwise both shrink in proportion to it (`flex-shrink: 1`).
+      // A `(1fr, auto)` grid would hand a long meta its full width and squeeze
+      // the title to one character per line. The title keeps at least a
+      // quarter of the row so a very long meta cannot crush it either.
+      let avail = region.width - gap
+      let (tw, mw) = (measure(title).width, measure(meta).width)
+      let title-w = if tw + mw <= avail { tw } else {
+        calc.max(tw * (avail / (tw + mw)), calc.min(tw, avail * 0.25))
+      }
+      // A wrapped title is balanced (no lone last character); the width that
+      // frees up goes to the meta. The meta box sits at the right edge, its
+      // own lines left-aligned.
+      let title-box = balanced(title-w, title)
+      let title-w = measure(title-box).width
+      let meta-w = calc.min(mw, avail - title-w)
+      grid(
+        columns: (title-w, 1fr),
+        column-gutter: gap,
+        align: (left + horizon, right + horizon),
+        title-box,
+        block(width: meta-w, {
+          set align(left)
+          meta
+        }),
+      )
+    }),
   )
 }
 
