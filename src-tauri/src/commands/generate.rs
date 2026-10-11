@@ -8,7 +8,7 @@ use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 /// Progress event emitted during generation
 #[derive(Debug, Clone, serde::Serialize)]
@@ -328,7 +328,15 @@ pub async fn generate_slides(
     );
 
     // Run the generator pipeline
-    let result = run_pipeline(app.clone(), &config, &md_content, db.clone(), run_id).await;
+    let result = run_pipeline(
+        app.clone(),
+        &config,
+        &md_content,
+        db.clone(),
+        run_id,
+        active_project_id,
+    )
+    .await;
 
     match result {
         Ok(blueprints) => {
@@ -492,14 +500,14 @@ pub async fn repair_slide(
             |_| IconIndex::load(&project_dir).unwrap_or_else(|_| IconIndex::empty()),
         )
     };
-    let asset_paths = crate::validate::collect_assets(&project_dir);
+    let assets = load_asset_catalog(&db, active_project_id, &project_dir);
 
     let mut repaired = crate::generator::slides::repair_single_slide(
         &config,
         &blueprint,
         &feedback,
         Some(&icon_index),
-        Some(&asset_paths),
+        Some(&assets),
     )
     .await
     .map_err(|e| e.to_string())?;
@@ -617,7 +625,7 @@ pub async fn retry_generation_page(
             let conn = db.lock().unwrap();
             IconIndex::load_with_cache(&project_dir, &config.embedding.model, &conn)?
         };
-        let assets = crate::validate::collect_assets(&project_dir);
+        let assets = load_asset_catalog(&db, project_id, &project_dir);
         let slide = crate::generator::slides::generate_single_page_pipeline(
             &llm,
             &embedding,
@@ -636,7 +644,7 @@ pub async fn retry_generation_page(
             anyhow::bail!("所选布局生成未成功，请选择其他布局后重试");
         }
         let issues =
-            crate::validate::validate_blueprints(std::slice::from_ref(&slide), &icons, &assets);
+            crate::validate::validate_blueprints(std::slice::from_ref(&slide), &icons, assets.refs());
         if !issues.is_empty() {
             anyhow::bail!(
                 "重试结果未通过校验：{}",
@@ -655,14 +663,27 @@ pub async fn retry_generation_page(
         *updated
             .get_mut(page_index + 2)
             .ok_or_else(|| anyhow::anyhow!("幻灯片列表已改变"))? = slide.clone();
+        // A recovered run may only become editable after the assembled deck passes validation.
+        let issues = crate::validate::validate_blueprints(&updated, &icons, assets.refs());
+        if !issues.is_empty() {
+            anyhow::bail!(
+                "整副幻灯片未通过校验：{}",
+                issues.iter().map(|i| i.message.as_str()).collect::<Vec<_>>().join("；")
+            );
+        }
+        let mut conn = db.lock().unwrap();
+        let tx = conn.transaction()?;
         if let Some(pid) = project_id {
             db::update_project_blueprints(
-                &db.lock().unwrap(),
+                &tx,
                 pid,
                 &serde_json::to_string(&updated)?,
             )?;
         }
+        db::finish_generation_run(&tx, run_id, "done", Some("done"))?;
+        tx.commit()?;
         st.blueprints = updated;
+        st.last_error = None;
         Ok(slide)
     }
     .await;
@@ -762,22 +783,112 @@ fn page_stage_callback(
     )
 }
 
+/// Media-library images for a project, or an empty list when there is no project or the
+/// read fails.
+fn load_project_media_assets(
+    db: &std::sync::Arc<std::sync::Mutex<Connection>>,
+    project_id: Option<i64>,
+) -> Vec<crate::db::MediaAsset> {
+    let Some(project_id) = project_id else {
+        return Vec::new();
+    };
+    let conn = db.lock().unwrap();
+    crate::db::get_media_assets_for_project(&conn, project_id).unwrap_or_default()
+}
+
+/// Everything the generator may use as an image: project files plus the media library.
+fn load_asset_catalog(
+    db: &std::sync::Arc<std::sync::Mutex<Connection>>,
+    project_id: Option<i64>,
+    project_dir: &std::path::Path,
+) -> crate::assets::AssetCatalog {
+    let media_assets = load_project_media_assets(db, project_id);
+    crate::assets::AssetCatalog::collect(project_dir, &media_assets)
+}
+
+/// Media library root, read from the app settings.
+fn app_media_dir(app: &AppHandle) -> std::path::PathBuf {
+    let state = app.state::<Mutex<AppState>>();
+    let media_dir = state.lock().unwrap().app_settings.media_dir.clone();
+    std::path::PathBuf::from(media_dir)
+}
+
+/// Write the article-aware captions from the placement pass back to the media library.
+///
+/// This intentionally overwrites the caption generated at import time, which only ever saw
+/// the picture itself.
+fn apply_placement_captions(
+    db: &std::sync::Arc<std::sync::Mutex<Connection>>,
+    placements: &[crate::assets::MediaPlacement],
+) {
+    let Ok(conn) = db.lock() else {
+        return;
+    };
+    for placement in placements {
+        let Some(caption) = placement
+            .caption
+            .as_deref()
+            .map(str::trim)
+            .filter(|caption| !caption.is_empty())
+        else {
+            continue;
+        };
+        let _ = db::update_media_asset_caption_only(&conn, placement.media_id, caption);
+    }
+}
+
+/// One log line describing what the placement pass decided.
+fn summarize_placements(
+    placements: &[crate::assets::MediaPlacement],
+    pages: &[crate::types::PagePlan],
+) -> String {
+    if placements.is_empty() {
+        return "没有可配对的素材图片".to_string();
+    }
+    let matched = placements
+        .iter()
+        .filter(|placement| placement.page_id.is_some())
+        .count();
+    let detail = placements
+        .iter()
+        .filter_map(|placement| {
+            let page_id = placement.page_id.as_deref()?;
+            let index = pages
+                .iter()
+                .position(|page| page.page_id == page_id)
+                .map(|position| position + 1)
+                .unwrap_or_default();
+            Some(format!(
+                "第{}页 {} — {}",
+                index, placement.reference, placement.purpose
+            ))
+        })
+        .collect::<Vec<_>>()
+        .join("；");
+    if detail.is_empty() {
+        format!("{} 张素材均未匹配到具体页面", placements.len())
+    } else {
+        format!("{}/{} 张素材已配对：{}", matched, placements.len(), detail)
+    }
+}
+
 async fn run_pipeline(
     app: AppHandle,
     config: &GenerationConfig,
     md_content: &str,
     db: std::sync::Arc<std::sync::Mutex<Connection>>,
     run_id: i64,
+    project_id: Option<i64>,
 ) -> anyhow::Result<Vec<SlideBlueprint>> {
     use crate::generator::planning;
     use crate::generator::slides::{generate_single_page_pipeline, plan_single_page};
     use crate::icon::IconIndex;
     use crate::input::parse_markdown;
-    use crate::validate::collect_assets;
 
     reset_debug_dir(&config.debug_dir)?;
 
-    let asset_paths = collect_assets(&config.project_dir);
+    let media_assets = load_project_media_assets(&db, project_id);
+    let mut assets = crate::assets::AssetCatalog::collect(&config.project_dir, &media_assets);
     let llm_client = config.llm_client()?;
     let embedding_client = config.embedding_client()?;
 
@@ -885,6 +996,54 @@ async fn run_pipeline(
         true,
     );
 
+    // Phase 1b: match media-library images to pages by reading the article with them.
+    // A caption alone cannot say where an image belongs, so this runs before per-page
+    // planning and seeds each page's preferred_assets.
+    if !media_assets.is_empty() && !config.multimodal.model.trim().is_empty() {
+        emit_progress(
+            &app,
+            &db,
+            run_id,
+            "media_match",
+            format!("比对 {} 张素材与文稿的对应关系...", media_assets.len()).as_str(),
+            0.18,
+        );
+        match config.multimodal_client() {
+            Ok(vision_client) => {
+                let placements = crate::generator::media_match::match_media_to_pages(
+                    &vision_client,
+                    &config.multimodal.model,
+                    &media_assets,
+                    &app_media_dir(&app),
+                    &doc.title,
+                    &page_plans,
+                    config.concurrency,
+                )
+                .await;
+                let _ = crate::generator::utils::write_debug(
+                    &config.debug_dir,
+                    "00-media-match.json",
+                    &serde_json::to_string_pretty(&placements).unwrap_or_default(),
+                );
+                record_log(
+                    &app,
+                    &db,
+                    run_id,
+                    None,
+                    "media_match",
+                    "status",
+                    "图文配对",
+                    &summarize_placements(&placements, &page_plans),
+                    json!({ "placements": placements }),
+                    true,
+                );
+                apply_placement_captions(&db, &placements);
+                assets.set_placements(placements);
+            }
+            Err(e) => eprintln!("media match skipped: {e}"),
+        }
+    }
+
     // Phase 2: Per-page concurrent pipeline
     let total = page_plans.len();
     emit_progress(
@@ -905,7 +1064,7 @@ async fn run_pipeline(
         let config_clone = config.clone();
         let doc_clone = doc.clone();
         let page_plan_owned = page_plan.clone();
-        let asset_paths_clone = asset_paths.clone();
+        let assets_clone = assets.clone();
         let debug_dir_owned = config.debug_dir.clone();
         let sem_clone = sem.clone();
         let on_stage_cb = page_stage_callback(app.clone(), idx);
@@ -918,7 +1077,7 @@ async fn run_pipeline(
                 &doc_clone,
                 page_plan_owned,
                 idx,
-                &asset_paths_clone,
+                &assets_clone,
                 &debug_dir_owned,
                 on_stage_cb,
             )
@@ -1008,7 +1167,7 @@ async fn run_pipeline(
         let page_plan_owned = page_plan.clone();
         let layout_plan = layout_plan.clone();
         let icon_index_clone = icon_index.clone();
-        let asset_paths_clone = asset_paths.clone();
+        let assets_clone = assets.clone();
         let debug_dir_owned = config.debug_dir.clone();
         let blueprints_ref = blueprints_arc.clone();
         let sem_clone = sem.clone();
@@ -1028,7 +1187,7 @@ async fn run_pipeline(
                 layout_plan.clone(),
                 idx,
                 &icon_index_clone,
-                &asset_paths_clone,
+                &assets_clone,
                 &debug_dir_owned,
                 on_stage_cb,
             )
@@ -1199,8 +1358,26 @@ async fn run_pipeline(
     )
     .await;
 
+    // Keep the assembled deck even when final validation fails, so a content-page
+    // retry can replace its slot rather than requiring another full generation.
+    {
+        let state = app.state::<Mutex<AppState>>();
+        let mut st = state.lock().unwrap();
+        if st.active_project_id != project_id {
+            anyhow::bail!("当前项目已切换，生成结果未写入");
+        }
+        if let Some(pid) = project_id {
+            db::update_project_blueprints(
+                &db.lock().unwrap(),
+                pid,
+                &serde_json::to_string(&final_slides)?,
+            )?;
+        }
+        st.blueprints = final_slides.clone();
+    }
+
     emit_progress(&app, &db, run_id, "validate", "最终校验...", 0.95);
-    let issues = crate::validate::validate_blueprints(&final_slides, &icon_index, &asset_paths);
+    let issues = crate::validate::validate_blueprints(&final_slides, &icon_index, assets.refs());
     if !issues.is_empty() {
         let issue_messages = issues
             .iter()

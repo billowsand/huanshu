@@ -1,15 +1,16 @@
+use crate::assets::AssetCatalog;
 use crate::config::GenerationConfig;
 use crate::icon::IconIndex;
 use crate::input::ParsedDocument;
 use crate::lmstudio::LmStudioClient;
 use crate::types::*;
 use anyhow::{Context, Result};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::generator::icons::collect_icon_candidates;
 use crate::generator::utils::{
-    blueprint_schema_hint, parse_page_display_index, sanitize_filename, sorted_assets, write_debug,
+    blueprint_schema_hint, parse_page_display_index, sanitize_filename, write_debug,
 };
 
 pub async fn generate_one_slide(
@@ -18,7 +19,7 @@ pub async fn generate_one_slide(
     doc_title: String,
     page: PagePlan,
     layout: LayoutPlan,
-    asset_list: Vec<String>,
+    assets: &AssetCatalog,
     candidates: Vec<String>,
     schema_hint: &'static str,
     debug_dir: PathBuf,
@@ -31,7 +32,7 @@ pub async fn generate_one_slide(
         doc_title,
         page,
         layout,
-        asset_list,
+        assets,
         candidates,
         schema_hint,
         debug_dir,
@@ -48,7 +49,7 @@ async fn generate_one_slide_inner(
     doc_title: String,
     page: PagePlan,
     layout: LayoutPlan,
-    asset_list: Vec<String>,
+    assets: &AssetCatalog,
     candidates: Vec<String>,
     schema_hint: &'static str,
     debug_dir: PathBuf,
@@ -56,13 +57,16 @@ async fn generate_one_slide_inner(
     slide_idx: usize,
     extra_context: String,
 ) -> Result<SlideBlueprint> {
-    let system = "You generate a single Slidev slide blueprint as strict JSON. Follow the chosen component kind exactly. Keep text compact and presentation-ready. Never invent image paths or icon names. Faithfully express the content using the assigned component kind; do not substitute or simplify it into a different layout.";
+    let asset_section = assets
+        .prompt_section_for(&page.page_id)
+        .unwrap_or_else(|| "Available image assets: none for this project.".to_string());
+    let system = "You generate a single Slidev slide blueprint as strict JSON. Follow the chosen component kind exactly. Keep text compact and presentation-ready. Copy image references verbatim from the available image assets list; never invent an image path, media id, or icon name. Faithfully express the content using the assigned component kind; do not substitute or simplify it into a different layout.";
     let user = format!(
-        "Document title: {}\n\nPage plan:\n{}\n\nLayout plan:\n{}\n\nAvailable assets:\n{}\n\nIcon candidates:\n{}\n\nSchema:\nReturn {{\"slide\": SlideBlueprint}}.\nComponent-specific schema:\n{}\nRules:\n- `slide.kind` must equal the chosen layout kind.\n- Follow the schema exactly; do not add extra top-level objects copied from page plan or layout plan.\n- Use only fields shown in the component-specific schema for this kind.\n- Never use unsupported fields such as `layout`, `content_shape`, `layout_intent`, `visual_need`, `object_count`, `argument_mode`, `density`, `section_label`, `description`, `content`, or `color`.\n- Use the same language as the source page. This document is Chinese, so all user-facing text must be Chinese.\n- Labels, panel titles, notes, and placeholders must also be Chinese when present.\n- All text fields are plain text rendered verbatim: never use Markdown or HTML syntax such as **bold**, *italic*, `code`, # headings, [links](url), leading list markers like '- ' / '* ' / '1. ', or line breaks inside a field. Put each list entry into its own array item instead.\n- Do not output `section`: the chapter number is filled in by the system from the document structure.\n- Use only tones amber, blue, green, red.\n- Use only icon names from the candidates list.\n- preferred_assets should be used when relevant.\n- If an image is provided, placeholder may be omitted; do not output an empty placeholder string.\n- Fill all required fields for the assigned component kind as shown in the schema.\n- For section_intro: produce 2-6 concise preview cards for the upcoming sub-topics. This is a chapter-opening overview, not a closing summary.\n- For feature_grid: produce 2-4 balanced cards, each with its own title and concise body/items.\n- For section_list: produce 2-4 ordered list_items with step numbers.\n- For focus_example: produce 2-4 points plus a meaningful example_title and example_body.\n- For outcome_grid: produce 2-4 result cards with tag and top_bar_class.\n- For split_layers: produce both left_items and layers.\n- For split_layers: left_items must explain responsibilities, value, constraints, interfaces, or operating principles. Do not make them mere repeats of the layer names.\n- For split_layers: layers must describe the actual architecture stack or module structure on the right side, using wording that complements rather than duplicates left_items.\n- For step_flow: produce 2-5 steps, each with title, body, icon, and tone. Steps should represent a clear linear process.\n- For process: produce 2-4 phases, each with phase label, title, icon, tone, and 2-4 steps. Include a highlight conclusion for each phase.\n- For compare: produce left and right panels, each with title, tone, icon, items, and conclusion. Items should have label, desc, and highlight flag. Set mode to 'side-by-side', 'pros-cons', or 'versus'.\n- For issue_stack: produce 2-4 stacked problem cards. Each card needs title, tone, icon, one concise body sentence, and 2-4 short items capturing pains, obstacles, or failure modes.\n- For swot: produce exactly 4 quadrants in this order: strengths, weaknesses, opportunities, threats.\n- For swot: quadrant titles must be short Chinese labels suitable for in-card flags, for example '优势', '劣势', '机会', '威胁'. Do not include English in quadrant titles.\n- For swot: each quadrant needs tone, icon, 2-4 short items, and a one-line summary. Also provide a short strategy sentence that synthesizes the matrix.\n- Do not collapse structured content into a plain list.\nReturn only JSON.",
+        "Document title: {}\n\nPage plan:\n{}\n\nLayout plan:\n{}\n\n{}\n\nIcon candidates:\n{}\n\nSchema:\nReturn {{\"slide\": SlideBlueprint}}.\nComponent-specific schema:\n{}\nRules:\n- `slide.kind` must equal the chosen layout kind.\n- Follow the schema exactly; do not add extra top-level objects copied from page plan or layout plan.\n- Use only fields shown in the component-specific schema for this kind.\n- Never use unsupported fields such as `layout`, `content_shape`, `layout_intent`, `visual_need`, `object_count`, `argument_mode`, `density`, `section_label`, `description`, `content`, or `color`.\n- Use the same language as the source page. This document is Chinese, so all user-facing text must be Chinese.\n- Labels, panel titles, notes, and placeholders must also be Chinese when present.\n- All text fields are plain text rendered verbatim: never use Markdown or HTML syntax such as **bold**, *italic*, `code`, # headings, [links](url), leading list markers like '- ' / '* ' / '1. ', or line breaks inside a field. Put each list entry into its own array item instead.\n- Do not output `section`: the chapter number is filled in by the system from the document structure.\n- Use only tones amber, blue, green, red.\n- Use only icon names from the candidates list.\n- Copy `image`, `images`, and `preferred_assets` values verbatim from the available image assets list, and only when the image genuinely illustrates this page.\n- If an image is provided, placeholder may be omitted; do not output an empty placeholder string.\n- Fill all required fields for the assigned component kind as shown in the schema.\n- For section_intro: produce 2-6 concise preview cards for the upcoming sub-topics. This is a chapter-opening overview, not a closing summary.\n- For feature_grid: produce 2-4 balanced cards, each with its own title and concise body/items.\n- For section_list: produce 2-4 ordered list_items with step numbers.\n- For focus_example: produce 2-4 points plus a meaningful example_title and example_body.\n- For outcome_grid: produce 2-4 result cards with tag and top_bar_class.\n- For split_layers: produce both left_items and layers.\n- For split_layers: left_items must explain responsibilities, value, constraints, interfaces, or operating principles. Do not make them mere repeats of the layer names.\n- For split_layers: layers must describe the actual architecture stack or module structure on the right side, using wording that complements rather than duplicates left_items.\n- For step_flow: produce 2-5 steps, each with title, body, icon, and tone. Steps should represent a clear linear process.\n- For process: produce 2-4 phases, each with phase label, title, icon, tone, and 2-4 steps. Include a highlight conclusion for each phase.\n- For compare: produce left and right panels, each with title, tone, icon, items, and conclusion. Items should have label, desc, and highlight flag. Set mode to 'side-by-side', 'pros-cons', or 'versus'.\n- For issue_stack: produce 2-4 stacked problem cards. Each card needs title, tone, icon, one concise body sentence, and 2-4 short items capturing pains, obstacles, or failure modes.\n- For swot: produce exactly 4 quadrants in this order: strengths, weaknesses, opportunities, threats.\n- For swot: quadrant titles must be short Chinese labels suitable for in-card flags, for example '优势', '劣势', '机会', '威胁'. Do not include English in quadrant titles.\n- For swot: each quadrant needs tone, icon, 2-4 short items, and a one-line summary. Also provide a short strategy sentence that synthesizes the matrix.\n- Do not collapse structured content into a plain list.\nReturn only JSON.",
         doc_title,
         serde_json::to_string_pretty(&page).unwrap_or_default(),
         serde_json::to_string_pretty(&layout).unwrap_or_default(),
-        serde_json::to_string_pretty(&asset_list).unwrap_or_default(),
+        asset_section,
         serde_json::to_string_pretty(&candidates).unwrap_or_default(),
         schema_hint,
     );
@@ -95,14 +99,14 @@ async fn generate_one_slide_inner(
 
 /// Repair a single slide given free-form user feedback.
 ///
-/// `icon_index` and `asset_paths` are optional — pass `None` when not available
+/// `icon_index` and `assets` are optional — pass `None` when not available
 /// (e.g. in tests) and the prompt will simply omit those sections.
 pub async fn repair_single_slide(
     config: &GenerationConfig,
     blueprint: &SlideBlueprint,
     feedback: &str,
     icon_index: Option<&IconIndex>,
-    asset_paths: Option<&HashSet<String>>,
+    assets: Option<&AssetCatalog>,
 ) -> Result<SlideBlueprint> {
     use crate::generator::icons::collect_icon_candidates_from_slide;
     use crate::generator::utils::blueprint_schema_hint;
@@ -120,15 +124,9 @@ pub async fn repair_single_slide(
         })
         .unwrap_or_default();
 
-    let asset_section = asset_paths
-        .map(|paths| {
-            let mut sorted: Vec<&String> = paths.iter().collect();
-            sorted.sort();
-            format!(
-                "\n\nAvailable image assets:\n{}",
-                serde_json::to_string_pretty(&sorted).unwrap_or_default()
-            )
-        })
+    let asset_section = assets
+        .and_then(AssetCatalog::prompt_section)
+        .map(|section| format!("\n\n{section}"))
         .unwrap_or_default();
 
     let system = "You repair a single Slidev slide blueprint based on user feedback. Return strictly the corrected JSON object with a 'slide' wrapper. Preserve the slide kind and all valid content. Use only icon names from the provided candidates list (i-carbon: prefix only). All text fields are plain text: never use Markdown or HTML syntax (**bold**, list markers, # headings, `code`, links) or line breaks inside a field.";
@@ -164,7 +162,7 @@ pub async fn regenerate_slides_at(
     slides: &mut Vec<SlideBlueprint>,
     failing: &[(usize, String, Vec<String>)],
     icon_index: &IconIndex,
-    asset_paths: &HashSet<String>,
+    assets: &AssetCatalog,
     debug_dir: &Path,
     round: usize,
 ) -> Result<()> {
@@ -180,7 +178,6 @@ pub async fn regenerate_slides_at(
         let Some(layout) = layout_by_id.get(page.page_id.as_str()) else {
             continue;
         };
-        let asset_list = sorted_assets(asset_paths);
         let candidates = collect_icon_candidates(icon_index, page, layout);
         let schema_hint = blueprint_schema_hint(&layout.kind);
         let prefix = format!(
@@ -205,7 +202,7 @@ pub async fn regenerate_slides_at(
             doc.title.clone(),
             page.clone(),
             (*layout).clone(),
-            asset_list,
+            assets,
             candidates,
             schema_hint,
             debug_dir.to_path_buf(),
@@ -256,7 +253,7 @@ pub async fn plan_single_page(
     doc: &ParsedDocument,
     base_page_plan: PagePlan,
     slide_index: usize,
-    asset_paths: &HashSet<String>,
+    assets: &AssetCatalog,
     debug_dir: &Path,
     on_stage: std::sync::Arc<dyn Fn(usize, PageStage, Option<&str>) + Send + Sync>,
 ) -> (PagePlan, Vec<LayoutCandidate>) {
@@ -267,7 +264,7 @@ pub async fn plan_single_page(
         config,
         doc,
         &base_page_plan,
-        asset_paths,
+        assets,
         debug_dir,
     )
     .await;
@@ -293,7 +290,7 @@ pub async fn generate_single_page_pipeline(
     layout_plan: LayoutPlan,
     slide_index: usize,
     icon_index: &IconIndex,
-    asset_paths: &HashSet<String>,
+    assets: &AssetCatalog,
     debug_dir: &Path,
     on_stage: std::sync::Arc<dyn Fn(usize, PageStage, Option<&str>) + Send + Sync>,
 ) -> Result<SlideBlueprint> {
@@ -329,7 +326,6 @@ pub async fn generate_single_page_pipeline(
     };
 
     let schema_hint = crate::generator::utils::blueprint_schema_hint(&layout_plan.kind);
-    let asset_list = crate::generator::utils::sorted_assets(asset_paths);
 
     let mut slide = generate_one_slide(
         llm_client.clone(),
@@ -337,7 +333,7 @@ pub async fn generate_single_page_pipeline(
         doc.title.clone(),
         page_plan.clone(),
         layout_plan.clone(),
-        asset_list,
+        assets,
         candidates,
         schema_hint,
         debug_dir.to_path_buf(),
@@ -353,7 +349,7 @@ pub async fn generate_single_page_pipeline(
         embedding_client,
         &config.embedding.model,
         icon_index,
-        asset_paths,
+        assets,
         config.aspect_ratio,
     )
     .await?;
@@ -369,13 +365,16 @@ pub async fn generate_single_page_pipeline(
         &layout_plan,
         slide,
         icon_index,
-        asset_paths,
+        assets,
         debug_dir,
         slide_index,
     )
     .await?;
     // The chapter number comes from the document structure, never from the LLM.
     crate::generator::normalize::stamp_section_number(&mut slide, &page_plan);
+    // Repair may have dropped an invented reference, and the model may simply have left the
+    // image empty: fall back to the asset the page plan picked so the page still shows one.
+    crate::generator::normalize::ensure_image_from_page_plan(&mut slide, &page_plan);
 
     on_stage(slide_index, PageStage::Done, None);
     Ok(slide)

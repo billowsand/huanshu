@@ -1,3 +1,4 @@
+mod assets;
 mod commands;
 mod config;
 mod crypto;
@@ -6,6 +7,7 @@ mod embedded_icons;
 mod fonts;
 mod generator;
 mod icon;
+mod image_size;
 mod input;
 mod lmstudio;
 mod network;

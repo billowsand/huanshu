@@ -15,10 +15,10 @@
 //! - `LAYOUT_PROBE_ASPECT`: `16x9` (default) | `32x9` | `48x9`
 //! - `LAYOUT_PROBE_OUT`: debug output directory (default `<temp>/layout-probe`)
 
-use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::assets::AssetCatalog;
 use crate::config::{GenerationConfig, LlmSettings};
 use crate::generator::planning::{
     assign_layouts, derive_page_plans, enrich_one_page_plan, layout_assignment_report,
@@ -80,7 +80,7 @@ async fn layout_probe() {
 
     let started = std::time::Instant::now();
     let sem = Arc::new(tokio::sync::Semaphore::new(config.concurrency.max(1)));
-    let assets = Arc::new(HashSet::new());
+    let assets = Arc::new(AssetCatalog::from_project_files(&out));
     let handles: Vec<_> = base_plans
         .iter()
         .cloned()

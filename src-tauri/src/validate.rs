@@ -279,37 +279,6 @@ pub fn validate_blueprints(
     issues
 }
 
-pub fn collect_assets(project_root: &Path) -> HashSet<String> {
-    let mut set = HashSet::new();
-    for base in ["figure", "public"] {
-        let root = project_root.join(base);
-        collect_dir(&root, &root, &mut set);
-    }
-    set
-}
-
-fn collect_dir(root: &Path, current: &Path, set: &mut HashSet<String>) {
-    let Ok(entries) = std::fs::read_dir(current) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_dir(root, &path, set);
-            continue;
-        }
-        if let Ok(rel) = path.strip_prefix(root) {
-            let rel = rel.to_string_lossy().replace('\\', "/");
-            let prefix = root.file_name().unwrap_or_default().to_string_lossy();
-            set.insert(format!("{prefix}/{rel}"));
-            set.insert(format!("/{prefix}/{rel}"));
-            if prefix == "figure" {
-                set.insert(rel.clone());
-            }
-        }
-    }
-}
-
 fn asset_exists(image: &str, paths: &HashSet<String>) -> bool {
     if paths.contains(image) {
         return true;

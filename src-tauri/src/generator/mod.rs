@@ -4,6 +4,7 @@ pub mod icons;
 mod layout_probe;
 pub mod layout_rules;
 pub mod layout_scoring;
+pub mod media_match;
 pub mod normalize;
 pub mod planning;
 pub mod slides;

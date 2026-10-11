@@ -249,6 +249,16 @@ export const useGenerationStore = defineStore('generation', () => {
       lastError.value = String(e)
       stage.value = 'error'
       message.value = String(e)
+      // Final validation can fail after assembly. Recover that deck for page retries.
+      try {
+        const assembled = await invoke<SlideBlueprint[]>('get_blueprints')
+        if (assembled[0]?.kind === 'cover') {
+          blueprints.value = assembled
+          completedSlides.value = new Set(assembled.map((_, index) => index))
+        }
+      } catch {
+        // Preserve the original generation error and any previews already received.
+      }
     } finally {
       running.value = false
       stopListening()
@@ -272,6 +282,11 @@ export const useGenerationStore = defineStore('generation', () => {
       blueprints.value[index + 2] = slide
       completedSlides.value.add(index + 2)
       pageStatuses.value.set(index, { stage: 'done', message: '重试完成' })
+      stage.value = 'done'
+      progress.value = 1
+      lastError.value = ''
+      const now = Math.floor(Date.now() / 1000)
+      currentRun.value = { ...currentRun.value!, status: 'done', current_stage: 'done', updated_at: now, finished_at: now }
       message.value = '该页重试完成，可继续编辑'
     } catch (error) {
       if (version !== generationVersion) return

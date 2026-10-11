@@ -44,7 +44,7 @@ try {
   let checked = 0
   for (const count of [2, 3, 4, 5, 6]) {
     for (const aspect of ['ratio_16x9', 'ratio_32x9', 'ratio_48x9']) {
-      for (const theme of ['light-notes', 'light-terminal', 'dark-glass-blue']) {
+      for (const theme of ['light-notes', 'light-terminal', 'dark-blue']) {
         const slide = { kind: 'section_intro', badge: '章节导览', title: '引言：东非安全局势的新常态', aspect_ratio: aspect, cards: cards.slice(0, count) }
         await page.evaluate(([s, t]) => window.renderSlide(s, t), [slide, theme])
         const result = await page.evaluate(() => {

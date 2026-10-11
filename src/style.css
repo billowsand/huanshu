@@ -442,7 +442,7 @@ iframe {
 
 /* ============================================================
    THEME VARIABLES
-   5 themes: dark-yellow | dark-blue | dark-glass-blue | dark-terminal | light-terminal
+   4 themes: dark-yellow | dark-blue | dark-terminal | light-terminal
    Switched via: document.documentElement.setAttribute('data-theme', id)
    ============================================================ */
 
@@ -567,70 +567,6 @@ iframe {
   --danger-contrast: #fff5f7;
   --danger-bg:     rgba(244,63,94,0.09);
   --danger-border: rgba(244,63,94,0.24);
-}
-
-/* ── 3. Dark Glass Blue — "极光琉璃 / Aurora Prism"
-       Vivid multi-color aurora behind maximum-frost glass.
-       This IS the glassmorphism theme — you're literally looking through ice. */
-[data-theme="dark-glass-blue"] {
-  --bg:            #05071A;
-  --bg-gradient:
-    radial-gradient(circle at 18% 14%, rgba(124,58,237,0.60) 0%, transparent 36%),
-    radial-gradient(circle at 82% 18%, rgba(6,182,212,0.55) 0%, transparent 34%),
-    radial-gradient(circle at 55% 88%, rgba(16,185,129,0.40) 0%, transparent 40%),
-    radial-gradient(circle at 8%  72%, rgba(59,130,246,0.35) 0%, transparent 34%),
-    radial-gradient(circle at 90% 80%, rgba(167,139,250,0.28) 0%, transparent 32%),
-    #05071A;
-  --glow:          rgba(124,58,237,0.35);
-
-  --text:          #EEF6FF;
-  --text-muted:    rgba(186,218,255,0.65);
-
-  --primary:        #BAE6FD;
-  --primary-light:  #E0F2FE;
-  --primary-bg:     rgba(186,230,253,0.20);
-  --primary-border: rgba(224,242,254,0.36);
-
-  /* Maximum frost glass — thick, luminous, ultra-saturated */
-  --glass:         rgba(8,15,40,0.38);
-  --glass-border:  rgba(255,255,255,0.24);
-  --glass-highlight: rgba(255,255,255,0.28);
-  --glass-sheen: rgba(186,230,253,0.20);
-  --glass-blur: 36px;
-  --glass-saturate: 200%;
-  --glass-shadow: 0 22px 64px rgba(0,0,0,0.4);
-  --glass-shadow-strong: 0 36px 88px rgba(0,0,0,0.55);
-  --shell-frame:
-    linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.04) 20%, transparent 38%),
-    linear-gradient(135deg, rgba(124,58,237,0.20), transparent 44%);
-  --shell-frame-border: rgba(255,255,255,0.20);
-  --shell-frame-shadow: 0 24px 64px rgba(0,0,0,0.4);
-
-  --section-num-stroke: rgba(186,230,253,0.22);
-
-  --success:        #34d399;
-  --success-light:  #6ee7b7;
-  --success-contrast: #f0fdfb;
-  --success-bg:     rgba(52,211,153,0.18);
-  --success-border: rgba(110,231,183,0.34);
-
-  --info:           #BAE6FD;
-  --info-light:     #E0F2FE;
-  --info-contrast:  #f0f9ff;
-  --info-bg:        rgba(186,230,253,0.18);
-  --info-border:    rgba(224,242,254,0.34);
-
-  --warning:        #FDE68A;
-  --warning-light:  #FEF08A;
-  --warning-contrast: #fffdf5;
-  --warning-bg:     rgba(253,230,138,0.18);
-  --warning-border: rgba(254,240,138,0.34);
-
-  --danger:         #FDA4AF;
-  --danger-light:   #FECDD3;
-  --danger-contrast: #fff5f7;
-  --danger-bg:      rgba(253,164,175,0.18);
-  --danger-border:  rgba(254,205,211,0.34);
 }
 
 /* ============================================================
@@ -793,31 +729,6 @@ iframe {
   --studio-error:          #fb7185;
   --studio-error-bg:       rgba(251,113,133,0.10);
   --studio-error-border:   rgba(251,113,133,0.28);
-}
-
-/* ── dark-glass-blue ───────────────────────────────────────── */
-[data-theme="dark-glass-blue"] {
-  --studio-bg:            #07101d;
-  --studio-panel:         rgba(10,19,34,0.96);
-  --studio-panel-2:       rgba(14,25,45,0.96);
-  --studio-surface:       rgba(20,35,60,0.9);
-  --studio-border:        rgba(165,227,255,0.14);
-  --studio-border-hover:  rgba(165,227,255,0.28);
-
-  --studio-text:          #eaf6ff;
-  --studio-muted:         rgba(210,232,250,0.42);
-
-  --studio-primary:        #67c9ff;
-  --studio-primary-light:  #a5e3ff;
-  --studio-primary-contrast: #03131f;
-  --studio-primary-bg:     rgba(103,201,255,0.16);
-  --studio-primary-border: rgba(146,220,255,0.34);
-
-  --studio-success:        #4ade80;
-  --studio-success-bg:     rgba(74,222,128,0.12);
-  --studio-error:          #fb7185;
-  --studio-error-bg:       rgba(251,113,133,0.12);
-  --studio-error-border:   rgba(253,164,175,0.32);
 }
 
 /* ============================================================

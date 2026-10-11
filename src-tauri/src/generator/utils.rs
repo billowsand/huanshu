@@ -1092,6 +1092,8 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 }
 
 pub fn write_debug(root: &Path, filename: &str, content: &str) -> Result<()> {
+    fs::create_dir_all(root)
+        .with_context(|| format!("failed to create debug directory: {}", root.display()))?;
     let path = root.join(filename);
     fs::write(&path, content)
         .with_context(|| format!("failed to write debug file: {}", path.display()))
@@ -1124,12 +1126,6 @@ pub fn format_issue_block(title: &str, issues: &[crate::validate::ValidationIssu
     out
 }
 
-pub fn sorted_assets(asset_paths: &HashSet<String>) -> Vec<String> {
-    let mut assets = asset_paths.iter().cloned().collect::<Vec<_>>();
-    assets.sort();
-    assets
-}
-
 pub fn infer_asset_from_text(
     title: &str,
     body: &str,
@@ -1160,6 +1156,16 @@ pub fn infer_asset_from_text(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn debug_write_creates_missing_retry_directory() {
+        let root = std::env::temp_dir().join(format!("huanshu-debug-{}", uuid::Uuid::new_v4()));
+        let retry = root.join("retry-page-12");
+        write_debug(&retry, "slide-12.system.txt", "prompt").unwrap();
+        write_debug(&retry, "slide-12.raw.txt", "response").unwrap();
+        assert_eq!(fs::read_to_string(retry.join("slide-12.system.txt")).unwrap(), "prompt");
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn strips_inline_markdown() {

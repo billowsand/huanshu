@@ -35,6 +35,8 @@ pub struct MediaAssetResponse {
     pub caption: Option<String>,
     pub description: Option<String>,
     pub file_size: Option<i64>,
+    pub width: Option<i64>,
+    pub height: Option<i64>,
     pub created_at: i64,
     pub url: String,
 }
@@ -54,6 +56,8 @@ impl MediaAssetResponse {
             caption: a.caption,
             description: a.description,
             file_size: a.file_size,
+            width: a.width,
+            height: a.height,
             created_at: a.created_at,
             url: full_path.to_string_lossy().to_string(),
         }
@@ -198,6 +202,14 @@ pub async fn import_media_asset(
         let full_path = media_dir_path.join(&storage_path);
         fs::write(&full_path, &req.data).map_err(|e| e.to_string())?;
 
+        // Read the pixel size from the file header so the generator can reason about
+        // aspect ratio. Unsupported formats simply stay unknown.
+        let dimensions = if req.media_type == "image" {
+            crate::image_size::image_dimensions(&req.data)
+        } else {
+            None
+        };
+
         let mut asset = MediaAsset {
             id: 0,
             project_id: req.project_id,
@@ -210,6 +222,8 @@ pub async fn import_media_asset(
             caption: None,
             description: None,
             file_size: Some(req.data.len() as i64),
+            width: dimensions.map(|(w, _)| w as i64),
+            height: dimensions.map(|(_, h)| h as i64),
             created_at: now_ts(),
         };
 
@@ -376,6 +390,8 @@ pub fn export_project(
                 "description": a.description,
                 "slide_index": a.slide_index,
                 "file_size": a.file_size,
+                "width": a.width,
+                "height": a.height,
             })
         })
         .collect();
@@ -526,7 +542,7 @@ pub fn import_project(
                 let target_path = target_dir.join(filename);
                 let mut buffer = Vec::new();
                 file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
-                fs::write(&target_path, buffer).map_err(|e| e.to_string())?;
+                fs::write(&target_path, &buffer).map_err(|e| e.to_string())?;
 
                 let storage_path = format!("projects/{}/{}/{}", project_id, subdir, filename);
 
@@ -546,6 +562,15 @@ pub fn import_project(
                     m.get("slide_index")
                         .and_then(|v| v.as_i64().map(|n| n as i32))
                 });
+                // Prefer the packaged metadata, but fall back to reading the restored
+                // bytes so packages exported before dimensions existed still get sizes.
+                let dimensions = crate::image_size::image_dimensions(&buffer);
+                let width = meta
+                    .and_then(|m| m.get("width").and_then(|v| v.as_i64()))
+                    .or_else(|| dimensions.map(|(w, _)| w as i64));
+                let height = meta
+                    .and_then(|m| m.get("height").and_then(|v| v.as_i64()))
+                    .or_else(|| dimensions.map(|(_, h)| h as i64));
                 let original_name = meta
                     .and_then(|m| {
                         m.get("original_name")
@@ -569,6 +594,8 @@ pub fn import_project(
                     caption,
                     description,
                     file_size: Some(file.size() as i64),
+                    width,
+                    height,
                     created_at: ts,
                 };
                 let new_media_id =

@@ -13,6 +13,9 @@ export interface MediaItem {
   type: 'image' | 'video'
   caption?: string
   description?: string
+  /** Pixel size read from the file header on import, for images we could parse. */
+  width?: number
+  height?: number
 }
 
 const MEDIA_EXTS_IMG = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']
@@ -60,6 +63,8 @@ export function useMediaLibrary(options: {
         type: a.media_type,
         caption: a.caption,
         description: a.description,
+        width: a.width ?? undefined,
+        height: a.height ?? undefined,
       }))
     } catch (e) {
       console.error('Failed to load project media:', e)
@@ -107,6 +112,8 @@ export function useMediaLibrary(options: {
         type: asset.media_type,
         caption: asset.caption,
         description: asset.description,
+        width: asset.width ?? undefined,
+        height: asset.height ?? undefined,
       })
     } catch (e) {
       console.error('Failed to import media:', e)
@@ -143,6 +150,8 @@ export function useMediaLibrary(options: {
         type: asset.media_type,
         caption: asset.caption,
         description: asset.description,
+        width: asset.width ?? undefined,
+        height: asset.height ?? undefined,
       })
     } catch (e) {
       console.error('Failed to import media:', e)

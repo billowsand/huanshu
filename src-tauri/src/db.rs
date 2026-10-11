@@ -69,6 +69,10 @@ pub struct MediaAsset {
     pub caption: Option<String>,
     pub description: Option<String>,
     pub file_size: Option<i64>,
+    /// Pixel width/height of an image asset, read from the file header on import.
+    /// The generator uses the aspect ratio to reason about image layouts.
+    pub width: Option<i64>,
+    pub height: Option<i64>,
     pub created_at: i64,
 }
 
@@ -144,6 +148,8 @@ fn migrate(conn: &Connection) -> Result<()> {
         [],
     );
     let _ = conn.execute("ALTER TABLE projects ADD COLUMN aspect_ratio TEXT", []);
+    let _ = conn.execute("ALTER TABLE media_assets ADD COLUMN width INTEGER", []);
+    let _ = conn.execute("ALTER TABLE media_assets ADD COLUMN height INTEGER", []);
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY,
@@ -163,6 +169,8 @@ fn migrate(conn: &Connection) -> Result<()> {
             caption        TEXT,
             description    TEXT,
             file_size      INTEGER,
+            width          INTEGER,
+            height         INTEGER,
             created_at     INTEGER NOT NULL,
             FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
         );",
@@ -514,8 +522,8 @@ pub fn mark_first_run_done(conn: &Connection) -> Result<()> {
 pub fn create_media_asset(conn: &Connection, asset: &MediaAsset) -> Result<i64> {
     conn.execute(
         "INSERT INTO media_assets (project_id, slide_index, filename, original_name, media_type,
-         mime_type, storage_path, caption, description, file_size, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+         mime_type, storage_path, caption, description, file_size, width, height, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         params![
             asset.project_id,
             asset.slide_index,
@@ -527,6 +535,8 @@ pub fn create_media_asset(conn: &Connection, asset: &MediaAsset) -> Result<i64> 
             asset.caption,
             asset.description,
             asset.file_size,
+            asset.width,
+            asset.height,
             asset.created_at,
         ],
     )?;
@@ -536,7 +546,7 @@ pub fn create_media_asset(conn: &Connection, asset: &MediaAsset) -> Result<i64> 
 pub fn get_media_assets_for_project(conn: &Connection, project_id: i64) -> Result<Vec<MediaAsset>> {
     let mut stmt = conn.prepare(
         "SELECT id, project_id, slide_index, filename, original_name, media_type,
-         mime_type, storage_path, caption, description, file_size, created_at
+         mime_type, storage_path, caption, description, file_size, width, height, created_at
          FROM media_assets WHERE project_id = ?1 ORDER BY created_at ASC",
     )?;
     let rows = stmt.query_map(params![project_id], |row| {
@@ -552,7 +562,9 @@ pub fn get_media_assets_for_project(conn: &Connection, project_id: i64) -> Resul
             caption: row.get(8)?,
             description: row.get(9)?,
             file_size: row.get(10)?,
-            created_at: row.get(11)?,
+            width: row.get(11)?,
+            height: row.get(12)?,
+            created_at: row.get(13)?,
         })
     })?;
     Ok(rows.filter_map(|r| r.ok()).collect())
@@ -571,6 +583,18 @@ pub fn update_media_asset_caption(
     Ok(())
 }
 
+/// Update only the caption, leaving any user-written description untouched.
+///
+/// Used by the media placement pass: its article-aware caption beats the one generated
+/// from the picture alone at import time.
+pub fn update_media_asset_caption_only(conn: &Connection, id: i64, caption: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE media_assets SET caption = ?1 WHERE id = ?2",
+        params![caption, id],
+    )?;
+    Ok(())
+}
+
 pub fn delete_media_asset(conn: &Connection, id: i64) -> Result<()> {
     conn.execute("DELETE FROM media_assets WHERE id = ?1", params![id])?;
     Ok(())
@@ -579,7 +603,7 @@ pub fn delete_media_asset(conn: &Connection, id: i64) -> Result<()> {
 pub fn get_media_asset_by_id(conn: &Connection, id: i64) -> Result<Option<MediaAsset>> {
     let mut stmt = conn.prepare(
         "SELECT id, project_id, slide_index, filename, original_name, media_type,
-         mime_type, storage_path, caption, description, file_size, created_at
+         mime_type, storage_path, caption, description, file_size, width, height, created_at
          FROM media_assets WHERE id = ?1 LIMIT 1",
     )?;
     let mut rows = stmt.query(params![id])?;
@@ -596,7 +620,9 @@ pub fn get_media_asset_by_id(conn: &Connection, id: i64) -> Result<Option<MediaA
             caption: row.get(8)?,
             description: row.get(9)?,
             file_size: row.get(10)?,
-            created_at: row.get(11)?,
+            width: row.get(11)?,
+            height: row.get(12)?,
+            created_at: row.get(13)?,
         }))
     } else {
         Ok(None)

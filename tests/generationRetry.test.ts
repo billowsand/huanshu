@@ -30,6 +30,39 @@ beforeEach(() => {
 })
 
 describe('single-page retry', () => {
+  test('final validation failure retains the assembled deck for a page retry', async () => {
+    const store = useGenerationStore()
+    invoke.mockImplementation(async (command: string) => {
+      if (command === 'generate_slides') {
+        handlers.get('gen:log')!({ payload: { ...run, run_id: 42, stage: 'content', created_at: 0 } })
+        handlers.get('gen:page_status')!({ payload: { slide_index: 0, stage: 'error', message: '校验失败' } })
+        throw new Error('最终校验失败')
+      }
+      if (command === 'get_blueprints') return structuredClone(deck)
+      if (command === 'retry_generation_page') return slide('feature_grid', '成功')
+    })
+    await store.generate('## 原文')
+    expect(store.stage).toBe('error')
+    expect(store.blueprints.map(s => s.title)).toEqual(deck.map(s => s.title))
+    await store.retryPage(0)
+    expect(store.stage).toBe('done')
+    expect(store.blueprints[2].title).toBe('成功')
+  })
+
+  test('successful retry recovers the overall error state and editor access', async () => {
+    const store = failedStore()
+    store.stage = 'error'
+    store.lastError = '之前生成失败'
+    store.currentRun = { ...run, status: 'error', current_stage: 'error' }
+    invoke.mockResolvedValue(slide('feature_grid', '已恢复'))
+    await store.retryPage(0)
+    expect(store.stage).toBe('done')
+    expect(store.progress).toBe(1)
+    expect(store.lastError).toBe('')
+    expect(store.currentRun?.status).toBe('done')
+    expect(store.pageStatuses.get(0)?.stage).toBe('done')
+  })
+
   test('replaces only the content page, leaving cover/overview/closing intact', async () => {
     const store = failedStore()
     invoke.mockResolvedValue(slide('issue_stack', '已恢复'))
@@ -42,8 +75,12 @@ describe('single-page retry', () => {
 
   test('failed retry preserves fallback content and allows another attempt', async () => {
     const store = failedStore()
+    store.stage = 'error'
+    store.currentRun = { ...run, status: 'error' }
     invoke.mockRejectedValueOnce(new Error('仍然是坏 JSON'))
     await store.retryPage(0)
+    expect(store.stage).toBe('error')
+    expect(store.currentRun?.status).toBe('error')
     expect(store.blueprints[2].title).toBe('兜底')
     expect(store.pageStatuses.get(0)?.message).toContain('仍然是坏 JSON')
     invoke.mockResolvedValueOnce(slide('feature_grid', '成功'))
@@ -137,5 +174,19 @@ describe('single-page retry', () => {
     await store.loadLatestRun(1)
     expect(store.pageStatuses.get(0)?.stage).toBe('error')
     expect(store.pageStatuses.get(1)?.stage).toBe('done')
+  })
+
+  test('reopening a recovered run restores editor access without replaying old errors', async () => {
+    const store = useGenerationStore()
+    store.loadFromJson(JSON.stringify(deck))
+    store.stage = 'error'
+    invoke.mockImplementation(async (command: string) => command === 'get_latest_generation_run' ? run : [
+      { slide_index: 0, kind: 'page_error', summary: '坏 JSON' },
+      { slide_index: 0, kind: 'retry', summary: '恢复', detail: { retry_succeeded: true } },
+    ])
+    await store.loadLatestRun(1)
+    expect(store.stage).toBe('done')
+    expect(store.pageStatuses.get(0)?.stage).toBe('done')
+    expect(store.currentRun?.status).toBe('done')
   })
 })

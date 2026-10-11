@@ -183,4 +183,9 @@ impl GenerationConfig {
     pub fn embedding_client(&self) -> anyhow::Result<crate::lmstudio::LmStudioClient> {
         crate::lmstudio::LmStudioClient::from_service(&self.embedding)
     }
+
+    /// Client for the multimodal model, used to match images against the article.
+    pub fn multimodal_client(&self) -> anyhow::Result<crate::lmstudio::LmStudioClient> {
+        crate::lmstudio::LmStudioClient::from_service(&self.multimodal)
+    }
 }

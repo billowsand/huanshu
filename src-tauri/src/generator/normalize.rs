@@ -5,7 +5,7 @@ use crate::lmstudio::LmStudioClient;
 use crate::types::*;
 use crate::validate::validate_blueprints;
 use anyhow::Result;
-use std::collections::HashSet;
+use crate::assets::AssetCatalog;
 use std::path::Path;
 
 use crate::generator::utils::{
@@ -43,6 +43,75 @@ mod section_intro_tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod image_tests {
+    use super::*;
+
+    fn page_with_asset(asset: Option<&str>) -> PagePlan {
+        PagePlan {
+            page_id: "1".to_string(),
+            section_title: "章节".to_string(),
+            subsection_title: None,
+            page_title: "核心能力".to_string(),
+            objective: String::new(),
+            key_points: vec!["一".to_string()],
+            takeaway: None,
+            content_shape: Some("summary".to_string()),
+            layout_intent: None,
+            visual_need: Some("image_required".to_string()),
+            object_count: Some("single".to_string()),
+            argument_mode: Some("summary".to_string()),
+            density: Some("low".to_string()),
+            source_excerpt: None,
+            preferred_assets: asset.into_iter().map(str::to_string).collect(),
+            page_role: Some("content".to_string()),
+            section_number: Some("01".to_string()),
+        }
+    }
+
+    fn spotlight_slide() -> SlideBlueprint {
+        serde_json::from_value(serde_json::json!({
+            "kind": "spotlight",
+            "title": "核心能力",
+            "panels": [{"title": "说明", "body": "内容"}],
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_spotlight_page_takes_the_asset_the_plan_picked() {
+        let mut slide = spotlight_slide();
+        slide.placeholder = Some("图片待补充".to_string());
+        ensure_image_from_page_plan(&mut slide, &page_with_asset(Some("media:12")));
+        assert_eq!(slide.image.as_deref(), Some("media:12"));
+        assert!(slide.placeholder.is_none());
+    }
+
+    #[test]
+    fn an_image_the_model_already_chose_is_left_alone() {
+        let mut slide = spotlight_slide();
+        slide.image = Some("figure/arch.png".to_string());
+        ensure_image_from_page_plan(&mut slide, &page_with_asset(Some("media:12")));
+        assert_eq!(slide.image.as_deref(), Some("figure/arch.png"));
+    }
+
+    #[test]
+    fn pages_without_an_asset_or_of_another_kind_are_untouched() {
+        let mut empty = spotlight_slide();
+        ensure_image_from_page_plan(&mut empty, &page_with_asset(None));
+        assert!(empty.image.is_none());
+
+        let mut other: SlideBlueprint = serde_json::from_value(serde_json::json!({
+            "kind": "feature_grid",
+            "title": "核心能力",
+            "cards": [{"title": "一", "body": "内容"}],
+        }))
+        .unwrap();
+        ensure_image_from_page_plan(&mut other, &page_with_asset(Some("media:12")));
+        assert!(other.image.is_none());
     }
 }
 
@@ -366,21 +435,21 @@ pub fn normalize_tones(slide: &mut SlideBlueprint) {
     }
 }
 
-pub fn repair_assets(slide: &mut SlideBlueprint, asset_paths: &HashSet<String>) {
+pub fn repair_assets(slide: &mut SlideBlueprint, assets: &AssetCatalog) {
     if let Some(image) = slide.image.as_ref() {
         let image_path = std::path::Path::new(image);
         let is_media_ref = image
             .strip_prefix("media:")
             .and_then(|id| id.parse::<i64>().ok())
             .is_some();
-        if !asset_paths.contains(image)
+        if !assets.contains(image)
             && !is_media_ref
             && !(image_path.is_absolute() && image_path.exists())
         {
             slide.image = infer_asset_from_text(
                 &slide.title,
                 slide.note.as_deref().unwrap_or(""),
-                asset_paths,
+                assets.refs(),
             );
         }
     }
@@ -391,7 +460,7 @@ pub fn repair_assets(slide: &mut SlideBlueprint, asset_paths: &HashSet<String>) 
                 .strip_prefix("media:")
                 .and_then(|id| id.parse::<i64>().ok())
                 .is_some();
-            asset_paths.contains(img) || is_media_ref || (path.is_absolute() && path.exists())
+            assets.contains(img) || is_media_ref || (path.is_absolute() && path.exists())
         });
     }
     if slide.kind == SlideKind::Spotlight && slide.image.is_none() && slide.images.is_empty() {
@@ -399,6 +468,21 @@ pub fn repair_assets(slide: &mut SlideBlueprint, asset_paths: &HashSet<String>) 
             .placeholder
             .get_or_insert_with(|| "图片待补充".to_string());
     }
+}
+
+/// A `spotlight` page that ended up without an image — the model left it empty, or repair
+/// dropped a reference it had invented — can still use the asset the page plan picked
+/// during enrichment. Prefers rendering the image over an empty frame.
+pub fn ensure_image_from_page_plan(slide: &mut SlideBlueprint, page: &PagePlan) {
+    if slide.kind != SlideKind::Spotlight || slide.image.is_some() || !slide.images.is_empty() {
+        return;
+    }
+    let Some(reference) = page.preferred_assets.first() else {
+        return;
+    };
+    slide.image = Some(reference.clone());
+    // The frame is filled now, so the "image pending" hint is no longer needed.
+    slide.placeholder = None;
 }
 
 pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
@@ -930,13 +1014,13 @@ pub async fn normalize_one_blueprint(
     embedding_client: &LmStudioClient,
     embedding_model: &str,
     icon_index: &IconIndex,
-    asset_paths: &HashSet<String>,
+    assets: &AssetCatalog,
     aspect_ratio: AspectRatio,
 ) -> Result<()> {
     slide.aspect_ratio = Some(aspect_ratio);
     normalize_lengths(slide);
     normalize_tones(slide);
-    repair_assets(slide, asset_paths);
+    repair_assets(slide, assets);
     apply_component_defaults(slide);
     // Fix invalid icons for this single slide
     crate::generator::icons::fix_invalid_icons(
@@ -959,7 +1043,7 @@ pub async fn repair_one_slide(
     layout_plan: &LayoutPlan,
     mut slide: SlideBlueprint,
     icon_index: &IconIndex,
-    asset_paths: &HashSet<String>,
+    assets: &AssetCatalog,
     debug_dir: &Path,
     slide_idx: usize,
 ) -> Result<SlideBlueprint> {
@@ -968,7 +1052,7 @@ pub async fn repair_one_slide(
     let max_rounds = config.repair_rounds.max(3);
 
     for round in 0..max_rounds {
-        let issues = validate_blueprints(std::slice::from_ref(&slide), icon_index, asset_paths);
+        let issues = validate_blueprints(std::slice::from_ref(&slide), icon_index, assets.refs());
         if issues.is_empty() {
             return Ok(slide);
         }
@@ -1000,7 +1084,7 @@ pub async fn repair_one_slide(
                 &mut slides_vec,
                 &[(0, prev_kind_str, error_msgs)],
                 icon_index,
-                asset_paths,
+                assets,
                 debug_dir,
                 round,
             )
@@ -1066,14 +1150,14 @@ pub async fn repair_one_slide(
             embedding_client,
             &config.embedding.model,
             icon_index,
-            asset_paths,
+            assets,
             config.aspect_ratio,
         )
         .await?;
     }
 
     // All rounds exhausted: try deterministic fallback
-    let issues = validate_blueprints(std::slice::from_ref(&slide), icon_index, asset_paths);
+    let issues = validate_blueprints(std::slice::from_ref(&slide), icon_index, assets.refs());
     if !issues.is_empty() {
         eprintln!(
             "repair_one_slide: slide {} still invalid after {} rounds; using fallback",

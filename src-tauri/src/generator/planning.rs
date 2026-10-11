@@ -4,7 +4,6 @@ use crate::lmstudio::LmStudioClient;
 use crate::types::*;
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::path::Path;
 
 use crate::generator::candidate_parsing::parse_layout_candidates;
@@ -12,7 +11,8 @@ use crate::generator::layout_rules::{
     ineligibility, is_eligible, prompt_rules, UNIVERSAL_CONTENT_KINDS,
 };
 use crate::generator::layout_scoring::{score_kinds, ScoredKind};
-use crate::generator::utils::{slide_kind_name, sorted_assets, write_debug};
+use crate::assets::AssetCatalog;
+use crate::generator::utils::{slide_kind_name, write_debug};
 
 // ---------------------------------------------------------------------------
 // Public stage entry points (called by Tauri commands)
@@ -178,7 +178,7 @@ struct OverviewSummaryItem {
 fn merge_page_signal_patch(
     base: &PagePlan,
     patch: &PageSignalPatch,
-    asset_paths: &HashSet<String>,
+    assets: &AssetCatalog,
 ) -> PagePlan {
     let patch_page_id = patch
         .page_id
@@ -243,7 +243,17 @@ fn merge_page_signal_patch(
         .map(str::to_string)
         .or_else(|| merged.density.clone());
     merged.preferred_assets =
-        normalize_preferred_assets(patch.preferred_assets.as_deref(), asset_paths);
+        normalize_preferred_assets(patch.preferred_assets.as_deref(), assets);
+    if merged.preferred_assets.is_empty() {
+        // The placement pass already read the article together with each image. When the
+        // model named no asset for this page, fall back to the ones matched to it.
+        merged.preferred_assets = assets
+            .placements_for(&merged.page_id)
+            .into_iter()
+            .map(|placement| placement.reference.clone())
+            .take(2)
+            .collect();
+    }
 
     if merged.key_points.is_empty() {
         merged.key_points = base.key_points.clone();
@@ -282,15 +292,14 @@ fn normalize_key_points(value: Option<&[String]>) -> Option<Vec<String>> {
     }
 }
 
-fn normalize_preferred_assets(
-    value: Option<&[String]>,
-    asset_paths: &HashSet<String>,
-) -> Vec<String> {
+/// Keep up to two references that really exist in the catalogue. The model is free to
+/// invent them, so anything unknown is dropped rather than carried into the blueprint.
+fn normalize_preferred_assets(value: Option<&[String]>, assets: &AssetCatalog) -> Vec<String> {
     value
         .into_iter()
         .flat_map(|items| items.iter())
         .map(|item| item.trim())
-        .filter(|item| !item.is_empty() && asset_paths.contains(*item))
+        .filter(|item| !item.is_empty() && assets.contains(*item))
         .take(2)
         .map(str::to_string)
         .collect()
@@ -798,18 +807,23 @@ pub async fn enrich_one_page_plan(
     config: &GenerationConfig,
     doc: &ParsedDocument,
     base_plan: &PagePlan,
-    asset_paths: &HashSet<String>,
+    assets: &AssetCatalog,
     debug_dir: &Path,
 ) -> PagePlan {
     let idx = base_plan.page_id.parse::<usize>().unwrap_or(0);
     let prefix = format!("01-page-{:02}-enrich", idx);
 
     let system = "You enrich a deterministic slide page plan for a Chinese Slidev deck. Return strict JSON only.";
+    // The catalogue lists `media:<id>` entries together with their captions and pixel
+    // sizes, so the model can pick an image that actually matches the page.
+    let asset_section = assets
+        .prompt_section_for(&base_plan.page_id)
+        .unwrap_or_else(|| "Available image assets: none for this project.".to_string());
     let user = format!(
-        "Document title: {}\n\nPage plan to enrich:\n{}\n\nAvailable image assets:\n{}\n\nEnrich only these fields:\n- objective: one concise Chinese sentence describing the communication goal.\n- key_points: 1-6 short Chinese bullet-like points capturing the page's actual content.\n- takeaway: optional one-line takeaway in Chinese.\n- content_shape: one of overview, summary, comparison, architecture, timeline, workflow, matrix.\n- layout_intent: short English phrase describing the ideal visual arrangement.\n- visual_need: one of text_only, image_optional, image_required.\n- object_count: one of single, pair, multi.\n- argument_mode: one of parallel, sequential, layered, summary, evidence, causal, warning.\n- density: one of low, medium, high.\n- preferred_assets: zero to two items chosen only from the available asset list.\n\nRules:\n- Preserve page_id exactly.\n- Use the page's source_excerpt and headings as the primary evidence.\n- key_points must be faithful to the source and not generic filler.\n- If no asset is truly relevant, return an empty preferred_assets array.\n- Do not invent asset paths.\n\nReturn JSON: {{\"pages\": [{{...}}]}}",
+        "Document title: {}\n\nPage plan to enrich:\n{}\n\n{}\n\nEnrich only these fields:\n- objective: one concise Chinese sentence describing the communication goal.\n- key_points: 1-6 short Chinese bullet-like points capturing the page's actual content.\n- takeaway: optional one-line takeaway in Chinese.\n- content_shape: one of overview, summary, comparison, architecture, timeline, workflow, matrix.\n- layout_intent: short English phrase describing the ideal visual arrangement.\n- visual_need: one of text_only, image_optional, image_required.\n- object_count: one of single, pair, multi.\n- argument_mode: one of parallel, sequential, layered, summary, evidence, causal, warning.\n- density: one of low, medium, high.\n- preferred_assets: zero to two references copied verbatim from the available image assets list; those are the only valid values.\n\nRules:\n- Preserve page_id exactly.\n- Use the page's source_excerpt and headings as the primary evidence.\n- key_points must be faithful to the source and not generic filler.\n- Only choose an asset that genuinely illustrates this page; otherwise return an empty preferred_assets array.\n- Never invent an asset reference.\n\nReturn JSON: {{\"pages\": [{{...}}]}}",
         doc.title,
         serde_json::to_string_pretty(base_plan).unwrap_or_default(),
-        serde_json::to_string_pretty(&sorted_assets(asset_paths)).unwrap_or_default(),
+        asset_section,
     );
 
     let _ = write_debug(debug_dir, &format!("{prefix}.system.txt"), system);
@@ -826,7 +840,7 @@ pub async fn enrich_one_page_plan(
                         &serde_json::to_string_pretty(&resp).unwrap_or_default(),
                     );
                     if let Some(patch) = resp.pages.into_iter().next() {
-                        return merge_page_signal_patch(base_plan, &patch, asset_paths);
+                        return merge_page_signal_patch(base_plan, &patch, assets);
                     }
                 }
                 Err(e) => eprintln!("parse error enriching page {}: {e}", base_plan.page_id),
@@ -1861,6 +1875,72 @@ mod tests {
         slide.section = Some("09".to_string()); // e.g. copied from a schema example
         crate::generator::normalize::stamp_section_number(&mut slide, &page);
         assert_eq!(slide.section.as_deref(), Some("03"));
+    }
+
+    fn media_asset(id: i64) -> crate::db::MediaAsset {
+        crate::db::MediaAsset {
+            id,
+            project_id: 1,
+            slide_index: None,
+            filename: format!("{id}.png"),
+            original_name: format!("图{id}.png"),
+            media_type: "image".to_string(),
+            mime_type: Some("image/png".to_string()),
+            storage_path: format!("projects/1/images/{id}.png"),
+            caption: Some("架构图".to_string()),
+            description: None,
+            file_size: None,
+            width: Some(1920),
+            height: Some(1080),
+            created_at: 0,
+        }
+    }
+
+    #[test]
+    fn matched_images_seed_preferred_assets_without_overriding_the_model() {
+        let page = content_page(1);
+        let mut catalog = AssetCatalog::collect(
+            std::path::Path::new("no-such-project-dir"),
+            &[media_asset(5), media_asset(6)],
+        );
+        catalog.set_placements(vec![crate::assets::MediaPlacement {
+            media_id: 5,
+            reference: "media:5".to_string(),
+            page_id: Some(page.page_id.clone()),
+            purpose: "佐证核心能力".to_string(),
+            caption: None,
+        }]);
+
+        // The model named nothing: the image matched to this page is used.
+        let silent = serde_json::from_value::<PageSignalPatch>(serde_json::json!({
+            "page_id": page.page_id.clone(),
+            "preferred_assets": [],
+        }))
+        .unwrap();
+        assert_eq!(
+            merge_page_signal_patch(&page, &silent, &catalog).preferred_assets,
+            vec!["media:5".to_string()]
+        );
+
+        // A choice the model did make still wins over the seed.
+        let chosen = serde_json::from_value::<PageSignalPatch>(serde_json::json!({
+            "page_id": page.page_id.clone(),
+            "preferred_assets": ["media:6"],
+        }))
+        .unwrap();
+        assert_eq!(
+            merge_page_signal_patch(&page, &chosen, &catalog).preferred_assets,
+            vec!["media:6".to_string()]
+        );
+
+        // With no placement for this page, nothing is invented.
+        let catalog_without_match = AssetCatalog::collect(
+            std::path::Path::new("no-such-project-dir"),
+            &[media_asset(5)],
+        );
+        assert!(merge_page_signal_patch(&page, &silent, &catalog_without_match)
+            .preferred_assets
+            .is_empty());
     }
 
     #[test]

@@ -80,7 +80,7 @@ try {
   }
   for (const count of [2, 3, 4, 6]) {
     for (const aspect of ['ratio_16x9', 'ratio_32x9', 'ratio_48x9']) {
-      for (const theme of ['light-notes', 'light-terminal', 'dark-glass-blue']) {
+      for (const theme of ['light-notes', 'light-terminal', 'dark-blue']) {
         for (const mode of ['side-by-side', 'pros-cons', 'versus']) {
           const slide = structuredClone(example)
           slide.aspect_ratio = aspect

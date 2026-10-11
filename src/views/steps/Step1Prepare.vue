@@ -587,6 +587,7 @@ async function optimizeMarkdown() {
                   </button>
                 </div>
                 <span class="media-name" :title="m.name">{{ m.name }}</span>
+                <span v-if="m.type === 'image' && m.width && m.height" class="media-dim">{{ m.width }}×{{ m.height }}</span>
               </div>
             </div>
           </div>

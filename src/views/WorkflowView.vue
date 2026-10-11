@@ -1243,6 +1243,12 @@ onMounted(() => {
   text-align: center;
 }
 
+.media-dim {
+  font-size: 0.58rem;
+  color: var(--studio-muted);
+  opacity: 0.75;
+}
+
 /* Footer action bar */
 .step-actions {
   padding: 0.875rem 1.5rem;

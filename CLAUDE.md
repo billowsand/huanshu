@@ -144,6 +144,50 @@ cargo test -p auto-slidev-studio --lib layout_probe -- --ignored --nocapture
 LLM 回复即使不是合法 JSON（实测出现过单引号字符串），`candidate_parsing` 也会按模式抢救出 kind/score。
 
 
+## 素材库图片与生成链路
+
+素材有两个来源，统一由 `src-tauri/src/assets.rs` 的 `AssetCatalog` 表达：
+
+- 项目目录下的 `figure/`、`public/` 文件：`collect_assets` 会为每个文件产出 `figure/x.png`、`/figure/x.png`、`x.png` 三种拼写；
+- 素材库图片：文件在 `<media_dir>/projects/<id>/images/`，元数据在 `media_assets` 表，引用形式是 `media:<id>`。
+
+`AssetCatalog.refs` 是「蓝图里合法可用的引用集合」（校验用），`entries` 是给提示词的目录（`media:` 条目带 caption 与宽高比）。
+
+要点：
+
+- `run_pipeline` / `retry_generation_page` / 反馈修复三处都通过 `commands/generate.rs::load_asset_catalog` 构造目录
+  （项目文件 + 该项目的素材库图片）。**不要把 `collect_assets` 直接当素材全集**——它扫不到素材库。
+- 素材库图片只有在目录里出现，`preferred_assets` 才可能带上它（`planning::normalize_preferred_assets` 丢弃未知引用），
+  `layout_rules::has_image` 才会放行 `spotlight`。
+- 导入素材时 `commands/storage.rs` 用 `image_size::image_dimensions` 读文件头写 `media_assets.width/height`
+  （零依赖，支持 PNG/JPEG/GIF/BMP/WebP/SVG）；`.keynn` 导出/导入携带宽高，旧包回退到读还原后的字节。
+- 给模型的素材清单一律走 `AssetCatalog::prompt_section()`，不要手写路径列表——`media:` 条目必须带 caption 与比例，模型才选得准。
+- `spotlight` 是唯一渲染图片的模板：`normalize::ensure_image_from_page_plan` 会在它缺图时用 `page.preferred_assets[0]` 兜底填充。
+  `layout_scoring` 的 `has_assets` 规则（+2.0）只做辅助加权，**不要加到能压过 content_shape 结构信号（3-4）的量级**，
+  否则会把流程/对比页抢成图片页（有单测守护这一点）。
+- 图片目前一律 `object-contain`（保比例、留白），`SlideBlueprint` 没有裁剪/遮罩/画框字段；固定画框 + `cover` +
+  槽位（16:9 / 4:3 / 1:1）是尚未实现的一步。素材库图片在自动生成里只影响「是否选 spotlight」，不影响图片自身呈现。
+
+### 图文配对（生成时，Phase 1b）
+
+caption 只说图片「是什么」，说不出它「该放哪」。所以 `generator/media_match.rs` 在 `derive_page_plans` 之后、
+2a 之前，把每张素材图片连同**文稿大纲**一起交给多模态模型：
+
+- 输入：`page_outline` 生成的分页大纲（`page_id`、页标题、章节、要点、原文摘要截断 120 字）+ 单张图片；
+- 输出：`MediaPlacement`（目标页、用途、带语境的图注）。`page_id` 经**白名单校验**，不在牌组里的一律丢弃，
+  模型编造的页码不会进 `preferred_assets`；`page_id` 为空（判断为不相关）时图注仍然保留用于回写；
+- 上限 `MAX_MATCHED_IMAGES = 12`、按 `config.concurrency` 限流、逐图容错（失败只丢这一张，退回 caption-only 行为）；
+- 结果写调试目录 `00-media-match.json`，并记入生成日志「图文配对」一行；
+- 图注回写 `media_assets.caption`（用 `db::update_media_asset_caption_only`，**只动 caption，不动用户写的 description**）；
+- `config.multimodal.model` 为空（未配置多模态）或项目没有素材图片时整段跳过，行为等同于旧路径。
+
+配对结果是**软信号**，不要改成硬约束：
+
+- `AssetCatalog::set_placements` 之后，`prompt_section_for(page_id)` 会在素材目录前插入 `Matched to this page …`
+  段（引用 + 用途）；enrich（`planning.rs`）与内容生成（`slides.rs`）两条提示词都走它；
+- `planning::merge_page_signal_patch` 只在模型**没有**给出 `preferred_assets` 时才用配对结果兜底（`take(2)`）；
+- 因此配对只提高「选对页的概率」，不剥夺模型按版式改选的能力。
+
 ## 幻灯片字号体系（`--type-scale`）
 
 所有幻灯片字号都来自一套变量，**不要**在模板里写裸 `font-size: 0.Nrem`（历史上散落过 17 处，最小 0.68rem）。

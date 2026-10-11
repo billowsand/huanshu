@@ -55,7 +55,7 @@ try {
   page.on('console', message => { if(message.type()==='error') console.error(message.text()) })
   await page.goto(server.resolvedUrls.local[0]+'__layout-check')
   await page.waitForFunction(() => !!window.renderSlide)
-  const themes = ['light-terminal', 'dark-terminal', 'dark-yellow', 'dark-blue', 'dark-glass-blue']
+  const themes = ['light-terminal', 'dark-terminal', 'dark-yellow', 'dark-blue']
   let checked = 0
   for (const count of (process.env.LAYOUT_TEMPLATES_ONLY ? [] : [3, 4, 5, 6, 7, 8])) {
     console.log('Checking '+count+' items')

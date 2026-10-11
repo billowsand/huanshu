@@ -109,21 +109,20 @@ impl LmStudioClient {
         Ok(parsed.data.into_iter().map(|item| item.embedding).collect())
     }
 
-    pub async fn generate_image_caption(&self, model: &str, image_path: &str) -> Result<String> {
+    /// Send one image plus a text prompt to the multimodal model and return its answer.
+    pub async fn generate_vision(
+        &self,
+        model: &str,
+        image_path: &str,
+        prompt: &str,
+    ) -> Result<String> {
         let image_data = std::fs::read(image_path)?;
         let base64_image = base64_encode(&image_data);
-        let mime_type = if image_path.ends_with(".png") {
-            "image/png"
-        } else if image_path.ends_with(".jpg") || image_path.ends_with(".jpeg") {
-            "image/jpeg"
-        } else if image_path.ends_with(".gif") {
-            "image/gif"
-        } else if image_path.ends_with(".webp") {
-            "image/webp"
-        } else {
-            "image/jpeg"
-        };
-        let image_url = format!("data:{};base64,{}", mime_type, base64_image);
+        let image_url = format!(
+            "data:{};base64,{}",
+            image_mime_type(image_path),
+            base64_image
+        );
 
         let payload = json!({
             "model": model,
@@ -135,7 +134,7 @@ impl LmStudioClient {
                     "content": [
                         {
                             "type": "text",
-                            "text": "请描述这张图片的内容，用中文简短回答（50字以内）。只描述图像内容，不要有其他解释。"
+                            "text": prompt
                         },
                         {
                             "type": "image_url",
@@ -156,21 +155,47 @@ impl LmStudioClient {
             .json(&payload)
             .send()
             .await
-            .context("failed to call vision caption")?;
+            .context("failed to call the vision model")?;
         let status = resp.status();
         let body = resp.text().await?;
         if !status.is_success() {
-            bail!("Vision caption failed: {status} {body}");
+            bail!("Vision request failed: {status} {body}");
         }
         let parsed: ChatCompletionResponse =
-            serde_json::from_str(&body).context("failed to parse caption response")?;
+            serde_json::from_str(&body).context("failed to parse the vision response")?;
         let content = parsed
             .choices
             .into_iter()
             .next()
             .and_then(|choice| choice.message.content)
-            .ok_or_else(|| anyhow::anyhow!("caption response contained no content"))?;
+            .ok_or_else(|| anyhow::anyhow!("vision response contained no content"))?;
         Ok(content)
+    }
+
+    /// One-off description of a single image, used when an asset is imported.
+    pub async fn generate_image_caption(&self, model: &str, image_path: &str) -> Result<String> {
+        self.generate_vision(
+            model,
+            image_path,
+            "请描述这张图片的内容，用中文简短回答（50字以内）。只描述图像内容，不要有其他解释。",
+        )
+        .await
+    }
+}
+
+/// MIME type from the file extension, for the data URL handed to the vision model.
+fn image_mime_type(path: &str) -> &'static str {
+    let lower = path.to_ascii_lowercase();
+    if lower.ends_with(".png") {
+        "image/png"
+    } else if lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
+        "image/jpeg"
+    } else if lower.ends_with(".gif") {
+        "image/gif"
+    } else if lower.ends_with(".webp") {
+        "image/webp"
+    } else {
+        "image/jpeg"
     }
 }
 

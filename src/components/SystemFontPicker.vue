@@ -156,17 +156,7 @@ function onPanelKeydown(event: KeyboardEvent) {
 .font-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
 .font-default, .font-current { color: var(--studio-muted); font-size: 11px; flex-shrink: 0; }
 .font-overlay { position: fixed; inset: var(--titlebar-height, 36px) 0 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: #0007; backdrop-filter: blur(4px); font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif; font-size: 13px; color: var(--studio-text); }
-.font-overlay {
-  --studio-panel: #fff; --studio-panel-2: #f5f5f1; --studio-surface: #f0f2eb;
-  --studio-border: #e2e4dc; --studio-text: #292c26; --studio-muted: #777b73;
-  --studio-primary: #58644a; --studio-primary-light: #47543b;
-  --studio-primary-bg: #edf0e6; --studio-primary-border: #a2ac96;
-  --studio-primary-contrast: #fff;
-}
-.font-overlay .font-preview { background: var(--studio-panel-2); }
 .font-overlay .font-option.active { box-shadow: none; }
-.font-overlay .btn { background: #fff; border: 1px solid var(--studio-border); box-shadow: none; border-radius: 6px; }
-.font-overlay .btn-primary { background: var(--studio-primary); border-color: var(--studio-primary); color: #fff; }
 .font-dialog { display: flex; flex-direction: column; width: min(760px, 100%); max-height: calc(100dvh - var(--titlebar-height, 36px) - 48px); overflow: hidden; border: 1px solid var(--studio-border); border-radius: 16px; background: var(--studio-panel); box-shadow: 0 24px 80px #0004; }
 .font-dialog-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--studio-border); }
 .font-dialog-header h2 { margin: 0; font-size: 17px; font-family: inherit; font-weight: 600; }

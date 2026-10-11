@@ -25,6 +25,8 @@ pub struct Signals<'a> {
     object_count: &'a str,
     key_count: usize,
     title: &'a str,
+    /// Whether the page plan already picked an image from the asset catalogue.
+    has_assets: bool,
 }
 
 impl<'a> Signals<'a> {
@@ -37,6 +39,7 @@ impl<'a> Signals<'a> {
             object_count: page.object_count.as_deref().unwrap_or(""),
             key_count: page.key_points.len(),
             title: page.page_title.as_str(),
+            has_assets: !page.preferred_assets.is_empty(),
         }
     }
 
@@ -303,6 +306,12 @@ static SCORE_RULES: &[ScoreRule] = &[
         signal: "visual_need=image_required",
         matches: |s| s.visual_need == "image_required",
     },
+    ScoreRule {
+        kind: SlideKind::Spotlight,
+        weight: 2.0,
+        signal: "page plan picked an image asset",
+        matches: |s| s.has_assets,
+    },
     // --- object count & amount of content ---
     ScoreRule {
         kind: SlideKind::Compare,
@@ -494,6 +503,34 @@ mod tests {
             top(&page("现状", "summary", "warning", 3)),
             SlideKind::IssueStack
         );
+    }
+
+    #[test]
+    fn a_page_plan_image_lifts_spotlight_without_overriding_structural_signals() {
+        // `preferred_assets` only becomes non-empty when the catalogue really offers an
+        // image, and spotlight is the only layout that renders one — a real signal, but a
+        // supporting one.
+        let plain = page("核心能力", "summary", "summary", 3);
+        let mut with_image = plain.clone();
+        with_image.preferred_assets = vec!["media:12".to_string()];
+
+        let spotlight_score = |p: &PagePlan| {
+            score_kinds(p)
+                .into_iter()
+                .find(|scored| scored.kind == SlideKind::Spotlight)
+                .map(|scored| scored.score)
+                .unwrap_or_default()
+        };
+        // Without an asset the page keeps its generic default…
+        assert_ne!(top(&plain), SlideKind::Spotlight);
+        // …and an available asset is worth a fixed bump.
+        assert!((spotlight_score(&with_image) - spotlight_score(&plain) - 2.0).abs() < 1e-4);
+
+        // A specific structural signal still outranks it: an image alone must not turn a
+        // workflow page into a picture page.
+        let mut workflow = page("实施安排", "workflow", "summary", 3);
+        workflow.preferred_assets = vec!["media:12".to_string()];
+        assert_eq!(top(&workflow), SlideKind::StepFlow);
     }
 
     #[test]
