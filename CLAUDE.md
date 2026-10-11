@@ -239,6 +239,101 @@ caption 只说图片「是什么」，说不出它「该放哪」。所以 `gene
   应 0 命中（数字用 `--font-number` 或 `.slide-number`，`font-mono`/`font-sans` 会被角色组的
   `!important` 覆盖成死代码，只会误导后来人）。
 
+## Typst 原生 PDF 导出（实验中，`crates/slide-typst`）
+
+独立的 workspace crate，由 `src-tauri/src/commands/pdf.rs` 接入应用（见下方「应用接入」）。它在进程内嵌入 Typst 编译器，把 `SlideBlueprint`
+JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍然负责屏幕渲染，Typst 侧是另一套
+版式实现。目前只移植了「便签·稿纸」主题；17 个模板已全部移植（`SUPPORTED_KINDS`）。以后新增的模板在移植前
+会渲染成「Typst 版式尚未实现」占位页，不会丢页，导出结果弹窗会列出这些页。
+
+- Rust（`src/lib.rs`）：`Renderer::with_system_fonts()` 扫描一次系统字体（约 0.5 秒，进程内复用），
+  然后调用 `render_pdf(&slides, &ExportOptions)`，返回 `Rendered { pdf, pages, overflows, missing_assets }`。
+  自定义 `World` 只提供四类文件：`include_str!` 内嵌的模板、虚拟的 `/deck.json`、
+  `/icons/<set>/<name>/<rrggbb[aa]>.svg`（由 `build.rs` 内嵌的 Carbon 图标集按颜色现生成，alpha 转为不透明度），
+  以及 `/assets/<n>.<ext>`（校验过的图片，见下）。
+- 图片（`src/assets.rs`）：调用方用 `ExportOptions.assets`（`Assets`）把蓝图里出现的每种引用写法
+  （`media:<id>`、`figure/x.png`、`/figure/x.png`、`x.png`）映射到文件路径或字节，`data:` URI 会直接解码。
+  编译前每张图都会按文件头识别格式，并用与 Typst 相同的解码器完整解码一遍：**一张坏图本来会让整份导出失败**。
+  BMP 转成 PNG（Typst 不支持 BMP，素材库支持）；SVG 用 usvg 校验。引用缺失、远程 URL、坏文件都记进
+  `missing_assets`（页号 + 原因），模板显示带引用名的占位图。Typst 只看到按序号命名的虚拟路径和像素尺寸，
+  看不到引用字符串本身。只有会显示图片的模板（`assets.rs` 的 `IMAGE_KINDS`，目前只有 `spotlight`）才解析图片：
+  蓝图在切换 kind 时会保留 `image` 字段，若对所有页面都解析，会白白读盘解码，还会误报缺图。
+- `spotlight` 与屏幕版的有意差异：`images` 在屏幕上是轮播，PDF 里改为平铺（最多 6 张，超出的显示 `+N`）；
+  位图不会放大到超过原始像素尺寸（与 `object-contain max-w-full max-h-full` 一致），SVG 可以自由缩放；
+  侧栏用 `fit-height` 实测缩放，取代按字数分档的 `sideScale`。
+- 模板（`typst/`）：`main.typ` 负责分发；`lib/base.typ` 放单位、字号体系、富文本、图标和自动缩放；
+  `lib/components.typ` 放标题、页面骨架、卡片和色调；`themes/notes.typ` 是主题 token（取自 notes*.css）；
+  每个版式一个 `layouts/<kind>.typ`。
+- 约定：
+  - 尺寸按 Vue 画布的 CSS px 书写，`px = 0.75pt`，16:9 页面正好是 13.333in × 7.5in。
+  - 字号来自 `type-sizes(scale)`（移植了 `contentLoad` / `--type-scale`）。
+  - 文本用 `line-box` 模拟 CSS 行高。
+  - 模型输出的字符串一律经过 `rich()` 或作为纯文本渲染，**绝不拼成 Typst 标记**（有注入测试守护）。
+  - 垂直居中用 `center-v`，**不要用 `align(horizon)`**：它会被继承进每个子网格单元格。
+  - 内容自适应用 `fit-height`：先测量，再二分搜索缩放系数（下限 0.4）。仍放不下时裁切，并发出
+    `<slide-overflow>` 标记，Rust 侧在 `Rendered.overflows` 里报告。一页幻灯片必须恰好是一个 PDF 页面。
+    裁切时内层块必须拿到实测的完整高度并设为 `breakable: false`，否则可分页的子块会被拆成片段叠在一起。
+  - 布局参数**不要命名成 `h` / `v`**：会遮蔽 Typst 的 `h()` / `v()` 函数（报错 `expected function, found length`）。
+  - 代码块里，**以 `+` 开头的续行会被当成新语句**（报错 `cannot join length with length`），多行算式要用括号包起来。
+  - 局部辅助函数**不要命名成 `center` / `left` / `top` 等对齐值**：会遮蔽内置的对齐常量，`align(center, …)`
+    随即报错 `expected content, found function`。
+  - 比例一律用 `aspect-of(ctx)`（由画布宽度推出），**不要读页面自己的 `aspect_ratio` 字段**：旧数据或手改过的
+    页面可能没有这个字段，此时 32:9 页面会按 16:9 排版；`none in 字典` 还会直接编译失败。
+  - 版式要超出内容区（如 `section_intro` 上下各外扩 4px）时，用 `place` 定位，不要放进文档流：
+    哪怕在文档流里只多占 4px，也会被挤出一个新页面。
+- 应用接入：
+  - Tauri 命令 `export_pdf(project_id, slides?, path, theme)`：传了 `slides` 就导出它（编辑器传的是
+    **已应用**的牌组，与预览、演示一致）；不传就读数据库里保存的蓝图。字体取「设置 → 外观与字体」的
+    6 个角色。`Renderer` 用 `OnceLock` 在进程内只建一次，首次导出要扫描系统字体（约 0.5 秒），
+    渲染放在 `spawn_blocking` 里执行。
+  - 素材映射在 `export_assets`：项目文件来自 `assets::project_file_refs`，它和生成流程的校验集合
+    `collect_assets` 共用同一份写法规则，素材库是 `media:<id>` → `<media_dir>/<storage_path>`。
+    **不要另写一套引用规则**，否则生成时合法的图片可能在导出时找不到。
+  - 返回 `PdfExportReport`：占位页（模板还没有 PDF 版式）、溢出裁切页、缺失图片，由前端弹窗展示。
+    另有 `reveal_exported_file` 命令，在文件管理器中选中导出的文件。
+  - 前端入口：编辑器预览栏的「导出 PDF」按钮（`Step3Editor` 的 `export-pdf` 事件），以及首页导出弹窗
+    （`ExportDialog`）里的「PDF 文档」选项。导出状态由 `composables/usePdfExport.ts` 全局共享，进度和结果
+    由 `components/PdfExportDialog.vue` 显示，它需要挂在用到导出的 view 里。
+  - 真机验证：用环境变量打开 WebView2 调试端口，再通过 CDP 驱动窗口（Node 22 自带 WebSocket，
+    不用装任何包）：
+
+    ```powershell
+    $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9223'; bunx tauri dev
+    ```
+
+    之后从 `http://127.0.0.1:9223/json` 拿到页面的 `webSocketDebuggerUrl`，就可以发
+    `Runtime.evaluate` / `Page.captureScreenshot`。
+    保存对话框是系统原生窗口，CDP 操作不到，需要人工点一下；在页面里覆盖 `__TAURI_INTERNALS__.invoke`
+    来跳过它的做法**实测无效**。
+- 新增一个版式：写 `layouts/<kind>.typ`，在 `main.typ` 的 `layouts` 表登记，在 `lib.rs` 的 `TEMPLATES` 和
+  `SUPPORTED_KINDS` 里各加一项，并确保 `fixtures/all-layout-blueprints.json` 里有该 kind 的页面（有单测检查）。
+- 验证：
+
+```bash
+cargo test -p slide-typst
+cargo run -p slide-typst --example render_fixture -- --png
+```
+
+  第二条输出到 `target/slide-typst/`（PDF 加逐页 PNG）。还支持这些参数：`--kinds all`（包含占位页）、
+  `--aspect ratio_32x9`、`--assets <manifest.json>`（图片清单，格式为 `{ "<引用>": "<相对清单的路径>" }`），
+  以及指定输入：`crates/slide-typst/tests/fixtures/stress.json <out-dir>`（压力用例）、
+  `crates/slide-typst/tests/fixtures/spotlight.json`（图片用例，配合 `--assets crates/slide-typst/tests/fixtures/assets.json`，
+  覆盖 PNG/JPG/WebP/BMP/SVG、多图、缺图、坏图）。
+- Vue 对照页：`bunx vite` 之后打开 `http://localhost:5173/experiments/typst/preview/index.html?theme=light-notes&kind=swot`，
+  控制台里的 `measure([...selectors])` 可以导出元素的几何尺寸和计算样式，用于校准 Typst 版式。
+  加上 `&deck=/crates/slide-typst/tests/fixtures/spotlight.json&assets=/crates/slide-typst/tests/fixtures/assets.json`
+  可以用同一份图片清单渲染 Vue 版。
+  对照页必须像 `src/main.ts` 一样**全局注册 `GlassCard` / `TagBadge` 等组件**：模板里这些组件不 import 直接用，
+  漏注册时会被当成未知标签渲染，卡片的底色、边框、内边距和副标题的标签样式全都会消失，量出来的数据就是错的
+  （曾因此按错误的参照做过几个版式，后来统一修正）。
+- 有意偏离屏幕版的地方：Vue 的时间线在卡片较高时，节点会偏离时间轴（实测偶数列 y=407、奇数列 y=328，轴在 y=376），
+  Typst 版按两侧最高的卡片计算上下区域，保证节点都在轴上；spotlight 的多图改为平铺；所有「按字数估算」的
+  收缩规则都改成了实测；`center_grid` 的卡片区宽度上限（屏幕版固定 `max-w-2xl` 即 672px）在 32:9 / 48:9 下
+  按 2 / 3 倍放宽，否则 8 列、12 列会被挤成细条；`outcome_grid` 卡片没有 `tag` 时不画空标签。
+- 已知差异：没有阴影和毛玻璃（便签主题本身也基本不用）；`text-wrap: balance`（`base.typ` 的 `balanced`）
+  目前只用在 `center_grid` 的居中标题上，其他页面标题仍按普通换行；屏幕版标题还会先分词再换行，PDF 没有；
+  终端两个主题还没移植。
+
 ## 多比例幻灯片支持 (16:9 / 32:9 / 48:9)
 
 ### 功能说明

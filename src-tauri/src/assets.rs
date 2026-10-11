@@ -11,7 +11,7 @@
 //! deliberately uploaded.
 
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::db::MediaAsset;
 
@@ -237,31 +237,41 @@ fn aspect_label(width: i64, height: i64) -> Option<&'static str> {
 /// References for every image file bundled in the project directory: `figure/…`,
 /// `/figure/…`, and a bare relative path for files under `figure/`.
 pub fn collect_assets(project_root: &Path) -> HashSet<String> {
-    let mut set = HashSet::new();
-    for base in ["figure", "public"] {
-        let root = project_root.join(base);
-        collect_dir(&root, &root, &mut set);
-    }
-    set
+    project_file_refs(project_root)
+        .into_iter()
+        .map(|(reference, _)| reference)
+        .collect()
 }
 
-fn collect_dir(root: &Path, current: &Path, set: &mut HashSet<String>) {
+/// Every reference spelling of the files under `figure/` and `public/`, paired with the
+/// file it points to. Single source for the validation set above and for resolving
+/// references to bytes (PDF export), so both always agree on what a reference means.
+pub fn project_file_refs(project_root: &Path) -> Vec<(String, PathBuf)> {
+    let mut refs = Vec::new();
+    for base in ["figure", "public"] {
+        let root = project_root.join(base);
+        collect_dir(&root, &root, &mut refs);
+    }
+    refs
+}
+
+fn collect_dir(root: &Path, current: &Path, refs: &mut Vec<(String, PathBuf)>) {
     let Ok(entries) = std::fs::read_dir(current) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            collect_dir(root, &path, set);
+            collect_dir(root, &path, refs);
             continue;
         }
         if let Ok(rel) = path.strip_prefix(root) {
             let rel = rel.to_string_lossy().replace('\\', "/");
             let prefix = root.file_name().unwrap_or_default().to_string_lossy();
-            set.insert(format!("{prefix}/{rel}"));
-            set.insert(format!("/{prefix}/{rel}"));
+            refs.push((format!("{prefix}/{rel}"), path.clone()));
+            refs.push((format!("/{prefix}/{rel}"), path.clone()));
             if prefix == "figure" {
-                set.insert(rel.clone());
+                refs.push((rel.clone(), path.clone()));
             }
         }
     }

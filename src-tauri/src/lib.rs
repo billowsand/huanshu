@@ -293,6 +293,8 @@ pub fn run() {
             commands::storage::get_project_media,
             commands::storage::update_media_caption,
             commands::storage::export_project,
+            commands::pdf::export_pdf,
+            commands::pdf::reveal_exported_file,
             commands::storage::import_project,
             commands::storage::is_encrypted_file,
         ])

@@ -10,9 +10,12 @@ import ThemeToggle from "../components/ThemeToggle.vue";
 import BrandMark from "../components/BrandMark.vue";
 import ExportDialog from "../components/ExportDialog.vue";
 import PasswordDialog from "../components/PasswordDialog.vue";
+import PdfExportDialog from "../components/PdfExportDialog.vue";
+import { usePdfExport } from "../composables/usePdfExport";
 
 const router = useRouter();
 const projects = useProjectsStore();
+const pdfExport = usePdfExport();
 const confirmDelete = ref<number | null>(null);
 const pendingDeleteId = ref<number | null>(null);
 const exportingId = ref<number | null>(null);
@@ -68,6 +71,20 @@ async function handleExportSubmit(password: string | null) {
 
     showExportDialog.value = false;
     await doExport(id, password);
+}
+
+// PDF of the project's saved deck (the editor exports its in-memory deck instead).
+async function handleExportPdf() {
+    const id = pendingExportId.value;
+    const p = projects.list.find((proj) => proj.id === id);
+    closeExportDialog();
+    if (!p) return;
+    exportingId.value = p.id;
+    try {
+        await pdfExport.exportPdf({ projectId: p.id, name: p.name });
+    } finally {
+        exportingId.value = null;
+    }
 }
 
 async function doExport(id: number, password: string | null) {
@@ -288,7 +305,7 @@ async function handlePasswordSubmit(password: string) {
                             :title="
                                 exportingId === p.id
                                     ? '导出中…'
-                                    : '导出为 .keynn'
+                                    : '导出（.keynn / PDF）'
                             "
                             :disabled="exportingId === p.id"
                             @click="handleExport(p.id)"
@@ -335,7 +352,10 @@ async function handlePasswordSubmit(password: string) {
             :project-name="passwordDialogProject"
             @close="closeExportDialog"
             @submit="handleExportSubmit"
+            @submit-pdf="handleExportPdf"
         />
+
+        <PdfExportDialog />
 
         <PasswordDialog
             :visible="showPasswordDialog"

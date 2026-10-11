@@ -9,8 +9,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "submit", password: string | null): void;
+  (e: "submit-pdf"): void;
 }>();
 
+// `.keynn` (plain or encrypted) round-trips into the app; PDF is for reading/printing.
+const format = ref<"keynn" | "pdf">("keynn");
 const encrypt = ref(false);
 const password = ref("");
 const confirmPassword = ref("");
@@ -43,7 +46,7 @@ const strength = computed(() => {
 });
 
 const canSubmit = computed(() => {
-  if (!encrypt.value) return true;
+  if (format.value === "pdf" || !encrypt.value) return true;
   return password.value.length >= 8 && password.value === confirmPassword.value;
 });
 
@@ -51,6 +54,7 @@ watch(
   () => props.visible,
   (visible) => {
     if (!visible) return;
+    format.value = "keynn";
     encrypt.value = false;
     password.value = "";
     confirmPassword.value = "";
@@ -68,8 +72,18 @@ watch(encrypt, (enabled) => {
   }
 });
 
+function choose(next: "keynn" | "encrypted" | "pdf") {
+  format.value = next === "pdf" ? "pdf" : "keynn";
+  encrypt.value = next === "encrypted";
+}
+
 function handleSubmit() {
   if (!canSubmit.value) return;
+
+  if (format.value === "pdf") {
+    emit("submit-pdf");
+    return;
+  }
 
   if (!encrypt.value) {
     emit("submit", null);
@@ -111,8 +125,8 @@ function handleClose() {
           <div class="option-grid">
             <button
               class="option-card"
-              :class="{ active: !encrypt }"
-              @click="encrypt = false"
+              :class="{ active: format === 'keynn' && !encrypt }"
+              @click="choose('keynn')"
             >
               <span class="option-icon i-carbon:document-export" />
               <span class="option-title">普通导出</span>
@@ -120,16 +134,25 @@ function handleClose() {
             </button>
             <button
               class="option-card"
-              :class="{ active: encrypt }"
-              @click="encrypt = true"
+              :class="{ active: format === 'keynn' && encrypt }"
+              @click="choose('encrypted')"
             >
               <span class="option-icon i-carbon:locked" />
               <span class="option-title">加密导出</span>
               <span class="option-copy">设置密码后再生成导出文件</span>
             </button>
+            <button
+              class="option-card"
+              :class="{ active: format === 'pdf' }"
+              @click="choose('pdf')"
+            >
+              <span class="option-icon i-carbon:document-pdf" />
+              <span class="option-title">PDF 文档</span>
+              <span class="option-copy">矢量排版，适合阅读与打印</span>
+            </button>
           </div>
 
-          <div v-if="encrypt" class="encrypt-panel">
+          <div v-if="format === 'keynn' && encrypt" class="encrypt-panel">
             <div class="form-group">
               <label class="form-label">导出密码</label>
               <div class="input-wrapper">
@@ -187,7 +210,7 @@ function handleClose() {
           <div class="modal-actions">
             <button class="btn btn-ghost" @click="handleClose">取消</button>
             <button class="btn btn-primary" :disabled="!canSubmit" @click="handleSubmit">
-              {{ encrypt ? "加密导出" : "开始导出" }}
+              {{ format === "pdf" ? "导出 PDF" : encrypt ? "加密导出" : "开始导出" }}
             </button>
           </div>
         </div>
@@ -267,7 +290,7 @@ function handleClose() {
 
 .option-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }

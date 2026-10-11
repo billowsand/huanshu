@@ -423,6 +423,7 @@ const props = defineProps<{
   editorStageH: number
   currentSlideDims: { w: number, h: number }
   jsonTextareaRef: HTMLTextAreaElement | null
+  exportingPdf?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -438,6 +439,7 @@ const emit = defineEmits<{
   'move-slide': [dir: -1 | 1]
   'insert-media-url': [ref: string]
   'start-presentation': []
+  'export-pdf': []
   'go-to-step-1': []
   'textarea-input': [value: string]
   'textarea-keydown': [event: KeyboardEvent]
@@ -791,6 +793,14 @@ onBeforeUnmount(() => {
               <span class="i-carbon:arrow-right" />
             </button>
           </div>
+          <button
+            class="btn btn-ghost edit-present-btn"
+            :disabled="blueprints.length === 0 || exportingPdf"
+            title="导出为 PDF 文档"
+            @click="$emit('export-pdf')"
+          >
+            <span :class="exportingPdf ? 'i-carbon:renew' : 'i-carbon:document-pdf'" /> 导出 PDF
+          </button>
           <button class="btn btn-primary edit-present-btn" :disabled="blueprints.length === 0" @click="$emit('start-presentation')">
             <span class="i-carbon:presentation-file" /> 演示
           </button>

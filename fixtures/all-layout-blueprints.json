@@ -489,5 +489,37 @@
       ],
       "strategy": "建议把这份 fixture 固定为基线数据，每次布局或主题调整后先重放一遍，再决定是否需要更细的专项测试。"
     }
+  },
+  {
+    "kind": "section_intro",
+    "section": "11",
+    "badge": "章节导览",
+    "title": "Section Intro: 章节导览测试",
+    "note": "左侧深色导语卡验证 badge、标题、子主题计数与 note 的纵向分布。",
+    "cards": [
+      { "title": "输入侧：统一字段约定", "tone": "blue", "icon": "i-carbon:data-structured", "body": "说明章节开场卡片的正文换行与图标对齐。" },
+      { "title": "布局侧：版式边界清晰", "tone": "green", "icon": "i-carbon:grid", "body": "四张卡片时切成两列，验证行高均分。" },
+      { "title": "渲染侧：屏幕与导出一致", "tone": "amber", "icon": "i-carbon:document-pdf", "body": "同一份数据在 Vue 与 Typst 中排版一致。" },
+      { "title": "回归侧：固定样本对比", "tone": "red", "icon": "i-carbon:compare", "body": "每次调整后与基线截图逐页比对。" }
+    ]
+  },
+  {
+    "kind": "issue_stack",
+    "section": "12",
+    "title": "Issue Stack: 问题堆叠测试",
+    "footer": "四张卡片时切换为左标题、右内容的横排模式，验证标签换行与等高分配。",
+    "cards": [
+      { "title": "数据口径不一", "tone": "amber", "icon": "i-carbon:data-error", "body": "不同来源对同一指标的统计口径存在差异，导致结论无法横向比较。", "items": ["口径分散", "定义冲突", "难以对账"] },
+      { "title": "流程衔接断点", "tone": "red", "icon": "i-carbon:flow-stream", "body": "跨部门交接依赖人工传递，关键信息在流转中丢失。", "items": ["人工转录", "信息丢失", "责任模糊"] },
+      { "title": "工具链割裂", "tone": "blue", "icon": "i-carbon:tool-kit", "body": "各环节使用独立工具，数据需要反复导入导出。", "items": ["重复录入", "格式转换"] },
+      { "title": "反馈周期过长", "tone": "green", "icon": "i-carbon:time", "body": "问题从发现到修复平均需要两周，无法支撑快速迭代。", "items": ["响应滞后", "迭代缓慢", "复盘缺失"] }
+    ]
+  },
+  {
+    "kind": "closing",
+    "title": "感谢聆听",
+    "subtitle": "Closing: 结束页测试，验证 END 标记、标题、副标题、分隔线与备注的纵向节奏。",
+    "note": "备注用于放置联系方式或下一步行动，最长不超过 34rem。",
+    "badges": ["layout-regression", "visual-check"]
   }
 ]

@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "src-tauri",
+    "crates/slide-typst",
 ]
 resolver = "2"

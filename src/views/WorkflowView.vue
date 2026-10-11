@@ -10,6 +10,8 @@ import Step1Prepare from './steps/Step1Prepare.vue'
 import Step2Generate from './steps/Step2Generate.vue'
 import Step3Editor from './steps/Step3Editor.vue'
 import PresentationOverlay from './PresentationOverlay.vue'
+import PdfExportDialog from '../components/PdfExportDialog.vue'
+import { usePdfExport } from '../composables/usePdfExport'
 import { useMediaLibrary } from '../composables/useMediaLibrary'
 import { useSlideEditor } from '../composables/useSlideEditor'
 import type { SlideBlueprint } from '../components/types'
@@ -72,6 +74,20 @@ const mediaLib = useMediaLibrary({
   mdContent: () => mdContent.value,
   ensureProjectForMedia,
 })
+
+// ── PDF export ─────────────────────────────────────────────────────────────────
+const pdfExport = usePdfExport()
+
+// Exports what the preview and presentation show: the applied deck, not an
+// unapplied JSON draft (the result dialog says so when one exists).
+function exportPdf() {
+  void pdfExport.exportPdf({
+    projectId: projectId.value,
+    name: projectName.value,
+    slides: gen.blueprints as unknown as SlideBlueprint[],
+    note: slideEditor.hasUnsavedChanges.value ? '编辑器里还有未应用的修改，PDF 按应用前的内容导出。' : undefined,
+  })
+}
 
 // ── Slide editor ───────────────────────────────────────────────────────────────
 const slideEditor = useSlideEditor({
@@ -519,6 +535,7 @@ onMounted(() => {
         :editor-stage-h="slideEditor.editorStageH.value"
         :current-slide-dims="slideEditor.currentSlideDims.value"
         :json-textarea-ref="slideEditor.jsonTextareaRef.value"
+        :exporting-pdf="pdfExport.exporting.value"
         @replace-draft="slideEditor.replaceEditorDraft"
         @json-textarea-ref="slideEditor.jsonTextareaRef.value = $event"
         @preview-area-ref="slideEditor.previewArea.value = $event"
@@ -530,12 +547,15 @@ onMounted(() => {
         @move-slide="slideEditor.moveEditorSlide"
         @insert-media-url="slideEditor.insertMediaUrl"
         @start-presentation="presenting = true"
+        @export-pdf="exportPdf"
         @go-to-step-1="currentStep = 1"
         @textarea-input="slideEditor.onEditorJsonInput"
         @textarea-keydown="slideEditor.onEditorJsonKeydown"
       />
 
     </main>
+
+    <PdfExportDialog />
 
     <!-- Presentation overlay -->
     <PresentationOverlay
@@ -1963,6 +1983,9 @@ onMounted(() => {
 .edit-present-btn {
   font-size: 0.72rem;
   padding: 0.3rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 .edit-preview-stage-wrap {
