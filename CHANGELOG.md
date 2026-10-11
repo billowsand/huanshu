@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-11
+
 ### Added
 
 - **素材库图片参与生成**：素材库图片（`media:<id>`）现在与项目 `figure/`、`public/` 文件一起构成生成时的素材目录，enrich 与内容生成提示词会带上图片的图注与宽高比，`preferred_assets` 也接受素材库引用，`spotlight` 布局不再因为看不到素材而被整体跳过；幻灯片缺少图片时会用页面规划选中的素材兜底填充。
