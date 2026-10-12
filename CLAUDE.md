@@ -271,10 +271,11 @@ JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍
   `tones`（neutral/blue/green/amber/red，各含 solid/text/bg/border/contrast，对应屏幕版 `toneVars()` 的
   `--*-bg/--*-border/--*-light/--*-contrast/--*`）。键集合由 `themes/_check.typ` 编译期校验
   （`Renderer::check_theme_interface`，有单测守护），新增键要五个主题一起加。
-- 主题分支：版式里优先用 `deco` 开关和 token 表达差异；不够时再分支。`is-terminal(ctx)` 按 `-terminal` 后缀
-  判断（终端 CSS 把所有元素拍平成 2px 面板）；`is-glass(ctx)` 显式列出 `dark-yellow` / `dark-blue`（它们没有
-  自己的版式 CSS，模板原始样式生效：玻璃卡、999px 胶囊、primary→透明的渐变分隔线——`divider-line()` 用
-  渐变 rect 画，Typst 的 line 带不了渐变）。
+- 主题分支：版式里优先用 `deco` 开关和 token 表达差异；不够时再按主题的 `family` 分支（`"notes"` /
+  `"terminal"` / `"glass"`，对应屏幕版三层 CSS：`notes-layouts.css`、`terminal.css`、无专属版式 CSS）。
+  `is-terminal(ctx)`（终端 CSS 把所有元素拍平成面板）和 `is-glass(ctx)`（模板原始样式生效：玻璃卡、999px 胶囊、
+  primary→透明的渐变分隔线——`divider-line()` 用渐变 rect 画，Typst 的 line 带不了渐变）都读 `family`，
+  **不要按主题 id 判断**：新主题只要声明所属 family 就会走对分支，`_check.typ` 会校验它的取值。
 - 约定：
   - 尺寸按 Vue 画布的 CSS px 书写，`px = 0.75pt`，16:9 页面正好是 13.333in × 7.5in。
   - 字号来自 `type-sizes(scale)`（移植了 `contentLoad` / `--type-scale`）。
@@ -322,7 +323,8 @@ JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍
     来跳过它的做法**实测无效**。
 - 新增一个版式：写 `layouts/<kind>.typ`，在 `main.typ` 的 `layouts` 表登记，在 `lib.rs` 的 `TEMPLATES` 和
   `SUPPORTED_KINDS` 里各加一项，并确保 `fixtures/all-layout-blueprints.json` 里有该 kind 的页面（有单测检查）。
-- 新增一个主题：写 `themes/<id>.typ`（theme 字典 + `background(w, h)`，键集合照抄现有主题），在 `main.typ`
+- 新增一个主题：写 `themes/<id>.typ`（theme 字典 + `background(w, h)`，键集合照抄现有主题，`family` 填它
+  所属的 CSS 层），在 `main.typ`
   的 `themes` 表登记，在 `lib.rs` 的 `TEMPLATES` 和 `SUPPORTED_THEMES` 里各加一项，并在 `themes/_check.typ`
   里加 import（键集合校验会立刻发现缺漏）。然后用 Vue 对照页逐 kind 校准：`?theme=<id>&kind=<kind>`，
   token 值可以从 CSS 变量抄，几何和「哪个 CSS 规则实际生效」必须 `measure()` 实测——主题专属 CSS

@@ -7,6 +7,10 @@
 
 #let theme = (
   name: "light-notes",
+  // Style family: which CSS layer styles the slides — "notes" (notes-layouts.css),
+  // "terminal" (terminal.css), "glass" (raw template styles in style.css).
+  // Layouts branch on it via `is-terminal` / `is-glass` (lib/components.typ).
+  family: "notes",
   paper: rgb("#fbf7ec"),
   card: rgb("#fefbf5"),
   ink: rgb("#786051"),

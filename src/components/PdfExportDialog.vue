@@ -24,7 +24,7 @@ const placeholderGroups = computed(() => {
 
 const hasWarnings = computed(() => {
   const r = report.value
-  return !!r && (r.placeholder_slides.length > 0 || r.overflow_slides.length > 0 || r.missing_assets.length > 0)
+  return !!r && (r.placeholder_slides.length > 0 || r.overflow_slides.length > 0 || r.missing_assets.length > 0 || !!r.theme_fallback)
 })
 
 // Every slide theme has a PDF layout now; an unknown id falls back to
@@ -102,8 +102,12 @@ const fileName = computed(() => report.value?.path.split(/[\\/]/).pop() ?? '')
                 <span class="i-carbon:image" />
                 <span>第 {{ asset.slide + 1 }} 页图片 <code>{{ asset.reference }}</code> 未导出：{{ asset.reason }}</span>
               </li>
+              <li v-if="report.theme_fallback">
+                <span class="i-carbon:color-palette" />
+                <span>{{ themeHint }}</span>
+              </li>
             </ul>
-            <p class="pdf-theme-hint">{{ themeHint }}</p>
+            <p v-if="!report.theme_fallback" class="pdf-theme-hint">{{ themeHint }}</p>
 
             <div class="modal-actions">
               <button class="btn btn-ghost" @click="reveal">

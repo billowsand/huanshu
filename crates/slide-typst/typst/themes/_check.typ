@@ -16,6 +16,10 @@
 #let theme-keys = keyset(notes.theme)
 #for m in modules {
   assert.eq(keyset(m.theme), theme-keys, message: m.theme.name + " 的 theme 键集合与 light-notes 不一致")
+  assert(
+    m.theme.family in ("notes", "terminal", "glass"),
+    message: m.theme.name + " 的 family 必须是 notes / terminal / glass 之一",
+  )
   // Each theme module also provides the page background painter.
   assert(type(m.background) == function, message: m.theme.name + " 缺少 background(w, h)")
 }

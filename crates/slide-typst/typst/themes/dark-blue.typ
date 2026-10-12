@@ -21,6 +21,10 @@
 
 #let theme = (
   name: "dark-blue",
+  // Style family: which CSS layer styles the slides — "notes" (notes-layouts.css),
+  // "terminal" (terminal.css), "glass" (raw template styles in style.css).
+  // Layouts branch on it via `is-terminal` / `is-glass` (lib/components.typ).
+  family: "glass",
   paper: glass,
   card: glass,
   ink: rgb("#DFF0FF"),

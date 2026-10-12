@@ -22,6 +22,10 @@
 
 #let theme = (
   name: "dark-yellow",
+  // Style family: which CSS layer styles the slides — "notes" (notes-layouts.css),
+  // "terminal" (terminal.css), "glass" (raw template styles in style.css).
+  // Layouts branch on it via `is-terminal` / `is-glass` (lib/components.typ).
+  family: "glass",
   // `.glass-card` under this theme is a flat `var(--glass)` fill (the GlassCard
   // component's inline style overrides the class gradient).
   paper: glass,

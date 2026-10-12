@@ -36,13 +36,13 @@
 // decorations of light-notes into plain panel cards; their CSS forces solid
 // primary dividers, filled pills and single 1px borders, so layouts branch on
 // this where the theme dictionary has no matching switch.
-#let is-terminal(ctx) = ctx.theme.name.ends-with("-terminal")
+#let is-terminal(ctx) = ctx.theme.family == "terminal"
 
 // The dark glass themes (dark-yellow / dark-blue) live in src/style.css alone:
 // no per-layout CSS ever applies, so the raw Vue template styles win — glass
 // cards (12px), pill radii, primary→transparent gradient rules. Branch on this
 // where the result differs from both light-notes and the terminal overrides.
-#let is-glass(ctx) = ctx.theme.name in ("dark-yellow", "dark-blue")
+#let is-glass(ctx) = ctx.theme.family == "glass"
 
 // `.slide-title-divider` / `.divider-amber` / `.process-summary__line`: a solid
 // primary rule on the terminal themes, 65% primary on light-notes, and on the
@@ -81,7 +81,11 @@
 #let section-num(ctx, value) = {
   if not has(value) { return }
   if ctx.theme.deco.section-num == "meta" {
-    place(top + right, text(
+    // `.section-num` keeps its `top: 16px; right: 32px` box in the frame, i.e.
+    // 21px above and 5px inside the content area's corner (measured: x 1233
+    // right edge, y 29). Left at the corner it sat level with the title and,
+    // on section_intro, under the cards.
+    place(top + right, dx: -5 * px, dy: -21 * px, text(
       font: ctx.fonts.number,
       size: ctx.ty.meta,
       fill: ctx.theme.muted,

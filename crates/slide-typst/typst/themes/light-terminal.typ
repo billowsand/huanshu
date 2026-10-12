@@ -14,6 +14,10 @@
 
 #let theme = (
   name: "light-terminal",
+  // Style family: which CSS layer styles the slides — "notes" (notes-layouts.css),
+  // "terminal" (terminal.css), "glass" (raw template styles in style.css).
+  // Layouts branch on it via `is-terminal` / `is-glass` (lib/components.typ).
+  family: "terminal",
   // `--terminal-bg` (page) / `--terminal-panel` (glass-card fill).
   paper: rgb("#faf9f3"),
   card: rgb("#faf9f3"),
