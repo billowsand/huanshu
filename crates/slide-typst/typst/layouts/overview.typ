@@ -18,13 +18,17 @@
 #let card-body(ctx, item, stacked, body-size, f) = {
   let th = ctx.theme
   let scale = ctx.ty.meta / rem
+  // light-notes underlines the number in primary; every other theme renders
+  // the base style: ink at 55% opacity, no underline.
   let number = text(
     font: ctx.fonts.number,
     size: 2.2 * rem * scale * f,
-    fill: th.primary,
+    fill: if is-terminal(ctx) or is-glass(ctx) { th.ink.transparentize(45%) } else { th.primary },
     top-edge: "cap-height",
     bottom-edge: "baseline",
-    underline(stroke: 1 * px + th.edge, offset: 0.2em, str(item.at("number", default: ""))),
+    if is-terminal(ctx) or is-glass(ctx) { str(item.at("number", default: "")) } else {
+      underline(stroke: 1 * px + th.edge, offset: 0.2em, str(item.at("number", default: "")))
+    },
   )
   let copy = {
     txt(ctx, "title", body-size * scale * f * 1.25, 1.3, item.at("title", default: ""))
@@ -63,8 +67,12 @@
       block(
         width: 100%,
         fill: th.sheet-tint,
-        stroke: (paint: th.edge, thickness: 1 * px, dash: "dashed"),
-        radius: 4 * px,
+        // light-notes dashes the note border; terminal and glass keep the
+        // plain panel.
+        stroke: if is-terminal(ctx) or is-glass(ctx) { 1 * px + th.edge } else {
+          (paint: th.edge, thickness: 1 * px, dash: "dashed")
+        },
+        radius: if is-terminal(ctx) or is-glass(ctx) { th.radius.sheet * px } else { 4 * px },
         inset: (x: 20 * px, y: 12 * px),
         grid(
           columns: (auto, 1fr),
@@ -117,11 +125,16 @@
         place(top + left, dx: x, dy: y, block(
           width: w,
           height: h,
-          // `.overview-card`: paper sheet with a 6px tinted margin band.
-          fill: gradient.linear((th.sheet-tint, 0%), (th.sheet-tint, 6 * px / w * 100%), (th.paper, 6 * px / w * 100%), (th.paper, 100%)),
+          // `.overview-card`: paper sheet with a 6px tinted margin band on
+          // light-notes; a plain panel with even padding elsewhere.
+          fill: if is-terminal(ctx) or is-glass(ctx) { th.paper } else {
+            gradient.linear((th.sheet-tint, 0%), (th.sheet-tint, 6 * px / w * 100%), (th.paper, 6 * px / w * 100%), (th.paper, 100%))
+          },
           stroke: 1 * px + th.edge,
-          radius: 2 * px,
-          inset: (left: card-pad(f) + 6 * px, right: card-pad(f), y: card-pad(f)),
+          radius: if is-glass(ctx) { th.radius.card * px } else { 2 * px },
+          inset: if is-terminal(ctx) or is-glass(ctx) { card-pad(f) } else {
+            (left: card-pad(f) + 6 * px, right: card-pad(f), y: card-pad(f))
+          },
           clip: true,
           { v(calc.max(0pt, (h - 2 * card-pad(f) - content-h) / 2)); body },
         ))

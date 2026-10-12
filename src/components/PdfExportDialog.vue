@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { KIND_META } from '../composables/useSlideEditor'
 import { usePdfExport } from '../composables/usePdfExport'
+import { APP_THEMES } from '../themes/catalog'
 import type { SlideKind } from './types'
 
 // Progress + result of the shared PDF export (composables/usePdfExport.ts).
@@ -24,6 +25,15 @@ const placeholderGroups = computed(() => {
 const hasWarnings = computed(() => {
   const r = report.value
   return !!r && (r.placeholder_slides.length > 0 || r.overflow_slides.length > 0 || r.missing_assets.length > 0)
+})
+
+// Every slide theme has a PDF layout now; an unknown id falls back to
+// light-notes and the report names it (`theme_fallback`).
+const themeHint = computed(() => {
+  const fallback = report.value?.theme_fallback
+  if (!fallback) return 'PDF 版式跟随当前主题。'
+  const name = APP_THEMES.find(t => t.id === fallback)?.name ?? fallback
+  return `主题「${name}」还没有 PDF 版式，已回落到「便签·稿纸」。`
 })
 
 const fileName = computed(() => report.value?.path.split(/[\\/]/).pop() ?? '')
@@ -93,7 +103,7 @@ const fileName = computed(() => report.value?.path.split(/[\\/]/).pop() ?? '')
                 <span>第 {{ asset.slide + 1 }} 页图片 <code>{{ asset.reference }}</code> 未导出：{{ asset.reason }}</span>
               </li>
             </ul>
-            <p class="pdf-theme-hint">PDF 目前统一使用「便签·稿纸」版式。</p>
+            <p class="pdf-theme-hint">{{ themeHint }}</p>
 
             <div class="modal-actions">
               <button class="btn btn-ghost" @click="reveal">

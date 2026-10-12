@@ -44,6 +44,19 @@
   rule: rgb(170, 146, 125, 41),
   margin-fill: rgb("#eee8dc99"),
   margin-line: rgb(116, 98, 82, 46),
+  // Corner radii in CSS px: `paper-card` / `sheet` / `tag-pill` + `label-bar`.
+  radius: (card: 4, sheet: 2, pill: 2),
+  // Letter spacing: `slide-header` title / `tag-pill` + `label-bar`.
+  tracking: (title: -0.02em, label: 0.035em),
+  // Stationery decorations other themes may switch off.
+  deco: (
+    ruled: true, // `sheet(ruled:)` draws the ruled-paper lines
+    tape: true, // cover's paper tape
+    double-frame: true, // double-stroked badge / stamp / example frames
+    certificate: true, // outcome cards' inner certificate outline
+    stamp: "double", // step-stamp: "double" | "single"
+    section-num: "outline", // "outline" (giant stroked) | "meta" (small muted)
+  ),
   // Tone families of `[data-tone]` in notes-layouts.css; toneVars() in the Vue
   // templates resolves to the same values under this theme.
   tones: (

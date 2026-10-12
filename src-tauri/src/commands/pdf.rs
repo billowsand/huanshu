@@ -37,7 +37,23 @@ pub struct PdfExportReport {
     pub overflow_slides: Vec<usize>,
     /// Image references shown as placeholders, with the reason.
     pub missing_assets: Vec<slide_typst::MissingAsset>,
+    /// The requested theme id when it has no PDF layout; the export fell back
+    /// to light-notes. `None` when the requested theme rendered as-is.
+    pub theme_fallback: Option<String>,
     pub elapsed_ms: u128,
+}
+
+/// Resolves the requested theme to one with a Typst layout. Unknown ids fall
+/// back to light-notes (the Typst side would fall back too, silently — see
+/// `themes` in `typst/main.typ`); the second return value names the requested
+/// id so the report can surface the fallback.
+fn resolve_theme(theme: Option<String>) -> (String, Option<String>) {
+    let requested = theme.unwrap_or_else(|| "light-notes".to_string());
+    if slide_typst::SUPPORTED_THEMES.contains(&requested.as_str()) {
+        (requested, None)
+    } else {
+        ("light-notes".to_string(), Some(requested))
+    }
 }
 
 /// Exports `slides` (the editor's current deck) or, when absent, the project's saved
@@ -87,8 +103,9 @@ pub async fn export_pdf(
         .and_then(|p| p.aspect_ratio)
         .or_else(|| slides.first().and_then(|s| s.aspect_ratio))
         .unwrap_or(AspectRatio::Ratio16x9);
+    let (theme, theme_fallback) = resolve_theme(theme);
     let options = ExportOptions {
-        theme: theme.unwrap_or_else(|| "light-notes".to_string()),
+        theme,
         aspect_ratio: serde_json::to_value(aspect)
             .ok()
             .and_then(|v| v.as_str().map(str::to_string))
@@ -104,7 +121,7 @@ pub async fn export_pdf(
         .map_err(|e| e.to_string())?;
 
     tauri::async_runtime::spawn_blocking(move || {
-        render_to_file(&slides, &options, Path::new(&path))
+        render_to_file(&slides, &options, Path::new(&path), theme_fallback)
     })
     .await
     .map_err(|e| format!("导出任务异常结束：{e}"))?
@@ -114,6 +131,7 @@ fn render_to_file(
     slides: &[serde_json::Value],
     options: &ExportOptions,
     path: &Path,
+    theme_fallback: Option<String>,
 ) -> Result<PdfExportReport, String> {
     let started = Instant::now();
     let rendered = renderer()
@@ -141,6 +159,7 @@ fn render_to_file(
         placeholder_slides,
         overflow_slides,
         missing_assets: rendered.missing_assets,
+        theme_fallback,
         elapsed_ms: started.elapsed().as_millis(),
     })
 }
@@ -203,6 +222,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn unknown_theme_falls_back_to_notes_and_is_reported() {
+        assert_eq!(resolve_theme(None), ("light-notes".to_string(), None));
+        assert_eq!(
+            resolve_theme(Some("dark-blue".to_string())),
+            ("dark-blue".to_string(), None)
+        );
+        assert_eq!(
+            resolve_theme(Some("no-such-theme".to_string())),
+            ("light-notes".to_string(), Some("no-such-theme".to_string()))
+        );
+    }
+
+    #[test]
     fn export_resolves_project_files_and_media_library_images() {
         let root = std::env::temp_dir().join(format!("pdf-export-{}", std::process::id()));
         let png = std::fs::read(concat!(
@@ -244,7 +276,7 @@ mod tests {
             serde_json::json!({ "kind": "future_kind", "title": "未移植" }),
         ];
         let out = root.join("deck.pdf");
-        let report = render_to_file(&slides, &options, &out).unwrap();
+        let report = render_to_file(&slides, &options, &out, None).unwrap();
 
         assert!(std::fs::read(&out).unwrap().starts_with(b"%PDF"));
         assert_eq!(report.pages, 3);

@@ -5,6 +5,10 @@
 #import "lib/base.typ": *
 #import "lib/components.typ": frame-inset, unsupported-page
 #import "themes/notes.typ" as notes
+#import "themes/light-terminal.typ" as light-terminal
+#import "themes/dark-terminal.typ" as dark-terminal
+#import "themes/dark-yellow.typ" as dark-yellow
+#import "themes/dark-blue.typ" as dark-blue
 #import "layouts/cover.typ" as cover
 #import "layouts/feature-grid.typ" as feature-grid
 #import "layouts/step-flow.typ" as step-flow
@@ -25,9 +29,15 @@
 
 #let deck = json("/deck.json")
 
-// Only 便签·稿纸 is ported so far; every theme id resolves to it until the
-// terminal themes get their own token files.
-#let themes = ("light-notes": notes)
+// 便签·稿纸, the terminal themes and the dark glass themes are ported; every
+// other theme id falls back to light-notes.
+#let themes = (
+  "light-notes": notes,
+  "light-terminal": light-terminal,
+  "dark-terminal": dark-terminal,
+  "dark-yellow": dark-yellow,
+  "dark-blue": dark-blue,
+)
 #let theme-module = themes.at(deck.at("theme", default: "light-notes"), default: notes)
 
 #let layouts = (

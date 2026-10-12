@@ -25,7 +25,11 @@
     )
   } else { copy }
   let height = measure(block(width: width - inset.left - inset.right, body)).height + 2 * inset.y
-  sheet(ctx, width, height, inset: inset, stroke: (left: 3 * px + th.edge, rest: 1 * px + th.edge), ruled: true, body)
+  // Terminal and glass `.focus-point`: uniform 1px border, no 3px left accent.
+  let stroke = if is-terminal(ctx) or is-glass(ctx) { 1 * px + th.edge } else {
+    (left: 3 * px + th.edge, rest: 1 * px + th.edge)
+  }
+  sheet(ctx, width, height, inset: inset, stroke: stroke, ruled: true, body)
 }
 
 #let ranking-row(ctx, item, f) = {
@@ -63,7 +67,7 @@
   let ranking = slide.at("ranking", default: ())
   if has(ranking) {
     v(16 * px * f)
-    line(length: 100%, stroke: 1 * px + th.primary.transparentize(35%))
+    divider-line(ctx, 100%)
     v(16 * px * f)
     txt(ctx, "body", ctx.ty.meta * f, 1.5, "正确的关注顺序：")
     v(8 * px * f)
@@ -90,15 +94,27 @@
       columns: (col-w, col-w),
       column-gutter: gap * px,
       left,
-      block(
-        width: col-w,
-        height: height,
-        fill: th.sheet,
-        stroke: 1 * px + th.edge,
-        radius: 2 * px,
-        inset: 2 * px,
-        block(width: 100%, height: 100%, stroke: 1 * px + th.edge, radius: 1 * px, inset: ex-pad - 2 * px, example),
-      ),
+      if th.deco.double-frame {
+        block(
+          width: col-w,
+          height: height,
+          fill: th.sheet,
+          stroke: 1 * px + th.edge,
+          radius: 2 * px,
+          inset: 2 * px,
+          block(width: 100%, height: 100%, stroke: 1 * px + th.edge, radius: 1 * px, inset: ex-pad - 2 * px, example),
+        )
+      } else {
+        block(
+          width: col-w,
+          height: height,
+          fill: th.sheet,
+          stroke: 1 * px + th.edge,
+          radius: th.radius.sheet * px,
+          inset: ex-pad,
+          example,
+        )
+      },
     )
   }
   center-v(width, avail, fit-height(width, avail, build, slide-index: ctx.index))

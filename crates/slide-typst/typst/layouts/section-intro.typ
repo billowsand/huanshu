@@ -18,34 +18,52 @@
 #let lead-parts(ctx, slide, count, f) = {
   let lead = ctx.theme.lead
   let ty = ctx.ty
+  let terminal = is-terminal(ctx)
   let parts = ()
   let badge = slide.at("badge", default: none)
   let badge = if has(badge) { badge } else { "章节导览" }
   parts.push(label-bar(ctx, badge, colors: (bg: lead.badge-bg, border: lead.badge-border, text: lead.badge-ink)))
   parts.push({
-    txt(ctx, "title", ty.title * f, 1.18, slide.title, fill: lead.ink, tracking: -0.02em)
+    txt(ctx, "title", ty.title * f, 1.18, slide.title, fill: lead.ink, tracking: ctx.theme.tracking.title)
     v(0.85 * rem * f)
-    line(length: 10 * rem, stroke: 1 * px + lead.soft.transparentize(35%))
+    // `.section-intro__divider` is a `.slide-title-divider` (160px wide); on
+    // light-notes it keeps the lead sheet's soft tint instead of primary.
+    divider-line(ctx, 10 * rem, height: 2 * px, faded: true, paint: lead.soft.transparentize(35%))
   })
   if has(slide.at("subtitle", default: none)) {
     // `max-width: 24rem`: never wider than the sheet itself.
     parts.push(layout(size => block(
       width: calc.min(24 * rem, size.width),
-      txt(ctx, "subtitle", ty.note * f, 1.7, rich(slide.subtitle), fill: lead.soft),
+      // `.section-intro__subtitle` has no color of its own: it inherits the
+      // lead sheet's ink (the glass themes) instead of the muted soft ink.
+      txt(ctx, "subtitle", ty.note * f, 1.7, rich(slide.subtitle), fill: if is-glass(ctx) {
+        lead.ink
+      } else { lead.soft }),
     )))
   }
   parts.push({
     line(length: 100%, stroke: 1 * px + lead.rule)
     v(1 * rem * f)
-    txt(ctx, "caption", ty.caption * f, 1.5, "本章关注", fill: lead.soft, tracking: 0.22em)
+    // Terminal overrides `.section-intro__meta-label` to the 0.06em label tracking.
+    txt(ctx, "caption", ty.caption * f, 1.5, "本章关注", fill: lead.soft, tracking: if terminal {
+      ctx.theme.tracking.label
+    } else { 0.22em })
     v(0.45 * rem * f)
-    txt(ctx, "body", ty.body-strong * f, 1.5, str(count) + " 个子主题", fill: lead.ink)
+    // `.section-intro__meta-value` is `--success-light` outside light-notes.
+    txt(ctx, "body", ty.body-strong * f, 1.5, str(count) + " 个子主题", fill: if terminal or is-glass(ctx) {
+      ctx.theme.tones.green.text
+    } else { lead.ink })
   })
   if has(slide.at("note", default: none)) {
     parts.push(block(
       stroke: (left: 3 * px + lead.note-rule),
       inset: (left: 0.85 * rem),
-      txt(ctx, "body", ty.meta * f, 1.45, rich(slide.note, emphasis: lead.ink), fill: lead.soft),
+      // `.section-intro__note` keeps the plain ink color outside light-notes.
+      txt(ctx, "body", ty.meta * f, 1.45, rich(slide.note, emphasis: lead.ink), fill: if terminal or is-glass(
+        ctx,
+      ) {
+        ctx.theme.ink
+      } else { lead.soft }),
     ))
   }
   parts
@@ -71,7 +89,8 @@
     height: height,
     fill: lead.fill,
     stroke: 1 * px + lead.border,
-    radius: 3 * px,
+    // Terminal forces every card radius to 2px; glass uses its 12px cards.
+    radius: if is-terminal(ctx) or is-glass(ctx) { ctx.theme.radius.card * px } else { 3 * px },
     inset: pad,
     clip: true,
     // `justify-content: space-between`: first part on top, last at the bottom.
@@ -87,8 +106,10 @@
   size,
   1.5,
   if idx < 9 { "0" } + str(idx + 1),
-  fill: tone.solid,
-  tracking: 0.14em,
+  // Terminal forces `.section-intro__card-index` to muted text at 0.06em. The
+  // base style (glass themes) is the solid tone with no letter spacing.
+  fill: if is-terminal(ctx) { ctx.theme.muted } else { tone.solid },
+  tracking: if is-terminal(ctx) { ctx.theme.tracking.label } else if is-glass(ctx) { 0em } else { 0.14em },
 )
 
 #let card-text(ctx, card, compact, f) = {
@@ -206,8 +227,11 @@
         width: w,
         height: h,
         fill: ctx.theme.paper,
-        stroke: (top: 3 * px + tone.solid, rest: 1 * px + ctx.theme.edge),
-        radius: 2 * px,
+        // Terminal and glass cards are plain panels: no 3px tone bar on top.
+        stroke: if is-terminal(ctx) or is-glass(ctx) { 1 * px + ctx.theme.edge } else {
+          (top: 3 * px + tone.solid, rest: 1 * px + ctx.theme.edge)
+        },
+        radius: if is-glass(ctx) { ctx.theme.radius.card * px } else { 2 * px },
         inset: pad,
         clip: true,
         content(card, i, f),

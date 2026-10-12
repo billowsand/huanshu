@@ -44,10 +44,12 @@
     grid(
       columns: (auto, 1fr),
       align: (left + horizon, right + horizon),
+      // `.phase-chip`: a full 999px pill on the glass themes (the template's
+      // `border-radius: 999px`); notes/terminal use squared 2px chips.
       box(
         fill: tone.solid,
         stroke: 1 * px + tone.border,
-        radius: 2 * px,
+        radius: if is-glass(ctx) { ctx.theme.radius.pill * px } else { 2 * px },
         inset: (x: 0.7 * rem * f, y: 0.32 * rem * f),
         txt(ctx, "number", ctx.ty.meta * f, 1.5, str(phase.at("phase", default: "")), fill: tone.contrast, tracking: 0.01em),
       ),
@@ -67,7 +69,8 @@
     height: calc.max(natural, d.head-min * px * f),
     fill: tone.bg,
     stroke: 1 * px + tone.border,
-    radius: (top: 3 * px),
+    // `.phase-head` is a 12px glass card outside light-notes/terminal.
+    radius: if is-glass(ctx) { ctx.theme.radius.card * px } else { (top: 3 * px) },
     inset: inner,
     content,
   )
@@ -90,7 +93,7 @@
     height: calc.max(natural, d.hl-min * px * f),
     fill: tone.bg,
     stroke: (top: 2 * px + tone.solid, rest: 1 * px + tone.border),
-    radius: 2 * px,
+    radius: if is-glass(ctx) { ctx.theme.radius.card * px } else { 2 * px },
     inset: inner,
     // Centered like the template's flex row inside its min-height.
     center-v(width - 2 * inner.x, calc.max(natural, d.hl-min * px * f) - 2 * inner.y - 3 * px, content),
@@ -120,7 +123,8 @@
         height: dot,
         fill: tone.solid,
         stroke: 1 * px + tone.border,
-        radius: 2 * px,
+        // `.step-dot` is a full circle on the glass themes.
+        radius: if is-glass(ctx) { ctx.theme.radius.pill * px } else { 2 * px },
         align(center + horizon, text(
           font: ctx.fonts.number,
           size: ctx.ty.caption * d.dot-k * f,
@@ -180,7 +184,7 @@
       height: wrap-h,
       fill: th.paper,
       stroke: 1 * px + th.edge,
-      radius: (bottom: 3 * px),
+      radius: if is-glass(ctx) { ctx.theme.radius.card * px } else { (bottom: 3 * px) },
       inset: wrap-pad,
       clip: true,
       steps-list(ctx, phase, d, width - 2 * wrap-pad.x, f),
@@ -215,9 +219,9 @@
   let height = size.height + 28 * px
 
   let header = block(width: width, {
-    txt(ctx, "title", ctx.ty.title, 1.18, slide.title, tracking: -0.02em)
+    txt(ctx, "title", ctx.ty.title, 1.18, slide.title, tracking: th.tracking.title)
     v(0.6 * rem)
-    line(length: 100%, stroke: 1 * px + th.primary.transparentize(35%))
+    divider-line(ctx, 100%, height: 2 * px, faded: true)
   })
   // Subtitle tag and summary card share one row (`.process-topbar`).
   let topbar = {
@@ -226,22 +230,22 @@
       parts.push(box(
         fill: th.tones.neutral.bg,
         stroke: 1 * px + th.tones.neutral.border,
-        radius: 2 * px,
+        radius: if is-glass(ctx) { th.radius.pill * px } else { 2 * px },
         inset: (x: 12 * px, y: 2 * px),
-        txt(ctx, "subtitle", ctx.ty.subtitle, 1.5, slide.subtitle, fill: th.tones.neutral.text, tracking: 0.035em),
+        txt(ctx, "subtitle", ctx.ty.subtitle, 1.5, slide.subtitle, fill: th.tones.neutral.text, tracking: th.tracking.label),
       ))
     }
     if has(slide.at("summary", default: none)) {
       parts.push(block(
         fill: th.paper,
         stroke: 1 * px + th.edge,
-        radius: 4 * px,
+        radius: if is-terminal(ctx) or is-glass(ctx) { th.radius.card * px } else { 4 * px },
         inset: (x: 1 * rem, y: 0.75 * rem),
         grid(
           columns: (42 * px, 1fr),
           column-gutter: 0.75 * rem,
           align: horizon,
-          line(length: 42 * px, stroke: 1 * px + th.primary.transparentize(35%)),
+          divider-line(ctx, 42 * px, height: 2 * px),
           txt(ctx, "body", ctx.ty.body-tight, 1.45, slide.summary, fill: th.muted),
         ),
       ))

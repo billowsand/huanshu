@@ -44,6 +44,26 @@ const TEMPLATES: &[(&str, &str)] = &[
         include_str!("../typst/themes/notes.typ"),
     ),
     (
+        "/themes/light-terminal.typ",
+        include_str!("../typst/themes/light-terminal.typ"),
+    ),
+    (
+        "/themes/dark-terminal.typ",
+        include_str!("../typst/themes/dark-terminal.typ"),
+    ),
+    (
+        "/themes/dark-yellow.typ",
+        include_str!("../typst/themes/dark-yellow.typ"),
+    ),
+    (
+        "/themes/dark-blue.typ",
+        include_str!("../typst/themes/dark-blue.typ"),
+    ),
+    (
+        "/themes/_check.typ",
+        include_str!("../typst/themes/_check.typ"),
+    ),
+    (
         "/layouts/cover.typ",
         include_str!("../typst/layouts/cover.typ"),
     ),
@@ -136,6 +156,16 @@ pub const SUPPORTED_KINDS: &[&str] = &[
 
 const DEFAULT_FONT: &str = "Microsoft YaHei";
 
+/// Theme ids with a Typst token file under `typst/themes/`; unknown ids fall
+/// back to `light-notes` (see `themes` in `typst/main.typ`).
+pub const SUPPORTED_THEMES: &[&str] = &[
+    "light-notes",
+    "light-terminal",
+    "dark-terminal",
+    "dark-yellow",
+    "dark-blue",
+];
+
 /// Font fallback list per slide font role (mirrors `src/typography.ts` `fontRoles`).
 #[derive(Debug, Clone, Serialize)]
 pub struct FontRoles {
@@ -184,7 +214,8 @@ impl Default for FontRoles {
 
 #[derive(Debug, Clone)]
 pub struct ExportOptions {
-    /// Theme id from `src/themes/catalog.ts`; only `light-notes` is ported so far.
+    /// Theme id from `src/themes/catalog.ts`; see [`SUPPORTED_THEMES`].
+    /// Unknown ids fall back to `light-notes`.
     pub theme: String,
     /// `ratio_16x9` / `ratio_32x9` / `ratio_48x9`.
     pub aspect_ratio: String,
@@ -360,6 +391,27 @@ impl Renderer {
             overflows,
             missing_assets: prepared.missing,
         })
+    }
+
+    /// Compiles `typst/themes/_check.typ`, which asserts that every theme
+    /// module exposes the same dictionary keys plus a `background` painter.
+    /// Guards against theme drift; used by the test suite.
+    #[doc(hidden)]
+    pub fn check_theme_interface(&self) -> Result<(), RenderError> {
+        let world = SlideWorld {
+            renderer: self,
+            main: file_id("/themes/_check.typ"),
+            deck: Bytes::new(&b"{}"[..]),
+            images: HashMap::new(),
+            sources: Mutex::new(HashMap::new()),
+            missing_icons: Mutex::new(HashSet::new()),
+        };
+        typst::compile::<PagedDocument>(&world)
+            .output
+            .map_err(|errors| RenderError {
+                diagnostics: errors.iter().map(|d| world.describe(d)).collect(),
+            })?;
+        Ok(())
     }
 
     /// Drops families that are not installed so Typst does not warn about every

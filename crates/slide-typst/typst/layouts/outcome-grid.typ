@@ -17,22 +17,28 @@
 
 #let card-tone(ctx, card) = tone-of(ctx, card.at("tone", default: none))
 
-// `.outcome-tag`: a toned pill with a 3px double border.
-#let outcome-tag(ctx, tone, value, size) = box(
-  fill: tone.bg,
-  stroke: 1 * px + tone.border,
-  radius: 2 * px,
-  inset: 1 * px,
-  box(stroke: 1 * px + tone.border, radius: 1 * px, inset: (x: 10 * px, y: 0pt), txt(
-    ctx,
-    "caption",
-    size,
-    1.5,
-    value,
-    fill: tone.text,
-    tracking: 0.035em,
-  )),
-)
+// `.outcome-tag`: a toned pill; light-notes gives it a 3px double border
+// (`deco.double-frame`), other themes a plain 1px frame.
+#let outcome-tag(ctx, tone, value, size) = {
+  let label = txt(ctx, "caption", size, 1.5, value, fill: tone.text, tracking: ctx.theme.tracking.label)
+  if ctx.theme.deco.double-frame {
+    box(
+      fill: tone.bg,
+      stroke: 1 * px + tone.border,
+      radius: ctx.theme.radius.pill * px,
+      inset: 1 * px,
+      box(stroke: 1 * px + tone.border, radius: 1 * px, inset: (x: 10 * px, y: 0pt), label),
+    )
+  } else {
+    box(
+      fill: tone.bg,
+      stroke: 1 * px + tone.border,
+      radius: ctx.theme.radius.pill * px,
+      inset: (x: 10 * px, y: 0pt),
+      label,
+    )
+  }
+}
 
 // The four aligned fields of one card; `none` where the card has no value.
 #let fields(ctx, card, d, f) = {
@@ -71,15 +77,23 @@
   let card-h = 2 * card-pad.y * px * f + 4 * px + 2 * pad-y + content-h
   let card-block(card, cell) = {
     let tone = card-tone(ctx, card)
-    block(width: col-w, height: card-h, fill: th.paper, stroke: 1 * px + tone.border, radius: 4 * px, {
+    // Terminal and glass cards are plain panels: no tone border, no top bar
+    // (the screen's `outcome-top-bar` only renders when the data sets a bar
+    // class).
+    let flat = is-terminal(ctx) or is-glass(ctx)
+    block(width: col-w, height: card-h, fill: th.paper, stroke: 1 * px + if flat {
+      th.edge
+    } else { tone.border }, radius: if flat { th.radius.card * px } else { 4 * px }, {
       // `outline: 1px; outline-offset: -5px` — a hairline frame 4–5px inside.
-      place(top + left, dx: 4.5 * px, dy: 4.5 * px, rect(
-        width: col-w - 9 * px,
-        height: card-h - 9 * px,
-        stroke: 1 * px + th.outline,
-      ))
+      if th.deco.certificate {
+        place(top + left, dx: 4.5 * px, dy: 4.5 * px, rect(
+          width: col-w - 9 * px,
+          height: card-h - 9 * px,
+          stroke: 1 * px + th.outline,
+        ))
+      }
       pad(x: card-pad.x * px, y: card-pad.y * px * f, {
-        block(width: 100%, height: 4 * px, fill: tone.solid)
+        if not flat { block(width: 100%, height: 4 * px, fill: tone.solid) }
         pad(x: pad-x, y: pad-y, stack(
           spacing: row-gap * rem * f,
           ..rows.map(r => block(width: 100%, height: heights.at(r), cell.at(r))),

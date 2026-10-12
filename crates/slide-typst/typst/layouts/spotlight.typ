@@ -30,7 +30,7 @@
   height: h,
   fill: ctx.theme.paper,
   stroke: 1 * px + ctx.theme.edge,
-  radius: 4 * px,
+  radius: if is-terminal(ctx) or is-glass(ctx) { ctx.theme.radius.card * px } else { 4 * px },
   {
     let body = {
       let ink = ctx.theme.ink.transparentize(60%)
@@ -116,7 +116,7 @@
     height: h,
     fill: th.paper,
     stroke: 1 * px + th.edge,
-    radius: 2 * px,
+    radius: if is-glass(ctx) { th.radius.card * px } else { 2 * px },
     inset: frame * px,
     block(width: 100%, height: 100%, fill: th.media-bg, clip: true, body),
   )
@@ -236,7 +236,9 @@
         align: horizon,
         box(width: badge, height: badge, fill: tone.solid, stroke: 1 * px + tone.border, radius: 2 * px, align(
           center + horizon,
-          text(font: ctx.fonts.number, size: ty.caption * 0.85 * f, fill: th.paper, str(i + 1)),
+          // The screen paints the digit in tone.text on tone.solid (invisible);
+          // the contrast token is what makes the number readable.
+          text(font: ctx.fonts.number, size: ty.caption * 0.85 * f, fill: tone.contrast, str(i + 1)),
         )),
         txt(ctx, "body", meta, 1.45, step, fill: soft),
       )
@@ -248,10 +250,15 @@
 
   block(
     width: 100%,
-    // light-notes forces the paper fill (`!important`); a highlight only tints the border.
-    fill: th.paper,
-    stroke: (left: 3 * px + tone.solid, rest: 1 * px + if highlighted { tone.border } else { th.edge }),
-    radius: 2 * px,
+    // light-notes forces the paper fill (`!important`) with a 3px tone bar on
+    // the left; terminal and glass panels are plain glass cards and only pick
+    // up the tone tint when the panel carries a `highlight` (see the inline
+    // style guard in KeynoteSpotlightSlide.vue).
+    fill: if is-terminal(ctx) or is-glass(ctx) { if highlighted { tone.bg } else { th.card } } else { th.paper },
+    stroke: if is-terminal(ctx) or is-glass(ctx) { 1 * px + if highlighted { tone.border } else { th.edge } } else {
+      (left: 3 * px + tone.solid, rest: 1 * px + if highlighted { tone.border } else { th.edge })
+    },
+    radius: if is-glass(ctx) { th.radius.card * px } else { 2 * px },
     inset: (x: 10 * px + 6 * px * f, y: 6 * px + 6 * px * f),
     stack(spacing: 8 * px * f, ..parts),
   )
@@ -268,7 +275,10 @@
     columns: (auto, 1fr),
     column-gutter: 12 * px,
     align: horizon,
-    box(fill: label-tone.bg, stroke: 1 * px + label-tone.border, radius: 4 * px, inset: (x: 10 * px, y: 2 * px), txt(
+    // Terminal `.tag-pill` radius is 2px, glass 999px.
+    box(fill: label-tone.bg, stroke: 1 * px + label-tone.border, radius: if is-terminal(ctx) or is-glass(ctx) {
+      th.radius.pill * px
+    } else { 4 * px }, inset: (x: 10 * px, y: 2 * px), txt(
       ctx,
       "caption",
       ctx.ty.subtitle,
@@ -276,7 +286,7 @@
       label,
       fill: label-tone.text,
     )),
-    txt(ctx, "title", ctx.ty.title, 1.18, slide.title, tracking: -0.02em),
+    txt(ctx, "title", ctx.ty.title, 1.18, slide.title, tracking: th.tracking.title),
   ))
   let gap = 16 * px
   let body-h = size.height - measure(header).height - gap

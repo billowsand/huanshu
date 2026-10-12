@@ -40,7 +40,10 @@
       col-w,
       height,
       inset: inset,
-      stroke: (top: 3 * px + item-tone(ctx, item).solid, rest: 1 * px + th.edge),
+      // Terminal and glass tiles are plain panels without the 3px tone bar.
+      stroke: if is-terminal(ctx) or is-glass(ctx) { 1 * px + th.edge } else {
+        (top: 3 * px + item-tone(ctx, item).solid, rest: 1 * px + th.edge)
+      },
       ruled: true,
       tile-body(ctx, item, f),
     )))
@@ -68,12 +71,14 @@
     1.18,
     value,
     fill: fill,
-    tracking: -0.02em,
+    tracking: th.tracking.title,
   )))
   title-line(slide.title, th.ink)
-  if has(accent) { title-line(accent, th.primary) }
+  // The screen's `text="var(--primary)"` on the accent span never applies (the
+  // attributify value is dropped), so the accent line renders in ink.
+  if has(accent) { title-line(accent, if is-terminal(ctx) or is-glass(ctx) { th.ink } else { th.primary }) }
   v(12 * px * f)
-  align(center, line(length: calc.min(256 * px, width), stroke: 1 * px + th.primary.transparentize(35%)))
+  align(center, divider-line(ctx, calc.min(256 * px, width), height: 2 * px, faded: true))
   v(16 * px * f + gap) // `.slide-header` margin-bottom, then the column gap
   if items.len() > 0 {
     let grid-w = calc.min(672 * px * wf, width)

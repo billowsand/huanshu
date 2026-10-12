@@ -49,8 +49,14 @@
           .map(((i, side)) => block(
             width: 100%,
             fill: tones.at(i).bg,
-            stroke: (top: 3 * px + tones.at(i).solid, rest: 1 * px + tones.at(i).border),
-            radius: (top: 2 * px),
+            // Terminal and glass `.cp-header`: a uniform 1px tone border, no
+            // 3px top bar; glass rounds it to 10px.
+            stroke: if is-terminal(ctx) or is-glass(ctx) { 1 * px + tones.at(i).border } else {
+              (top: 3 * px + tones.at(i).solid, rest: 1 * px + tones.at(i).border)
+            },
+            radius: if is-glass(ctx) { 10 * px } else if is-terminal(ctx) {
+              ctx.theme.radius.card * px
+            } else { (top: 2 * px) },
             inset: (x: 18 * px, y: 14 * px * f),
             grid(
               columns: (auto, auto, 1fr),
@@ -58,7 +64,9 @@
               align: horizon,
               if has(side.at("icon", default: none)) { icon(side.icon, tones.at(i).text, ctx.ty.icon-lg) },
               if mode == "pros-cons" {
-                box(stroke: 1 * px + tones.at(i).text, radius: 4 * px, inset: (x: 6 * px, y: 2 * px), txt(
+                box(stroke: 1 * px + tones.at(i).text, radius: if is-terminal(ctx) or is-glass(ctx) {
+                  ctx.theme.radius.pill * px
+                } else { 4 * px }, inset: (x: 6 * px, y: 2 * px), txt(
                   ctx,
                   "caption",
                   14 * px,
@@ -107,13 +115,23 @@
         block(
           width: 100%,
           height: height,
-          fill: if highlight { tone.bg } else if calc.odd(row) { th.stripe } else { th.paper },
-          stroke: (
-            left: 3 * px + tone.solid,
-            top: 1 * px + tone.border,
-            right: 1 * px + tone.border,
-            bottom: (paint: th.edge, thickness: 1 * px, dash: "dashed"),
-          ),
+          // Non-highlighted `.cp-item` is transparent on the glass themes.
+          fill: if highlight { tone.bg } else if is-glass(ctx) {
+            none
+          } else if calc.odd(row) and th.stripe != none { th.stripe } else { th.paper },
+          // Terminal `.cp-item`: 1px borders, the left one in the solid tone.
+          // Glass `.cp-item`: a uniform 1px tone border, rounded 10px.
+          stroke: if is-glass(ctx) { 1 * px + tone.border } else if is-terminal(ctx) {
+            (left: 1 * px + tone.solid, rest: 1 * px + tone.border)
+          } else {
+            (
+              left: 3 * px + tone.solid,
+              top: 1 * px + tone.border,
+              right: 1 * px + tone.border,
+              bottom: (paint: th.edge, thickness: 1 * px, dash: "dashed"),
+            )
+          },
+          radius: if is-glass(ctx) { 10 * px } else { 0 * px },
           inset: (x: 20 * px, y: pad-y * f),
           item-cell(i, item, row),
         )

@@ -8,8 +8,13 @@
 
 #let item-body(ctx, item, f) = {
   let th = ctx.theme
+  let glass = is-glass(ctx)
   let marker = if has(item.at("step", default: none)) {
-    step-stamp(ctx, item.step, f: f)
+    // StepNumber: a full 999px pill on the glass themes, its digit in
+    // `--primary-light`.
+    step-stamp(ctx, item.step, f: f, radius: if glass { 999 } else { 3 }, digit: if glass {
+      th.primary-strong
+    } else { auto })
   } else if has(item.at("icon", default: none)) {
     pad(top: 4 * px * f, icon(item.icon, th.primary, ctx.ty.icon-2xl * f))
   }
@@ -30,7 +35,11 @@
     width,
     height,
     inset: inset,
-    stroke: (left: 3 * px + ctx.theme.edge, rest: 1 * px + ctx.theme.edge),
+    // `.section-list-card` is a plain glass panel on the dark glass themes;
+    // light-notes keeps the inset 3px left edge, terminal its 1px frame.
+    stroke: if is-glass(ctx) { 1 * px + ctx.theme.edge } else {
+      (left: 3 * px + ctx.theme.edge, rest: 1 * px + ctx.theme.edge)
+    },
     ruled: true,
     body,
   )

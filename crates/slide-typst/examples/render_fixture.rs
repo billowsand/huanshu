@@ -1,9 +1,10 @@
 //! Renders the layout fixture to PDF (and optionally one PNG per page).
 //!
-//!   cargo run -p slide-typst --example render_fixture -- [fixture.json] [out-dir] [--png] [--kinds a,b] [--aspect ratio_32x9] [--assets manifest.json]
+//!   cargo run -p slide-typst --example render_fixture -- [fixture.json] [out-dir] [--png] [--kinds a,b] [--aspect ratio_32x9] [--assets manifest.json] [--theme light-notes]
 //!
 //! Defaults: fixtures/all-layout-blueprints.json → target/slide-typst/, only the
-//! kinds that have a Typst layout (pass `--kinds all` to include placeholders).
+//! kinds that have a Typst layout (pass `--kinds all` to include placeholders),
+//! theme `light-notes`.
 
 use std::path::PathBuf;
 use std::time::Instant;
@@ -14,12 +15,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut png = false;
     let mut kinds: Option<String> = None;
     let mut aspect = "ratio_16x9".to_string();
+    let mut theme = "light-notes".to_string();
     let mut manifest: Option<PathBuf> = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--png" => png = true,
             "--kinds" => kinds = args.next(),
             "--aspect" => aspect = args.next().unwrap_or(aspect),
+            "--theme" => theme = args.next().unwrap_or(theme),
             "--assets" => manifest = args.next().map(PathBuf::from),
             _ => positional.push(arg),
         }
@@ -55,6 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let options = slide_typst::ExportOptions {
         title: Some("Layout fixture".into()),
+        theme,
         aspect_ratio: aspect,
         assets: match &manifest {
             Some(path) => slide_typst::Assets::from_manifest(path)?,

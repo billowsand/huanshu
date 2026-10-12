@@ -21,10 +21,17 @@
 
 #let pill(ctx, tone, value, f) = box(
   fill: tone.bg,
-  stroke: (paint: tone.border, thickness: 1 * px, dash: "dashed"),
-  radius: 4 * px,
+  // light-notes makes the pills dashed; every other theme keeps them solid,
+  // at the theme's pill radius (999px on the glass themes).
+  stroke: if is-terminal(ctx) or is-glass(ctx) { 1 * px + tone.border } else {
+    (paint: tone.border, thickness: 1 * px, dash: "dashed")
+  },
+  radius: if is-terminal(ctx) or is-glass(ctx) { ctx.theme.radius.pill * px } else { 4 * px },
   inset: (x: 0.65 * rem * f, y: 0.16 * rem * f),
-  txt(ctx, "caption", ctx.ty.caption * f, 1.2, value, fill: tone.text),
+  // The screen's `.issue-card__pill` has `opacity: 0.88` outside light-notes.
+  txt(ctx, "caption", ctx.ty.caption * f, 1.2, value, fill: if is-terminal(ctx) or is-glass(ctx) {
+    tone.text.transparentize(12%)
+  } else { tone.text }),
 )
 
 #let details(ctx, card, rows-mode, f) = {
@@ -70,8 +77,11 @@
     width: width,
     height: height,
     fill: ctx.theme.paper,
-    stroke: (left: 3 * px + tone.solid, rest: 1 * px + ctx.theme.edge),
-    radius: 2 * px,
+    // Terminal and glass `.issue-card`: a plain panel without the 3px tone bar.
+    stroke: if is-terminal(ctx) or is-glass(ctx) { 1 * px + ctx.theme.edge } else {
+      (left: 3 * px + tone.solid, rest: 1 * px + ctx.theme.edge)
+    },
+    radius: if is-glass(ctx) { ctx.theme.radius.card * px } else { 2 * px },
     clip: true,
     body,
   )

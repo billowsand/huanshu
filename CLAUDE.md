@@ -243,7 +243,8 @@ caption 只说图片「是什么」，说不出它「该放哪」。所以 `gene
 
 独立的 workspace crate，由 `src-tauri/src/commands/pdf.rs` 接入应用（见下方「应用接入」）。它在进程内嵌入 Typst 编译器，把 `SlideBlueprint`
 JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍然负责屏幕渲染，Typst 侧是另一套
-版式实现。目前只移植了「便签·稿纸」主题；17 个模板已全部移植（`SUPPORTED_KINDS`）。以后新增的模板在移植前
+版式实现。17 个模板（`SUPPORTED_KINDS`）与全部 5 个主题（`SUPPORTED_THEMES`：便签·稿纸、终端·纸/墨、暗·琥珀/星图）都已移植；
+未知主题 id 回落到便签（`main.typ` 的 `themes` 表兜底，`pdf.rs` 会把回落记进导出报告）。以后新增的模板在移植前
 会渲染成「Typst 版式尚未实现」占位页，不会丢页，导出结果弹窗会列出这些页。
 
 - Rust（`src/lib.rs`）：`Renderer::with_system_fonts()` 扫描一次系统字体（约 0.5 秒，进程内复用），
@@ -262,8 +263,18 @@ JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍
   位图不会放大到超过原始像素尺寸（与 `object-contain max-w-full max-h-full` 一致），SVG 可以自由缩放；
   侧栏用 `fit-height` 实测缩放，取代按字数分档的 `sideScale`。
 - 模板（`typst/`）：`main.typ` 负责分发；`lib/base.typ` 放单位、字号体系、富文本、图标和自动缩放；
-  `lib/components.typ` 放标题、页面骨架、卡片和色调；`themes/notes.typ` 是主题 token（取自 notes*.css）；
+  `lib/components.typ` 放标题、页面骨架、卡片和色调；`themes/<id>.typ` 是主题 token（取自对应的主题 CSS）；
   每个版式一个 `layouts/<kind>.typ`。
+- 主题接口：每个 `themes/<id>.typ` 导出一个 `theme` 字典（paper/card/ink/muted/edge/primary 系、media-bg、stripe、
+  sheet 系、lead 系等）加 `background(w, h)` 页面背景绘制函数。子字典固定为 `radius`（card/sheet/pill）、
+  `tracking`（title/label）、`deco`（ruled/tape/double-frame/certificate/stamp/section-num 开关）和
+  `tones`（neutral/blue/green/amber/red，各含 solid/text/bg/border/contrast，对应屏幕版 `toneVars()` 的
+  `--*-bg/--*-border/--*-light/--*-contrast/--*`）。键集合由 `themes/_check.typ` 编译期校验
+  （`Renderer::check_theme_interface`，有单测守护），新增键要五个主题一起加。
+- 主题分支：版式里优先用 `deco` 开关和 token 表达差异；不够时再分支。`is-terminal(ctx)` 按 `-terminal` 后缀
+  判断（终端 CSS 把所有元素拍平成 2px 面板）；`is-glass(ctx)` 显式列出 `dark-yellow` / `dark-blue`（它们没有
+  自己的版式 CSS，模板原始样式生效：玻璃卡、999px 胶囊、primary→透明的渐变分隔线——`divider-line()` 用
+  渐变 rect 画，Typst 的 line 带不了渐变）。
 - 约定：
   - 尺寸按 Vue 画布的 CSS px 书写，`px = 0.75pt`，16:9 页面正好是 13.333in × 7.5in。
   - 字号来自 `type-sizes(scale)`（移植了 `contentLoad` / `--type-scale`）。
@@ -293,6 +304,7 @@ JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍
     `collect_assets` 共用同一份写法规则，素材库是 `media:<id>` → `<media_dir>/<storage_path>`。
     **不要另写一套引用规则**，否则生成时合法的图片可能在导出时找不到。
   - 返回 `PdfExportReport`：占位页（模板还没有 PDF 版式）、溢出裁切页、缺失图片，由前端弹窗展示。
+    主题 id 不在 `SUPPORTED_THEMES` 时回落到便签，`theme_fallback` 字段记录请求的原 id。
     另有 `reveal_exported_file` 命令，在文件管理器中选中导出的文件。
   - 前端入口：编辑器预览栏的「导出 PDF」按钮（`Step3Editor` 的 `export-pdf` 事件），以及首页导出弹窗
     （`ExportDialog`）里的「PDF 文档」选项。导出状态由 `composables/usePdfExport.ts` 全局共享，进度和结果
@@ -310,6 +322,11 @@ JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍
     来跳过它的做法**实测无效**。
 - 新增一个版式：写 `layouts/<kind>.typ`，在 `main.typ` 的 `layouts` 表登记，在 `lib.rs` 的 `TEMPLATES` 和
   `SUPPORTED_KINDS` 里各加一项，并确保 `fixtures/all-layout-blueprints.json` 里有该 kind 的页面（有单测检查）。
+- 新增一个主题：写 `themes/<id>.typ`（theme 字典 + `background(w, h)`，键集合照抄现有主题），在 `main.typ`
+  的 `themes` 表登记，在 `lib.rs` 的 `TEMPLATES` 和 `SUPPORTED_THEMES` 里各加一项，并在 `themes/_check.typ`
+  里加 import（键集合校验会立刻发现缺漏）。然后用 Vue 对照页逐 kind 校准：`?theme=<id>&kind=<kind>`，
+  token 值可以从 CSS 变量抄，几何和「哪个 CSS 规则实际生效」必须 `measure()` 实测——主题专属 CSS
+  （`terminal.css`、`notes-layouts.css`）会覆盖模板原始样式，暗色玻璃主题则没有覆盖、原始样式生效。
 - 验证：
 
 ```bash
@@ -333,9 +350,19 @@ cargo run -p slide-typst --example render_fixture -- --png
   Typst 版按两侧最高的卡片计算上下区域，保证节点都在轴上；spotlight 的多图改为平铺；所有「按字数估算」的
   收缩规则都改成了实测；`center_grid` 的卡片区宽度上限（屏幕版固定 `max-w-2xl` 即 672px）在 32:9 / 48:9 下
   按 2 / 3 倍放宽，否则 8 列、12 列会被挤成细条；`outcome_grid` 卡片没有 `tag` 时不画空标签。
+  按主题分：
+  - 便签·稿纸：基本没有省略，装饰（稿线、纸胶带、双线框、证书框）全画。
+  - 终端·纸/墨：玻璃阴影、inset 高光和 backdrop-filter 省略（终端卡片本来就是纯色面板）；动画一律取静止态。
+  - 暗·琥珀/星图：backdrop-filter 的模糊/饱和度丢弃，玻璃卡画半透明平铺填充（恰好等于 GlassCard 的内联样式）；
+    `.slide-shell__ambient` 的动画模糊光斑按 preset 0 位置画静态径向渐斑（PDF 无模糊，且背景函数拿不到
+    每页的预设选择）；`--shell-frame` 顶部约 1% 白的光泽低于可见阈值，省略；`.section-num` 水印在屏幕上被卡片的
+    backdrop-blur 糊掉，PDF 里会透过半透明卡显出来；phase-chip/step-dot 的 86%→62% mix 渐变画成平的 tone.solid；
+    tl-node 的 glow 阴影、phase-head::after / steps-wrap__glow 模糊光斑省略。closing 的 kicker/subtitle/note/mark
+    照抄了模板里硬编码的 slate/琥珀色（屏幕在这些主题下同样不随主题变量变）。
 - 已知差异：没有阴影和毛玻璃（便签主题本身也基本不用）；`text-wrap: balance`（`base.typ` 的 `balanced`）
   目前只用在 `center_grid` 的居中标题上，其他页面标题仍按普通换行；屏幕版标题还会先分词再换行，PDF 没有；
-  终端两个主题还没移植。
+  屏幕上一行放不下的超长标题会被裁掉（如 cover），PDF 版换行显示；未知图标在 PDF 里渲染为兜底图标
+  （屏幕上 unocss 缺图标时不显示）。
 
 ## 多比例幻灯片支持 (16:9 / 32:9 / 48:9)
 

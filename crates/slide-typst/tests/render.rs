@@ -5,7 +5,7 @@
 use std::sync::OnceLock;
 
 use serde_json::{json, Value};
-use slide_typst::{ExportOptions, Renderer, SUPPORTED_KINDS};
+use slide_typst::{ExportOptions, Renderer, SUPPORTED_KINDS, SUPPORTED_THEMES};
 
 fn renderer() -> &'static Renderer {
     static RENDERER: OnceLock<Renderer> = OnceLock::new();
@@ -50,6 +50,82 @@ fn fixture_covers_every_supported_kind() {
             "fixture lacks a {kind} slide"
         );
     }
+}
+
+/// The layout fixture restricted to the kinds with a Typst layout.
+fn supported_fixture_slides() -> Vec<Value> {
+    load("../../fixtures/all-layout-blueprints.json")
+        .into_iter()
+        .filter(|s| SUPPORTED_KINDS.contains(&s["kind"].as_str().unwrap_or("")))
+        .collect()
+}
+
+#[test]
+fn every_theme_renders_the_fixture_deck() {
+    let slides = supported_fixture_slides();
+    for theme in SUPPORTED_THEMES {
+        let options = ExportOptions {
+            theme: theme.to_string(),
+            ..Default::default()
+        };
+        let rendered = render(&slides, &options);
+        assert!(
+            rendered.overflows.is_empty(),
+            "{theme} overflowed: {:?}",
+            rendered.overflows
+        );
+    }
+}
+
+#[test]
+fn stress_deck_overflows_match_notes_on_every_theme() {
+    let deck = load("tests/fixtures/stress.json");
+    for theme in SUPPORTED_THEMES {
+        let options = ExportOptions {
+            theme: theme.to_string(),
+            assets: fixture_assets(),
+            ..Default::default()
+        };
+        let rendered = render(&deck, &options);
+        // Same contract as `stress_deck_fits_or_reports_overflow`: only the
+        // 6-card feature grid and the overloaded spotlight may clip. Themes
+        // change colors and radii, not the amount of content, so the overflow
+        // set must be identical on every theme.
+        let overflowing: Vec<_> = rendered.overflows.iter().filter_map(|o| o.slide).collect();
+        assert_eq!(
+            overflowing,
+            vec![1, 6],
+            "{theme}: unexpected overflow set: {:?}",
+            rendered.overflows
+        );
+    }
+}
+
+#[test]
+fn unknown_theme_falls_back_to_light_notes_byte_for_byte() {
+    let slides = supported_fixture_slides();
+    let fallback = render(
+        &slides,
+        &ExportOptions {
+            theme: "no-such-theme".to_string(),
+            ..Default::default()
+        },
+    );
+    let notes = render(&slides, &ExportOptions::default());
+    assert_eq!(
+        fallback.pdf, notes.pdf,
+        "an unknown theme must render exactly the light-notes output"
+    );
+}
+
+#[test]
+fn theme_dictionaries_share_one_interface() {
+    // Compiles typst/themes/_check.typ: every theme module must expose the same
+    // theme keys (plus lead/radius/tracking/deco/tones sub-keys) and a
+    // background(w, h) painter.
+    renderer()
+        .check_theme_interface()
+        .unwrap_or_else(|err| panic!("{err}"));
 }
 
 #[test]

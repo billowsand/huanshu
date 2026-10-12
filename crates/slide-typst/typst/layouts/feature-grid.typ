@@ -29,7 +29,11 @@
   } else if row == "subtitle" {
     txt(ctx, "subtitle", body-size, 1.5, value, fill: th.muted)
   } else if row == "body" {
-    txt(ctx, "body", body-size, 1.625, rich(value, emphasis: tone.text), fill: th.muted)
+    // `.feature-copy` is `opacity-70`: exactly `muted` on light-notes, but the
+    // raw ink at 70% on the glass themes (no override CSS applies there).
+    txt(ctx, "body", body-size, 1.625, rich(value, emphasis: tone.text), fill: if is-glass(ctx) {
+      th.ink.transparentize(30%)
+    } else { th.muted })
   } else if row == "items" {
     stack(spacing: 0.5 * rem * f, ..value.map(item => {
       let item = if type(item) == str { (text: item) } else { item }
@@ -51,8 +55,12 @@
     block(
       width: 100%,
       fill: tone.bg,
-      stroke: (paint: tone.border, thickness: 1 * px, dash: "dashed"),
-      radius: 2 * px,
+      // light-notes dashes the risk frame; the screen's inline style is solid.
+      // Glass rounds it to a full pill (the template's `rounded-full`).
+      stroke: if is-terminal(ctx) or is-glass(ctx) { 1 * px + tone.border } else {
+        (paint: tone.border, thickness: 1 * px, dash: "dashed")
+      },
+      radius: if is-glass(ctx) { ctx.theme.radius.pill * px } else { 2 * px },
       inset: (x: 12 * px * f, y: 4 * px * f),
       align(center, txt(ctx, "body", body-size, 1.5, value, fill: tone.text)),
     )
@@ -60,8 +68,12 @@
     block(
       width: 100%,
       fill: tone.bg,
-      stroke: (left: 3 * px + tone.solid, rest: 1 * px + tone.border),
-      radius: 2 * px,
+      // Terminal and glass: a uniform 1px tone border without the 3px left
+      // accent; glass rounds it to 8px (the template's `rounded-lg`).
+      stroke: if is-terminal(ctx) or is-glass(ctx) { 1 * px + tone.border } else {
+        (left: 3 * px + tone.solid, rest: 1 * px + tone.border)
+      },
+      radius: if is-glass(ctx) { 8 * px } else { 2 * px },
       inset: (x: 12 * px * f, y: 8 * px * f),
       align(center, txt(ctx, "body", body-size, 1.5, "→ " + value, fill: tone.text)),
     )
@@ -82,7 +94,11 @@
   block(
     width: 100%,
     fill: tone.bg,
-    stroke: (top: 3 * px + tone.solid, bottom: 1 * px + tone.border),
+    // Terminal and glass `.feature-header`: only the 1px bottom tone border;
+    // the template's `.feature-top-bar` has no styles outside light-notes.
+    stroke: if is-terminal(ctx) or is-glass(ctx) { (bottom: 1 * px + tone.border) } else {
+      (top: 3 * px + tone.solid, bottom: 1 * px + tone.border)
+    },
     inset: (x: d.head-x * rem * f, y: d.head-y * rem * f),
     grid(
       columns: if has(icon-name) { (auto, 1fr) } else { (1fr,) },
@@ -112,7 +128,9 @@
   grid(
     columns: (col-w,) * cols,
     column-gutter: gap,
-    ..cards.map(card => paper-card(ctx, radius: 3 * px, inset: (x: card-pad.x, y: card-pad.y * f), clip: true, stack(
+    ..cards.map(card => paper-card(ctx, radius: if is-terminal(ctx) or is-glass(ctx) {
+      ctx.theme.radius.card * px
+    } else { 3 * px }, inset: (x: card-pad.x, y: card-pad.y * f), clip: true, stack(
       block(height: head-h, width: 100%, fill: tone-of(ctx, card.at("tone", default: none)).bg, header(ctx, card, d, f)),
       block(inset: pad, width: 100%, stack(spacing: 0.75 * rem * f, ..rows
         .zip(heights)

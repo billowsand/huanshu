@@ -12,6 +12,8 @@ export interface PdfExportReport {
   /** Slides clipped because their content did not fit even when shrunk. */
   overflow_slides: number[]
   missing_assets: Array<{ slide: number, reference: string, reason: string }>
+  /** The requested theme id when it had no PDF layout and the export fell back to light-notes. */
+  theme_fallback: string | null
   elapsed_ms: number
 }
 

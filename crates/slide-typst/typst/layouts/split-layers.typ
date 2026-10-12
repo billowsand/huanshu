@@ -21,9 +21,12 @@
     size: 46.4,
     f: f,
     text-size: ctx.ty.caption,
-    border: th.edge,
+    // `.split-left-step` uses the neutral (primary) tone border outside
+    // light-notes; on the glass themes it is a full pill.
+    border: if is-terminal(ctx) or is-glass(ctx) { th.tones.neutral.border } else { th.edge },
     tracking: 0.08em,
-    radius: 4,
+    // Terminal flattens every radius to 2px; glass uses its 999px pill.
+    radius: if is-glass(ctx) { 999 } else if is-terminal(ctx) { 2 } else { 4 },
   )
   let copy = {
     grid(
@@ -38,7 +41,8 @@
         1.5,
         pad2(idx + 1),
         fill: th.muted,
-        tracking: 0.14em,
+        // Terminal `.split-left-index` tracks at 0.06em.
+        tracking: if is-terminal(ctx) { th.tracking.label } else { 0.14em },
       )),
     )
     v(0.32 * rem * f)
@@ -60,11 +64,24 @@
     left-content(ctx, item, idx, f)
     if not last {
       v(connector.top * px * f)
-      pad(left: connector.left * px * f, line(angle: 90deg, length: connector.length * px * f, stroke: 1 * px + th.edge))
+      // `.split-left-connector`: a primary→glass gradient hairline on the dark
+      // glass themes, a flat edge rule elsewhere.
+      let conn = if is-glass(ctx) {
+        rect(width: 1 * px, height: connector.length * px * f, fill: gradient.linear(
+          (th.primary, 0%),
+          (th.paper, 100%),
+          angle: 90deg,
+        ))
+      } else { line(angle: 90deg, length: connector.length * px * f, stroke: 1 * px + th.edge) }
+      pad(left: connector.left * px * f, conn)
     }
   }
   let height = measure(block(width: inner-w, body)).height + 2 * card-pad.y * px * f + extra
-  sheet(ctx, width, height, inset: (x: card-pad.x * px, y: card-pad.y * px * f), radius: 4 * px, body)
+  sheet(ctx, width, height, inset: (x: card-pad.x * px, y: card-pad.y * px * f), radius: if is-terminal(ctx) or is-glass(
+    ctx,
+  ) {
+    ctx.theme.radius.card * px
+  } else { 4 * px }, body)
 }
 
 #let left-column(ctx, items, width, avail, f) = {
@@ -81,10 +98,14 @@
   let size = ctx.ty.caption * f
   block(
     width: 100%,
-    fill: th.paper,
-    // `box-shadow: inset 3px 0 0` in the tone ink, inside a toned hairline.
-    stroke: (left: 3 * px + tone.solid, rest: 1 * px + tone.border),
-    radius: 2 * px,
+    // light-notes: paper with an inset 3px tone bar; terminal and glass: a
+    // tone-tinted row with a uniform 1px tone border (rounded 8px on glass,
+    // the template's `rounded-lg`).
+    fill: if is-terminal(ctx) or is-glass(ctx) { tone.bg } else { th.paper },
+    stroke: if is-terminal(ctx) or is-glass(ctx) { 1 * px + tone.border } else {
+      (left: 3 * px + tone.solid, rest: 1 * px + tone.border)
+    },
+    radius: if is-glass(ctx) { 8 * px } else { 2 * px },
     inset: (left: 14 * px, right: 12 * px, y: 8 * px * f),
     layout(region => {
       let title = txt(ctx, "body", size, 1.5, layer.at("title", default: ""))

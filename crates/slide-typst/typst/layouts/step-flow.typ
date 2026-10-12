@@ -27,11 +27,23 @@
     let track-x = col-w / 2
     block(width: w, {
       // `.sf-track`: hairline joining the node centers, drawn under the nodes.
+      // Terminal sets it to the solid border color (`opacity: 1`); the glass
+      // themes draw a transparent→edge→transparent gradient at 45% opacity.
       if n > 1 {
-        place(top + left, dx: track-x, dy: 2.24 * rem, line(
-          length: w - 2 * track-x,
-          stroke: 2 * px + th.edge.transparentize(55%),
-        ))
+        let track = if is-glass(ctx) {
+          let fade = th.edge.transparentize(55%)
+          rect(width: w - 2 * track-x, height: 2 * px, radius: 999 * px, fill: gradient.linear(
+            (fade.transparentize(100%), 0%),
+            (fade, 20%),
+            (fade, 80%),
+            (fade.transparentize(100%), 100%),
+          ))
+        } else {
+          line(length: w - 2 * track-x, stroke: 2 * px + if is-terminal(ctx) {
+            th.edge
+          } else { th.edge.transparentize(55%) })
+        }
+        place(top + left, dx: track-x, dy: 2.24 * rem, track)
       }
       grid(
         columns: (col-w,) * n,
@@ -45,20 +57,23 @@
                 height: node-h,
                 fill: tone.bg,
                 stroke: 1 * px + tone.border,
-                radius: 3 * px,
+                // `.sf-hnode`: 1rem pill; terminal forces every radius to 2px.
+                radius: if is-glass(ctx) { 16 * px } else if is-terminal(ctx) { 2 * px } else { 3 * px },
                 {
                   align(center + horizon, icon(step.at("icon", default: "i-carbon:arrow-right"), tone.text, ty.icon-hero))
                   // `.sf-num`: stamped index tab over the node's top-left corner.
+                  // On the glass themes it is a borderless circle with a
+                  // hardcoded rgba(0,0,0,0.7) digit.
                   place(top + left, dx: -0.35 * rem, dy: -0.35 * rem, box(
                     width: 1.9 * rem,
                     height: 1.9 * rem,
                     fill: tone.solid,
-                    stroke: 1 * px + th.paper,
-                    radius: 2 * px,
+                    stroke: if is-glass(ctx) { none } else { 1 * px + th.paper },
+                    radius: if is-glass(ctx) { 999 * px } else { 2 * px },
                     align(center + horizon, text(
                       font: ctx.fonts.number,
                       size: ty.caption,
-                      fill: tone.contrast,
+                      fill: if is-glass(ctx) { rgb(0, 0, 0, 178) } else { tone.contrast },
                       str(i + 1),
                     )),
                   ))
@@ -67,9 +82,10 @@
               v(1 * rem)
               block(
                 width: 100%,
-                fill: th.paper,
+                // `.sf-hcard`: paper on light-notes; tone-tinted elsewhere.
+                fill: if is-terminal(ctx) or is-glass(ctx) { tone.bg } else { th.paper },
                 stroke: 1 * px + tone.border,
-                radius: 2 * px,
+                radius: if is-glass(ctx) { th.radius.card * px } else { 2 * px },
                 inset: (x: card-pad.x, y: card-pad.y * f),
                 align(center, {
                   block(height: title-h, title(step))
@@ -112,12 +128,16 @@
         column-gutter: 1 * rem,
         align: top,
         {
-          align(center, circle(
-            radius: 1.125 * rem,
-            fill: tone.bg,
-            stroke: 1 * px + tone.border,
-            align(center + horizon, text(font: ctx.fonts.number, size: ty.caption, fill: tone.text, str(i + 1))),
-          ))
+          // Terminal flattens `rounded-full` nodes into 2px squares.
+          let node-body = align(center + horizon, text(font: ctx.fonts.number, size: ty.caption, fill: tone.text, str(
+            i + 1,
+          )))
+          let node = if is-terminal(ctx) {
+            box(width: 2.25 * rem, height: 2.25 * rem, fill: tone.bg, stroke: 1 * px + tone.border, radius: 2 * px, node-body)
+          } else {
+            circle(radius: 1.125 * rem, fill: tone.bg, stroke: 1 * px + tone.border, node-body)
+          }
+          align(center, node)
           if not last {
             align(center, line(
               angle: 90deg,
