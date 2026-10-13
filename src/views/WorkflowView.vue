@@ -2925,11 +2925,6 @@ kbd {
   object-fit: fill;
 }
 
-/* 图还没到时的底：透明占位（不能白一下，翻页动画期间会闪）。 */
-.pres-slide-loading {
-  background: transparent;
-}
-
 /* ─── Slide page transitions ─── */
 
 /* Shared active state: stack absolutely, GPU-accelerated */

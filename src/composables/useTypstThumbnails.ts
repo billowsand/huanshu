@@ -121,19 +121,26 @@ export function useTypstThumbnails(opts: {
    * 把缓存压回 `maxCached`：不在 `wanted` 里、也没有在途请求的图，按最久没被点名的先丢。
    * 必须连「已显示键」一起忘掉，否则这一页再回到 `wanted` 时键还相等，永远不会重新请求。
    */
-  function evict(wanted: Set<number>) {
+  function evict(wantedPositions: Set<number>) {
     const limit = opts.maxCached
     if (!limit || Object.keys(thumbs.value).length <= limit) return
+    // `thumbs` / `lastUsed` 以数组下标为键，`shownKeys` / `pendingKeys` / `wantedPositions`
+    // 以子集位置为键（生成中有空位时两者不同），这里统一换算。
+    const positionOf = new Map(latestIndices.map((index, position) => [index, position]))
     const evictable = Object.keys(thumbs.value)
       .map(Number)
-      .filter(index => !wanted.has(index) && pendingKeys[index] === undefined)
+      .filter((index) => {
+        const position = positionOf.get(index)
+        return position === undefined || (!wantedPositions.has(position) && pendingKeys[position] === undefined)
+      })
       .sort((a, b) => (lastUsed[a] ?? 0) - (lastUsed[b] ?? 0))
     const next = { ...thumbs.value }
     for (const index of evictable) {
       if (Object.keys(next).length <= limit) break
       delete next[index]
-      delete shownKeys[index]
       delete lastUsed[index]
+      const position = positionOf.get(index)
+      if (position !== undefined) delete shownKeys[position]
     }
     thumbs.value = next
   }

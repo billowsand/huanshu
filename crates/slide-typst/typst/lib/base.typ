@@ -212,22 +212,24 @@
 // at least 10% per round whatever the metric does. Returns `none` when even
 // `min` is over the limit, like `fit-factor`.
 #let fit-scale(metric, limit, min: fit-min, max: 1, rounds: 10, tolerance: 0.005) = {
-  let over(f) = metric(f) > limit
-  if not over(max) { return max }
-  if over(min) { return none }
   // The interpolation works on numbers; `limit` may be authored as a length.
   let bound = fit-metric-value(limit)
+  // The metric at each end of the bracket, carried along so every round measures once.
+  let upper = fit-metric-value(metric(max))
+  if upper <= bound { return max }
+  let lower = fit-metric-value(metric(min))
+  if lower > bound { return none }
   let (lo, hi) = (min, max)
   for _ in range(rounds) {
     if hi - lo <= tolerance { break }
-    let (lower, upper) = (fit-metric-value(metric(lo)), fit-metric-value(metric(hi)))
     let next = if upper <= lower {
       (lo + hi) / 2
     } else {
       lo + (hi - lo) * (bound - lower) / (upper - lower)
     }
     let next = calc.clamp(next, lo + 0.1 * (hi - lo), hi - 0.1 * (hi - lo))
-    if fit-metric-value(metric(next)) <= bound { lo = next } else { hi = next }
+    let value = fit-metric-value(metric(next))
+    if value <= bound { (lo, lower) = (next, value) } else { (hi, upper) = (next, value) }
   }
   lo
 }
@@ -255,15 +257,16 @@
 
 // Fits `build` into `width × height`. If nothing fits, renders at `fit-min`,
 // clips like the browser's `overflow: hidden`, and emits an overflow marker.
-// `center: true` vertically centers the fitted content as well, reusing the
-// height that the last fit probe measured instead of measuring it again.
+// `center: true` vertically centers the fitted content as well, using the height
+// the search already measured at the chosen factor.
 #let fit-height(width, height, build, slide-index: none, center: false) = {
   let probe-at(f) = measure(block(width: width, build(f))).height
   let f = fit-scale(probe-at, height)
   if f != none {
-    let content = build(f)
-    if center { return center-v(width, height, content) }
-    return content
+    // `probe-at(f)` was measured by the search (the same memoized measurement), so
+    // centering costs no extra layout.
+    if center { return { v(calc.max(0pt, (height - probe-at(f)) / 2)); build(f) } }
+    return build(f)
   }
   let needed = probe-at(fit-min)
   overflow-marker(slide-index, needed, height)

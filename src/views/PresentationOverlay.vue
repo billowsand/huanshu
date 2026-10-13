@@ -422,12 +422,7 @@ onBeforeUnmount(() => {
               draggable="false"
               alt=""
             >
-            <div
-              v-else-if="stageImageEnabled() && !stage.failed.value && !stage.thumbs.value[presentSlide]"
-              class="pres-slide-loading"
-              :style="stageImageSize()"
-              aria-hidden="true"
-            />
+            <!-- 还没有图（首次进入、跳页超出预取范围）、占位页或失败：照旧渲染幻灯片组件，主画面不能空白。 -->
             <div
               v-else
               class="pres-slide"

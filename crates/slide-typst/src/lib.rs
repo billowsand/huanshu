@@ -526,6 +526,13 @@ impl Renderer {
             missing_icons: Mutex::new(HashSet::new()),
         };
         let result = typst::compile::<PagedDocument>(&world);
+        // Typst memoizes layout in a process-wide cache that only grows unless it is evicted.
+        // The app compiles on every thumbnail/stage refresh, so drop entries unused for the
+        // last 50 compiles; without this, memory grows without bound the longer the app runs.
+        // The typst CLI's watch mode uses 10, which is too tight here: the thumbnail grid, the
+        // presentation stage and the PDF export interleave different decks, and a page's
+        // layouts get evicted between two edits of it.
+        typst::comemo::evict(50);
         for warning in &result.warnings {
             eprintln!("[slide-typst] warning: {}", world.describe(warning));
         }
