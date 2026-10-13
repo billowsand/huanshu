@@ -51,6 +51,10 @@ function thumbnailsEnabledByPreference(): boolean {
  *   不自动重试，下一次内容/主题/尺寸变化时这些页会重新请求。
  * - **停用**：`enabled()` 为假时只是不发请求，已有的图保留（全览关了再开不用重渲）；
  *   localStorage 开关关掉时才清空，让调用方回退到幻灯片组件。
+ * - **`wanted` / `maxCached`**：只要 `wanted()` 里出现的下标（`thumbs` 的键，即传入数组的下标）
+ *   才进 `only`；`wanted` 不影响发给 Rust 的牌组，仍是整副、仍按子集位置（缓存键里有子集位置，
+ *   按 `wanted` 裁剪牌组会让翻一页就整批失效）。`maxCached` 超出时淘汰「不在 `wanted` 里、
+ *   最久没被请求过」的图，并同步忘掉它们的已显示键，这样它们回到 `wanted` 时会重新请求。
  *
  * `thumbs` 以传入数组的下标为键（不是子集位置），没有缩略图的页不出现。
  */
@@ -62,6 +66,10 @@ export function useTypstThumbnails(opts: {
   widthPx: () => number
   /** 为假时（例如全览没打开）不发请求，已有的图保留。 */
   enabled?: () => boolean
+  /** 只要这些下标（传入数组的下标）的图；默认全部。 */
+  wanted?: () => number[]
+  /** `thumbs` 里最多保留几张；超出时淘汰最久没请求过、且不在 `wanted` 里的。 */
+  maxCached?: number
 }): {
   thumbs: Ref<Record<number, TypstThumbnail>>
   failed: Ref<boolean>
@@ -76,6 +84,11 @@ export function useTypstThumbnails(opts: {
   /** 子集位置 → 当前显示的图的键 / 在途请求的键。 */
   let shownKeys: Record<number, string> = {}
   let pendingKeys: Record<number, string> = {}
+  /** 最近一次 `refresh` 时，`wanted` 里那几页在子集里的位置。响应到达时按它淘汰。 */
+  let latestWanted = new Set<number>()
+  /** 子集位置 → 最后一次被 `wanted` 点名的次序，`maxCached` 淘汰用它排序。 */
+  let lastUsed: Record<number, number> = {}
+  let accessCounter = 0
   /** 最近一次 `refresh` 时的键与页序映射，响应到达时用它判断图是否仍然有效、该落到哪一页。 */
   let latestKeys: string[] = []
   let latestIndices: number[] = []
@@ -87,10 +100,44 @@ export function useTypstThumbnails(opts: {
     return Math.max(WIDTH_BUCKET, Math.ceil(Math.max(opts.widthPx(), 1) / WIDTH_BUCKET) * WIDTH_BUCKET)
   }
 
+  /** `wanted()` 说的「要哪几页」，翻译成传给 Rust 的数组下标；默认全部已有蓝图的页。 */
+  function wantedIndices(all: Array<SlideBlueprint | null | undefined>): number[] {
+    if (!opts.wanted) return all.flatMap((slide, index) => (slide ? [index] : []))
+    const asked = new Set(opts.wanted().map(index => Math.max(0, Math.trunc(index))))
+    return all.flatMap((slide, index) => (slide && asked.has(index) ? [index] : []))
+  }
+
+  /** 标记这些下标刚被用到，并把它们排到 `wanted` 前面（淘汰顺序用）。 */
+  function touch(wanted: number[]) {
+    for (const index of wanted) lastUsed[index] = ++accessCounter
+  }
+
+  /**
+   * 把缓存压回 `maxCached`：不在 `wanted` 里、也没有在途请求的图，按最久没被点名的先丢。
+   * 必须连「已显示键」一起忘掉，否则这一页再回到 `wanted` 时键还相等，永远不会重新请求。
+   */
+  function evict(wanted: Set<number>) {
+    const limit = opts.maxCached
+    if (!limit || Object.keys(thumbs.value).length <= limit) return
+    const evictable = Object.keys(thumbs.value)
+      .map(Number)
+      .filter(index => !wanted.has(index) && pendingKeys[index] === undefined)
+      .sort((a, b) => (lastUsed[a] ?? 0) - (lastUsed[b] ?? 0))
+    const next = { ...thumbs.value }
+    for (const index of evictable) {
+      if (Object.keys(next).length <= limit) break
+      delete next[index]
+      delete shownKeys[index]
+      delete lastUsed[index]
+    }
+    thumbs.value = next
+  }
+
   function refresh() {
     if (!thumbnailsEnabledByPreference()) {
       thumbs.value = {}
       shownKeys = {}
+      lastUsed = {}
       return
     }
     if (!(opts.enabled?.() ?? true)) return
@@ -100,15 +147,24 @@ export function useTypstThumbnails(opts: {
     const width = widthBucket()
     const theme = document.documentElement.getAttribute('data-theme')
     const fonts = appSettings.settings.fonts
+    const wanted = wantedIndices(all)
+    touch(wanted)
     latestKeys = deck.map((slide, position) => JSON.stringify([slide, position, theme, fonts, width]))
     latestIndices = all.flatMap((slide, index) => (slide ? [index] : []))
+    // `latestIndices` 是子集位置 → 数组下标；`wanted` 反过来用。
+    const wantedPositions = latestIndices.flatMap((index, position) => (wanted.includes(index) ? [position] : []))
+    latestWanted = new Set(wantedPositions)
 
-    const only = latestKeys.flatMap((key, position) =>
-      shownKeys[position] !== key && pendingKeys[position] !== key ? [position] : [],
+    const only = wantedPositions.flatMap(position =>
+      shownKeys[position] !== latestKeys[position] && pendingKeys[position] !== latestKeys[position] ? [position] : [],
     )
-    if (!only.length) return
+    if (!only.length) {
+      evict(latestWanted)
+      return
+    }
     const requestKeys = [...latestKeys]
     for (const position of only) pendingKeys[position] = requestKeys[position]
+    evict(latestWanted)
     void render(deck, theme, width, only, requestKeys)
   }
 
@@ -153,6 +209,8 @@ export function useTypstThumbnails(opts: {
       }
       thumbs.value = next
       failed.value = false
+      // 这一批请求期间可能翻过页：新的 `wanted` 之外的图要按上限淘汰。
+      evict(latestWanted)
     } catch (e) {
       if (disposed) return
       for (const position of only) {
@@ -180,6 +238,8 @@ export function useTypstThumbnails(opts: {
   watch(() => Math.ceil(Math.max(opts.widthPx(), 1) / WIDTH_BUCKET), schedule)
   watch(() => opts.enabled?.() ?? true, schedule)
   watch(() => appSettings.settings.fonts, schedule, { deep: true })
+  // `wanted` 只决定请求哪几页（键里没有它），翻页时它会变，所以要单独盯着。
+  watch(() => (opts.wanted ? opts.wanted().join(',') : ''), schedule)
 
   // 主题切换会改 --chart-* / 主题 token，键里带主题 id，触发一次刷新即可。
   const themeObserver = new MutationObserver(schedule)
