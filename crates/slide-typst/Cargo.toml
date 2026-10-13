@@ -10,6 +10,8 @@ build = "build.rs"
 typst = "0.15.1"
 typst-layout = "0.15.1"
 typst-pdf = "0.15.1"
+# Rasterizes laid-out pages to PNG for the app's thumbnails (see `render_png`).
+typst-render = "0.15.1"
 typst-kit = { version = "0.15.1", default-features = false, features = ["scan-fonts"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -24,4 +26,3 @@ usvg = { version = "0.47", default-features = false }
 
 [dev-dependencies]
 base64 = "0.22"
-typst-render = "0.15.1"

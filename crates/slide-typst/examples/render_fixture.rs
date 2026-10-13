@@ -1,12 +1,14 @@
 //! Renders the layout fixture to PDF (and optionally one PNG per page).
 //!
-//!   cargo run -p slide-typst --example render_fixture -- [fixture.json] [out-dir] [--png] [--kinds a,b] [--aspect ratio_32x9] [--assets manifest.json] [--theme light-notes] [--chart-boxes]
+//!   cargo run -p slide-typst --example render_fixture -- [fixture.json] [out-dir] [--png] [--thumbs 560] [--kinds a,b] [--aspect ratio_32x9] [--assets manifest.json] [--theme light-notes] [--chart-boxes]
 //!
 //! Defaults: fixtures/all-layout-blueprints.json → target/slide-typst/, only the
 //! kinds that have a Typst layout (pass `--kinds all` to include placeholders),
 //! theme `light-notes`. `--chart-boxes` also writes `chart-boxes.json`: the
 //! plot box of every chart_focus slide, to render chart SVGs at (see
-//! scripts/chart-fixtures.ts).
+//! scripts/chart-fixtures.ts). `--thumbs <width_px>` writes `thumb-NN-<kind>.png`
+//! per page through `Renderer::render_png` (the path the app's thumbnails take)
+//! and prints the whole-deck and per-page timings.
 
 use std::path::PathBuf;
 use std::time::Instant;
@@ -20,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut theme = "light-notes".to_string();
     let mut manifest: Option<PathBuf> = None;
     let mut chart_boxes = false;
+    let mut thumbs: Option<u32> = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--png" => png = true,
@@ -28,6 +31,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--theme" => theme = args.next().unwrap_or(theme),
             "--assets" => manifest = args.next().map(PathBuf::from),
             "--chart-boxes" => chart_boxes = true,
+            "--thumbs" => {
+                thumbs = Some(
+                    args.next()
+                        .and_then(|value| value.parse().ok())
+                        .unwrap_or(560),
+                )
+            }
             _ => positional.push(arg),
         }
     }
@@ -109,6 +119,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let path = out_dir.join(format!("{:02}-{kind}.png", i + 1));
             pixmap.save_png(&path)?;
             println!("  {}", path.display());
+        }
+    }
+
+    if let Some(width) = thumbs {
+        // The whole deck is compiled and rasterized in one call, exactly as the app's
+        // `render_slide_thumbnails` command does; the timings are the reported numbers.
+        let started = Instant::now();
+        let rendered = renderer.render_png(&slides, &options, width, None)?;
+        let elapsed = started.elapsed();
+        for page in &rendered.pages {
+            let kind = slides
+                .get(page.index)
+                .and_then(|s| s["kind"].as_str())
+                .unwrap_or("overflow");
+            let path = out_dir.join(format!("thumb-{:02}-{kind}.png", page.index));
+            std::fs::write(&path, &page.png)?;
+            println!("  {} ({}×{})", path.display(), page.width, page.height);
+        }
+        let count = rendered.pages.len().max(1);
+        println!(
+            "thumbs at {width}px: {} pages in {:?}, {:?} per page",
+            rendered.pages.len(),
+            elapsed,
+            elapsed / count as u32
+        );
+        for overflow in &rendered.overflows {
+            println!("  overflow: {overflow:?}");
         }
     }
     Ok(())

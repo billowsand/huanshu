@@ -468,6 +468,72 @@ fn text_fills(frame: &typst::layout::Frame, out: &mut Vec<(String, typst::visual
 }
 
 #[test]
+fn png_rendering_returns_only_the_requested_pages_at_the_requested_width() {
+    let slides = supported_fixture_slides();
+    let options = ExportOptions::default();
+    let pages = renderer()
+        .render_png(&slides, &options, 560, Some(&[0, 3]))
+        .unwrap();
+    assert_eq!(
+        pages.pages.iter().map(|p| p.index).collect::<Vec<_>>(),
+        vec![0, 3],
+        "exactly the requested pages, in slide order"
+    );
+    for page in &pages.pages {
+        assert!(
+            page.png.starts_with(b"\x89PNG"),
+            "slide {} is not a PNG",
+            page.index
+        );
+        assert_eq!(page.width, 560);
+        // 16:9 slides are 1280×720 CSS px; rounding may be off by a pixel.
+        let expected = (560.0_f64 * 9.0 / 16.0).round() as i32;
+        assert!(
+            (page.height as i32 - expected).abs() <= 1,
+            "slide {} height {} != {expected}",
+            page.index,
+            page.height
+        );
+    }
+
+    // Wide slides keep their own ratio, and out-of-range indices are ignored.
+    let wide = ExportOptions {
+        aspect_ratio: "ratio_32x9".to_string(),
+        ..Default::default()
+    };
+    let pages = renderer()
+        .render_png(&slides, &wide, 560, Some(&[0, 9999]))
+        .unwrap();
+    assert_eq!(pages.pages.len(), 1);
+    let expected = (560.0_f64 * 9.0 / 32.0).round() as i32;
+    assert!(
+        (pages.pages[0].height as i32 - expected).abs() <= 1,
+        "32:9 height {} != {expected}",
+        pages.pages[0].height
+    );
+}
+
+#[test]
+fn png_rendering_clamps_the_width_and_covers_the_whole_deck_by_default() {
+    let slides = supported_fixture_slides();
+    let options = ExportOptions::default();
+    let all = renderer().render_png(&slides, &options, 560, None).unwrap();
+    assert_eq!(all.pages.len(), slides.len());
+    assert_eq!(
+        all.pages.iter().map(|p| p.index).collect::<Vec<_>>(),
+        (0..slides.len()).collect::<Vec<_>>()
+    );
+
+    // Narrower than the floor and wider than the ceiling are both clamped.
+    for (requested, expected) in [(1u32, 64u32), (99_999, 3840)] {
+        let pages = renderer()
+            .render_png(&slides, &options, requested, Some(&[0]))
+            .unwrap();
+        assert_eq!(pages.pages[0].width, expected);
+    }
+}
+
+#[test]
 fn editorial_headline_sets_the_tail_in_the_accent() {
     // light-editorial splits cover / closing titles after the first full-width
     // comma or colon (src/utils/titleTail.ts) and colors the tail; other themes

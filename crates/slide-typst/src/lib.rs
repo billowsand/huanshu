@@ -318,6 +318,27 @@ pub struct Rendered {
     pub missing_assets: Vec<MissingAsset>,
 }
 
+/// One rasterized deck page (the app shows these as thumbnails).
+#[derive(Debug)]
+pub struct RenderedPng {
+    /// Index into the `slides` passed to the renderer.
+    pub index: usize,
+    pub png: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Rasterized deck pages plus the diagnostics of the single compile behind them.
+pub struct RenderedPages {
+    pub pages: Vec<RenderedPng>,
+    pub overflows: Vec<Overflow>,
+    pub missing_assets: Vec<MissingAsset>,
+}
+
+/// Allowed thumbnail widths, in device pixels.
+const MIN_PNG_WIDTH: u32 = 64;
+const MAX_PNG_WIDTH: u32 = 3840;
+
 /// A compile failure with Typst's diagnostics resolved to `file:line:col`.
 #[derive(Debug)]
 pub struct RenderError {
@@ -370,6 +391,72 @@ impl Renderer {
         Ok(Rendered {
             pdf,
             pages: document.pages().len(),
+            overflows,
+            missing_assets,
+        })
+    }
+
+    /// Compiles the whole deck once and rasterizes the requested pages (all when `only` is None).
+    ///
+    /// The whole deck is compiled even when one page is wanted: the slide index (`ctx.index`)
+    /// keys the `chart:<index>` assets and the overflow markers, so pages cannot be rasterized
+    /// from a subset compile. `width_px` is the thumbnail width in device pixels; each page is
+    /// rasterized at `width_px / page width` pixels per point, so its height follows the page's
+    /// own aspect ratio. Pages beyond `slides.len()` (a layout that overflowed its canvas) and
+    /// out-of-range entries in `only` are ignored.
+    pub fn render_png(
+        &self,
+        slides: &[serde_json::Value],
+        options: &ExportOptions,
+        width_px: u32,
+        only: Option<&[usize]>,
+    ) -> Result<RenderedPages, RenderError> {
+        let Compiled {
+            document,
+            overflows,
+            missing_assets,
+            ..
+        } = self.compile(slides, options)?;
+        let width_px = width_px.clamp(MIN_PNG_WIDTH, MAX_PNG_WIDTH);
+        let all = document.pages();
+        let mut pages = Vec::new();
+        for (index, page) in all.iter().enumerate().take(slides.len()) {
+            if only.is_some_and(|wanted| !wanted.contains(&index)) {
+                continue;
+            }
+            let page_width_pt = page.frame.size().x.to_pt();
+            if page_width_pt <= 0.0 {
+                continue;
+            }
+            let pixmap = typst_render::render(
+                page,
+                &typst_render::RenderOptions {
+                    pixel_per_pt: typst::utils::Scalar::new(width_px as f64 / page_width_pt),
+                    render_bleed: false,
+                },
+            );
+            let png = pixmap.encode_png().map_err(|err| RenderError {
+                diagnostics: vec![format!("encode slide {index} as PNG: {err}")],
+            })?;
+            pages.push(RenderedPng {
+                index,
+                png,
+                width: pixmap.width(),
+                height: pixmap.height(),
+            });
+        }
+        // An overflow marker carries the index of the slide that was clipped; pages the caller
+        // did not ask for are dropped here too, so the diagnostics match `pages`.
+        let overflows = overflows
+            .into_iter()
+            .filter(|overflow| {
+                overflow
+                    .slide
+                    .is_none_or(|slide| slides.get(slide).is_some())
+            })
+            .collect();
+        Ok(RenderedPages {
+            pages,
             overflows,
             missing_assets,
         })
