@@ -24,6 +24,7 @@ export const KIND_META: Record<SlideKind, KindMeta> = {
   compare:      { label: '对比',    icon: 'i-carbon:compare',       desc: '左右双栏对比分析' },
   issue_stack:  { label: '问题堆叠', icon: 'i-carbon:warning-alt',  desc: '纵向堆叠的问题/挑战说明卡片' },
   swot:         { label: 'SWOT',   icon: 'i-carbon:analytics',     desc: '四象限战略分析矩阵' },
+  chart_focus:  { label: '图表页', icon: 'i-carbon:chart-line-smooth', desc: '要点解读 + 数据图表（数据来自 ```chart 围栏块）' },
 }
 
 export const ALL_KINDS = Object.keys(KIND_META) as SlideKind[]
@@ -46,6 +47,7 @@ export const KIND_FIELDS: Record<SlideKind, string[]> = {
   compare:      ['kind', 'section', 'title', 'subtitle', 'compare_data', 'footer'],
   issue_stack:  ['kind', 'section', 'title', 'subtitle', 'cards', 'footer'],
   swot:         ['kind', 'section', 'title', 'subtitle', 'swot_data'],
+  chart_focus:  ['kind', 'section', 'title', 'subtitle', 'points', 'chart', 'footer'],
 }
 
 export const KIND_DEFAULTS: Record<SlideKind, Partial<SlideBlueprint>> = {
@@ -369,6 +371,29 @@ export const KIND_DEFAULTS: Record<SlideKind, Partial<SlideBlueprint>> = {
       ],
       strategy: '建议采用"试点先行 + 能力沉淀"策略，先快速证明价值，再逐步扩展。',
     },
+  },
+  chart_focus: {
+    section: '13',
+    title: '关键指标解读',
+    subtitle: '数据来自文档中的 ```chart 围栏块，正文负责解读而非复述。',
+    points: [
+      { step: '01', title: '趋势判断', body: '说明指标的整体走向与阶段特征。' },
+      { step: '02', title: '关键拐点', body: '指出变化最明显的时间点或分类并解释原因。' },
+      { step: '03', title: '行动建议', body: '基于图表给出可执行的下一步建议。' },
+    ],
+    chart: {
+      type: 'bar',
+      title: '季度交付量（示例）',
+      data: [
+        { quarter: 'Q1', count: 12 },
+        { quarter: 'Q2', count: 19 },
+        { quarter: 'Q3', count: 27 },
+        { quarter: 'Q4', count: 34 },
+      ],
+      encoding: { x: 'quarter', y: 'count' },
+      source: 'llm_generated',
+    },
+    footer: '示例数据，仅用于版式预览；真实数据请在文档中以 ```chart 围栏块提供。',
   },
 }
 

@@ -1,10 +1,12 @@
 //! Renders the layout fixture to PDF (and optionally one PNG per page).
 //!
-//!   cargo run -p slide-typst --example render_fixture -- [fixture.json] [out-dir] [--png] [--kinds a,b] [--aspect ratio_32x9] [--assets manifest.json] [--theme light-notes]
+//!   cargo run -p slide-typst --example render_fixture -- [fixture.json] [out-dir] [--png] [--kinds a,b] [--aspect ratio_32x9] [--assets manifest.json] [--theme light-notes] [--chart-boxes]
 //!
 //! Defaults: fixtures/all-layout-blueprints.json → target/slide-typst/, only the
 //! kinds that have a Typst layout (pass `--kinds all` to include placeholders),
-//! theme `light-notes`.
+//! theme `light-notes`. `--chart-boxes` also writes `chart-boxes.json`: the
+//! plot box of every chart_focus slide, to render chart SVGs at (see
+//! scripts/chart-fixtures.ts).
 
 use std::path::PathBuf;
 use std::time::Instant;
@@ -17,6 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut aspect = "ratio_16x9".to_string();
     let mut theme = "light-notes".to_string();
     let mut manifest: Option<PathBuf> = None;
+    let mut chart_boxes = false;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--png" => png = true,
@@ -24,6 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--aspect" => aspect = args.next().unwrap_or(aspect),
             "--theme" => theme = args.next().unwrap_or(theme),
             "--assets" => manifest = args.next().map(PathBuf::from),
+            "--chart-boxes" => chart_boxes = true,
             _ => positional.push(arg),
         }
     }
@@ -83,6 +87,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     for missing in &rendered.missing_assets {
         println!("  missing image: {missing:?}");
+    }
+
+    if chart_boxes {
+        let boxes = renderer.chart_boxes(&slides, &options)?;
+        let path = out_dir.join("chart-boxes.json");
+        std::fs::write(&path, serde_json::to_string_pretty(&boxes)?)?;
+        println!("  {} chart boxes → {}", boxes.len(), path.display());
     }
 
     if png {

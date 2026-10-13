@@ -62,14 +62,7 @@ pub fn derive_page_plans(doc: &ParsedDocument, granularity: HeadingLevel) -> Vec
         HeadingLevel::H2 => {
             for (chapter, sec) in doc.sections.iter().enumerate() {
                 let first = pages.len();
-                pages.push(build_content_page(
-                    global_idx,
-                    &sec.title,
-                    None,
-                    &sec.title,
-                    &sec.paragraphs,
-                ));
-                global_idx += 1;
+                push_text_unit(&mut pages, &mut global_idx, &sec.title, None, &sec.paragraphs, &sec.charts);
                 stamp_chapter(&mut pages[first..], chapter);
             }
         }
@@ -78,40 +71,29 @@ pub fn derive_page_plans(doc: &ParsedDocument, granularity: HeadingLevel) -> Vec
                 let first = pages.len();
                 if sec.subsections.is_empty() {
                     // H2 with no children → single content slide
-                    pages.push(build_content_page(
-                        global_idx,
-                        &sec.title,
-                        None,
-                        &sec.title,
-                        &sec.paragraphs,
-                    ));
-                    global_idx += 1;
+                    push_text_unit(&mut pages, &mut global_idx, &sec.title, None, &sec.paragraphs, &sec.charts);
                 } else {
                     // H2 with H3 children: check whether the H2 itself has substantive intro text.
                     // If it does, emit an intro content slide (not a summary/TOC page).
                     // If it doesn't, emit a section_summary overview of the H3 children.
                     let intro_chars: usize = sec.paragraphs.iter().map(|p| p.chars().count()).sum();
                     if intro_chars > 50 {
-                        pages.push(build_content_page(
-                            global_idx,
-                            &sec.title,
-                            None,
-                            &sec.title,
-                            &sec.paragraphs,
-                        ));
+                        push_text_unit(&mut pages, &mut global_idx, &sec.title, None, &sec.paragraphs, &sec.charts);
                     } else {
                         pages.push(build_summary_page(global_idx, sec));
+                        global_idx += 1;
+                        // The summary page shows no chart: every H2-level chart gets its own page.
+                        append_chart_pages(&mut pages, &mut global_idx, &sec.title, None, &sec.paragraphs, &sec.charts);
                     }
-                    global_idx += 1;
                     for sub in &sec.subsections {
-                        pages.push(build_content_page(
-                            global_idx,
+                        push_text_unit(
+                            &mut pages,
+                            &mut global_idx,
                             &sec.title,
                             Some(&sub.title),
-                            &sub.title,
                             &sub.paragraphs,
-                        ));
-                        global_idx += 1;
+                            &sub.charts,
+                        );
                     }
                 }
                 stamp_chapter(&mut pages[first..], chapter);
@@ -215,12 +197,16 @@ fn merge_page_signal_patch(
     .map(str::to_string)
     .or_else(|| merged.content_shape.clone());
     merged.layout_intent = non_empty_text(patch.layout_intent.as_deref()).map(str::to_string);
-    merged.visual_need = normalized_enum(
-        patch.visual_need.as_deref(),
-        &["text_only", "image_optional", "image_required"],
-    )
-    .map(str::to_string)
-    .or_else(|| merged.visual_need.clone());
+    // A page carrying a ```chart block keeps visual_need=chart: the enrich prompt does not
+    // know that value and would otherwise downgrade it to text_only.
+    if merged.chart.is_none() {
+        merged.visual_need = normalized_enum(
+            patch.visual_need.as_deref(),
+            &["text_only", "image_optional", "image_required"],
+        )
+        .map(str::to_string)
+        .or_else(|| merged.visual_need.clone());
+    }
     merged.object_count =
         normalized_enum(patch.object_count.as_deref(), &["single", "pair", "multi"])
             .map(str::to_string)
@@ -332,16 +318,21 @@ fn build_summary_page(idx: usize, sec: &Section) -> PagePlan {
         preferred_assets: Vec::new(),
         page_role: Some("section_summary".to_string()),
         section_number: None,
+        chart: None,
     }
 }
 
 /// Build a content PagePlan for a leaf section (H2 without children, or H3).
+/// `charts` are the ```chart blocks that belong to this text unit: the first one
+/// rides on this page (making chart_focus eligible); each extra chart spawns an
+/// additional chart page right after (see `derive_page_plans`).
 fn build_content_page(
     idx: usize,
     section_title: &str,
     subsection_title: Option<&str>,
     page_title: &str,
     paragraphs: &[String],
+    chart: Option<crate::types::ChartSpec>,
 ) -> PagePlan {
     let text = paragraphs.join("\n\n");
     let (content_shape, argument_mode, density, object_count) = infer_signals(paragraphs);
@@ -355,7 +346,7 @@ fn build_content_page(
         takeaway: None,
         content_shape: Some(content_shape),
         layout_intent: None,
-        visual_need: Some("text_only".to_string()),
+        visual_need: Some(if chart.is_some() { "chart" } else { "text_only" }.to_string()),
         object_count: Some(object_count),
         argument_mode: Some(argument_mode),
         density: Some(density),
@@ -363,6 +354,99 @@ fn build_content_page(
         preferred_assets: Vec::new(),
         page_role: Some("content".to_string()),
         section_number: None,
+        chart,
+    }
+}
+
+/// Body text above this many `content_units` (≈ 300 汉字) does not fit chart_focus's left
+/// column of 2-4 points without being squeezed: such a unit becomes a text page with a normally
+/// chosen layout, followed by its chart page(s).
+const CHART_PAGE_SPLIT_UNITS: usize = 150;
+
+/// Context handed to a chart page split off from its text, so the interpretation is not generic.
+const CHART_CONTEXT_CHARS: usize = 200;
+
+/// Pages for one text unit (an H2 without children, an H2 intro, or an H3) and its ```chart
+/// blocks. Short text keeps its first chart on the same page (chart_focus: points + chart);
+/// long text gets its own page and every chart follows on a chart page. Extra charts always get
+/// their own pages, right after.
+fn push_text_unit(
+    pages: &mut Vec<PagePlan>,
+    global_idx: &mut usize,
+    section_title: &str,
+    subsection_title: Option<&str>,
+    paragraphs: &[String],
+    charts: &[crate::types::ChartSpec],
+) {
+    let page_title = subsection_title.unwrap_or(section_title);
+    let split = content_units(&paragraphs.join("\n")) > CHART_PAGE_SPLIT_UNITS;
+    let (inline, rest) = match charts.split_first() {
+        Some((first, rest)) if !split => (Some(first.clone()), rest),
+        _ => (None, charts),
+    };
+    pages.push(build_content_page(
+        *global_idx,
+        section_title,
+        subsection_title,
+        page_title,
+        paragraphs,
+        inline,
+    ));
+    *global_idx += 1;
+    append_chart_pages(pages, global_idx, section_title, subsection_title, paragraphs, rest);
+}
+
+/// A page that carries only a chart (no body text of its own); `context` is the text unit it
+/// came from, truncated, so the model can interpret the chart in context.
+fn build_chart_page(
+    idx: usize,
+    section_title: &str,
+    subsection_title: Option<&str>,
+    context: &[String],
+    chart: crate::types::ChartSpec,
+) -> PagePlan {
+    let context: String = context.join("\n\n").chars().take(CHART_CONTEXT_CHARS).collect();
+    PagePlan {
+        page_id: idx.to_string(),
+        section_title: section_title.to_string(),
+        subsection_title: subsection_title.map(str::to_string),
+        page_title: chart.title.clone(),
+        objective: format!("展示图表「{}」", chart.title),
+        key_points: Vec::new(),
+        takeaway: None,
+        content_shape: Some("chart".to_string()),
+        layout_intent: None,
+        visual_need: Some("chart".to_string()),
+        object_count: Some("single".to_string()),
+        argument_mode: Some("parallel".to_string()),
+        density: Some("low".to_string()),
+        source_excerpt: (!context.is_empty()).then_some(context),
+        preferred_assets: Vec::new(),
+        page_role: Some("content".to_string()),
+        section_number: None,
+        chart: Some(chart),
+    }
+}
+
+/// 图表单独成页：为 `charts` 各建一页，紧跟在文本页之后
+/// （`context` 是所属文本单元，截断后给模型做解读语境）。
+fn append_chart_pages(
+    pages: &mut Vec<PagePlan>,
+    global_idx: &mut usize,
+    section_title: &str,
+    subsection_title: Option<&str>,
+    context: &[String],
+    charts: &[crate::types::ChartSpec],
+) {
+    for chart in charts {
+        pages.push(build_chart_page(
+            *global_idx,
+            section_title,
+            subsection_title,
+            context,
+            chart.clone(),
+        ));
+        *global_idx += 1;
     }
 }
 
@@ -512,11 +596,11 @@ fn object_count_label(n: usize) -> String {
 /// section_summary pages get `SectionIntro`; for content pages `layout_scoring` ranks every
 /// content kind, so the universal kinds always survive the eligibility filter.
 pub fn eligible_fallback_scores(page: &PagePlan, aspect: AspectRatio) -> Vec<ScoredKind> {
-    if let Some(kind) = forced_kind(page) {
+    if let Some((kind, reason)) = forced_kind_reason(page) {
         return vec![ScoredKind {
             kind,
             score: 10.0,
-            signals: vec!["section_summary page"],
+            signals: vec![reason],
         }];
     }
     score_kinds(page)
@@ -585,6 +669,7 @@ pub async fn assemble_slides(
         label_tone: None,
         image: None,
         images: Vec::new(),
+        chart: None,
         placeholder: None,
         side_width: None,
         badges: vec![model.to_string(), "幻述".to_string()],
@@ -663,6 +748,7 @@ pub async fn make_overview_slide(
         label_tone: None,
         image: None,
         images: Vec::new(),
+        chart: None,
         placeholder: None,
         side_width: None,
         badges: Vec::new(),
@@ -701,6 +787,7 @@ pub fn make_closing_slide(model: &str, aspect_ratio: AspectRatio) -> SlideBluepr
         label_tone: None,
         image: None,
         images: Vec::new(),
+        chart: None,
         placeholder: None,
         side_width: None,
         badges: vec!["Q&A".to_string(), model.to_string()],
@@ -931,9 +1018,24 @@ pub async fn layout_candidates_for_page(
 }
 
 /// Kinds fully determined by the page plan, needing no LLM call.
-/// `section_summary` pages always render as `SectionIntro`.
+/// `section_summary` pages always render as `SectionIntro`; a page carrying a ```chart block
+/// always renders as `ChartFocus`, the only template that draws it (any other kind would
+/// silently drop the user's data).
 fn forced_kind(page_plan: &PagePlan) -> Option<SlideKind> {
-    (page_plan.page_role.as_deref() == Some("section_summary")).then_some(SlideKind::SectionIntro)
+    forced_kind_reason(page_plan).map(|(kind, _)| kind)
+}
+
+fn forced_kind_reason(page_plan: &PagePlan) -> Option<(SlideKind, &'static str)> {
+    if page_plan.page_role.as_deref() == Some("section_summary") {
+        return Some((
+            SlideKind::SectionIntro,
+            "section_summary page always uses section_intro",
+        ));
+    }
+    page_plan.chart.is_some().then_some((
+        SlideKind::ChartFocus,
+        "page with a ```chart block always uses chart_focus",
+    ))
 }
 
 /// Drop kinds the eligibility table rules out, collapse duplicate kinds (keeping the higher
@@ -968,11 +1070,11 @@ fn sanitize_candidates(
 /// nothing usable for: the best eligible signal-based pick plus one different eligible
 /// alternative so the deck-level assigner still has room to avoid repeats.
 fn fallback_candidates(page_plan: &PagePlan, aspect: AspectRatio) -> Vec<LayoutCandidate> {
-    if let Some(kind) = forced_kind(page_plan) {
+    if let Some((kind, reason)) = forced_kind_reason(page_plan) {
         return vec![LayoutCandidate {
             kind,
             score: 10,
-            reason: "section_summary page always uses section_intro".to_string(),
+            reason: reason.to_string(),
         }];
     }
     eligible_fallback_scores(page_plan, aspect)
@@ -1045,7 +1147,8 @@ pub fn assign_layouts(
         })
         .collect();
 
-    // SectionIntro pages are structural, so the cap is based on the remaining pages.
+    // Forced pages (section_intro, chart_focus) are structural, so the cap is based on the
+    // remaining pages.
     let content_pages = page_plans
         .iter()
         .filter(|page| forced_kind(page).is_none())
@@ -1392,18 +1495,20 @@ mod tests {
     }
 
     fn content_page(idx: usize) -> PagePlan {
-        build_content_page(idx, "章节", None, &format!("页面{idx}"), &[])
+        build_content_page(idx, "章节", None, &format!("页面{idx}"), &[], None)
     }
 
     fn summary_page(idx: usize) -> PagePlan {
         let section = Section {
             title: "实施路径".to_string(),
             paragraphs: Vec::new(),
+            charts: Vec::new(),
             subsections: ["阶段一", "阶段二"]
                 .iter()
                 .map(|title| Subsection {
                     title: title.to_string(),
                     paragraphs: Vec::new(),
+                    charts: Vec::new(),
                 })
                 .collect(),
         };
@@ -1954,5 +2059,113 @@ mod tests {
                 rule.kind
             );
         }
+    }
+
+    const CHART_MD: &str = r#"```chart
+{"type": "bar", "title": "季度交付量", "data": [{"q": "Q1", "n": 12}], "encoding": {"x": "q", "y": "n"}}
+```"#;
+
+    #[test]
+    fn charts_reach_their_pages_and_force_chart_focus() {
+        // H2 without intro text (→ section_summary) whose own chart must not be lost, plus an
+        // H3 with two charts: the first rides on the text page, the second gets its own page.
+        let raw = format!(
+            "# 文档\n\n## 经营回顾\n\n{CHART_MD}\n\n### 交付情况\n\n业务逐季提速。\n\n{CHART_MD}\n\n{CHART_MD}\n\n### 团队\n\n人员稳定。\n"
+        );
+        let doc = crate::input::parse_markdown(&raw).unwrap();
+        let pages = derive_page_plans(&doc, HeadingLevel::H3);
+        let shape: Vec<(Option<&str>, bool)> = pages
+            .iter()
+            .map(|p| (p.page_role.as_deref(), p.chart.is_some()))
+            .collect();
+        assert_eq!(
+            shape,
+            vec![
+                (Some("section_summary"), false),
+                (Some("content"), true), // the H2's own chart
+                (Some("content"), true), // 交付情况 text + first chart
+                (Some("content"), true), // 交付情况 second chart
+                (Some("content"), false),
+            ]
+        );
+        assert_eq!(
+            pages.iter().map(|p| p.page_id.as_str()).collect::<Vec<_>>(),
+            vec!["1", "2", "3", "4", "5"]
+        );
+
+        for aspect in [
+            AspectRatio::Ratio16x9,
+            AspectRatio::Ratio32x9,
+            AspectRatio::Ratio48x9,
+        ] {
+            for page in pages.iter().filter(|p| p.chart.is_some()) {
+                assert_eq!(fallback_kind(page, aspect), SlideKind::ChartFocus);
+                assert_eq!(
+                    pick_different_kind(page, &SlideKind::ChartFocus, aspect),
+                    SlideKind::ChartFocus
+                );
+                let fallback = crate::generator::normalize::make_fallback_slide(page, None, aspect);
+                assert_eq!(fallback.kind, SlideKind::ChartFocus);
+                assert!(fallback.chart.is_some());
+            }
+        }
+        let candidates = vec![Vec::new(); pages.len()];
+        let plans = assign_layouts(&pages, &candidates, AspectRatio::Ratio16x9);
+        for (page, plan) in pages.iter().zip(&plans) {
+            assert_eq!(page.chart.is_some(), plan.kind == SlideKind::ChartFocus);
+        }
+    }
+
+    #[test]
+    fn long_text_and_its_chart_become_two_pages() {
+        let long = "数字化转型".repeat(80); // 400 汉字 ≈ 200 units
+        let raw = format!("# 文档\n\n## 章节\n\n### 交付\n\n{long}\n\n{CHART_MD}\n");
+        let doc = crate::input::parse_markdown(&raw).unwrap();
+        let pages = derive_page_plans(&doc, HeadingLevel::H3);
+        // summary, the text page (layout chosen as usual), then the chart page
+        assert_eq!(pages.len(), 3);
+        assert!(pages[1].chart.is_none());
+        assert_eq!(pages[1].visual_need.as_deref(), Some("text_only"));
+        assert_eq!(pages[1].page_title, "交付");
+        assert!(forced_kind(&pages[1]).is_none());
+        assert!(pages[2].chart.is_some());
+        assert_eq!(pages[2].subsection_title.as_deref(), Some("交付"));
+        // the split-off chart page keeps (truncated) context for its interpretation
+        let context = pages[2].source_excerpt.as_deref().unwrap();
+        assert_eq!(context.chars().count(), CHART_CONTEXT_CHARS);
+    }
+
+    #[test]
+    fn layout_probe_sample_has_one_chart_page() {
+        let raw = include_str!("../../fixtures/layout-probe-sample.md");
+        let doc = crate::input::parse_markdown(raw).unwrap();
+        let pages = derive_page_plans(&doc, HeadingLevel::H3);
+        let chart_pages: Vec<&str> = pages
+            .iter()
+            .filter(|p| p.chart.is_some())
+            .map(|p| p.page_title.as_str())
+            .collect();
+        assert_eq!(chart_pages, vec!["建设成效"]);
+    }
+
+    #[test]
+    fn enrich_keeps_visual_need_chart() {
+        let mut page = content_page(1);
+        page.visual_need = Some("chart".to_string());
+        page.chart = derive_page_plans(
+            &crate::input::parse_markdown(&format!("# 文档\n\n## 章节\n\n{CHART_MD}\n")).unwrap(),
+            HeadingLevel::H2,
+        )[0]
+        .chart
+        .clone();
+        let patch = serde_json::from_value::<PageSignalPatch>(serde_json::json!({
+            "page_id": page.page_id.clone(),
+            "visual_need": "text_only",
+        }))
+        .unwrap();
+        let catalog = AssetCatalog::collect(std::path::Path::new("no-such-project-dir"), &[]);
+        let merged = merge_page_signal_patch(&page, &patch, &catalog);
+        assert_eq!(merged.visual_need.as_deref(), Some("chart"));
+        assert!(merged.chart.is_some());
     }
 }

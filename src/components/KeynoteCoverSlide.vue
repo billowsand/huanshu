@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SlideTitle from './SlideTitle.vue'
 import SlideReveal from './SlideReveal.vue'
+import { renderRichText } from '../utils/richText'
 
 defineProps<{
   badges?: string[]
@@ -18,18 +19,18 @@ defineProps<{
         :key="badge"
         class="amber-badge tag-pill"
       >
-        {{ badge }}
+        <span v-html="renderRichText(badge)"></span>
       </div>
     </SlideReveal>
     <SlideReveal :delay="200" text-center w-full min-w-0>
       <SlideTitle class="cover-title" :title="title" />
       <div v-if="subtitle" class="cover-subtitle">
-        {{ subtitle }}
+        <span v-html="renderRichText(subtitle)"></span>
       </div>
     </SlideReveal>
     <SlideReveal :delay="350" class="divider-amber" w-64 mt-2 />
     <SlideReveal v-if="enTitle" :delay="450" class="cover-en-title text-center">
-      {{ enTitle }}
+      <span v-html="renderRichText(enTitle)"></span>
     </SlideReveal>
   </div>
 

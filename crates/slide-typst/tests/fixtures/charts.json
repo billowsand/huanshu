@@ -1,0 +1,133 @@
+[
+  {
+    "kind": "chart_focus",
+    "section": "03",
+    "title": "交付量逐月攀升",
+    "subtitle": "折线图：单系列 + 高亮点",
+    "points": [
+      { "step": "01", "title": "持续上升", "body": "六个月交付量从 18 增至 41，没有回落。" },
+      { "step": "02", "title": "五月提速", "body": "自动化流水线上线后单月增量最大。" },
+      { "step": "03", "title": "下一步", "body": "把流水线复制到另外两条业务线。" }
+    ],
+    "chart": {
+      "type": "line",
+      "title": "月度交付量",
+      "data": [
+        { "month": "1月", "count": 18 },
+        { "month": "2月", "count": 21 },
+        { "month": "3月", "count": 24 },
+        { "month": "4月", "count": 27 },
+        { "month": "5月", "count": 36 },
+        { "month": "6月", "count": 41 }
+      ],
+      "encoding": { "x": "month", "y": "count" },
+      "emphasis": { "highlight": ["5月"] },
+      "source": "user_input",
+      "source_note": "交付平台月报"
+    },
+    "footer": "统计口径：已上线并通过验收的需求。"
+  },
+  {
+    "kind": "chart_focus",
+    "section": "03",
+    "title": "季度营收结构",
+    "subtitle": "柱状图：无高亮时全部实色",
+    "points": [
+      { "step": "01", "title": "Q4 最高", "body": "年末集中交付带来全年峰值。" },
+      { "step": "02", "title": "Q2 低谷", "body": "春季招标周期导致回款延后。" }
+    ],
+    "chart": {
+      "type": "bar",
+      "title": "季度营收（万元）",
+      "data": [
+        { "quarter": "Q1", "revenue": 320 },
+        { "quarter": "Q2", "revenue": 260 },
+        { "quarter": "Q3", "revenue": 410 },
+        { "quarter": "Q4", "revenue": 530 }
+      ],
+      "encoding": { "x": "quarter", "y": "revenue" },
+      "source": "user_input"
+    }
+  },
+  {
+    "kind": "chart_focus",
+    "section": "04",
+    "title": "客户来源分布",
+    "points": [
+      { "step": "01", "title": "渠道为主", "body": "渠道合作贡献了接近一半的新客户。" },
+      { "step": "02", "title": "自然流量", "body": "官网与搜索带来稳定的三成客户。" },
+      { "step": "03", "title": "活动转化", "body": "线下活动转化偏低，需要复盘。" }
+    ],
+    "chart": {
+      "type": "donut",
+      "title": "新客户来源（家）",
+      "data": [
+        { "channel": "渠道合作", "customers": 46 },
+        { "channel": "官网", "customers": 18 },
+        { "channel": "搜索", "customers": 13 },
+        { "channel": "线下活动", "customers": 9 },
+        { "channel": "老客推荐", "customers": 14 }
+      ],
+      "encoding": { "label": "channel", "value": "customers" },
+      "emphasis": { "highlight": ["渠道合作"] },
+      "source": "tool"
+    },
+    "footer": "数值为客户数，不是百分比：中心显示合计。"
+  },
+  {
+    "kind": "chart_focus",
+    "section": "04",
+    "title": "三条产品线对比",
+    "subtitle": "分组柱状图：多系列 + 图例",
+    "points": [
+      { "step": "01", "title": "A 线领先", "body": "A 线每个季度都保持第一。" },
+      { "step": "02", "title": "C 线追赶", "body": "C 线下半年增速最快。" }
+    ],
+    "chart": {
+      "type": "grouped_bar",
+      "title": "季度签约额（万元）",
+      "data": [
+        { "quarter": "Q1", "a": 120, "b": 80, "c": 40 },
+        { "quarter": "Q2", "a": 135, "b": 82, "c": 55 },
+        { "quarter": "Q3", "a": 150, "b": 90, "c": 88 },
+        { "quarter": "Q4", "a": 170, "b": 95, "c": 120 }
+      ],
+      "encoding": { "x": "quarter" },
+      "series": [
+        { "key": "a", "name": "A 产品线" },
+        { "key": "b", "name": "B 产品线" },
+        { "key": "c", "name": "C 产品线" }
+      ],
+      "source": "user_input"
+    }
+  },
+  {
+    "kind": "chart_focus",
+    "section": "05",
+    "title": "算力成本构成",
+    "points": [
+      { "step": "01", "title": "推理占比扩大", "body": "推理成本从三成升至一半以上。" },
+      { "step": "02", "title": "训练趋稳", "body": "训练支出基本持平。" },
+      { "step": "03", "title": "存储可控", "body": "存储成本增长缓慢。" }
+    ],
+    "chart": {
+      "type": "stacked_area",
+      "title": "月度算力成本（万元）",
+      "data": [
+        { "month": "1月", "train": 40, "infer": 25, "storage": 10 },
+        { "month": "2月", "train": 42, "infer": 32, "storage": 11 },
+        { "month": "3月", "train": 41, "infer": 40, "storage": 11 },
+        { "month": "4月", "train": 43, "infer": 51, "storage": 12 },
+        { "month": "5月", "train": 42, "infer": 63, "storage": 13 }
+      ],
+      "encoding": { "x": "month" },
+      "series": [
+        { "key": "train", "name": "训练" },
+        { "key": "infer", "name": "推理" },
+        { "key": "storage", "name": "存储" }
+      ],
+      "source": "llm_generated"
+    },
+    "footer": "示例数据：source 为 llm_generated 时角标显示「示例数据」。"
+  }
+]

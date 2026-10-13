@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SlideTitle from './SlideTitle.vue'
 import { toneVars, type Tone } from './keynoteTheme'
+import { renderRichText } from '../utils/richText'
 
 defineProps<{
   badge?: string
@@ -19,7 +20,7 @@ defineProps<{
 
 <template>
   <div relative z-10 flex flex-col items-center justify-center gap-5 text-center h-full py-4>
-    <TagBadge v-if="badge">{{ badge }}</TagBadge>
+    <TagBadge v-if="badge"><span v-html="renderRichText(badge)"></span></TagBadge>
 
     <div class="slide-header center-grid-header">
       <SlideTitle as="h2" class="slide-title center-grid-title" :title="title">
@@ -43,12 +44,12 @@ defineProps<{
         text-center
       >
         <div :class="item.icon" class="slide-icon-2xl" :style="{ color: toneVars(item.tone).solid }" />
-        <div class="slide-card-title center-grid-item-title">{{ item.title }}</div>
-        <div class="slide-meta" opacity-60>{{ item.desc }}</div>
+        <div class="slide-card-title center-grid-item-title"><span v-html="renderRichText(item.title)"></span></div>
+        <div class="slide-meta" opacity-60><span v-html="renderRichText(item.desc)"></span></div>
       </GlassCard>
     </CardGrid>
 
-    <div v-if="footer" class="slide-footnote slide-meta center-grid-footer" mt-2>{{ footer }}</div>
+    <div v-if="footer" class="slide-footnote slide-meta center-grid-footer" mt-2><span v-html="renderRichText(footer)"></span></div>
   </div>
 </template>
 

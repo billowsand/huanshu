@@ -20,6 +20,7 @@ import KeynoteProcessSlide from './KeynoteProcessSlide.vue'
 import KeynoteCompareSlide from './KeynoteCompareSlide.vue'
 import KeynoteIssueStackSlide from './KeynoteIssueStackSlide.vue'
 import KeynoteSwotSlide from './KeynoteSwotSlide.vue'
+import KeynoteChartSlide from './KeynoteChartSlide.vue'
 
 const props = defineProps<{
   slide: SlideBlueprint
@@ -45,6 +46,7 @@ const componentMap: Record<string, unknown> = {
   compare: KeynoteCompareSlide,
   issue_stack: KeynoteIssueStackSlide,
   swot: KeynoteSwotSlide,
+  chart_focus: KeynoteChartSlide,
 }
 
 const component = computed(() => componentMap[props.slide.kind] ?? KeynoteCoverSlide)
@@ -118,6 +120,7 @@ const kindPresetMap: Partial<Record<SlideBlueprint['kind'], number[]>> = {
   compare: [0, 3],
   issue_stack: [3, 2],
   swot: [2, 0],
+  chart_focus: [1, 3],
 }
 
 function hashString(input: string) {
@@ -142,7 +145,9 @@ const TYPE_SCALE_BASE = 1.25
 const contentLoad = computed(() => {
   let chars = 0
   let entries = 0
-  const skipKeys = new Set(['kind', 'aspect_ratio', 'tone', 'icon', 'label_tone', 'footer_tone', 'titleTone', 'top_bar_class', 'topBarClass'])
+  // chart：数据行画在固定大小的图表区里，不是排版文字；计入会让每个图表页都落到最小字号。
+  // 与 typst 侧 base.typ 的 load-skip-keys 保持一致。
+  const skipKeys = new Set(['kind', 'aspect_ratio', 'tone', 'icon', 'label_tone', 'footer_tone', 'titleTone', 'top_bar_class', 'topBarClass', 'chart'])
   const walk = (value: unknown) => {
     if (typeof value === 'string') {
       chars += value.replace(/<[^>]*>/g, '').length
@@ -360,6 +365,15 @@ const slideProps = computed(() => {
         subtitle: s.subtitle ?? '',
         quadrants: s.swot_data?.quadrants ?? [],
         strategy: s.swot_data?.strategy ?? '',
+      }
+    case 'chart_focus':
+      return {
+        section: s.section ?? '',
+        title: s.title,
+        subtitle: s.subtitle ?? '',
+        points: s.points ?? [],
+        chart: s.chart,
+        footer: s.footer ?? '',
       }
     default:
       return { title: s.title }

@@ -15,12 +15,23 @@
 
 // ── Per-slide type scale (port of SlideRenderer.vue `contentLoad`) ───────────
 
+// `chart`: a chart's data rows are drawn in a fixed-size panel, not set as
+// text; counting them would push every chart page to the smallest scale.
+// Keep in sync with `skipKeys` in SlideRenderer.vue.
 #let load-skip-keys = (
   "kind", "aspect_ratio", "tone", "icon", "label_tone", "footer_tone",
-  "titleTone", "top_bar_class", "topBarClass",
+  "titleTone", "top_bar_class", "topBarClass", "chart",
 )
 
-#let strip-tags(s) = s.replace(regex("<[^>]*>"), "")
+// LaTeX math (`$...$` / `$$...$$`) reaches templates already converted to Typst
+// math source by Rust (see src/math.rs), wrapped as `\u{1}I…\u{2}` (inline) or
+// `\u{1}D…\u{2}` (display) spans; each span is eval'd in the vendored mitex
+// scope. Spans whose LaTeX failed conversion keep their literal `$` text.
+#import "/vendor/mitex/specs/mod.typ": mitex-scope
+
+#let math-span = regex("(?s)\u{1}([ID])(.*?)\u{2}")
+
+#let strip-tags(s) = s.replace(regex("<[^>]*>"), "").replace(math-span, "xx")
 
 #let content-load(value) = {
   if type(value) == str {
@@ -105,9 +116,12 @@
 // Renders the small HTML subset the LLM may put into `v-html` fields.
 // Strings become text content, never Typst markup, so `#`, `*`, `$` … in model
 // output cannot execute. Unknown tags are dropped, as the browser would hide them.
-#let rich(value, emphasis: none) = {
-  if value == none { return [] }
-  let s = str(value)
+//
+// LaTeX math (`$...$` / `$$...$$`) reaches templates already converted to Typst
+// math source by Rust (see src/math.rs), wrapped as `\u{1}I…\u{2}` (inline) or
+// `\u{1}D…\u{2}` (display) spans; each span is eval'd in the vendored mitex
+// scope. Spans whose LaTeX failed conversion keep their literal `$` text.
+#let rich-plain(s, emphasis: none) = {
   let pattern = regex("(?s)<br\s*/?>|<(strong|b|em|i|mark)(?:\s[^>]*)?>(.*?)</(?:strong|b|em|i|mark)>|<[^>]+>")
   let parts = ()
   let pos = 0
@@ -123,6 +137,21 @@
   }
   parts.push(decode-entities(s.slice(pos)))
   parts.map(part => if type(part) == str { [#part] } else { part }).join()
+}
+
+#let rich(value, emphasis: none) = {
+  if value == none { return [] }
+  let s = str(value)
+  let parts = ()
+  let pos = 0
+  for m in s.matches(math-span) {
+    parts.push(rich-plain(s.slice(pos, m.start), emphasis: emphasis))
+    let equation = eval("$" + m.captures.at(1) + "$", scope: mitex-scope)
+    parts.push(math.equation(block: m.captures.at(0) == "D", equation))
+    pos = m.end
+  }
+  parts.push(rich-plain(s.slice(pos), emphasis: emphasis))
+  parts.join()
 }
 
 #let has(value) = value != none and value != "" and value != ()

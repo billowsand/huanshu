@@ -71,6 +71,7 @@ static PRIORS: &[(SlideKind, f32)] = &[
     (SlideKind::IssueStack, 0.1),
     (SlideKind::Swot, 0.1),
     (SlideKind::Spotlight, 0.1),
+    (SlideKind::ChartFocus, 0.9),
 ];
 
 const GOAL_WORDS: &[&str] = &["目标", "思路", "转变", "方向", "愿景"];
@@ -104,6 +105,12 @@ static SCORE_RULES: &[ScoreRule] = &[
         weight: 4.0,
         signal: "content_shape=timeline",
         matches: |s| s.content_shape == "timeline",
+    },
+    ScoreRule {
+        kind: SlideKind::ChartFocus,
+        weight: 4.0,
+        signal: "visual_need=chart",
+        matches: |s| s.visual_need == "chart",
     },
     ScoreRule {
         kind: SlideKind::StepFlow,
@@ -445,6 +452,7 @@ mod tests {
             preferred_assets: Vec::new(),
             page_role: Some("content".to_string()),
             section_number: Some("01".to_string()),
+            chart: None,
         }
     }
 
@@ -460,7 +468,7 @@ mod tests {
                 "{kind:?} listed twice"
             );
         }
-        assert_eq!(PRIORS.len(), 13);
+        assert_eq!(PRIORS.len(), 14);
         for rule in SCORE_RULES {
             assert!(
                 PRIORS.iter().any(|(kind, _)| kind == &rule.kind),

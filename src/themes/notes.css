@@ -56,6 +56,16 @@
   --danger-bg: #f7e9e3;
   --danger-border: #d4b0a5;
   --danger-contrast: #fbf7ec;
+
+  /* chart tokens（ECharts 主题，hexA() 依赖 #hex 格式） */
+  --chart-grid:  #e8e0cf;
+  --chart-axis:  #c8bbaa;
+  --chart-palette-0: #746254;
+  --chart-palette-1: #54633d;
+  --chart-palette-2: #826039;
+  --chart-palette-3: #4e6570;
+  --chart-palette-4: #8a5a44;
+  --chart-palette-5: #9c4a3c;
   --studio-bg: var(--notes-backing);
   --studio-panel: var(--notes-paper);
   --studio-panel-2: #f8f3e9;

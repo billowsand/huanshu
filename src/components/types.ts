@@ -1,3 +1,5 @@
+import type { ChartSpec } from './chartOptions'
+
 // TypeScript mirrors of Rust types in src-tauri/src/types.rs
 
 export type SlideKind =
@@ -18,6 +20,7 @@ export type SlideKind =
   | 'compare'
   | 'issue_stack'
   | 'swot'
+  | 'chart_focus'
 
 export type AspectRatio = 'ratio_16x9' | 'ratio_32x9' | 'ratio_48x9'
 export const ASPECT_DIMENSIONS: Record<AspectRatio, { w: number, h: number }> = {
@@ -183,4 +186,5 @@ export interface SlideBlueprint {
   direction?: string
   compare_data?: CompareData
   swot_data?: SwotData
+  chart?: ChartSpec
 }

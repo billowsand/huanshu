@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
+import markdownItKatex from '@vscode/markdown-it-katex'
 import { EditorState } from '@codemirror/state'
 import {
   EditorView,
@@ -43,6 +44,7 @@ const md = new MarkdownIt({
   linkify: true,
   typographer: true,
 })
+md.use(markdownItKatex)
 
 type PreviewSlide = {
   number: number
@@ -60,6 +62,7 @@ function splitSlides(raw: string, granularity: 'h2' | 'h3') {
   const lines = raw.split(/\r?\n/)
   const slides: string[] = []
   let current: string[] = []
+  let inDisplayMath = false
 
   const flush = () => {
     const chunk = current.join('\n').trim()
@@ -70,9 +73,16 @@ function splitSlides(raw: string, granularity: 'h2' | 'h3') {
 
   for (const line of lines) {
     const trimmed = line.trim()
+    if (trimmed.startsWith('$$')) {
+      // A $$ fence toggles display-math mode; headings inside a formula must
+      // not split the slide. `$$...$$` on one line toggles twice.
+      const fences = line.split('$$').length - 1
+      if (fences % 2 === 1)
+        inDisplayMath = !inDisplayMath
+    }
     const isH2 = /^##\s+[^#]/.test(trimmed)
     const isH3 = /^###\s+[^#]/.test(trimmed)
-    const shouldSplit = granularity === 'h2' ? isH2 : (isH2 || isH3)
+    const shouldSplit = !inDisplayMath && (granularity === 'h2' ? isH2 : (isH2 || isH3))
 
     if (shouldSplit && current.join('\n').trim()) {
       flush()

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useGenerationStore } from '../stores/generation'
 import type { SlideBlueprint } from '../stores/generation'
+import { renderRichText } from '../utils/richText'
 
 const props = defineProps<{
   slide: SlideBlueprint
@@ -59,7 +60,7 @@ async function repair() {
       <span class="kind-badge" :style="{ background: color + '22', color, borderColor: color + '44' }">
         {{ label }}
       </span>
-      <span class="slide-title">{{ slide.title }}</span>
+      <span class="slide-title" v-html="renderRichText(slide.title)"></span>
       <button
         class="debug-btn"
         :class="{ active: showDebug }"

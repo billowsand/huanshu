@@ -1,0 +1,62 @@
+<svg width="920" height="440" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 920 440">
+<rect width="920" height="440" x="0" y="0" fill="none"></rect>
+<path d="M48 400.5L880 400.5" fill="none" pointer-events="visible" stroke="#eee" class="zr0-cls-0"></path>
+<path d="M48 348.5L880 348.5" fill="none" pointer-events="visible" stroke="#eee" class="zr0-cls-0"></path>
+<path d="M48 297.5L880 297.5" fill="none" pointer-events="visible" stroke="#eee" class="zr0-cls-0"></path>
+<path d="M48 245.5L880 245.5" fill="none" pointer-events="visible" stroke="#eee" class="zr0-cls-0"></path>
+<path d="M48 194.5L880 194.5" fill="none" pointer-events="visible" stroke="#eee" class="zr0-cls-0"></path>
+<path d="M48 143.5L880 143.5" fill="none" pointer-events="visible" stroke="#eee" class="zr0-cls-0"></path>
+<path d="M48 91.5L880 91.5" fill="none" pointer-events="visible" stroke="#eee" class="zr0-cls-0"></path>
+<path d="M48 40.5L880 40.5" fill="none" pointer-events="visible" stroke="#eee" class="zr0-cls-0"></path>
+<path d="M48 400.5L880 400.5" fill="none" pointer-events="visible" stroke="#ccc" stroke-linecap="round" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" transform="translate(40 400)" fill="#333">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" transform="translate(40 348.5714)" fill="#333">1</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" transform="translate(40 297.1429)" fill="#333">2</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" transform="translate(40 245.7143)" fill="#333">3</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" transform="translate(40 194.2857)" fill="#333">4</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" transform="translate(40 142.8571)" fill="#333">5</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" transform="translate(40 91.4286)" fill="#333">6</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" transform="translate(40 40)" fill="#333">7</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" y="6" transform="translate(48 408)" fill="#333">一</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" y="6" transform="translate(880 408)" fill="#333">二</text>
+<g clip-path="url(#zr0-c0)">
+<path d="M48 245.7C48 245.7 880 40 880 40L880 400L48 400Z" fill="url(#zr0-g0)" fill-opacity="0.7" class="zr0-cls-2"></path>
+<path d="M48 245.7C48 245.7 880 40 880 40" fill="none" pointer-events="visible" stroke="#f59e0b" stroke-width="3" stroke-linejoin="bevel" class="zr0-cls-3"></path>
+</g>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(4,0,0,4,48,245.7143)" fill="#f59e0b" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr0-cls-4"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(4,0,0,4,880,40)" fill="#f59e0b" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr0-cls-4"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" y="-6" transform="translate(48 236.7143)" fill="#333">3</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:"Microsoft YaHei", "PingFang SC", sans-serif;" y="-6" transform="translate(880 31)" fill="#333">7</text>
+<defs >
+<clipPath id="zr0-c0">
+<path d="M46 38.5l836 0l0 363l-836 0Z" fill="#000" class="zr0-cls-1"></path>
+</clipPath>
+<linearGradient gradientUnits="objectBoundingBox" x1="0" y1="0" x2="0" y2="1" id="zr0-g0">
+<stop offset="0%" stop-color="rgb(245,158,11)" stop-opacity="0.2"></stop>
+<stop offset="100%" stop-color="rgb(245,158,11)" stop-opacity="0.02"></stop>
+</linearGradient>
+</defs>
+<style ><![CDATA[
+.zr0-cls-0:hover {
+pointer-events:none;
+}
+.zr0-cls-1:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr0-cls-2:hover {
+cursor:pointer;
+fill:[object Object];
+}
+.zr0-cls-3:hover {
+cursor:pointer;
+}
+.zr0-cls-4:hover {
+cursor:pointer;
+fill:rgba(255,173,12,1);
+}
+
+]]>
+
+</style>
+</svg>

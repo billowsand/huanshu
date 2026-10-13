@@ -1,0 +1,42 @@
+<svg width="646" height="336" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 646 336">
+<rect width="646" height="336" x="0" y="0" fill="none"></rect>
+<path d="M48 296.5L622 296.5" fill="none" pointer-events="visible" stroke="#e8e0cf" class="zr1-cls-6"></path>
+<path d="M48 252.5L622 252.5" fill="none" pointer-events="visible" stroke="#e8e0cf" class="zr1-cls-6"></path>
+<path d="M48 209.5L622 209.5" fill="none" pointer-events="visible" stroke="#e8e0cf" class="zr1-cls-6"></path>
+<path d="M48 166.5L622 166.5" fill="none" pointer-events="visible" stroke="#e8e0cf" class="zr1-cls-6"></path>
+<path d="M48 122.5L622 122.5" fill="none" pointer-events="visible" stroke="#e8e0cf" class="zr1-cls-6"></path>
+<path d="M48 79.5L622 79.5" fill="none" pointer-events="visible" stroke="#e8e0cf" class="zr1-cls-6"></path>
+<path d="M48 36.5L622 36.5" fill="none" pointer-events="visible" stroke="#e8e0cf" class="zr1-cls-6"></path>
+<path d="M48 296.5L622 296.5" fill="none" pointer-events="visible" stroke="#c8bbaa" stroke-linecap="round" class="zr1-cls-6"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" transform="translate(40 296)" fill="#89786b">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" transform="translate(40 252.6667)" fill="#89786b">100</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" transform="translate(40 209.3333)" fill="#89786b">200</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" transform="translate(40 166)" fill="#89786b">300</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" transform="translate(40 122.6667)" fill="#89786b">400</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" transform="translate(40 79.3333)" fill="#89786b">500</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" transform="translate(40 36)" fill="#89786b">600</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" y="8.55" transform="translate(119.75 304)" fill="#89786b">Q1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" y="8.55" transform="translate(263.25 304)" fill="#89786b">Q2</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" y="8.55" transform="translate(406.75 304)" fill="#89786b">Q3</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" y="8.55" transform="translate(550.25 304)" fill="#89786b">Q4</text>
+<path d="M92.7 157.3L146.8 157.3A6 6 0 0 1 152.8 163.3L152.8 296L86.7 296L86.7 163.3A6 6 0 0 1 92.7 157.3Z" fill="#746254" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr1-cls-7"></path>
+<path d="M236.2 183.3L290.3 183.3A6 6 0 0 1 296.3 189.3L296.3 296L230.2 296L230.2 189.3A6 6 0 0 1 236.2 183.3Z" fill="#746254" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr1-cls-7"></path>
+<path d="M379.7 118.3L433.8 118.3A6 6 0 0 1 439.8 124.3L439.8 296L373.7 296L373.7 124.3A6 6 0 0 1 379.7 118.3Z" fill="#746254" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr1-cls-7"></path>
+<path d="M523.2 66.3L577.3 66.3A6 6 0 0 1 583.3 72.3L583.3 296L517.2 296L517.2 72.3A6 6 0 0 1 523.2 66.3Z" fill="#746254" ecmeta_series_index="0" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr1-cls-7"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" y="-8.55" transform="translate(119.75 152.3333)" fill="#89786b">320</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" y="-8.55" transform="translate(263.25 178.3333)" fill="#89786b">260</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" y="-8.55" transform="translate(406.75 113.3333)" fill="#89786b">410</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:17.1px;font-family:'Microsoft YaHei', sans-serif;" y="-8.55" transform="translate(550.25 61.3333)" fill="#89786b">530</text>
+<style ><![CDATA[
+.zr1-cls-6:hover {
+pointer-events:none;
+}
+.zr1-cls-7:hover {
+cursor:pointer;
+fill:rgba(127,107,92,1);
+}
+
+]]>
+
+</style>
+</svg>

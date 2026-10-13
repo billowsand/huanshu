@@ -2,6 +2,7 @@
 import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
+import { renderRichText } from '../utils/richText'
 
 const props = defineProps<{
   section?: string
@@ -23,14 +24,14 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
 </script>
 
 <template>
-  <div v-if="section" class="section-num">{{ section }}</div>
+  <div v-if="section" class="section-num"><span v-html="renderRichText(section)"></span></div>
 
   <div relative z-10 py-4 flex flex-col h-full>
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2"><span v-html="renderRichText(subtitle)"></span></TagBadge>
 
     <!-- ─── Horizontal Flow ─── -->
     <div v-if="!isVertical" flex-1 flex flex-col justify-center>
@@ -71,7 +72,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
             <span
               class="sf-num"
               :style="{ background: toneVars(step.tone || 'blue').solid, '--step-contrast': toneVars(step.tone || 'blue').contrast }"
-            >{{ idx + 1 }}</span>
+            ><span v-html="renderRichText(idx + 1)"></span></span>
           </div>
           <GlassCard
             padding="px-3 py-2"
@@ -85,9 +86,9 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
             <div
               font-bold class="slide-card-title sf-htitle" leading-snug
               :style="{ color: toneVars(step.tone || 'blue').text }"
-            >{{ step.title }}</div>
+            ><span v-html="renderRichText(step.title)"></span></div>
             <div v-if="step.body" class="slide-text-caption slide-font-body sf-hbody" opacity-60 leading-relaxed mt-1>
-              {{ step.body }}
+              <span v-html="renderRichText(step.body)"></span>
             </div>
           </GlassCard>
         </div>
@@ -117,7 +118,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
                 class="slide-text-caption slide-number"
                 font-bold
                 :style="{ color: toneVars(step.tone || 'blue').text }"
-              >{{ idx + 1 }}</span>
+              ><span v-html="renderRichText(idx + 1)"></span></span>
             </div>
             <!-- Connecting line to next step -->
             <div
@@ -151,10 +152,10 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
                 <div
                   font-bold class="slide-card-title"
                   :style="{ color: toneVars(step.tone || 'blue').text }"
-                >{{ step.title }}</div>
+                ><span v-html="renderRichText(step.title)"></span></div>
               </div>
               <div v-if="step.body" class="slide-text-caption slide-font-body" opacity-70 leading-relaxed>
-                {{ step.body }}
+                <span v-html="renderRichText(step.body)"></span>
               </div>
             </GlassCard>
           </div>
@@ -163,7 +164,7 @@ const trackLeft = computed(() => `${100 / (2 * safeStepCount.value)}%`)
     </div>
 
     <div v-if="footer" mt-4 text-center class="slide-footnote slide-text-caption" opacity-40>
-      {{ footer }}
+      <span v-html="renderRichText(footer)"></span>
     </div>
   </div>
 </template>

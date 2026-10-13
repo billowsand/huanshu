@@ -48,8 +48,8 @@
       column-gutter: 8 * px * f,
       txt(ctx, "number", size, 1.5, str(item.at("index", default: "")), fill: fade(if muted { th.muted } else { th.primary })),
       txt(ctx, "body", size, 1.5, fill: fade(th.ink), {
-        str(item.at("label", default: ""))
-        if has(meta) { text(fill: fade(th.ink.transparentize(50%)), " （" + str(meta) + "）") }
+        rich(str(item.at("label", default: "")))
+        if has(meta) { text(fill: fade(th.ink.transparentize(50%)), rich(" （" + str(meta) + "）")) }
       }),
     ),
   )

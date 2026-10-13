@@ -3,7 +3,11 @@
     "kind": "cover",
     "title": "Auto Slidev Layout Blueprint Test Deck",
     "subtitle": "覆盖当前项目全部布局类型的测试数据",
-    "badges": ["layout-regression", "db-fixture", "visual-check"]
+    "badges": [
+      "layout-regression",
+      "db-fixture",
+      "visual-check"
+    ]
   },
   {
     "kind": "overview",
@@ -46,7 +50,11 @@
         "icon": "i-carbon:data-base",
         "subtitle": "结构完整性",
         "body": "要求 blueprint 字段命名稳定，空数组和可选字段都能被前端安全处理。",
-        "items": ["字段命名一致", "数组类型稳定", "空值可回退"],
+        "items": [
+          "字段命名一致",
+          "数组类型稳定",
+          "空值可回退"
+        ],
         "conclusion": "先保证 schema 稳定，再测样式",
         "footer_tag": "Schema",
         "footer_tone": "blue"
@@ -57,7 +65,11 @@
         "icon": "i-carbon:chart-relationship",
         "subtitle": "紧凑布局",
         "body": "四列时需要验证标题长度、段落换行和卡片高度是否一致。",
-        "items": ["标题不顶边", "长文本可换行", "高度尽量齐平"],
+        "items": [
+          "标题不顶边",
+          "长文本可换行",
+          "高度尽量齐平"
+        ],
         "conclusion": "四列是最容易暴露布局抖动的场景",
         "footer_tag": "Density",
         "footer_tone": "green"
@@ -68,7 +80,11 @@
         "icon": "i-carbon:view",
         "subtitle": "层级对比",
         "body": "需要区分主标题、副标题、正文、列表与结论区域的视觉优先级。",
-        "items": ["标题对比明确", "正文行高稳定", "强调区块不抢主标题"],
+        "items": [
+          "标题对比明确",
+          "正文行高稳定",
+          "强调区块不抢主标题"
+        ],
         "conclusion": "优先检查小屏或缩放场景",
         "footer_tag": "Readability",
         "footer_tone": "amber"
@@ -79,7 +95,11 @@
         "icon": "i-carbon:warning-alt",
         "subtitle": "边界情况",
         "body": "本卡片模拟风险提示、较长文字和视觉强调区域同时出现。",
-        "items": ["支持长句", "支持风险提醒", "支持卡片底部状态位"],
+        "items": [
+          "支持长句",
+          "支持风险提醒",
+          "支持卡片底部状态位"
+        ],
         "risk": "若这里溢出，通常意味着卡片内边距或字体比例需要调整",
         "conclusion": "边界内容比正常内容更能发现问题",
         "footer_tag": "Edge Case",
@@ -100,7 +120,11 @@
         "icon": "i-carbon:idea",
         "tone": "blue",
         "body": "侧栏第一块测试常规正文与列表组合。",
-        "items": ["一段正文", "多条 checklist", "默认边框风格"],
+        "items": [
+          "一段正文",
+          "多条 checklist",
+          "默认边框风格"
+        ],
         "highlight": "适合验证高亮标题和正文间距"
       },
       {
@@ -108,7 +132,12 @@
         "kind": "flow",
         "icon": "i-carbon:flow-stream",
         "tone": "green",
-        "items": ["采集输入", "归一化结构", "渲染预览", "回写数据库"]
+        "items": [
+          "采集输入",
+          "归一化结构",
+          "渲染预览",
+          "回写数据库"
+        ]
       },
       {
         "title": "矩阵块",
@@ -152,10 +181,26 @@
       }
     ],
     "layers": [
-      { "title": "视觉表现层", "meta": "Vue Components", "tone": "red" },
-      { "title": "数据映射层", "meta": "SlideRenderer", "tone": "amber" },
-      { "title": "结构协议层", "meta": "SlideBlueprint", "tone": "green" },
-      { "title": "持久化层", "meta": "SQLite projects.blueprints", "tone": "blue" }
+      {
+        "title": "视觉表现层",
+        "meta": "Vue Components",
+        "tone": "red"
+      },
+      {
+        "title": "数据映射层",
+        "meta": "SlideRenderer",
+        "tone": "amber"
+      },
+      {
+        "title": "结构协议层",
+        "meta": "SlideBlueprint",
+        "tone": "green"
+      },
+      {
+        "title": "持久化层",
+        "meta": "SQLite projects.blueprints",
+        "tone": "blue"
+      }
     ]
   },
   {
@@ -215,10 +260,27 @@
       }
     ],
     "ranking": [
-      { "index": "1", "label": "结构正确", "meta": "字段映射无误" },
-      { "index": "2", "label": "布局稳定", "meta": "不溢出不塌陷" },
-      { "index": "3", "label": "视觉清晰", "meta": "层级和强调合理" },
-      { "index": "4", "label": "动画顺滑", "meta": "进入效果不突兀", "muted": true }
+      {
+        "index": "1",
+        "label": "结构正确",
+        "meta": "字段映射无误"
+      },
+      {
+        "index": "2",
+        "label": "布局稳定",
+        "meta": "不溢出不塌陷"
+      },
+      {
+        "index": "3",
+        "label": "视觉清晰",
+        "meta": "层级和强调合理"
+      },
+      {
+        "index": "4",
+        "label": "动画顺滑",
+        "meta": "进入效果不突兀",
+        "muted": true
+      }
     ]
   },
   {
@@ -368,8 +430,14 @@
         "icon": "i-carbon:inspect",
         "tone": "blue",
         "steps": [
-          { "label": "读取类型定义", "desc": "确认字段名称和默认值策略" },
-          { "label": "读取组件映射", "desc": "确认每种 kind 对应的展示组件" }
+          {
+            "label": "读取类型定义",
+            "desc": "确认字段名称和默认值策略"
+          },
+          {
+            "label": "读取组件映射",
+            "desc": "确认每种 kind 对应的展示组件"
+          }
         ],
         "highlight": "先保证数据形状正确"
       },
@@ -379,9 +447,15 @@
         "icon": "i-carbon:edit",
         "tone": "green",
         "steps": [
-          { "label": "填充代表性标题" },
-          { "label": "加入长短混合文案" },
-          { "label": "补充 tone 与 icon" }
+          {
+            "label": "填充代表性标题"
+          },
+          {
+            "label": "加入长短混合文案"
+          },
+          {
+            "label": "补充 tone 与 icon"
+          }
         ],
         "highlight": "让正常态和边界态同时存在"
       },
@@ -391,9 +465,15 @@
         "icon": "i-carbon:task-complete",
         "tone": "amber",
         "steps": [
-          { "label": "保存到数据库" },
-          { "label": "打开编辑器/演示页" },
-          { "label": "逐页截图或人工检查" }
+          {
+            "label": "保存到数据库"
+          },
+          {
+            "label": "打开编辑器/演示页"
+          },
+          {
+            "label": "逐页截图或人工检查"
+          }
         ],
         "highlight": "把问题收敛到具体布局"
       }
@@ -412,9 +492,19 @@
         "tone": "green",
         "icon": "i-carbon:thumbs-up",
         "items": [
-          { "label": "回归稳定", "desc": "每次对比的是同一组输入", "highlight": true },
-          { "label": "覆盖全面", "desc": "每种布局都有代表页" },
-          { "label": "问题可复现", "desc": "样式问题不会因随机内容漂移" }
+          {
+            "label": "回归稳定",
+            "desc": "每次对比的是同一组输入",
+            "highlight": true
+          },
+          {
+            "label": "覆盖全面",
+            "desc": "每种布局都有代表页"
+          },
+          {
+            "label": "问题可复现",
+            "desc": "样式问题不会因随机内容漂移"
+          }
         ],
         "conclusion": "适合主题调整、组件重构后的快速回归"
       },
@@ -423,9 +513,19 @@
         "tone": "red",
         "icon": "i-carbon:warning",
         "items": [
-          { "label": "输入不稳定", "desc": "每次内容密度不同，难以横向比较", "highlight": true },
-          { "label": "容易漏测", "desc": "某些布局可能这次根本没被选中" },
-          { "label": "难以归因", "desc": "发现问题后不容易精确复现到同一页" }
+          {
+            "label": "输入不稳定",
+            "desc": "每次内容密度不同，难以横向比较",
+            "highlight": true
+          },
+          {
+            "label": "容易漏测",
+            "desc": "某些布局可能这次根本没被选中"
+          },
+          {
+            "label": "难以归因",
+            "desc": "发现问题后不容易精确复现到同一页"
+          }
         ],
         "conclusion": "随机内容适合探索，固定 fixture 更适合回归"
       }
@@ -497,10 +597,30 @@
     "title": "Section Intro: 章节导览测试",
     "note": "左侧深色导语卡验证 badge、标题、子主题计数与 note 的纵向分布。",
     "cards": [
-      { "title": "输入侧：统一字段约定", "tone": "blue", "icon": "i-carbon:data-structured", "body": "说明章节开场卡片的正文换行与图标对齐。" },
-      { "title": "布局侧：版式边界清晰", "tone": "green", "icon": "i-carbon:grid", "body": "四张卡片时切成两列，验证行高均分。" },
-      { "title": "渲染侧：屏幕与导出一致", "tone": "amber", "icon": "i-carbon:document-pdf", "body": "同一份数据在 Vue 与 Typst 中排版一致。" },
-      { "title": "回归侧：固定样本对比", "tone": "red", "icon": "i-carbon:compare", "body": "每次调整后与基线截图逐页比对。" }
+      {
+        "title": "输入侧：统一字段约定",
+        "tone": "blue",
+        "icon": "i-carbon:data-structured",
+        "body": "说明章节开场卡片的正文换行与图标对齐。"
+      },
+      {
+        "title": "布局侧：版式边界清晰",
+        "tone": "green",
+        "icon": "i-carbon:grid",
+        "body": "四张卡片时切成两列，验证行高均分。"
+      },
+      {
+        "title": "渲染侧：屏幕与导出一致",
+        "tone": "amber",
+        "icon": "i-carbon:document-pdf",
+        "body": "同一份数据在 Vue 与 Typst 中排版一致。"
+      },
+      {
+        "title": "回归侧：固定样本对比",
+        "tone": "red",
+        "icon": "i-carbon:compare",
+        "body": "每次调整后与基线截图逐页比对。"
+      }
     ]
   },
   {
@@ -509,17 +629,110 @@
     "title": "Issue Stack: 问题堆叠测试",
     "footer": "四张卡片时切换为左标题、右内容的横排模式，验证标签换行与等高分配。",
     "cards": [
-      { "title": "数据口径不一", "tone": "amber", "icon": "i-carbon:data-error", "body": "不同来源对同一指标的统计口径存在差异，导致结论无法横向比较。", "items": ["口径分散", "定义冲突", "难以对账"] },
-      { "title": "流程衔接断点", "tone": "red", "icon": "i-carbon:flow-stream", "body": "跨部门交接依赖人工传递，关键信息在流转中丢失。", "items": ["人工转录", "信息丢失", "责任模糊"] },
-      { "title": "工具链割裂", "tone": "blue", "icon": "i-carbon:tool-kit", "body": "各环节使用独立工具，数据需要反复导入导出。", "items": ["重复录入", "格式转换"] },
-      { "title": "反馈周期过长", "tone": "green", "icon": "i-carbon:time", "body": "问题从发现到修复平均需要两周，无法支撑快速迭代。", "items": ["响应滞后", "迭代缓慢", "复盘缺失"] }
+      {
+        "title": "数据口径不一",
+        "tone": "amber",
+        "icon": "i-carbon:data-error",
+        "body": "不同来源对同一指标的统计口径存在差异，导致结论无法横向比较。",
+        "items": [
+          "口径分散",
+          "定义冲突",
+          "难以对账"
+        ]
+      },
+      {
+        "title": "流程衔接断点",
+        "tone": "red",
+        "icon": "i-carbon:flow-stream",
+        "body": "跨部门交接依赖人工传递，关键信息在流转中丢失。",
+        "items": [
+          "人工转录",
+          "信息丢失",
+          "责任模糊"
+        ]
+      },
+      {
+        "title": "工具链割裂",
+        "tone": "blue",
+        "icon": "i-carbon:tool-kit",
+        "body": "各环节使用独立工具，数据需要反复导入导出。",
+        "items": [
+          "重复录入",
+          "格式转换"
+        ]
+      },
+      {
+        "title": "反馈周期过长",
+        "tone": "green",
+        "icon": "i-carbon:time",
+        "body": "问题从发现到修复平均需要两周，无法支撑快速迭代。",
+        "items": [
+          "响应滞后",
+          "迭代缓慢",
+          "复盘缺失"
+        ]
+      }
     ]
+  },
+  {
+    "kind": "chart_focus",
+    "section": "12",
+    "title": "Chart Focus: 数据图表解读测试",
+    "subtitle": "左侧要点 + 右侧图表，验证图表页版式",
+    "points": [
+      {
+        "step": "01",
+        "title": "趋势判断",
+        "body": "指标整体向上，Q3 起增速明显加快。"
+      },
+      {
+        "step": "02",
+        "title": "关键拐点",
+        "body": "Q3 新增自动化流水线后，交付量跳升。"
+      },
+      {
+        "step": "03",
+        "title": "行动建议",
+        "body": "建议复制该机制到其余两条业务线。"
+      }
+    ],
+    "chart": {
+      "type": "bar",
+      "title": "季度交付量（示例）",
+      "data": [
+        {
+          "quarter": "Q1",
+          "count": 12
+        },
+        {
+          "quarter": "Q2",
+          "count": 19
+        },
+        {
+          "quarter": "Q3",
+          "count": 27
+        },
+        {
+          "quarter": "Q4",
+          "count": 34
+        }
+      ],
+      "encoding": {
+        "x": "quarter",
+        "y": "count"
+      },
+      "source": "llm_generated"
+    },
+    "footer": "示例数据，仅用于版式验证。"
   },
   {
     "kind": "closing",
     "title": "感谢聆听",
     "subtitle": "Closing: 结束页测试，验证 END 标记、标题、副标题、分隔线与备注的纵向节奏。",
     "note": "备注用于放置联系方式或下一步行动，最长不超过 34rem。",
-    "badges": ["layout-regression", "visual-check"]
+    "badges": [
+      "layout-regression",
+      "visual-check"
+    ]
   }
 ]

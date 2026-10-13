@@ -76,6 +76,22 @@
 - 跨部门数据调用时间由数天缩短至分钟级
 - 数据质量合格率提升至百分之九十五以上
 
+```chart
+{
+  "type": "bar",
+  "title": "跨部门数据调用平均耗时（小时）",
+  "data": [
+    { "stage": "建设前", "hours": 72 },
+    { "stage": "一期上线", "hours": 8 },
+    { "stage": "二期上线", "hours": 0.5 }
+  ],
+  "encoding": { "x": "stage", "y": "hours" },
+  "emphasis": { "highlight": ["二期上线"] },
+  "source": "user_input",
+  "source_note": "试点部门调用日志"
+}
+```
+
 ### 主要风险与应对
 
 - 部门配合风险：纳入年度绩效考核，压实责任

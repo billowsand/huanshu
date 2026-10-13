@@ -69,6 +69,7 @@ mod image_tests {
             preferred_assets: asset.into_iter().map(str::to_string).collect(),
             page_role: Some("content".to_string()),
             section_number: Some("01".to_string()),
+            chart: None,
         }
     }
 
@@ -185,6 +186,12 @@ pub fn make_fallback_slide(
         label_tone: None,
         image: None,
         images: Vec::new(),
+        // A chart page is forced to chart_focus, so its fallback still shows the data.
+        chart: if kind == SlideKind::ChartFocus {
+            page.chart.clone()
+        } else {
+            None
+        },
         placeholder: None,
         side_width: None,
         badges: Vec::new(),
@@ -200,10 +207,13 @@ pub fn make_fallback_slide(
         left_items: Vec::new(),
         layers: Vec::new(),
         list_items: match kind {
-            SlideKind::SectionList => list_items,
+            SlideKind::SectionList => list_items.clone(),
             _ => Vec::new(),
         },
-        points: Vec::new(),
+        points: match kind {
+            SlideKind::ChartFocus => list_items,
+            _ => Vec::new(),
+        },
         ranking: Vec::new(),
         center_items: Vec::new(),
         footer: None,
@@ -483,6 +493,19 @@ pub fn ensure_image_from_page_plan(slide: &mut SlideBlueprint, page: &PagePlan) 
     slide.image = Some(reference.clone());
     // The frame is filled now, so the "image pending" hint is no longer needed.
     slide.placeholder = None;
+}
+
+/// chart_focus 页的图表来自 markdown 的 ```chart 围栏（page plan 附带），模型只负责解读。
+/// 数据以文档为准：无论模型漏掉、改写还是编造了 chart，都用 page plan 的原值覆盖。
+/// 必须在校验之前调用（生成后、每轮 repair 后），否则缺 chart 会触发 repair，
+/// 最后一轮换模板把图丢掉。
+pub fn ensure_chart_from_page_plan(slide: &mut SlideBlueprint, page: &PagePlan) {
+    if slide.kind != SlideKind::ChartFocus {
+        return;
+    }
+    if let Some(chart) = page.chart.clone() {
+        slide.chart = Some(chart);
+    }
 }
 
 pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
@@ -1112,7 +1135,7 @@ pub async fn repair_one_slide(
                 "component_schema": schema,
             })];
 
-            let system = "You repair an invalid Slidev slide blueprint. Fix only what is necessary to satisfy validation while preserving the content intent. Return strict JSON. IMPORTANT: all icon fields must use the i-carbon: prefix (e.g. \"i-carbon:chart-line\"). Never use i-mdi:, i-fa:, or any other prefix. All text fields are plain text: never use Markdown or HTML syntax (**bold**, list markers, # headings, `code`, links) or line breaks inside a field.";
+            let system = "You repair an invalid Slidev slide blueprint. Fix only what is necessary to satisfy validation while preserving the content intent. Return strict JSON. IMPORTANT: all icon fields must use the i-carbon: prefix (e.g. \"i-carbon:chart-line\"). Never use i-mdi:, i-fa:, or any other prefix. All text fields are plain text: never use Markdown or HTML syntax (**bold**, list markers, # headings, `code`, links) or line breaks inside a field. The only exception is LaTeX math: keep any $...$ inline formulas and $$...$$ display formulas intact; apart from math, fields must stay free of Markdown and HTML.";
             let user = format!(
                 "Document title: {}\n\nFailing slide with its plan and schema:\n{}\n\nValidation issues:\n{}\n\nReturn ONLY the corrected slide as JSON: {{\"slides\": [<corrected blueprint>]}}.",
                 doc.title,
@@ -1154,6 +1177,7 @@ pub async fn repair_one_slide(
             config.aspect_ratio,
         )
         .await?;
+        ensure_chart_from_page_plan(&mut slide, page_plan);
     }
 
     // All rounds exhausted: try deterministic fallback

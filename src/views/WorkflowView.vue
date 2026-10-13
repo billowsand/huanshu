@@ -2167,6 +2167,14 @@ onMounted(() => {
   border: none !important;
 }
 
+/* chart_focus 的图表数据 JSON 编辑框（Step3Editor） */
+.ej-chart-json {
+  font-family: var(--font-code);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+
 .ej-qf-textarea {
   resize: vertical;
   min-height: 4.5rem;

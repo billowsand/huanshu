@@ -89,6 +89,43 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
 3. **2c 并发生成**（`slides.rs::generate_single_page_pipeline`）：content → normalize → validate/repair。
    repair 最后一轮仍可能用 `pick_different_kind` 换模板，此时不会回头重排其他页（少见，可接受）。
 
+### 图表页（`chart_focus`）
+
+数据来自 Markdown 的 ```` ```chart ```` 围栏块（`input.rs` 解析，`ChartSpec::problems()` 不通过就直接报错给用户），
+按位置挂到 H2/H3，由 `planning::push_text_unit` 分页：
+- 正文短（`content_units` ≤ `CHART_PAGE_SPLIT_UNITS` = 150，约 300 汉字）：首图随文本页（chart_focus：左侧 2-4 条解读 + 右侧图表）；
+- 正文长：**拆成两页**——文本页不带图、照常选版式，图表紧跟着单独成页（带截断 200 字的原文做解读语境）；
+- 同一文本单元的其余图表各追加一页；H2 走 `section_summary` 时它自己的图全部单独成页。
+- **带图表的页固定 `chart_focus`**（`planning::forced_kind`，与 section_summary → section_intro 同一机制）：
+  它是唯一渲染图表的模板，换成别的模板等于静默丢掉用户数据。所以 repair 最后一轮、`make_fallback_slide` 也都回到 chart_focus。
+- **chart 由代码挂载，不让 LLM 抄**：内容提示词只让模型写 `points`；`normalize::ensure_chart_from_page_plan` 在**校验之前**
+  和每轮 repair 之后用 page plan 的原值覆盖。数据错误 LLM 修不了，绝不能让它进 repair 循环（否则最后一轮换模板丢图）。
+  反馈修复（`repair_slide`）同样保留原 chart。enrich 不会把 `visual_need=chart` 降回 `text_only`。
+- 渲染只有一份：`src/components/chartOptions.ts` 的 `buildChartOption`。屏幕直接挂 ECharts（换主题/字体靠 MutationObserver 重绘，
+  内容变化引起 `--type-scale` 变化也会重绘）。图表字号写成「scale=1 时的 px」再乘本页 `--type-scale`，与其他文字一起缩放。
+- PDF 导出三步（`usePdfExport`）：① 首页导出没有内存牌组时先 `get_project` 读出牌组；② `pdf_chart_boxes` 命令让 typst 按与导出
+  完全相同的参数只排版图表页，`chart-focus.typ` 发出 `<chart-box>` 标记（绘图框 CSS px + 本页 type scale，`Renderer::chart_boxes`）；
+  ③ webview 按这个框的尺寸和字号比例 SSR 出 SVG，以 `chart:<页序>` 经 asset 管道交给 `export_pdf`。所以 SVG 在 PDF 里 1:1 落位，
+  **不要**再在前端按画布尺寸估算图表框（曾固定 920×440，PDF 里 12px 标签只剩约 8px；按比例估的高度也差 10%）。
+  typst 侧 `fit: "contain"`（默认 `cover` 会裁掉坐标轴）；无 SVG 时卡片结构不变，只把绘图区换成占位，测量与导出两遍排版一致（有单测）。
+- 内容量估算（`SlideRenderer.vue` 的 `contentLoad` / typst `content-load`）跳过 `chart` 键：数据行不是排版文字，计入会让图表页
+  一律落到最小字号。两边的跳过列表必须一致。
+- 图表数据校验两份，规则一致：Rust `ChartSpec::problems()`（解析 Markdown、`validate.rs`）与 TS `chartProblems()`
+  （Step3 编辑器「图表数据（JSON）」框与高级 JSON 的语义错误；只有通过校验的 JSON 才写回牌组）。
+- 配色只在 CSS（`--chart-*` 与主题 token，`themeFromCssVars` 读取）；typst 主题里**没有**图表色，SVG 自带颜色。
+- 校准结果（Vue 对照页实测）：绘图框宽度一致（646/647），高度差 ≤ 5px（仅「有副标题、无页脚」时，源自通用 `content-page` 几何）；
+  左栏要点与 focus_example 同一套度量（card-title 标题、caption 正文 70%、序号同标题字号）；卡片底色取 `paper`；
+  图表标题为墨色（模板里的 `text="var(--primary)"` 在屏幕上不生效，13 处模板都如此，typst 一律按屏幕实测）。
+- 回归与目检：`crates/slide-typst/tests/fixtures/charts.json`（五种图）+ `charts/svg/`（由 `scripts/chart-fixtures.ts` 生成的原始 SSR 输出）
+  + `charts/themes/*.json`（Vue 对照页读出的五套 `ChartTheme`）。改了 `buildChartOption` 后重新生成：
+
+  ```bash
+  cargo run -p slide-typst --example render_fixture -- crates/slide-typst/tests/fixtures/charts.json target/chart-check --chart-boxes
+  bun scripts/chart-fixtures.ts crates/slide-typst/tests/fixtures/charts.json target/chart-check/chart-boxes.json crates/slide-typst/tests/fixtures/charts/themes/light-notes.json crates/slide-typst/tests/fixtures/charts/svg
+  cargo run -p slide-typst --example render_fixture -- crates/slide-typst/tests/fixtures/charts.json target/chart-check --assets crates/slide-typst/tests/fixtures/charts/svg/assets.json --png
+  ```
+- 来源角标 `chartSourceLabel()` 与 `chart-focus.typ` 的 `source-caption` 必须同步；`source` 是内部枚举，不能原样显示。
+
 ### 适用条件表（`generator/layout_rules.rs`）
 
 `LAYOUT_RULES` 是「模板何时可用」的唯一来源，以下全部从它派生，**不要再在别处手写模板白名单或硬约束**：
@@ -100,7 +137,7 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
 现有硬条件：`step_flow` 要点 ≤4 / `process` 要点 ≥5；`compare` 需 pair 或 comparison；
 `issue_stack` 需 warning/causal 或问题类措辞；`swot` 需 matrix 或 SWOT 措辞；`spotlight` 需
 `preferred_assets` 非空；32:9 禁 `spotlight`，48:9 禁 `spotlight`/`compare`/`focus_example`；
-`section_intro` 仅且必须用于 `section_summary` 页；Cover/Overview/Closing 不在表中，永不可选。
+`section_intro` 仅且必须用于 `section_summary` 页；`chart_focus` 仅且必须用于带 ```` ```chart ```` 的页；Cover/Overview/Closing 不在表中，永不可选。
 
 不变量：`UNIVERSAL_CONTENT_KINDS`（`feature_grid`、`section_list`）对任何内容页、任何比例都可用，
 兜底链依赖它保证总能找到可用 kind——给这两个模板加硬条件前先改兜底逻辑（有单测守护）。
@@ -111,7 +148,7 @@ LLM 没给出可用候选、repair 最后一轮换模板、生成兜底页时，
 再经上面的适用条件表过滤。它取代了旧的 `safe_fallback_kind` if 链（旧链规则顺序会让
 「summary + 2-4 要点 → outcome_grid」抢先截走 timeline/workflow/问题类页面）。
 
-- `PRIORS`：每个内容模板一行先验分（平局时偏向通用模板），单测要求恰好覆盖 13 个内容模板
+- `PRIORS`：每个内容模板一行先验分（平局时偏向通用模板），单测要求恰好覆盖 14 个内容模板
 - `SCORE_RULES`：每行「信号命中 → 给某模板加权重」，带 `signal` 标签；兜底候选的 `reason`
   会列出命中的前 3 个信号，可在 `02-layout-assignment.json` 里看到
 - 权重约定：具体结构信号（content_shape、warning、问题措辞）3-4，辅助信号 1.5-2，
@@ -243,7 +280,7 @@ caption 只说图片「是什么」，说不出它「该放哪」。所以 `gene
 
 独立的 workspace crate，由 `src-tauri/src/commands/pdf.rs` 接入应用（见下方「应用接入」）。它在进程内嵌入 Typst 编译器，把 `SlideBlueprint`
 JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍然负责屏幕渲染，Typst 侧是另一套
-版式实现。17 个模板（`SUPPORTED_KINDS`）与全部 5 个主题（`SUPPORTED_THEMES`：便签·稿纸、终端·纸/墨、暗·琥珀/星图）都已移植；
+版式实现。18 个模板（`SUPPORTED_KINDS`）与全部 5 个主题（`SUPPORTED_THEMES`：便签·稿纸、终端·纸/墨、暗·琥珀/星图）都已移植；
 未知主题 id 回落到便签（`main.typ` 的 `themes` 表兜底，`pdf.rs` 会把回落记进导出报告）。以后新增的模板在移植前
 会渲染成「Typst 版式尚未实现」占位页，不会丢页，导出结果弹窗会列出这些页。
 
@@ -361,6 +398,14 @@ cargo run -p slide-typst --example render_fixture -- --png
     backdrop-blur 糊掉，PDF 里会透过半透明卡显出来；phase-chip/step-dot 的 86%→62% mix 渐变画成平的 tone.solid；
     tl-node 的 glow 阴影、phase-head::after / steps-wrap__glow 模糊光斑省略。closing 的 kicker/subtitle/note/mark
     照抄了模板里硬编码的 slate/琥珀色（屏幕在这些主题下同样不随主题变量变）。
+- 数学公式（`$...$` / `$$...$$`）：屏幕由 `src/utils/richText.ts`（KaTeX）渲染，PDF 由 `src/math.rs` 经 mitex 转成
+  `\u{1}I…\u{2}` 哨兵段、`rich()` 里 `eval`。三处定界规则（另一处是生成侧 `generator/utils.rs` 的公式保护）必须一致。
+  - Typst 的 `eval` 出错无法捕获，一个坏公式会让整份导出失败：`Renderer::failing_math` 先用 `math-check.typ`
+    试编译全部公式（一次），失败时逐个定位，被拒的公式退回原文。mitex 能转换但 Typst 会拒的例子：`\frac{1}`、`\left(`、`\ref{x}`。
+  - 输入字符串里的 `\u{1}`/`\u{2}` 会先被删掉，否则模型文本可以伪造哨兵段直接 `eval` 任意 Typst 代码（有单测）。
+  - 内嵌的 mitex spec 在 `standard.typ` 的 `arrow-handle` 打了本地补丁（用 `math.stretch`）：上游依赖的 xarrow 用了
+    Typst 0.15 已删除的 `style()`，且是 GPL-3.0，**不要重新 vendor xarrow**。
+  - `richText.ts` 的白名单标签只输出裸标签（丢弃属性），结果要进 `v-html`。
 - 已知差异：没有阴影和毛玻璃（便签主题本身也基本不用）；`text-wrap: balance`（`base.typ` 的 `balanced`）
   目前只用在 `center_grid` 的居中标题上，其他页面标题仍按普通换行；屏幕版标题还会先分词再换行，PDF 没有；
   屏幕上一行放不下的超长标题会被裁掉（如 cover），PDF 版换行显示；未知图标在 PDF 里渲染为兜底图标

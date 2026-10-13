@@ -511,6 +511,16 @@ iframe {
   --danger-contrast: #fff5f7;
   --danger-bg:     rgba(244,63,94,0.1);
   --danger-border: rgba(244,63,94,0.25);
+
+  /* chart tokens（ECharts 主题，hexA() 依赖 #hex 格式） */
+  --chart-grid:  #1e1e28;
+  --chart-axis:  #2e2e3c;
+  --chart-palette-0: #f59e0b;
+  --chart-palette-1: #818cf8;
+  --chart-palette-2: #10b981;
+  --chart-palette-3: #f43f5e;
+  --chart-palette-4: #38bdf8;
+  --chart-palette-5: #e879f9;
 }
 
 /* ── 2. Dark Blue — "星图终端 / Star Chart"
@@ -570,6 +580,16 @@ iframe {
   --danger-contrast: #fff5f7;
   --danger-bg:     rgba(244,63,94,0.09);
   --danger-border: rgba(244,63,94,0.24);
+
+  /* chart tokens（ECharts 主题，hexA() 依赖 #hex 格式） */
+  --chart-grid:  #0f2233;
+  --chart-axis:  #1c3a4f;
+  --chart-palette-0: #0ea5e9;
+  --chart-palette-1: #a78bfa;
+  --chart-palette-2: #34d399;
+  --chart-palette-3: #fb7185;
+  --chart-palette-4: #fbbf24;
+  --chart-palette-5: #22d3ee;
 }
 
 /* ============================================================

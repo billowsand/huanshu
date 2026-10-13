@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SlideTitle from './SlideTitle.vue'
 import { toneVars, type Tone } from './keynoteTheme'
+import { renderRichText } from '../utils/richText'
 
 defineProps<{
   section?: string
@@ -18,14 +19,14 @@ defineProps<{
 </script>
 
 <template>
-  <div v-if="section" class="section-num">{{ section }}</div>
+  <div v-if="section" class="section-num"><span v-html="renderRichText(section)"></span></div>
 
   <div relative z-10 py-4 flex flex-col h-full>
     <div class="slide-header">
       <SlideTitle class="slide-title slide-compact-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2"><span v-html="renderRichText(subtitle)"></span></TagBadge>
 
     <div class="tl-wrap" flex-1 flex flex-col justify-center>
       <div class="tl-axis" relative>
@@ -75,8 +76,8 @@ defineProps<{
                     <div
                       font-bold class="slide-card-title" leading-snug mb-1
                       :style="{ color: toneVars(evt.tone).text }"
-                    >{{ evt.title }}</div>
-                    <div class="slide-text-caption slide-font-body" opacity-60 leading-snug>{{ evt.body }}</div>
+                    ><span v-html="renderRichText(evt.title)"></span></div>
+                    <div class="slide-text-caption slide-font-body" opacity-60 leading-snug><span v-html="renderRichText(evt.body)"></span></div>
                   </GlassCard>
                 </div>
                 <!-- Stem: card → node -->
@@ -99,7 +100,7 @@ defineProps<{
                   :style="{ background: `color-mix(in srgb, ${toneVars(evt.tone).solid} 19%, transparent)` }"
                 />
                 <!-- Date label -->
-                <div class="tl-date pt-1">{{ evt.date }}</div>
+                <div class="tl-date pt-1"><span v-html="renderRichText(evt.date)"></span></div>
                 <!-- Bottom spacer -->
                 <div flex-1 />
               </template>
@@ -109,7 +110,7 @@ defineProps<{
                 <!-- Top spacer -->
                 <div flex-1 />
                 <!-- Date label -->
-                <div class="tl-date pb-1">{{ evt.date }}</div>
+                <div class="tl-date pb-1"><span v-html="renderRichText(evt.date)"></span></div>
                 <!-- Stem: date → node -->
                 <div
                   class="tl-stem"
@@ -151,8 +152,8 @@ defineProps<{
                     <div
                       font-bold class="slide-card-title" leading-snug mb-1
                       :style="{ color: toneVars(evt.tone).text }"
-                    >{{ evt.title }}</div>
-                    <div class="slide-text-caption slide-font-body" opacity-60 leading-snug>{{ evt.body }}</div>
+                    ><span v-html="renderRichText(evt.title)"></span></div>
+                    <div class="slide-text-caption slide-font-body" opacity-60 leading-snug><span v-html="renderRichText(evt.body)"></span></div>
                   </GlassCard>
                 </div>
               </template>
@@ -162,7 +163,7 @@ defineProps<{
       </div>
     </div>
 
-    <div v-if="footer" mt-3 class="slide-footnote slide-text-caption" opacity-40 text-center v-html="footer" />
+    <div v-if="footer" mt-3 class="slide-footnote slide-text-caption" opacity-40 text-center v-html="renderRichText(footer)" />
   </div>
 </template>
 

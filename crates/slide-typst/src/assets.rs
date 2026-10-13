@@ -136,6 +136,45 @@ fn image_refs(slide: &serde_json::Value) -> Vec<&str> {
         .collect()
 }
 
+/// Synthetic reference of a chart_focus slide's SSR SVG. The app renders the
+/// chart in the webview (ECharts SSR) and hands the SVG bytes over `Assets`;
+/// the template looks the result up by this exact spelling.
+pub fn chart_asset_ref(slide_index: usize) -> String {
+    format!("chart:{slide_index}")
+}
+
+fn is_chart_slide(slide: &serde_json::Value) -> bool {
+    slide.get("kind").and_then(|v| v.as_str()) == Some("chart_focus")
+}
+
+/// ECharts SSR SVG → 合法 XML。SSR 把字体列表原样写进 style 属性：
+/// `style="font-family:"Microsoft YaHei", "PingFang SC", sans-serif;"`，内层裸双引号会提前
+/// 结束属性值，XML 解析直接失败。把 `font-family:` 值里的双引号换成单引号即可（保留整条回退列表）。
+/// 紧凑 path 语法（`M48 400.5L880`）是合法 SVG，usvg 能直接解析，不要去改写 path：
+/// 按 `d="` 查找会同时命中 `id="…"`，曾把 `id="zr0-c0"` 改成 `id="zr0 -c0"`，
+/// clip-path / 渐变引用随之失效。
+fn sanitize_svg_for_typst(svg: &str) -> String {
+    const KEY: &str = "font-family:";
+    let mut out = String::with_capacity(svg.len() + 40);
+    let mut rest = svg;
+    while let Some(pos) = rest.find(KEY) {
+        let value_start = pos + KEY.len();
+        out.push_str(&rest[..value_start]);
+        let after = &rest[value_start..];
+        // The value ends at the declaration's `;` (font names never contain one); `>` guards
+        // against a malformed tail so the scan never runs past the element.
+        let end = after.find([';', '>']).unwrap_or(after.len());
+        out.push_str(&after[..end].replace('"', "'"));
+        rest = &after[end..];
+    }
+    out.push_str(rest);
+    // usvg only accepts elements in the SVG namespace.
+    if !out.contains("xmlns=") {
+        out = out.replacen("<svg", "<svg xmlns=\"http://www.w3.org/2000/svg\"", 1);
+    }
+    out
+}
+
 pub(crate) fn prepare(slides: &[serde_json::Value], assets: &Assets) -> PreparedAssets {
     let mut prepared = PreparedAssets {
         paths: HashMap::new(),
@@ -145,13 +184,17 @@ pub(crate) fn prepare(slides: &[serde_json::Value], assets: &Assets) -> Prepared
     // Failures are cached per reference but reported for every slide using it.
     let mut failures: HashMap<String, String> = HashMap::new();
     for (index, slide) in slides.iter().enumerate() {
-        for reference in image_refs(slide) {
-            if prepared.paths.contains_key(reference) {
+        let mut refs: Vec<String> = image_refs(slide).iter().map(|r| r.to_string()).collect();
+        if is_chart_slide(slide) {
+            refs.push(chart_asset_ref(index));
+        }
+        for reference in refs {
+            if prepared.paths.contains_key(&reference) {
                 continue;
             }
-            let reason = match failures.get(reference) {
+            let reason = match failures.get(&reference) {
                 Some(reason) => reason.clone(),
-                None => match assets.load(reference).and_then(normalize_image) {
+                None => match assets.load(&reference).and_then(normalize_image) {
                     Ok(image) => {
                         let path = format!("/assets/{}.{}", prepared.files.len(), image.ext);
                         prepared.files.insert(path.clone(), image.bytes);
@@ -161,18 +204,18 @@ pub(crate) fn prepare(slides: &[serde_json::Value], assets: &Assets) -> Prepared
                             height: image.height,
                             vector: image.ext == "svg",
                         };
-                        prepared.paths.insert(reference.to_string(), info);
+                        prepared.paths.insert(reference.clone(), info);
                         continue;
                     }
                     Err(reason) => {
-                        failures.insert(reference.to_string(), reason.clone());
+                        failures.insert(reference.clone(), reason.clone());
                         reason
                     }
                 },
             };
             prepared.missing.push(MissingAsset {
                 slide: index,
-                reference: reference.to_string(),
+                reference,
                 reason,
             });
         }
@@ -258,6 +301,9 @@ fn normalize_image(bytes: Vec<u8>) -> Result<NormalizedImage, String> {
             })
         }
         Format::Svg => {
+            // ECharts SSR 输出的 style 属性里有裸双引号（非法 XML），先修正再交给 usvg 校验。
+            let normalized = sanitize_svg_for_typst(&String::from_utf8_lossy(&bytes));
+            let bytes = normalized.into_bytes();
             let tree = usvg::Tree::from_data(&bytes, &usvg::Options::default())
                 .map_err(|err| format!("SVG 无法解析：{err}"))?;
             let size = tree.size();
@@ -354,5 +400,27 @@ mod tests {
             base64::engine::general_purpose::STANDARD.encode(&png)
         );
         assert_eq!(Assets::new().load(&uri).unwrap(), png);
+    }
+
+    #[test]
+    fn raw_echarts_ssr_svg_survives_sanitize_and_usvg() {
+        // Captured verbatim from ECharts SSR output (compact path data, bare
+        // quotes in font-family style) — the sanitizer must make it parse.
+        let raw = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/assets/echarts-ssr-raw.svg"
+        ))
+        .unwrap();
+        let image = normalize_image(raw).expect("raw ECharts SSR SVG must normalize");
+        assert_eq!(image.ext, "svg");
+        let text = String::from_utf8_lossy(&image.bytes);
+        assert!(!text.contains("font-family:\""), "bare quotes must be gone");
+        assert!(
+            text.contains("font-family:'Microsoft YaHei', 'PingFang SC', sans-serif;"),
+            "the fallback list must survive"
+        );
+        // `id="…"` also ends in `d="`: ids (clip paths, gradients) must stay untouched.
+        assert!(text.contains(r#"id="zr0-c0""#), "clip-path id was rewritten");
+        assert!(text.contains(r#"id="zr0-g0""#), "gradient id was rewritten");
     }
 }

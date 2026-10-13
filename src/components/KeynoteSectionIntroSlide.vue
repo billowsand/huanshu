@@ -2,6 +2,7 @@
 import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
+import { renderRichText } from '../utils/richText'
 
 const props = defineProps<{
   section?: string
@@ -53,25 +54,25 @@ const cardGridGap = computed(() => {
 </script>
 
 <template>
-  <div v-if="section" class="section-num">{{ section }}</div>
+  <div v-if="section" class="section-num"><span v-html="renderRichText(section)"></span></div>
 
   <div class="section-intro" relative z-10 :style="{ gridTemplateColumns: gridCols }">
     <div class="section-intro__lead glass-card">
-      <TagBadge v-if="badge" inline color="green" class="section-intro__badge">{{ badge }}</TagBadge>
+      <TagBadge v-if="badge" inline color="green" class="section-intro__badge"><span v-html="renderRichText(badge)"></span></TagBadge>
 
       <div class="slide-header section-intro__header">
         <SlideTitle class="slide-title section-intro__title" :title="title" />
         <div class="slide-title-divider section-intro__divider" />
       </div>
 
-      <p v-if="subtitle" class="slide-text-note section-intro__subtitle" v-html="subtitle" />
+      <p v-if="subtitle" class="slide-text-note section-intro__subtitle" v-html="renderRichText(subtitle)" />
 
       <div class="section-intro__meta">
         <div class="section-intro__meta-label">本章关注</div>
-        <div class="section-intro__meta-value">{{ previewCards.length }} 个子主题</div>
+        <div class="section-intro__meta-value"><span v-html="renderRichText(previewCards.length)"></span> 个子主题</div>
       </div>
 
-      <p v-if="note" class="slide-meta section-intro__note" v-html="note" />
+      <p v-if="note" class="slide-meta section-intro__note" v-html="renderRichText(note)" />
     </div>
 
     <div class="section-intro__grid"
@@ -86,16 +87,16 @@ const cardGridGap = computed(() => {
         no-padding
         :style="{ '--intro-tone': toneVars(card.tone).solid }"
       >
-        <div class="section-intro__card-index">{{ `0${idx + 1}`.slice(-2) }}</div>
+        <div class="section-intro__card-index"><span v-html="renderRichText(`0${idx + 1}`.slice(-2))"></span></div>
 
         <div :class="card.icon || 'i-carbon:arrow-right'" class="section-intro__card-icon" aria-hidden="true" />
-        <div class="section-intro__card-title">{{ card.title }}</div>
+        <div class="section-intro__card-title"><span v-html="renderRichText(card.title)"></span></div>
 
-        <div v-if="card.body" class="slide-text-meta section-intro__card-body" opacity-70 v-html="card.body" />
+        <div v-if="card.body" class="slide-text-meta section-intro__card-body" opacity-70 v-html="renderRichText(card.body)" />
 
         <div v-else-if="card.items?.length" class="section-intro__card-items">
           <div v-for="item in card.items.slice(0, 2)" :key="item" class="section-intro__card-item">
-            {{ item }}
+            <span v-html="renderRichText(item)"></span>
           </div>
         </div>
       </GlassCard>

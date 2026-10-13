@@ -68,11 +68,17 @@
   }
 }
 
-// Text in a role font with CSS-like line height.
+// Text in a role font with CSS-like line height. Plain strings route through
+// `rich()` so converted math spans (and the small HTML subset) render here too.
 #let txt(ctx, role, size, lh, body, fill: auto, ..args) = line-box(
   size,
   lh,
-  text(font: ctx.fonts.at(role), fill: if fill == auto { ctx.theme.ink } else { fill }, ..args, body),
+  text(
+    font: ctx.fonts.at(role),
+    fill: if fill == auto { ctx.theme.ink } else { fill },
+    ..args,
+    if type(body) == str { rich(body) } else { body },
+  ),
 )
 
 // Large chapter number in the top-right corner (`.section-num`). The theme's

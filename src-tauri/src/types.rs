@@ -185,6 +185,143 @@ pub enum SlideKind {
     Compare,
     IssueStack,
     Swot,
+    ChartFocus,
+}
+
+/// 图表 DSL：markdown 中 ```chart 围栏块的内容，原样贯穿 生成 → blueprint → 双端渲染。
+/// LLM 不得改写其中的数据（validate.rs 把关），normalize 只做默认值修复。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChartSpec {
+    /// line | bar | donut | grouped_bar | stacked_area
+    #[serde(rename = "type")]
+    pub chart_type: String,
+    pub title: String,
+    /// 行数据数组；每行是一个 { 列名: 值 } 对象
+    pub data: Vec<serde_json::Value>,
+    pub encoding: ChartEncoding,
+    /// 多系列图表（grouped_bar / stacked_area）的系列定义，按调色板顺序取色
+    #[serde(default)]
+    pub series: Vec<ChartSeries>,
+    #[serde(default)]
+    pub emphasis: Option<ChartEmphasis>,
+    /// user_input | llm_generated | tool —— 决定来源角标文案
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub source_note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChartEncoding {
+    #[serde(default)]
+    pub x: Option<String>,
+    #[serde(default)]
+    pub y: Option<String>,
+    /// donut：分类列名 / 数值列名
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub value: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChartSeries {
+    pub name: String,
+    /// data 行对象中取值用的键
+    pub key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChartEmphasis {
+    /// 需要高亮的类目名（x 值或 donut 的 label 值）
+    #[serde(default)]
+    pub highlight: Vec<String>,
+    #[serde(default)]
+    pub trend: Option<String>,
+}
+
+pub const CHART_TYPES: &[&str] = &["line", "bar", "donut", "grouped_bar", "stacked_area"];
+
+impl ChartSpec {
+    /// Structural problems that make the chart unrenderable. The data comes from the user's
+    /// markdown, so these are reported at parse time (`input.rs`) where the user can fix them;
+    /// `validate.rs` re-checks edited decks. The LLM repair loop cannot fix chart data and must
+    /// never be asked to.
+    pub fn problems(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        if !CHART_TYPES.contains(&self.chart_type.as_str()) {
+            out.push(format!(
+                "chart type '{}' is invalid; must be one of {}",
+                self.chart_type,
+                CHART_TYPES.join(", ")
+            ));
+            return out;
+        }
+        if self.title.trim().is_empty() {
+            out.push("chart title is empty".to_string());
+        }
+        if self.data.is_empty() {
+            out.push("chart data is empty".to_string());
+        }
+        let enc = &self.encoding;
+        let present = |key: &Option<String>| key.as_deref().is_some_and(|k| !k.trim().is_empty());
+        // (column, what) pairs whose values must be numeric in every row.
+        let mut numeric: Vec<(&str, &str)> = Vec::new();
+        match self.chart_type.as_str() {
+            "line" | "bar" => {
+                if !present(&enc.x) || !present(&enc.y) {
+                    out.push("line/bar chart requires encoding.x and encoding.y".to_string());
+                } else {
+                    numeric.push((enc.y.as_deref().unwrap_or_default(), "encoding.y"));
+                }
+            }
+            "donut" => {
+                if !present(&enc.label) || !present(&enc.value) {
+                    out.push("donut chart requires encoding.label and encoding.value".to_string());
+                } else {
+                    numeric.push((enc.value.as_deref().unwrap_or_default(), "encoding.value"));
+                }
+            }
+            _ => {
+                if !present(&enc.x) {
+                    out.push("grouped/stacked chart requires encoding.x".to_string());
+                }
+                if self.series.is_empty() {
+                    out.push("grouped/stacked chart requires at least one series entry".to_string());
+                }
+                for s in &self.series {
+                    if s.key.trim().is_empty() {
+                        out.push("chart series entry has empty key".to_string());
+                    } else {
+                        numeric.push((s.key.as_str(), "series"));
+                    }
+                }
+            }
+        }
+        for (row_idx, row) in self.data.iter().enumerate() {
+            let Some(obj) = row.as_object() else {
+                out.push(format!("chart data row {} is not an object", row_idx + 1));
+                continue;
+            };
+            for (key, what) in &numeric {
+                if !obj.get(*key).is_some_and(is_numeric) {
+                    out.push(format!(
+                        "chart data row {} is missing a numeric value for {what} '{key}'",
+                        row_idx + 1
+                    ));
+                }
+            }
+        }
+        out
+    }
+}
+
+/// Numbers, or strings that parse as one (the renderer applies `Number()` to every value).
+fn is_numeric(value: &serde_json::Value) -> bool {
+    value.is_number()
+        || value
+            .as_str()
+            .is_some_and(|s| s.trim().parse::<f64>().is_ok_and(f64::is_finite))
 }
 
 /// Tolerant kind deserialization for persisted decks: a kind that no longer exists (for example the
@@ -263,6 +400,9 @@ pub struct SlideBlueprint {
     pub compare_data: Option<CompareData>,
     #[serde(default)]
     pub swot_data: Option<SwotData>,
+    /// chart_focus 布局的图表数据；来自 markdown ```chart 块，LLM 原样搬运
+    #[serde(default)]
+    pub chart: Option<ChartSpec>,
 }
 
 impl SlideBlueprint {
@@ -544,6 +684,10 @@ pub struct PagePlan {
     /// stamped onto the generated slide by code; the LLM never decides it.
     #[serde(default)]
     pub section_number: Option<String>,
+    /// 本页关联的图表（来自 markdown ```chart 块，按出现位置归属到小节）。
+    /// 有图表的页才有资格选 chart_focus 布局。
+    #[serde(default)]
+    pub chart: Option<ChartSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -26,6 +26,7 @@
 #import "layouts/focus-example.typ" as focus-example
 #import "layouts/outcome-grid.typ" as outcome-grid
 #import "layouts/center-grid.typ" as center-grid
+#import "layouts/chart-focus.typ" as chart-focus
 
 #let deck = json("/deck.json")
 
@@ -58,6 +59,7 @@
   focus_example: focus-example.render,
   outcome_grid: outcome-grid.render,
   center_grid: center-grid.render,
+  chart_focus: chart-focus.render,
 )
 
 #let canvas = canvas-sizes.at(deck.at("aspect_ratio", default: "ratio_16x9"), default: canvas-sizes.ratio_16x9)
@@ -89,6 +91,10 @@
 #set block(spacing: 0pt)
 #set stack(spacing: 0pt)
 
+// Equations need an OpenType MATH font; try the usual ones in order so export
+// works on Windows (Cambria Math) and machines with TeX fonts installed.
+#show math.equation: set text(font: ("Cambria Math", "New Computer Modern Math", "STIX Two Math", "Libertinus Math"))
+
 #for (index, slide) in deck.slides.enumerate() {
   if index > 0 { pagebreak() }
   let scale = slide-type-scale(slide)
@@ -98,6 +104,8 @@
     fonts: deck.fonts,
     canvas: canvas,
     index: index,
+    // `--type-scale` of this slide (chart_focus reports it to the chart SSR).
+    scale: scale,
     // Image reference → (path, width, height, vector); see src/assets.rs.
     assets: deck.at("assets", default: (:)),
   )

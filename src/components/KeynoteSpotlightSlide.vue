@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import SlideTitle from './SlideTitle.vue'
 import { toneVars, type Tone } from './keynoteTheme'
+import { renderRichText } from '../utils/richText'
 
 const props = defineProps<{
   label: string
@@ -68,7 +69,7 @@ const sideVars = computed(() => {
           color: toneVars(labelTone).text
         }"
       >
-        {{ label }}
+        <span v-html="renderRichText(label)"></span>
       </div>
       <SlideTitle as="h2" class="slide-title" :title="title" />
     </div>
@@ -80,7 +81,7 @@ const sideVars = computed(() => {
         <div v-else class="glass-card w-full h-full flex items-center justify-center">
           <div flex flex-col items-center gap-3 opacity-40>
             <div i-carbon:image class="slide-icon-hero" />
-            <div class="slide-meta slide-font-caption">{{ placeholder || '图片待补充' }}</div>
+            <div class="slide-meta slide-font-caption"><span v-html="renderRichText(placeholder || '图片待补充')"></span></div>
           </div>
         </div>
       </div>
@@ -103,9 +104,9 @@ const sideVars = computed(() => {
         >
           <div class="spotlight-panel-heading" flex items-center gap-2 mb-2>
             <div v-if="panel.icon" :class="panel.icon" class="slide-icon-lg" :style="{ color: toneVars(panel.tone).text }" />
-            <span class="slide-card-title spotlight-panel-title">{{ panel.title }}</span>
+            <span class="slide-card-title spotlight-panel-title"><span v-html="renderRichText(panel.title)"></span></span>
           </div>
-          <div v-if="panel.body" class="slide-meta" opacity-70 v-html="panel.body" />
+          <div v-if="panel.body" class="slide-meta" opacity-70 v-html="renderRichText(panel.body)" />
           <div
             v-if="panel.kind !== 'flow' && panel.kind !== 'matrix' && panel.items?.length"
             class="slide-meta"
@@ -113,7 +114,7 @@ const sideVars = computed(() => {
           >
             <div v-for="item in panel.items" :key="item" flex items-center gap-1>
               <div i-carbon:checkmark text="var(--primary)" />
-              <span>{{ item }}</span>
+              <span><span v-html="renderRichText(item)"></span></span>
             </div>
           </div>
           <div v-if="panel.kind === 'flow' && panel.items?.length" class="slide-meta spotlight-flow" flex flex-col gap-2>
@@ -135,7 +136,7 @@ const sideVars = computed(() => {
                   :style="{ color: idx === panel.items.length - 1 ? 'var(--primary)' : toneVars(panel.tone).text }"
                 />
                 <span :style="idx === panel.items.length - 1 ? { color: 'var(--primary-light)', fontWeight: 600 } : {}">
-                  {{ item }}
+                  <span v-html="renderRichText(item)"></span>
                 </span>
               </div>
               <div
@@ -181,7 +182,7 @@ const sideVars = computed(() => {
                 :style="{ color: idx <= 3 ? toneVars(panel.tone).text : idx === panel.items.length - 1 ? 'var(--primary-light)' : 'var(--primary)' }"
               />
               <span :style="idx === panel.items.length - 1 ? { color: 'var(--primary-light)' } : {}">
-                {{ item }}
+                <span v-html="renderRichText(item)"></span>
               </span>
             </div>
           </div>
@@ -196,13 +197,13 @@ const sideVars = computed(() => {
                   color: toneVars(panel.tone).text
                 }"
               >
-                {{ idx + 1 }}
+                <span v-html="renderRichText(idx + 1)"></span>
               </div>
-              <span opacity-70>{{ step }}</span>
+              <span opacity-70><span v-html="renderRichText(step)"></span></span>
             </div>
           </div>
           <div v-if="panel.highlight" class="slide-meta" mt-1 :style="{ color: toneVars(panel.tone).text, fontWeight: 700 }">
-            {{ panel.highlight }}
+            <span v-html="renderRichText(panel.highlight)"></span>
           </div>
         </div>
       </div>

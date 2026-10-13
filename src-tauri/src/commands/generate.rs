@@ -515,6 +515,10 @@ pub async fn repair_slide(
     if blueprint.section.is_some() {
         repaired.section = blueprint.section.clone();
     }
+    // Chart data comes from the document; feedback may reword the interpretation, never the data.
+    if repaired.kind == crate::types::SlideKind::ChartFocus && blueprint.chart.is_some() {
+        repaired.chart = blueprint.chart.clone();
+    }
 
     {
         let mut st = state.lock().unwrap();

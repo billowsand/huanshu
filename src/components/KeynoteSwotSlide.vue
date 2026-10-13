@@ -3,6 +3,7 @@ import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
 import SlideReveal from './SlideReveal.vue'
+import { renderRichText } from '../utils/richText'
 
 const props = defineProps<{
   section?: string
@@ -34,14 +35,14 @@ function summaryFirst(quadrantKey: string) {
 </script>
 
 <template>
-  <div v-if="section" class="section-num">{{ section }}</div>
+  <div v-if="section" class="section-num"><span v-html="renderRichText(section)"></span></div>
 
   <div relative z-10 py-4 flex flex-col gap-4 h-full>
     <div class="slide-header">
       <SlideTitle class="slide-title slide-compact-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2"><span v-html="renderRichText(subtitle)"></span></TagBadge>
 
     <div
       class="grid flex-1 min-h-0"
@@ -84,7 +85,7 @@ function summaryFirst(quadrantKey: string) {
             >
               <div :class="quadrant.icon || 'i-carbon:idea'" class="slide-icon-sm" text-white />
             </div>
-            <span class="swot-flag-text">{{ quadrant.title }}</span>
+            <span class="swot-flag-text"><span v-html="renderRichText(quadrant.title)"></span></span>
           </div>
 
           <div
@@ -97,7 +98,7 @@ function summaryFirst(quadrantKey: string) {
               color: toneVars(quadrant.tone).text,
             }"
           >
-            {{ quadrant.summary }}
+            <span v-html="renderRichText(quadrant.summary)"></span>
           </div>
 
           <div class="swot-items">
@@ -112,7 +113,7 @@ function summaryFirst(quadrantKey: string) {
                 class="swot-bullet"
                 :style="{ background: toneVars(quadrant.tone).solid }"
               />
-              <span leading-relaxed>{{ item }}</span>
+              <span leading-relaxed><span v-html="renderRichText(item)"></span></span>
             </div>
           </div>
 
@@ -126,7 +127,7 @@ function summaryFirst(quadrantKey: string) {
               color: toneVars(quadrant.tone).text,
             }"
           >
-            {{ quadrant.summary }}
+            <span v-html="renderRichText(quadrant.summary)"></span>
           </div>
         </div>
       </GlassCard>
@@ -134,7 +135,7 @@ function summaryFirst(quadrantKey: string) {
 
     <SlideReveal v-if="strategy" :delay="600" class="glass-card px-5 py-3 flex items-center gap-3">
       <div i-carbon:direction-loop-right class="slide-icon-xl" text="var(--primary)" />
-      <span class="slide-text-note slide-font-body" leading-relaxed>{{ strategy }}</span>
+      <span class="slide-text-note slide-font-body" leading-relaxed><span v-html="renderRichText(strategy)"></span></span>
     </SlideReveal>
   </div>
 </template>

@@ -2,6 +2,7 @@
 import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
+import { renderRichText } from '../utils/richText'
 
 const props = defineProps<{
   section?: string
@@ -44,7 +45,7 @@ const processDensityClass = computed(() => {
 </script>
 
 <template>
-  <div v-if="section" class="section-num">{{ section }}</div>
+  <div v-if="section" class="section-num"><span v-html="renderRichText(section)"></span></div>
 
   <div class="process-slide" :class="processDensityClass" relative z-10 flex flex-col h-full>
     <div class="slide-header process-header">
@@ -52,10 +53,10 @@ const processDensityClass = computed(() => {
       <div class="slide-title-divider" />
     </div>
     <div class="process-topbar">
-      <TagBadge v-if="subtitle" inline class="slide-subtitle process-badge">{{ subtitle }}</TagBadge>
+      <TagBadge v-if="subtitle" inline class="slide-subtitle process-badge"><span v-html="renderRichText(subtitle)"></span></TagBadge>
       <div v-if="summary" class="process-summary glass-card">
         <div class="process-summary__line" />
-        <span>{{ summary }}</span>
+        <span><span v-html="renderRichText(summary)"></span></span>
       </div>
     </div>
 
@@ -88,7 +89,7 @@ const processDensityClass = computed(() => {
                 borderColor: toneVars(phase.tone).border,
                 color: toneVars(phase.tone).contrast,
               }"
-            >{{ phase.phase }}</div>
+            ><span v-html="renderRichText(phase.phase)"></span></div>
             <div
               v-if="phase.icon"
               :class="phase.icon"
@@ -99,15 +100,15 @@ const processDensityClass = computed(() => {
           <div
             class="phase-head__title"
             :style="{ color: toneVars(phase.tone).text }"
-          >{{ phase.title }}</div>
-          <div v-if="phase.subtitle" class="phase-head__subtitle">{{ phase.subtitle }}</div>
+          ><span v-html="renderRichText(phase.title)"></span></div>
+          <div v-if="phase.subtitle" class="phase-head__subtitle"><span v-html="renderRichText(phase.subtitle)"></span></div>
         </GlassCard>
 
         <div class="phase-steps-wrap glass-card" flex-1 flex flex-col>
           <div class="phase-steps-wrap__glow" :style="{ background: toneVars(phase.tone).solid }" />
           <div class="phase-steps-wrap__title">
             <span>关键动作</span>
-            <span class="slide-font-number">{{ phase.steps.length.toString().padStart(2, '0') }}</span>
+            <span class="slide-font-number"><span v-html="renderRichText(phase.steps.length.toString().padStart(2, '0'))"></span></span>
           </div>
           <div class="phase-steps" flex-1 flex flex-col>
             <div
@@ -123,11 +124,11 @@ const processDensityClass = computed(() => {
                   borderColor: toneVars(phase.tone).border,
                   color: toneVars(phase.tone).contrast,
                 }"
-              >{{ sIdx + 1 }}</div>
+              ><span v-html="renderRichText(sIdx + 1)"></span></div>
               <div class="step-copy" flex-1>
-                <div class="step-label">{{ step.label }}</div>
+                <div class="step-label"><span v-html="renderRichText(step.label)"></span></div>
                 <div v-if="step.desc" class="step-desc">
-                  {{ step.desc }}
+                  <span v-html="renderRichText(step.desc)"></span>
                 </div>
               </div>
 
@@ -158,7 +159,7 @@ const processDensityClass = computed(() => {
               :style="{ color: toneVars(phase.tone).text }"
             />
             <span class="phase-highlight__text" :style="{ color: toneVars(phase.tone).text }">
-              {{ phase.highlight }}
+              <span v-html="renderRichText(phase.highlight)"></span>
             </span>
           </div>
         </GlassCard>
@@ -166,7 +167,7 @@ const processDensityClass = computed(() => {
     </div>
 
     <div v-if="footer" class="slide-footnote process-footer">
-      {{ footer }}
+      <span v-html="renderRichText(footer)"></span>
     </div>
   </div>
 </template>

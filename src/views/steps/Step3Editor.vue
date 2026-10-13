@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import SlideRenderer from '../../components/SlideRenderer.vue'
+import { chartProblems } from '../../components/chartOptions'
 import { ALL_KINDS, KIND_FIELDS, KIND_META } from '../../composables/useSlideEditor'
 import type { SlideBlueprint, SlideKind } from '../../components/types'
 import type { MediaItem } from '../../composables/useMediaLibrary'
@@ -318,6 +319,20 @@ const LIST_SECTIONS: Partial<Record<SlideKind, ListSectionDef[]>> = {
       ],
     },
   ],
+  chart_focus: [
+    {
+      key: 'points',
+      label: '解读要点',
+      emptyText: '还没有解读要点',
+      createItem: () => ({ step: '', title: '', body: '' }),
+      iconQueryKeys: ['title', 'body'],
+      fields: [
+        { key: 'step', label: '编号', type: 'text', placeholder: '01' },
+        { key: 'title', label: '标题', type: 'text', placeholder: '趋势判断' },
+        { key: 'body', label: '说明', type: 'textarea', rows: 2, placeholder: '一句解读' },
+      ],
+    },
+  ],
 }
 
 const OBJECT_SECTIONS: Partial<Record<SlideKind, ObjectSectionDef[]>> = {
@@ -397,6 +412,15 @@ const OBJECT_SECTIONS: Partial<Record<SlideKind, ObjectSectionDef[]>> = {
             { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
           ],
         },
+      ],
+    },
+  ],
+  chart_focus: [
+    {
+      key: 'chart',
+      label: '图表设置',
+      fields: [
+        { key: 'title', label: '图表标题', type: 'text', placeholder: '季度交付量' },
       ],
     },
   ],
@@ -540,6 +564,11 @@ const semanticErrors = computed<string[]>(() => {
   }
 
   walkTone(obj, '')
+
+  if (obj.kind === 'chart_focus') {
+    if (obj.chart == null) errors.push('chart_focus 页缺少 chart（图表数据）')
+    else errors.push(...chartProblems(obj.chart).map((problem) => `chart：${problem}`))
+  }
   return errors
 })
 
@@ -572,6 +601,52 @@ function updatePath(path: string, value: unknown) {
   if (!draft) return
   setAtPath(draft as unknown as Record<string, unknown>, path, value)
   replaceDraft(draft)
+}
+
+// ── chart_focus 图表数据：整块 JSON 编辑 ──────────────────────────────────────
+// 只有语法正确且通过 chartProblems（与 Rust ChartSpec::problems 同一套规则）时才写回牌组，
+// 输入中途的半截 JSON 不会把正在预览的图表弄坏。编辑框获得焦点期间不被外部改动覆盖。
+const chartJsonText = ref('')
+const chartJsonError = ref('')
+const chartJsonFocused = ref(false)
+
+function chartJsonFromDraft() {
+  const chart = getFieldValue('chart')
+  return chart == null ? '' : JSON.stringify(chart, null, 2)
+}
+
+watch(
+  () => [props.editorKind, getFieldValue('chart')],
+  () => {
+    if (chartJsonFocused.value) return
+    chartJsonText.value = chartJsonFromDraft()
+    chartJsonError.value = ''
+  },
+  { deep: true, immediate: true },
+)
+
+function onChartJsonInput(text: string) {
+  chartJsonText.value = text
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch (e) {
+    chartJsonError.value = `JSON 语法错误：${e instanceof Error ? e.message : String(e)}`
+    return
+  }
+  const problems = chartProblems(parsed)
+  if (problems.length) {
+    chartJsonError.value = problems.join('；')
+    return
+  }
+  chartJsonError.value = ''
+  updatePath('chart', parsed)
+}
+
+function onChartJsonBlur() {
+  chartJsonFocused.value = false
+  // 离开时若仍有错误，保留输入让用户继续改；否则规范化成牌组里的实际内容
+  if (!chartJsonError.value) chartJsonText.value = chartJsonFromDraft()
 }
 
 function getFieldValue(path: string): unknown {
@@ -1307,6 +1382,29 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div v-if="editorKind === 'chart_focus'" class="ej-field-group">
+            <div class="ej-label-row">
+              <label class="ej-label">图表数据（JSON）</label>
+              <span class="ej-hint">type / data / encoding / series，校验通过才会应用到预览</span>
+            </div>
+            <div class="ej-wrap" :class="{ 'ej-wrap--error': !!chartJsonError }">
+              <textarea
+                class="ej-qf-input ej-qf-textarea ej-chart-json"
+                rows="12"
+                spellcheck="false"
+                :value="chartJsonText"
+                placeholder='{ "type": "bar", "title": "…", "data": [], "encoding": { "x": "…", "y": "…" } }'
+                @focus="chartJsonFocused = true"
+                @blur="onChartJsonBlur"
+                @input="onChartJsonInput(($event.target as HTMLTextAreaElement).value)"
+              />
+            </div>
+            <div v-if="chartJsonError" class="ej-error">
+              <span class="i-carbon:warning-filled ej-error-icon" />
+              <span class="ej-error-text">{{ chartJsonError }}</span>
             </div>
           </div>
 

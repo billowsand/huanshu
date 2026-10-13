@@ -33,6 +33,16 @@
     0 3px 5px rgba(0, 0, 0, 0.34), 0 15px 30px -8px rgba(0, 0, 0, 0.56);
   --terminal-inner-shadow: inset 0 1px 0 var(--terminal-edge-light),
     0 1px 2px rgba(0, 0, 0, 0.22);
+
+  /* chart tokens（ECharts 主题，hexA() 依赖 #hex 格式） */
+  --chart-grid:  #232620;
+  --chart-axis:  #393d33;
+  --chart-palette-0: #ed9b62;
+  --chart-palette-1: #a9c58c;
+  --chart-palette-2: #96b9ce;
+  --chart-palette-3: #c9a227;
+  --chart-palette-4: #8a7a9e;
+  --chart-palette-5: #e99388;
 }
 
 [data-theme="light-terminal"] {
@@ -69,6 +79,16 @@
     0 3px 5px rgba(37, 41, 31, 0.09), 0 15px 30px -8px rgba(37, 41, 31, 0.22);
   --terminal-inner-shadow: inset 0 1px 0 var(--terminal-edge-light),
     0 1px 2px rgba(37, 41, 31, 0.06);
+
+  /* chart tokens（ECharts 主题，hexA() 依赖 #hex 格式） */
+  --chart-grid:  #e3e3d3;
+  --chart-axis:  #c9cebe;
+  --chart-palette-0: #9d4a1c;
+  --chart-palette-1: #49682c;
+  --chart-palette-2: #36627b;
+  --chart-palette-3: #a6761d;
+  --chart-palette-4: #6e5a8a;
+  --chart-palette-5: #a64239;
 }
 
 :is([data-theme="dark-terminal"], [data-theme="light-terminal"]) {

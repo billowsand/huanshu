@@ -2,6 +2,7 @@
 import SlideTitle from './SlideTitle.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AspectRatio } from './types'
+import { renderRichText } from '../utils/richText'
 
 const props = defineProps<{
   section: string
@@ -97,7 +98,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="section-num">{{ section }}</div>
+  <div class="section-num"><span v-html="renderRichText(section)"></span></div>
 
   <div ref="root" class="overview-layout" relative z-10 flex flex-col h-full py-4>
     <div class="slide-header">
@@ -117,10 +118,10 @@ onBeforeUnmount(() => {
             no-padding
             class="overview-card"
           >
-            <div class="overview-number slide-number" text="var(--primary)">{{ item.number }}</div>
+            <div class="overview-number slide-number" text="var(--primary)"><span v-html="renderRichText(item.number)"></span></div>
             <div class="overview-copy">
-              <h2 class="overview-title slide-card-title">{{ item.title }}</h2>
-              <div v-if="item.desc" class="overview-desc">{{ item.desc }}</div>
+              <h2 class="overview-title slide-card-title"><span v-html="renderRichText(item.title)"></span></h2>
+              <div v-if="item.desc" class="overview-desc"><span v-html="renderRichText(item.desc)"></span></div>
             </div>
           </GlassCard>
         </div>
@@ -128,7 +129,7 @@ onBeforeUnmount(() => {
 
       <div v-if="note" class="overview-note glass-card px-5 py-3 flex items-center gap-3">
         <div i-carbon:idea class="slide-icon-xl" text="var(--primary)" />
-        <span class="slide-text-note" opacity-80 v-html="note" />
+        <span class="slide-text-note" opacity-80 v-html="renderRichText(note)" />
       </div>
     </div>
   </div>

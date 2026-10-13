@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SlideTitle from './SlideTitle.vue'
 import { toneVars, type Tone } from './keynoteTheme'
+import { renderRichText } from '../utils/richText'
 
 defineProps<{
   section?: string
@@ -18,14 +19,14 @@ defineProps<{
 </script>
 
 <template>
-  <div v-if="section" class="section-num">{{ section }}</div>
+  <div v-if="section" class="section-num"><span v-html="renderRichText(section)"></span></div>
 
   <div class="issue-slide">
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3"><span v-html="renderRichText(subtitle)"></span></TagBadge>
 
     <div class="issue-stack" :class="{ 'issue-stack--rows': cards.length >= 4 }">
       <GlassCard
@@ -44,12 +45,12 @@ defineProps<{
         >
           <div class="issue-card__head-inner">
             <span v-if="card.icon" :class="card.icon" class="slide-icon-sm" :style="{ color: toneVars(card.tone || 'blue').text }" />
-            <span class="issue-card__eyebrow" :style="{ color: toneVars(card.tone || 'blue').text }">{{ card.title }}</span>
+            <span class="issue-card__eyebrow" :style="{ color: toneVars(card.tone || 'blue').text }"><span v-html="renderRichText(card.title)"></span></span>
           </div>
         </div>
 
         <div class="issue-card__body">
-          <p v-if="card.body" class="issue-card__summary">{{ card.body }}</p>
+          <p v-if="card.body" class="issue-card__summary"><span v-html="renderRichText(card.body)"></span></p>
 
           <div v-if="card.items?.length" class="issue-card__meta">
             <span
@@ -62,7 +63,7 @@ defineProps<{
                 color: toneVars(card.tone || 'blue').text,
               }"
             >
-              {{ item }}
+              <span v-html="renderRichText(item)"></span>
             </span>
           </div>
         </div>
@@ -70,7 +71,7 @@ defineProps<{
     </div>
 
     <div v-if="footer" class="issue-footer slide-footnote slide-text-caption">
-      {{ footer }}
+      <span v-html="renderRichText(footer)"></span>
     </div>
   </div>
 </template>

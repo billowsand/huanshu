@@ -66,7 +66,20 @@ pub fn parse_blueprint_with_repair(
 ) -> Result<BlueprintWrapper> {
     let json_text = extract_json_object(raw).unwrap_or_else(|| raw.to_string());
     let sanitized = sanitize_json_text(&json_text);
-    let mut value: Value = match serde_json::from_str(&sanitized) {
+    // Only on a parse failure: repairs are guesses and must never touch valid JSON.
+    let parsed = serde_json::from_str::<Value>(&sanitized).or_else(|err| {
+        // A dropped `{` also unbalances the brace-matched extraction, which then stops one `}`
+        // early: repair the span from the first `{` to the last `}` instead.
+        let span = raw
+            .find('{')
+            .zip(raw.rfind('}'))
+            .filter(|(start, end)| start < end)
+            .map_or(json_text.as_str(), |(start, end)| &raw[start..=end]);
+        repair_bare_step_items(&sanitize_json_text(span))
+            .and_then(|repaired| serde_json::from_str(&repaired).ok())
+            .ok_or(err)
+    });
+    let mut value: Value = match parsed {
         Ok(v) => v,
         Err(e) => {
             anyhow::bail!(
@@ -86,6 +99,90 @@ pub fn parse_blueprint_with_repair(
     }
     normalize_blueprint_value(&mut value, expected_kind);
     serde_json::from_value(value).context("model did not return a valid slide blueprint")
+}
+
+/// Repairs list items whose opening `{` the model dropped, writing the item's step number as a
+/// bare array element: `[ {…}, "02", "title": "…", "body": "…" }, … ]` (seen repeatedly from
+/// local models on `points` / `list_items`). An array element string followed by `, "key":` can
+/// only be that, so it becomes `{"step": "02", "title": …}`. `None` when nothing matched.
+fn repair_bare_step_items(text: &str) -> Option<String> {
+    fn string_end(chars: &[char], open: usize) -> Option<usize> {
+        let mut escape = false;
+        for (offset, &c) in chars.get(open + 1..)?.iter().enumerate() {
+            match c {
+                _ if escape => escape = false,
+                '\\' => escape = true,
+                '"' => return Some(open + 1 + offset),
+                _ => {}
+            }
+        }
+        None
+    }
+    fn skip_ws(chars: &[char], mut i: usize) -> usize {
+        while chars.get(i).is_some_and(|c| c.is_whitespace()) {
+            i += 1;
+        }
+        i
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len() + 32);
+    let mut stack: Vec<char> = Vec::new();
+    let mut changed = false;
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        match c {
+            '"' => {
+                let end = string_end(&chars, i)?;
+                if stack.last() == Some(&'[') {
+                    let comma = skip_ws(&chars, end + 1);
+                    let key = skip_ws(&chars, comma + 1);
+                    let key_is_key = chars.get(comma) == Some(&',')
+                        && chars.get(key) == Some(&'"')
+                        && string_end(&chars, key)
+                            .is_some_and(|key_end| chars.get(skip_ws(&chars, key_end + 1)) == Some(&':'));
+                    if key_is_key {
+                        out.push_str("{\"step\": ");
+                        stack.push('{');
+                        changed = true;
+                    }
+                }
+                out.extend(&chars[i..=end]);
+                i = end + 1;
+                continue;
+            }
+            '[' | '{' => stack.push(c),
+            ']' | '}' => {
+                stack.pop();
+            }
+            _ => {}
+        }
+        out.push(c);
+        i += 1;
+    }
+    changed.then_some(out)
+}
+
+/// Value-level counterpart of [`repair_bare_step_items`] for output that is valid JSON:
+/// `[ {…}, "02", { "step": "02", … } ]`. A bare string becomes the `step` of the object right
+/// after it when that object has none; every other non-object element is dropped, since list
+/// fields deserialize into structs and one stray string fails the whole slide.
+fn absorb_bare_list_items(items: &mut Vec<Value>) {
+    let mut out = Vec::with_capacity(items.len());
+    let mut pending_step: Option<Value> = None;
+    for item in items.drain(..) {
+        match item {
+            Value::Object(mut obj) => {
+                if let Some(step) = pending_step.take() {
+                    obj.entry("step".to_string()).or_insert(step);
+                }
+                out.push(Value::Object(obj));
+            }
+            Value::String(s) if !s.trim().is_empty() => pending_step = Some(Value::String(s)),
+            _ => pending_step = None,
+        }
+    }
+    *items = out;
 }
 
 pub fn sanitize_json_text(text: &str) -> String {
@@ -238,13 +335,117 @@ pub fn clean_model_text(text: &str) -> String {
     strip_english_only_clauses(&cleaned)
 }
 
+/// 数学段（`$...$` / `$$...$$`）抽出为控制字符占位符，避免公式里的 `*`、`_`、`` ` `` 等
+/// 被当成 Markdown 清洗掉；清洗完成后用 [`restore_math_segments`] 还原。识别规则与前端
+/// `src/utils/richText.ts` 的 splitMathSegments 对齐：`$$...$$` 优先且可跨行（内容 trim
+/// 后不能为空）；行内 `$...$` 不跨行，要求 `$` 后不跟空白、闭合 `$` 前不是空白、内容非空，
+/// 并按 pandoc 规则要求闭合 `$` 后不紧跟数字（否则「价格 $5 和 $10」会被误判为公式）；
+/// `\$` 是转义的字面美元符，不作定界符。
+fn extract_math_segments(text: &str) -> (String, Vec<String>) {
+    let chars: Vec<char> = text.chars().collect();
+    let mut segments: Vec<String> = Vec::new();
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '\\' && chars.get(i + 1) == Some(&'$') {
+            out.push('\\');
+            out.push('$');
+            i += 2;
+            continue;
+        }
+        if chars[i] != '$' {
+            out.push(chars[i]);
+            i += 1;
+            continue;
+        }
+        let display = chars.get(i + 1) == Some(&'$');
+        let open_end = i + if display { 2 } else { 1 };
+        let close = if display {
+            find_display_math_close(&chars, open_end)
+        } else {
+            find_inline_math_close(&chars, open_end)
+        };
+        let Some(close) = close else {
+            // 找不到合法闭合：`$` 按普通字符处理
+            out.push('$');
+            i += 1;
+            continue;
+        };
+        let close_end = close + if display { 2 } else { 1 };
+        segments.push(chars[i..close_end].iter().collect());
+        // \u{1}...\u{2} 不会被下面的清洗正则误伤，正常文本也不会出现控制字符
+        out.push_str(&format!("\u{1}MATH{}\u{2}", segments.len() - 1));
+        i = close_end;
+    }
+    (out, segments)
+}
+
+/// `$$...$$` 的闭合位置：可跨行，内容 trim 后不能为空。
+fn find_display_math_close(chars: &[char], from: usize) -> Option<usize> {
+    let mut j = from;
+    while j + 1 < chars.len() {
+        if chars[j] == '\\' && chars[j + 1] == '$' {
+            j += 2;
+            continue;
+        }
+        if chars[j] == '$' && chars[j + 1] == '$' {
+            let content: String = chars[from..j].iter().collect();
+            return (!content.trim().is_empty()).then_some(j);
+        }
+        j += 1;
+    }
+    None
+}
+
+/// `$...$` 的闭合位置：不跨行，开 `$` 后不跟空白、闭合 `$` 前不是空白（内容因此非空），
+/// 闭合 `$` 后不紧跟数字。
+fn find_inline_math_close(chars: &[char], from: usize) -> Option<usize> {
+    if chars.get(from).is_none_or(|c| c.is_whitespace()) {
+        return None;
+    }
+    let mut j = from;
+    while j < chars.len() {
+        if chars[j] == '\\' && chars.get(j + 1) == Some(&'$') {
+            j += 2;
+            continue;
+        }
+        match chars[j] {
+            '\n' => return None,
+            '$' if chars.get(j + 1) != Some(&'$') => {
+                if chars[j - 1].is_whitespace() {
+                    return None;
+                }
+                if chars.get(j + 1).is_some_and(|c| c.is_ascii_digit()) {
+                    return None;
+                }
+                return Some(j);
+            }
+            _ => {}
+        }
+        j += 1;
+    }
+    None
+}
+
+fn restore_math_segments(text: &str, segments: &[String]) -> String {
+    let mut out = text.to_string();
+    for (idx, segment) in segments.iter().enumerate() {
+        out = out.replace(&format!("\u{1}MATH{idx}\u{2}"), segment);
+    }
+    out
+}
+
 /// 幻灯片字段都是纯文本（多数模板用 `{{ }}` 插值，少数用 `v-html`），LLM 常把源
 /// Markdown 的 `**加粗**`、`- 列表`、`1. 编号`、`# 标题`、`` `代码` ``、`[链接](url)`
 /// 原样抄进字段，渲染时就成了裸符号。这里把它们还原成纯文本：行首块级标记去掉，
 /// 多行（通常是被塞进一个字段的列表）用「；」合并成一句，行内强调/代码/链接只留文字。
+/// 数学段（`$...$` / `$$...$$`）先抽成占位符、行合并完成后在末尾还原，全程原样保留。
 pub fn strip_markdown(text: &str) -> String {
     use regex::Regex;
     use std::sync::OnceLock;
+
+    let (text, math_segments) = extract_math_segments(text);
+    let text = text.as_str();
 
     static BLOCK_PREFIX: OnceLock<Regex> = OnceLock::new();
     static HRULE: OnceLock<Regex> = OnceLock::new();
@@ -296,15 +497,17 @@ pub fn strip_markdown(text: &str) -> String {
         }
         merged.push_str(line);
     }
-    merged
+    restore_math_segments(&merged, &math_segments)
 }
 
 pub fn strip_english_only_clauses(text: &str) -> String {
     if !contains_cjk(text) {
         return text.to_string();
     }
+    // 数学段同样抽出保护：纯公式的分句没有 CJK，直接判断会被误判为英文残句丢掉
+    let (protected, math_segments) = extract_math_segments(text);
     let mut kept = Vec::new();
-    for segment in text.split_inclusive(['。', '！', '？', '；', ';', '.']) {
+    for segment in protected.split_inclusive(['。', '！', '？', '；', ';', '.']) {
         let trimmed = segment.trim();
         if trimmed.is_empty() {
             continue;
@@ -321,11 +524,12 @@ pub fn strip_english_only_clauses(text: &str) -> String {
         // 若用空格 join 就会变成 `3. 5`，「；」后也会多出空格。
         kept.push(segment);
     }
-    if kept.is_empty() {
-        text.to_string()
+    let merged = if kept.is_empty() {
+        protected
     } else {
         kept.concat().trim().to_string()
-    }
+    };
+    restore_math_segments(&merged, &math_segments)
 }
 
 pub fn contains_cjk(text: &str) -> bool {
@@ -459,6 +663,7 @@ pub fn normalize_blueprint_value(value: &mut Value, expected_kind: &SlideKind) {
         SlideKind::CenterGrid => normalize_center_grid_slide(slide),
         SlideKind::Timeline => normalize_timeline_slide(slide),
         SlideKind::Swot => normalize_swot_slide(slide),
+        SlideKind::ChartFocus => normalize_chart_focus_slide(slide),
         SlideKind::StepFlow
         | SlideKind::Process
         | SlideKind::Compare
@@ -704,6 +909,39 @@ fn normalize_focus_example_slide(slide: &mut Map<String, Value>) {
     }
 }
 
+fn normalize_chart_focus_slide(slide: &mut Map<String, Value>) {
+    // points 字段修复：去掉混进数组的裸字符串（"02"），兼容 description/content → body，缺失 body 补占位
+    if let Some(points) = slide.get_mut("points").and_then(Value::as_array_mut) {
+        absorb_bare_list_items(points);
+        for point in points {
+            let Some(point_obj) = point.as_object_mut() else {
+                continue;
+            };
+            promote_string_field(point_obj, "description", "body");
+            promote_string_field(point_obj, "content", "body");
+            point_obj
+                .entry("body".to_string())
+                .or_insert_with(|| Value::String(String::new()));
+            remove_keys(point_obj, &["description", "content"]);
+        }
+    }
+    // chart.title 为空时退回 slide.title（图表渲染与布局都依赖它）
+    let fallback_title = slide.get("title").and_then(Value::as_str).map(str::to_string);
+    if let Some(chart) = slide.get_mut("chart").and_then(Value::as_object_mut) {
+        let title_empty = chart
+            .get("title")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or("")
+            .is_empty();
+        if title_empty {
+            if let Some(title) = fallback_title {
+                chart.insert("title".to_string(), Value::String(title));
+            }
+        }
+    }
+}
+
 fn normalize_center_grid_slide(slide: &mut Map<String, Value>) {
     if slide.get("center_items").is_none() {
         if let Some(items) = slide.get("cards").and_then(Value::as_array) {
@@ -824,6 +1062,7 @@ pub fn slide_kind_name(kind: &SlideKind) -> &'static str {
         SlideKind::Compare => "compare",
         SlideKind::IssueStack => "issue_stack",
         SlideKind::Swot => "swot",
+        SlideKind::ChartFocus => "chart_focus",
     }
 }
 
@@ -1067,6 +1306,18 @@ pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
   }
 }"#
         }
+        SlideKind::ChartFocus => {
+            r#"{
+  "kind": "chart_focus",
+  "title": "...",
+  "subtitle": "...",
+  "points": [
+    { "step": "01", "title": "要点标题", "body": "要点描述" },
+    { "step": "02", "title": "要点标题", "body": "要点描述" }
+  ],
+  "footer": "..."
+}"#
+        }
         SlideKind::Cover | SlideKind::Closing | SlideKind::Overview => {
             r#"{"kind": "feature_grid"}"#
         }
@@ -1202,5 +1453,107 @@ mod tests {
         );
         assert_eq!(clean_model_text("-5% 同比"), "-5% 同比");
         assert_eq!(clean_model_text("snake_case_name"), "snake_case_name");
+    }
+
+    #[test]
+    fn math_segments_survive_strip_markdown() {
+        // 行内公式里的 * _ ` 等符号不能被当 markdown 清洗
+        assert_eq!(
+            clean_model_text(r"均值为 $\bar{x}_{i}$，整体稳定"),
+            r"均值为 $\bar{x}_{i}$，整体稳定"
+        );
+        assert_eq!(
+            clean_model_text(r"计算 $a*b$ 与 `$c_d$` 的结果"),
+            r"计算 $a*b$ 与 $c_d$ 的结果"
+        );
+        // 块级公式（单行与多行）都原样保留
+        assert_eq!(
+            clean_model_text(r"公式 $$\frac{a}{b}$$ 如上"),
+            r"公式 $$\frac{a}{b}$$ 如上"
+        );
+        assert_eq!(
+            clean_model_text("$$\n\\frac{a}{b}\n$$"),
+            "$$\n\\frac{a}{b}\n$$"
+        );
+        // 公式两侧的 markdown 仍正常清洗
+        assert_eq!(
+            clean_model_text(r"**重点**：$\bar{x}$ 见下"),
+            r"重点：$\bar{x}$ 见下"
+        );
+    }
+
+    #[test]
+    fn currency_dollars_are_not_math() {
+        assert_eq!(
+            clean_model_text("价格在 $5 和 $10 之间波动"),
+            "价格在 $5 和 $10 之间波动"
+        );
+        // pandoc 规则：闭合 $ 后紧跟数字不算公式
+        assert_eq!(clean_model_text("从 $5 涨到$10 元"), "从 $5 涨到$10 元");
+    }
+
+    #[test]
+    fn escaped_dollar_is_a_literal_dollar_sign() {
+        assert_eq!(
+            clean_model_text(r"单价 \$5 不含税，公式 $x+1$ 保留"),
+            r"单价 \$5 不含税，公式 $x+1$ 保留"
+        );
+        // 转义美元符不参与定界：这里的 $ y $ 前有空格，本就不算公式
+        assert_eq!(clean_model_text(r"\$a \$b$"), r"\$a \$b$");
+    }
+
+    #[test]
+    fn trailing_display_formula_is_not_dropped_as_english_clause() {
+        // 纯公式分句没有 CJK，若不做保护会被 strip_english_only_clauses 当英文残句丢掉
+        assert_eq!(
+            clean_model_text(r"收敛性见下。$$\int_{a}^{b} f(x) \, dx = F(b) - F(a)$$"),
+            r"收敛性见下。$$\int_{a}^{b} f(x) \, dx = F(b) - F(a)$$"
+        );
+    }
+
+    fn chart_points(raw: &str) -> Vec<(Option<String>, String)> {
+        let resp = parse_blueprint_with_repair(raw, &SlideKind::ChartFocus).unwrap();
+        resp.slide
+            .points
+            .into_iter()
+            .map(|p| (p.step, p.title))
+            .collect()
+    }
+
+    #[test]
+    fn stray_step_string_before_a_point_becomes_its_step() {
+        // Real model output (valid JSON): `"02",` sits between two point objects.
+        let points = chart_points(include_str!(
+            "../../fixtures/model-output/chart-focus-bare-step-valid.txt"
+        ));
+        let steps: Vec<_> = points.iter().map(|(s, _)| s.as_deref()).collect();
+        assert_eq!(steps, [Some("01"), Some("02"), Some("03"), Some("04")]);
+    }
+
+    #[test]
+    fn point_missing_its_open_brace_is_repaired() {
+        // Real model output (invalid JSON): `"02", "title": …, "body": … },` — the `{` is gone
+        // and the step number was written bare. Failed the page on every retry.
+        let points = chart_points(include_str!(
+            "../../fixtures/model-output/chart-focus-bare-step-broken.txt"
+        ));
+        assert_eq!(
+            points,
+            vec![
+                (Some("01".to_string()), "上半年稳步扩容".to_string()),
+                (Some("02".to_string()), "自动化提效显著".to_string()),
+                (Some("03".to_string()), "下半年高峰与封网".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn bare_step_repair_leaves_other_text_alone() {
+        // Strings in arrays followed by another element, and keys inside objects, are not touched.
+        assert_eq!(repair_bare_step_items(r#"{"a": ["x", "y"], "b": {"c": "d"}}"#), None);
+        // Escaped quotes inside strings do not confuse the scanner.
+        let fixed = repair_bare_step_items(r#"{"p": [{"t": "a\"b"}, "2", "t": "c"}]}"#).unwrap();
+        assert_eq!(fixed, r#"{"p": [{"t": "a\"b"}, {"step": "2", "t": "c"}]}"#);
+        assert!(serde_json::from_str::<Value>(&fixed).is_ok());
     }
 }

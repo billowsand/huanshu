@@ -239,6 +239,9 @@ pub fn validate_blueprints(
                 ));
             }
         }
+        if slide.kind == SlideKind::ChartFocus {
+            validate_chart(idx, slide, &mut issues);
+        }
         if slide.kind == SlideKind::Swot {
             let Some(swot) = slide.swot_data.as_ref() else {
                 issues.push(issue(idx, "swot slide requires swot_data"));
@@ -279,6 +282,16 @@ pub fn validate_blueprints(
         }
     }
     issues
+}
+
+fn validate_chart(idx: usize, slide: &SlideBlueprint, issues: &mut Vec<ValidationIssue>) {
+    let Some(chart) = slide.chart.as_ref() else {
+        issues.push(issue(idx, "chart focus slide requires chart"));
+        return;
+    };
+    for problem in chart.problems() {
+        issues.push(issue(idx, problem));
+    }
 }
 
 fn asset_exists(image: &str, paths: &HashSet<String>) -> bool {

@@ -2,6 +2,7 @@
 import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
+import { renderRichText } from '../utils/richText'
 
 const props = defineProps<{
   section: string
@@ -47,14 +48,14 @@ const cardGap = computed(() => ({ normal: '1rem', compact: '0.75rem', mini: '0.5
 </script>
 
 <template>
-  <div class="section-num">{{ section }}</div>
+  <div class="section-num"><span v-html="renderRichText(section)"></span></div>
 
   <div relative z-10 flex flex-col h-full py-4>
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3"><span v-html="renderRichText(subtitle)"></span></TagBadge>
 
     <div flex-1 flex flex-col justify-center>
     <div
@@ -75,16 +76,16 @@ const cardGap = computed(() => ({ normal: '1rem', compact: '0.75rem', mini: '0.5
         <div class="outcome-top-bar" h-1 :class="card.topBarClass || card.top_bar_class" />
         <div class="outcome-content" :style="bodyStyle">
           <div class="outcome-icon" :class="card.icon" :style="{ ...iconStyle, color: toneVars(card.tone).text }" />
-          <div class="outcome-title slide-card-title" font-bold :style="{ fontSize: `calc(${bodyStyle.fontSize} * 1.25)` }">{{ card.title }}</div>
-          <div class="outcome-copy" opacity-60 leading-relaxed :style="{ fontSize: bodyStyle.fontSize }" v-html="card.body" />
-          <TagBadge :color="card.tone" inline class="outcome-tag">{{ card.tag }}</TagBadge>
+          <div class="outcome-title slide-card-title" font-bold :style="{ fontSize: `calc(${bodyStyle.fontSize} * 1.25)` }"><span v-html="renderRichText(card.title)"></span></div>
+          <div class="outcome-copy" opacity-60 leading-relaxed :style="{ fontSize: bodyStyle.fontSize }" v-html="renderRichText(card.body)" />
+          <TagBadge :color="card.tone" inline class="outcome-tag"><span v-html="renderRichText(card.tag)"></span></TagBadge>
         </div>
       </GlassCard>
     </div>
 
     <div v-if="note" mt-4 class="glass-card px-5 py-3 flex items-center gap-3">
       <div i-carbon:collaborate class="slide-icon-xl" text="var(--primary)" />
-      <span class="slide-text-note" v-html="note" />
+      <span class="slide-text-note" v-html="renderRichText(note)" />
     </div>
     </div>
   </div>

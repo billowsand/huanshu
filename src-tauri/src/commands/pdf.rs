@@ -56,16 +56,92 @@ fn resolve_theme(theme: Option<String>) -> (String, Option<String>) {
     }
 }
 
+/// A chart_focus slide's SSR SVG, rendered in the app webview with the same
+/// ECharts option builder as the on-screen preview (static mode).
+#[derive(Debug, serde::Deserialize)]
+pub struct ChartSvgInput {
+    /// Index into the exported `slides` array; the asset pipe keys it `chart:<index>`.
+    pub index: usize,
+    pub svg: String,
+}
+
 /// Exports `slides` (the editor's current deck) or, when absent, the project's saved
 /// blueprints to a PDF at `path`.
+///
+/// chart_focus slides need `chart_svgs`: the frontend first asks `pdf_chart_boxes` for each
+/// chart's plot box, renders the SVGs at exactly that size, then calls this.
 #[tauri::command]
 pub async fn export_pdf(
     project_id: Option<i64>,
     slides: Option<Vec<SlideBlueprint>>,
     path: String,
     theme: Option<String>,
+    chart_svgs: Option<Vec<ChartSvgInput>>,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<PdfExportReport, String> {
+    let (slides, options, theme_fallback) =
+        prepare_export(project_id, slides, theme, chart_svgs.as_deref(), true, &state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        render_to_file(&slides, &options, Path::new(&path), theme_fallback)
+    })
+    .await
+    .map_err(|e| format!("导出任务异常结束：{e}"))?
+}
+
+/// Plot box (CSS px) and type scale of every chart_focus slide, as `export_pdf` would lay
+/// them out with the same arguments. Indices refer to `slides` (or the saved deck).
+#[tauri::command]
+pub async fn pdf_chart_boxes(
+    project_id: Option<i64>,
+    slides: Option<Vec<SlideBlueprint>>,
+    theme: Option<String>,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<Vec<slide_typst::ChartBox>, String> {
+    // Images are not needed: only chart_focus pages are laid out, and they show none.
+    let (slides, options, _) = prepare_export(project_id, slides, theme, None, false, &state)?;
+    tauri::async_runtime::spawn_blocking(move || measure_chart_boxes(&slides, &options))
+        .await
+        .map_err(|e| format!("图表测量任务异常结束：{e}"))?
+}
+
+/// Each page lays out independently, so only the chart pages are compiled (fast), with their
+/// boxes mapped back to deck indices.
+fn measure_chart_boxes(
+    slides: &[serde_json::Value],
+    options: &ExportOptions,
+) -> Result<Vec<slide_typst::ChartBox>, String> {
+    let indices: Vec<usize> = slides
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.get("kind").and_then(|k| k.as_str()) == Some("chart_focus"))
+        .map(|(i, _)| i)
+        .collect();
+    if indices.is_empty() {
+        return Ok(Vec::new());
+    }
+    let subset: Vec<serde_json::Value> = indices.iter().map(|&i| slides[i].clone()).collect();
+    let boxes = renderer()
+        .chart_boxes(&subset, options)
+        .map_err(|e| e.to_string())?;
+    Ok(boxes
+        .into_iter()
+        .filter_map(|mut b| {
+            b.slide = *indices.get(b.slide)?;
+            Some(b)
+        })
+        .collect())
+}
+
+/// Resolves the deck, theme, fonts and aspect ratio shared by the measuring pass and the
+/// export, so both lay the charts out identically.
+fn prepare_export(
+    project_id: Option<i64>,
+    slides: Option<Vec<SlideBlueprint>>,
+    theme: Option<String>,
+    chart_svgs: Option<&[ChartSvgInput]>,
+    with_images: bool,
+    state: &State<'_, Mutex<AppState>>,
+) -> Result<(Vec<serde_json::Value>, ExportOptions, Option<String>), String> {
     let (slides, project, media_assets, media_dir, project_dir, fonts) = {
         let state = state.lock().unwrap();
         let db = state.db.lock().unwrap();
@@ -112,19 +188,18 @@ pub async fn export_pdf(
             .unwrap_or_else(|| "ratio_16x9".to_string()),
         fonts: font_roles(&fonts),
         title: project.as_ref().map(|p| p.name.clone()),
-        assets: export_assets(&project_dir, &media_dir, &media_assets),
+        assets: if with_images {
+            export_assets(&project_dir, &media_dir, &media_assets, chart_svgs)
+        } else {
+            Assets::new()
+        },
     };
     let slides: Vec<serde_json::Value> = slides
         .iter()
         .map(serde_json::to_value)
         .collect::<Result<_, _>>()
         .map_err(|e| e.to_string())?;
-
-    tauri::async_runtime::spawn_blocking(move || {
-        render_to_file(&slides, &options, Path::new(&path), theme_fallback)
-    })
-    .await
-    .map_err(|e| format!("导出任务异常结束：{e}"))?
+    Ok((slides, options, theme_fallback))
 }
 
 fn render_to_file(
@@ -178,8 +253,14 @@ fn font_roles(fonts: &FontSettings) -> FontRoles {
 
 /// Every reference a blueprint may use, mapped to its file: the same spellings the
 /// generator validates against (`assets::AssetCatalog`), so an image that passes
-/// generation also resolves here.
-fn export_assets(project_dir: &Path, media_dir: &Path, media_assets: &[MediaAsset]) -> Assets {
+/// generation also resolves here. Chart SVGs rendered by the app webview are keyed
+/// `chart:<slide index>` and win over any file-based spelling of the same name.
+fn export_assets(
+    project_dir: &Path,
+    media_dir: &Path,
+    media_assets: &[MediaAsset],
+    chart_svgs: Option<&[ChartSvgInput]>,
+) -> Assets {
     let mut assets = Assets::new();
     for (reference, path) in crate::assets::project_file_refs(project_dir) {
         assets.insert_path(reference, path);
@@ -188,6 +269,12 @@ fn export_assets(project_dir: &Path, media_dir: &Path, media_assets: &[MediaAsse
         assets.insert_path(
             format!("media:{}", asset.id),
             media_dir.join(&asset.storage_path),
+        );
+    }
+    for chart in chart_svgs.unwrap_or(&[]) {
+        assets.insert_bytes(
+            slide_typst::chart_asset_ref(chart.index),
+            chart.svg.clone().into_bytes(),
         );
     }
     assets
@@ -264,7 +351,7 @@ mod tests {
             created_at: 0,
         };
         let options = ExportOptions {
-            assets: export_assets(&root.join("project"), &root.join("media"), &[media]),
+            assets: export_assets(&root.join("project"), &root.join("media"), &[media], None),
             ..Default::default()
         };
         // Every spelling the generator accepts must resolve; a kind without a PDF
@@ -288,5 +375,31 @@ mod tests {
         assert_eq!(report.placeholder_slides.len(), 1);
         assert_eq!(report.placeholder_slides[0].kind, "future_kind");
         std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn chart_boxes_map_back_to_deck_indices() {
+        let chart = serde_json::json!({
+            "kind": "chart_focus",
+            "title": "交付量",
+            "points": [{ "step": "01", "title": "趋势", "body": "逐季上升" }],
+            "chart": {
+                "type": "bar", "title": "季度交付量",
+                "data": [{ "q": "Q1", "n": 12 }],
+                "encoding": { "x": "q", "y": "n" }
+            }
+        });
+        let slides = vec![
+            serde_json::json!({ "kind": "cover", "title": "封面" }),
+            chart.clone(),
+            serde_json::json!({ "kind": "feature_grid", "title": "能力" }),
+            chart,
+        ];
+        let boxes = measure_chart_boxes(&slides, &ExportOptions::default()).unwrap();
+        assert_eq!(boxes.iter().map(|b| b.slide).collect::<Vec<_>>(), vec![1, 3]);
+        assert_eq!((boxes[0].width, boxes[0].height), (boxes[1].width, boxes[1].height));
+        assert!(measure_chart_boxes(&slides[..1], &ExportOptions::default())
+            .unwrap()
+            .is_empty());
     }
 }

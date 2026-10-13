@@ -2,6 +2,7 @@
 import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
+import { renderRichText } from '../utils/richText'
 
 const props = defineProps<{
   section: string
@@ -37,14 +38,14 @@ const gridGap = computed(() => {
 </script>
 
 <template>
-  <div class="section-num">{{ section }}</div>
+  <div class="section-num"><span v-html="renderRichText(section)"></span></div>
 
   <div relative z-10 flex flex-col h-full py-4>
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3"><span v-html="renderRichText(subtitle)"></span></TagBadge>
 
     <div :style="{ display: 'grid', gridTemplateColumns: gridCols, gap: gridGap }" mt-3 class="flex-1 items-stretch min-h-0">
       <div class="split-left-col">
@@ -56,15 +57,15 @@ const gridGap = computed(() => {
         >
           <div flex items-start gap="3">
             <div class="split-left-step">
-              {{ item.step || String(idx + 1).padStart(2, '0') }}
+              <span v-html="renderRichText(item.step || String(idx + 1).padStart(2, '0'))"></span>
             </div>
             <div :class="item.icon" class="slide-icon-2xl" text="var(--primary)" mt-1 flex-shrink-0 />
             <div class="min-w-0">
               <div class="split-left-title-row">
-                <div font-bold class="slide-card-title">{{ item.title }}</div>
-                <div class="split-left-index">{{ String(idx + 1).padStart(2, '0') }}</div>
+                <div font-bold class="slide-card-title"><span v-html="renderRichText(item.title)"></span></div>
+                <div class="split-left-index"><span v-html="renderRichText(String(idx + 1).padStart(2, '0'))"></span></div>
               </div>
-              <div class="slide-text-caption slide-font-body split-left-body" opacity-78 v-html="item.body" />
+              <div class="slide-text-caption slide-font-body split-left-body" opacity-78 v-html="renderRichText(item.body)" />
             </div>
           </div>
           <div v-if="idx < leftItems.length - 1" class="split-left-connector" />
@@ -72,7 +73,7 @@ const gridGap = computed(() => {
       </div>
 
       <div class="glass-card split-right-card p-4 flex flex-col gap-3 min-h-0">
-        <div font-bold class="slide-card-title" text="var(--primary)" mb-1>{{ layersTitle || '架构层次' }}</div>
+        <div font-bold class="slide-card-title" text="var(--primary)" mb-1><span v-html="renderRichText(layersTitle || '架构层次')"></span></div>
         <div flex flex-col gap-2 class="slide-text-caption slide-font-body">
           <template v-for="(layer, idx) in layers" :key="layer.title">
             <div
@@ -84,13 +85,13 @@ const gridGap = computed(() => {
                 border: `1px solid ${toneVars(layer.tone).border}`
               }"
             >
-              <span font-semibold>{{ layer.title }}</span>
-              <span opacity-50 class="slide-font-caption">{{ layer.meta }}</span>
+              <span font-semibold><span v-html="renderRichText(layer.title)"></span></span>
+              <span opacity-50 class="slide-font-caption"><span v-html="renderRichText(layer.meta)"></span></span>
             </div>
             <div v-if="idx < layers.length - 1" class="slide-icon-xl" text-center opacity-30 :style="{ color: toneVars(layers[idx + 1].tone).text }">↑</div>
           </template>
         </div>
-        <div v-if="footer" mt-1 class="slide-footnote slide-text-caption" opacity-50 text-center v-html="footer" />
+        <div v-if="footer" mt-1 class="slide-footnote slide-text-caption" opacity-50 text-center v-html="renderRichText(footer)" />
       </div>
     </div>
   </div>

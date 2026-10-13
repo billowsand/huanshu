@@ -294,6 +294,7 @@ pub fn run() {
             commands::storage::update_media_caption,
             commands::storage::export_project,
             commands::pdf::export_pdf,
+            commands::pdf::pdf_chart_boxes,
             commands::pdf::reveal_exported_file,
             commands::storage::import_project,
             commands::storage::is_encrypted_file,

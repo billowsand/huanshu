@@ -1,0 +1,20 @@
+{
+  "bg": "#151614",
+  "text_primary": "#eeeede",
+  "text_secondary": "#a1a697",
+  "text_tertiary": "#a1a697",
+  "color_primary": "#ed9b62",
+  "color_success": "#a9c58c",
+  "color_danger": "#e99388",
+  "chart_grid": "#232620",
+  "chart_axis": "#393d33",
+  "chart_palette": [
+    "#ed9b62",
+    "#a9c58c",
+    "#96b9ce",
+    "#c9a227",
+    "#8a7a9e",
+    "#e99388"
+  ],
+  "font_family": "'Microsoft YaHei', sans-serif"
+}

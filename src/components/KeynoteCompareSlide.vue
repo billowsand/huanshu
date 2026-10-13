@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SlideTitle from './SlideTitle.vue'
 import { toneVars, type Tone } from './keynoteTheme'
+import { renderRichText } from '../utils/richText'
 
 type CompareSide = {
   title: string
@@ -84,24 +85,24 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="section" class="section-num">{{ section }}</div>
+  <div v-if="section" class="section-num"><span v-html="renderRichText(section)"></span></div>
   <div ref="root" class="compare-slide" :style="layoutStyle" relative z-10 py-4 flex flex-col h-full>
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-2"><span v-html="renderRichText(subtitle)"></span></TagBadge>
 
     <div class="compare-layout">
       <div class="cp-heading-row cp-pair">
         <div v-for="(side, sideIndex) in sides" :key="sideIndex" class="cp-header cp-panel glass-card" :data-tone="side.tone"
           :style="{ background: toneVars(side.tone).bg, borderColor: toneVars(side.tone).border, color: toneVars(side.tone).text }">
           <div v-if="side.icon" :class="side.icon" class="slide-icon-lg cp-icon" />
-          <span v-if="mode === 'pros-cons'" class="cp-mode-badge">{{ sideIndex === 0 ? '优势' : '劣势' }}</span>
-          <span class="slide-card-title cp-heading">{{ side.title }}</span>
+          <span v-if="mode === 'pros-cons'" class="cp-mode-badge"><span v-html="renderRichText(sideIndex === 0 ? '优势' : '劣势')"></span></span>
+          <span class="slide-card-title cp-heading"><span v-html="renderRichText(side.title)"></span></span>
         </div>
         <div class="cp-axis-label" :class="{ 'cp-vs-badge': mode === 'versus', 'cp-balance-badge': mode === 'pros-cons' }">
-          {{ mode === 'versus' ? 'VS' : mode === 'pros-cons' ? '±' : '↔' }}
+          <span v-html="renderRichText(mode === 'versus' ? 'VS' : mode === 'pros-cons' ? '±' : '↔')"></span>
         </div>
       </div>
 
@@ -116,13 +117,13 @@ onBeforeUnmount(() => {
               <div :class="item.highlight ? 'i-carbon:star-filled' : mode === 'pros-cons' && sideIndex === 1 ? 'i-carbon:close' : 'i-carbon:checkmark-filled'"
                 class="slide-icon-sm cp-icon" :style="{ color: toneVars(sides[sideIndex].tone).text }" />
               <div class="cp-copy">
-                <div class="slide-text-meta cp-label">{{ item.label }}</div>
-                <div v-if="item.desc" class="slide-text-caption slide-font-body cp-desc">{{ item.desc }}</div>
+                <div class="slide-text-meta cp-label"><span v-html="renderRichText(item.label)"></span></div>
+                <div v-if="item.desc" class="slide-text-caption slide-font-body cp-desc"><span v-html="renderRichText(item.desc)"></span></div>
               </div>
             </template>
             <span v-else class="cp-empty">—</span>
           </div>
-          <span class="cp-row-index">{{ String(index + 1).padStart(2, '0') }}</span>
+          <span class="cp-row-index"><span v-html="renderRichText(String(index + 1).padStart(2, '0'))"></span></span>
         </div>
       </div>
 
@@ -131,11 +132,11 @@ onBeforeUnmount(() => {
           :class="{ 'cp-footer--empty': !side.conclusion }"
           :style="{ background: toneVars(side.tone).bg, borderColor: toneVars(side.tone).border, color: toneVars(side.tone).text }">
           <div v-if="side.conclusion" i-carbon:idea class="slide-icon-sm cp-icon" />
-          <span class="slide-text-caption cp-conclusion">{{ side.conclusion }}</span>
+          <span class="slide-text-caption cp-conclusion"><span v-html="renderRichText(side.conclusion)"></span></span>
         </div>
       </div>
     </div>
-    <div v-if="footerText" class="slide-footnote compare-footnote">{{ footerText }}</div>
+    <div v-if="footerText" class="slide-footnote compare-footnote"><span v-html="renderRichText(footerText)"></span></div>
   </div>
 </template>
 

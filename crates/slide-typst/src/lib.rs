@@ -13,8 +13,9 @@
 
 mod assets;
 mod icons;
+mod math;
 
-pub use assets::{AssetData, Assets, MissingAsset};
+pub use assets::{chart_asset_ref, AssetData, Assets, MissingAsset};
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -131,6 +132,27 @@ const TEMPLATES: &[(&str, &str)] = &[
         "/layouts/center-grid.typ",
         include_str!("../typst/layouts/center-grid.typ"),
     ),
+    (
+        "/layouts/chart-focus.typ",
+        include_str!("../typst/layouts/chart-focus.typ"),
+    ),
+    // Vendored Typst package (see typst/vendor/mitex/typst.toml for provenance;
+    // `arrow-handle` in standard.typ is patched locally). Its spec files build
+    // the eval scope for converted LaTeX math spans.
+    (
+        "/vendor/mitex/specs/mod.typ",
+        include_str!("../typst/vendor/mitex/specs/mod.typ"),
+    ),
+    (
+        "/vendor/mitex/specs/prelude.typ",
+        include_str!("../typst/vendor/mitex/specs/prelude.typ"),
+    ),
+    (
+        "/vendor/mitex/specs/latex/standard.typ",
+        include_str!("../typst/vendor/mitex/specs/latex/standard.typ"),
+    ),
+    // Compile check for converted math spans (see `Renderer::failing_math`).
+    ("/math-check.typ", include_str!("../typst/math-check.typ")),
 ];
 
 /// Slide kinds with a native Typst layout; others render a visible placeholder page.
@@ -152,6 +174,7 @@ pub const SUPPORTED_KINDS: &[&str] = &[
     "focus_example",
     "outcome_grid",
     "center_grid",
+    "chart_focus",
 ];
 
 const DEFAULT_FONT: &str = "Microsoft YaHei";
@@ -261,11 +284,24 @@ pub struct Overflow {
     pub available_pt: f64,
 }
 
+/// The plot box of a `chart_focus` slide (`<chart-box>` marker in chart-focus.typ), in CSS px
+/// of the slide canvas, plus the slide's `--type-scale`. The app renders each chart's SVG at
+/// exactly this size and scale so it embeds 1:1 (see `Renderer::chart_boxes`).
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ChartBox {
+    /// Index into the `slides` passed to the renderer.
+    pub slide: usize,
+    pub width: f64,
+    pub height: f64,
+    pub scale: f64,
+}
+
 /// A laid-out deck plus layout diagnostics.
 pub struct Compiled {
     pub document: PagedDocument,
     pub overflows: Vec<Overflow>,
     pub missing_assets: Vec<MissingAsset>,
+    pub chart_boxes: Vec<ChartBox>,
 }
 
 /// Exported PDF bytes plus layout diagnostics.
@@ -318,6 +354,7 @@ impl Renderer {
             document,
             overflows,
             missing_assets,
+            ..
         } = self.compile(slides, options)?;
         let pdf =
             typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).map_err(|errors| {
@@ -333,6 +370,18 @@ impl Renderer {
         })
     }
 
+    /// Plot boxes of every chart_focus slide. The chart SVGs are rendered by the app (ECharts
+    /// SSR) and must be sized before the export, so the app lays the deck out once without them
+    /// (the layout does not depend on whether the SVG is present), renders each chart at its
+    /// box, and then calls `render_pdf` with the SVGs in `options.assets`.
+    pub fn chart_boxes(
+        &self,
+        slides: &[serde_json::Value],
+        options: &ExportOptions,
+    ) -> Result<Vec<ChartBox>, RenderError> {
+        Ok(self.compile(slides, options)?.chart_boxes)
+    }
+
     /// Lays out the deck without exporting, e.g. to rasterize pages for visual checks.
     pub fn compile(
         &self,
@@ -346,13 +395,26 @@ impl Renderer {
                 missing.slide, missing.reference, missing.reason
             );
         }
+        // Convert LaTeX math spans to sentinel-wrapped Typst math before the
+        // deck is serialized; `rich()` in lib/base.typ evals the spans. Typst
+        // cannot catch an eval error, so one formula that mitex converts but
+        // Typst rejects (`rac{1}`, `ef{x}` …) would fail the whole export:
+        // such spans are found up front and kept as literal text instead.
+        let mut rewritten = slides.to_vec();
+        let spans = math::rewrite_deck(&mut rewritten, &HashSet::new());
+        let rejected = self.failing_math(&spans);
+        if !rejected.is_empty() {
+            rewritten = slides.to_vec();
+            math::rewrite_deck(&mut rewritten, &rejected);
+        }
+        let slides = rewritten;
         let deck = serde_json::to_vec(&DeckInput {
             theme: &options.theme,
             aspect_ratio: &options.aspect_ratio,
             title: options.title.as_deref(),
             fonts: &self.installed_fonts(&options.fonts),
             assets: &prepared.paths,
-            slides,
+            slides: &slides,
         })
         .map_err(|err| RenderError {
             diagnostics: vec![format!("serialize deck: {err}")],
@@ -385,12 +447,60 @@ impl Renderer {
                 document.pages().len()
             );
         }
-        let overflows = query_overflows(&document);
+        let overflows = query_markers(&document, "slide-overflow");
+        let chart_boxes = query_markers(&document, "chart-box");
         Ok(Compiled {
             document,
             overflows,
             missing_assets: prepared.missing,
+            chart_boxes,
         })
+    }
+
+    /// Converted math spans that fail to compile on their own. The common case
+    /// (every span fine) costs one small compile; only when that fails is each
+    /// span checked separately.
+    fn failing_math(&self, spans: &[math::Span]) -> HashSet<String> {
+        let mut unique: Vec<&math::Span> = Vec::new();
+        for span in spans {
+            if !unique.contains(&span) {
+                unique.push(span);
+            }
+        }
+        let compiles = |batch: &[&math::Span]| -> Result<(), String> {
+            let world = SlideWorld {
+                renderer: self,
+                main: file_id("/math-check.typ"),
+                deck: Bytes::new(serde_json::to_vec(batch).expect("spans serialize")),
+                images: HashMap::new(),
+                sources: Mutex::new(HashMap::new()),
+                missing_icons: Mutex::new(HashSet::new()),
+            };
+            typst::compile::<PagedDocument>(&world)
+                .output
+                .map(|_| ())
+                .map_err(|errors| {
+                    errors
+                        .iter()
+                        .map(|d| d.message.to_string())
+                        .collect::<Vec<_>>()
+                        .join("; ")
+                })
+        };
+        if unique.is_empty() || compiles(&unique).is_ok() {
+            return HashSet::new();
+        }
+        let mut rejected = HashSet::new();
+        for span in unique {
+            if let Err(reason) = compiles(&[span]) {
+                eprintln!(
+                    "[slide-typst] math kept as text, Typst rejected {:?}: {reason}",
+                    span.source
+                );
+                rejected.insert(span.source.clone());
+            }
+        }
+        rejected
     }
 
     /// Compiles `typst/themes/_check.typ`, which asserts that every theme
@@ -441,8 +551,9 @@ impl Renderer {
     }
 }
 
-fn query_overflows(document: &PagedDocument) -> Vec<Overflow> {
-    let label = Label::new(PicoStr::intern("slide-overflow")).expect("valid label");
+/// Values of every `metadata(..) <label>` marker in the laid-out document.
+fn query_markers<T: serde::de::DeserializeOwned>(document: &PagedDocument, label: &str) -> Vec<T> {
+    let label = Label::new(PicoStr::intern(label)).expect("valid label");
     document
         .introspector()
         .query(&Selector::Label(label))

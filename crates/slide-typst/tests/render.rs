@@ -158,8 +158,9 @@ fn stress_deck_fits_or_reports_overflow() {
 
 #[test]
 fn model_text_is_never_evaluated_as_typst_markup() {
-    // Would fail to compile (panic / unknown variable / unclosed math) if any of
-    // these reached Typst as markup instead of text.
+    // Would fail to compile (panic / unknown variable) if any of these reached
+    // Typst as markup instead of text. `$x^2` has no closing `$`, so it stays
+    // literal text; matched `$...$` spans are math by design (see next test).
     let hostile = r#"#panic("x") #let a = 1 $x^2 *b* _i_ @missing <lbl> \ ] [ }"#;
     let slide = json!({
         "kind": "feature_grid",
@@ -167,6 +168,51 @@ fn model_text_is_never_evaluated_as_typst_markup() {
         "subtitle": hostile,
         "note": format!("<strong>{hostile}</strong><br/>&lt;b&gt;"),
         "cards": [{ "title": hostile, "tone": hostile, "icon": "i-carbon:../../etc", "body": hostile, "items": [hostile] }]
+    });
+    render(&[slide], &ExportOptions::default());
+}
+
+#[test]
+fn latex_math_spans_render_as_equations() {
+    // Inline and display math are converted via mitex and rendered; LaTeX that
+    // fails conversion keeps its literal `$` text instead of failing the export.
+    let slide = json!({
+        "kind": "feature_grid",
+        "title": "勾股定理 $a^2 + b^2 = c^2$ 与货币 $5 和 $10",
+        "subtitle": "$$x_{1,2} = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$",
+        "cards": [
+            { "title": "求和", "body": "$\\sum_{i=1}^n i = \\frac{n(n+1)}{2}$ 恒成立" },
+            { "title": "坏公式回退", "body": "公式 $\\badcmd{$ 原样保留" },
+        ]
+    });
+    let rendered = render(&[slide], &ExportOptions::default());
+    assert_eq!(rendered.pages, 1);
+}
+
+#[test]
+fn math_that_typst_rejects_falls_back_to_text_instead_of_failing_export() {
+    // mitex converts all of these, but the converted source fails in Typst
+    // (missing argument, unclosed delimiter, dangling label). Each must degrade
+    // to literal text on its own while the valid formula still renders.
+    let slide = json!({
+        "kind": "feature_grid",
+        "title": "坏公式 $\\frac{1}$ 与 $\\left($ 与 $\\ref{eq}$",
+        "cards": [
+            { "title": "箭头", "body": "$A \\xrightarrow{f} B$ 与 $\\xleftarrow[g]{h}$" },
+            { "title": "正常", "body": "$x^2$" },
+        ]
+    });
+    render(&[slide], &ExportOptions::default());
+}
+
+#[test]
+fn sentinel_chars_in_model_text_are_never_evaluated() {
+    // `\u{1}I…\u{2}` is the internal math-span marker; text that already
+    // contains it must not reach `eval`.
+    let slide = json!({
+        "kind": "feature_grid",
+        "title": "\u{1}I#panic(\"injected\")\u{2}",
+        "cards": [{ "title": "a", "body": "\u{1}D#read(\"/deck.json\")\u{2}" }]
     });
     render(&[slide], &ExportOptions::default());
 }
@@ -227,6 +273,95 @@ fn unsupported_and_sparse_slides_still_render() {
 fn fixture_assets() -> slide_typst::Assets {
     let path = format!("{}/tests/fixtures/assets.json", env!("CARGO_MANIFEST_DIR"));
     slide_typst::Assets::from_manifest(std::path::Path::new(&path)).unwrap()
+}
+
+#[test]
+fn chart_focus_renders_sanitized_ssr_svg_and_reports_missing() {
+    // Mimics ECharts SSR output: compact path data (letter glued to numbers)
+    // and bare double quotes inside the style attribute (invalid XML) — the
+    // asset pipe must normalize both before Typst sees the SVG.
+    let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="920" height="440"><path d="M48 400.5L880 100V50" style="fill:#f59e0b"/><text x="10" y="20" style="font-family:"Microsoft YaHei", "PingFang SC", sans-serif;font-size:12px;fill:#333">标签</text></svg>"#;
+    let slides = vec![
+        json!({ "kind": "cover", "title": "封面" }),
+        json!({
+            "kind": "chart_focus",
+            "title": "交付量解读",
+            "points": [{ "step": "01", "title": "趋势", "body": "逐季上升" }],
+            "chart": {
+                "type": "bar", "title": "季度交付量",
+                "data": [{ "q": "Q1", "n": 12 }],
+                "encoding": { "x": "q", "y": "n" },
+                "source": "user_input"
+            }
+        }),
+    ];
+    let mut assets = slide_typst::Assets::new();
+    assets.insert_bytes(slide_typst::chart_asset_ref(1), svg.as_bytes().to_vec());
+    let options = ExportOptions {
+        assets,
+        ..Default::default()
+    };
+    let rendered = render(&slides, &options);
+    assert!(
+        rendered.missing_assets.is_empty(),
+        "{:?}",
+        rendered.missing_assets
+    );
+
+    // Without the SVG the page still renders (placeholder card) and the
+    // synthetic chart:<index> reference is reported.
+    let rendered = render(&slides, &ExportOptions::default());
+    let missing: Vec<_> = rendered
+        .missing_assets
+        .iter()
+        .map(|m| (m.slide, m.reference.as_str()))
+        .collect();
+    assert_eq!(missing, vec![(1, "chart:1")]);
+
+    // The measuring pass (no SVG yet) and the export pass (with it) must agree on
+    // the plot box, otherwise the SVG would not land 1:1.
+    let boxes = renderer().chart_boxes(&slides, &ExportOptions::default()).unwrap();
+    assert_eq!(boxes.len(), 1);
+    let measured = &boxes[0];
+    assert_eq!(measured.slide, 1);
+    assert!(measured.width > 500.0 && measured.width < 700.0, "{measured:?}");
+    assert!(measured.height > 200.0 && measured.height < 450.0, "{measured:?}");
+    assert!(measured.scale >= 1.25, "{measured:?}");
+    let mut assets = slide_typst::Assets::new();
+    assets.insert_bytes(slide_typst::chart_asset_ref(1), svg.as_bytes().to_vec());
+    let with_svg = renderer()
+        .compile(&slides, &ExportOptions { assets, ..Default::default() })
+        .unwrap()
+        .chart_boxes;
+    assert_eq!(with_svg, boxes);
+}
+
+/// All five chart types, as raw ECharts SSR output from the app's own option
+/// builder (regenerate with scripts/chart-fixtures.ts, see the header there),
+/// through the asset pipe in every theme and in 16:9 and 32:9.
+#[test]
+fn every_chart_type_renders_in_every_theme_and_aspect() {
+    let deck = load("tests/fixtures/charts.json");
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/charts/svg/assets.json");
+    let types: Vec<&str> = deck.iter().map(|s| s["chart"]["type"].as_str().unwrap()).collect();
+    assert_eq!(types, ["line", "bar", "donut", "grouped_bar", "stacked_area"]);
+    for theme in SUPPORTED_THEMES {
+        for aspect in ["ratio_16x9", "ratio_32x9"] {
+            let options = ExportOptions {
+                theme: theme.to_string(),
+                aspect_ratio: aspect.to_string(),
+                assets: slide_typst::Assets::from_manifest(&manifest).unwrap(),
+                ..Default::default()
+            };
+            let rendered = render(&deck, &options);
+            assert_eq!(rendered.pages, deck.len(), "{theme} {aspect}");
+            assert!(rendered.missing_assets.is_empty(), "{theme} {aspect}: {:?}", rendered.missing_assets);
+            assert!(rendered.overflows.is_empty(), "{theme} {aspect}: {:?}", rendered.overflows);
+            let boxes = renderer().chart_boxes(&deck, &options).unwrap();
+            assert_eq!(boxes.len(), deck.len(), "{theme} {aspect}");
+        }
+    }
 }
 
 #[test]

@@ -2,6 +2,7 @@
 import SlideTitle from './SlideTitle.vue'
 import { computed } from 'vue'
 import { toneVars, type Tone } from './keynoteTheme'
+import { renderRichText } from '../utils/richText'
 
 type CardItem = string | {
   text: string
@@ -153,14 +154,14 @@ function normalizeItem(item: CardItem) {
 </script>
 
 <template>
-  <div v-if="section" class="section-num">{{ section }}</div>
+  <div v-if="section" class="section-num"><span v-html="renderRichText(section)"></span></div>
 
   <div relative z-10 flex flex-col h-full py-4>
     <div class="slide-header">
       <SlideTitle class="slide-title" :title="title" />
       <div class="slide-title-divider" />
     </div>
-    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3">{{ subtitle }}</TagBadge>
+    <TagBadge v-if="subtitle" inline class="slide-subtitle mt-3"><span v-html="renderRichText(subtitle)"></span></TagBadge>
 
     <div flex-1 flex flex-col justify-center>
     <div
@@ -205,15 +206,15 @@ function normalizeItem(item: CardItem) {
             }"
           >
             <div v-if="card.icon" :class="card.icon" :style="{ ...iconStyle, color: toneVars(card.titleTone || card.tone).text }" />
-            <span class="slide-font-title" font-bold :style="{ fontSize: headerStyle.fontSize, color: toneVars(card.titleTone || card.tone).text }">{{ card.title }}</span>
+            <span class="slide-font-title" font-bold :style="{ fontSize: headerStyle.fontSize, color: toneVars(card.titleTone || card.tone).text }"><span v-html="renderRichText(card.title)"></span></span>
           </div>
 
           <div class="feature-body" :data-first-row="firstBodyRow" :style="bodyStyle">
             <div v-if="card.number" class="slide-number feature-number" :style="{ ...numberStyle, color: toneVars(card.tone).solid, opacity: 0.5 }">
-              {{ card.number }}
+              <span v-html="renderRichText(card.number)"></span>
             </div>
-            <div v-if="card.subtitle" class="feature-subtitle" opacity-60>{{ card.subtitle }}</div>
-            <div v-if="card.body" class="feature-copy" opacity-70 leading-relaxed v-html="card.body" />
+            <div v-if="card.subtitle" class="feature-subtitle" opacity-60><span v-html="renderRichText(card.subtitle)"></span></div>
+            <div v-if="card.body" class="feature-copy" opacity-70 leading-relaxed v-html="renderRichText(card.body)" />
 
             <div v-if="card.items?.length" class="feature-items" flex flex-col gap-2>
               <div
@@ -231,7 +232,7 @@ function normalizeItem(item: CardItem) {
                 <span
                   :style="normalizeItem(item).accent ? { color: toneVars(card.tone).text, fontWeight: 600 } : {}"
                 >
-                  {{ normalizeItem(item).text }}
+                  <span v-html="renderRichText(normalizeItem(item).text)"></span>
                 </span>
               </div>
             </div>
@@ -246,7 +247,7 @@ function normalizeItem(item: CardItem) {
                 color: toneVars(card.tone).text
               }"
             >
-              {{ card.risk }}
+              <span v-html="renderRichText(card.risk)"></span>
             </div>
 
             <div
@@ -259,12 +260,12 @@ function normalizeItem(item: CardItem) {
               }"
             >
               <span :style="{ color: toneVars(card.tone).text }" font-bold>
-                → {{ card.conclusion }}
+                → <span v-html="renderRichText(card.conclusion)"></span>
               </span>
             </div>
 
             <div v-if="card.footerTag || card.footer_tag" class="feature-footer">
-              <TagBadge :color="card.footerTone || card.footer_tone || card.tone">{{ card.footerTag || card.footer_tag }}</TagBadge>
+              <TagBadge :color="card.footerTone || card.footer_tone || card.tone"><span v-html="renderRichText(card.footerTag || card.footer_tag)"></span></TagBadge>
             </div>
           </div>
         </GlassCard>
@@ -273,7 +274,7 @@ function normalizeItem(item: CardItem) {
 
     <div v-if="note" mt-4 class="glass-card px-5 py-3 flex items-center gap-3">
       <div i-carbon:idea class="slide-icon-xl" text="var(--primary)" />
-      <span class="slide-text-note" v-html="note" />
+      <span class="slide-text-note" v-html="renderRichText(note)" />
     </div>
     </div>
   </div>

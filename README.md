@@ -31,7 +31,7 @@ bunx tauri dev
 ## 功能特点
 
 - **三步生成**：素材准备 → AI 生成 → 编辑完善
-- **智能布局**：AI 根据内容自动选择最佳幻灯片模板（17 种）
+- **智能布局**：AI 根据内容自动选择最佳幻灯片模板（18 种）
 - **多比例支持**：16:9 标准、32:9 超宽、48:9 全景
 - **并发生成**：多页并行处理，实时跟踪每页状态
 - **本地运行**：基于 LM Studio，完全离线可用
@@ -139,6 +139,42 @@ Markdown 文档
 └─────────────────┘
 ```
 
+### 图表数据（```chart 围栏块）
+
+Markdown 正文中可以用 ` ```chart ` 围栏块直接携带图表数据，归属其所在的 H2/H3 小节。
+正文较短时，小节的第一张图与文字同页，生成 `chart_focus` 版式（左侧要点解读 + 右侧图表）；正文较长（约 300 字以上）时拆成两页，
+文字页照常选版式，图表紧跟着单独成页。多出的图各追加一页。
+
+````markdown
+## 经营回顾
+
+### 交付情况
+
+业务逐季提速，Q3 起增速明显加快。
+
+```chart
+{
+  "type": "bar",                        // line | bar | donut | grouped_bar | stacked_area
+  "title": "季度交付量",
+  "data": [
+    { "quarter": "Q1", "count": 12 },
+    { "quarter": "Q2", "count": 19 },
+    { "quarter": "Q3", "count": 27 }
+  ],
+  "encoding": { "x": "quarter", "y": "count" },
+  "source": "user_input"                // 决定来源角标：llm_generated 显示「⚠ 示例数据」
+}
+```
+````
+
+多系列图（`grouped_bar` / `stacked_area`）额外需要 `series: [{ "key": "列名", "name": "图例名" }]`，
+`donut` 用 `encoding.label` / `encoding.value` 指认分类与数值列。
+
+图表渲染只有一份实现（`src/components/chartOptions.ts` 的 `buildChartOption`）：
+webview 预览直接挂载 ECharts；导出 PDF 时在同一 webview 里用 SSR 模式产出 SVG，
+经 asset 管道（`chart:<页码>`）交给内嵌 typst 的 `image()` 嵌入，两端视觉一致。
+图表配色来自各主题的 `--chart-*` token（5 套主题均已定义），换主题自动跟随。
+
 ### 核心数据结构
 
 **PagePlan** - 页面规划单元
@@ -177,7 +213,7 @@ Markdown 文档
 }
 ```
 
-### 17 种幻灯片模板
+### 18 种幻灯片模板
 
 | 模板 | 用途 | 关键字段 |
 |------|------|---------|
@@ -198,6 +234,7 @@ Markdown 文档
 | `Compare` | 双栏对比 | compare_data |
 | `IssueStack` | 问题堆叠 | cards, panels |
 | `Swot` | SWOT 分析 | swot_data |
+| `ChartFocus` | 数据图表解读 | points, chart |
 
 ### 布局选择策略
 
@@ -238,7 +275,7 @@ huanshu/
 ├── src/                          # Vue 前端
 │   ├── components/               # 幻灯片 Vue 组件
 │   │   ├── SlideRenderer.vue     # 模板渲染器
-│   │   ├── Keynote*.vue          # 17 种模板组件
+│   │   ├── Keynote*.vue          # 18 种模板组件
 │   │   ├── PasswordDialog.vue    # 加密密码对话框
 │   │   ├── ExportDialog.vue      # 导出对话框
 │   │   ├── PipelineProgress.vue  # 生成进度条
