@@ -204,32 +204,75 @@
 #let fit-metric-value(metric) = if type(metric) == length { metric / 1pt } else { metric }
 
 // Largest `f` in [min, max] with `metric(f) <= limit`, found by guarded
-// interpolation. The metric is the thing being measured (a height, or a
-// ratio), so the next probe is the `f` at which a linear model of the metric
-// would reach the limit. Wrapping changes a line count and makes the metric a
-// step function, which a pure interpolation can get stuck on; every step is
-// therefore clamped to the middle 80% of the bracket, so the bracket shrinks by
-// at least 10% per round whatever the metric does. Returns `none` when even
-// `min` is over the limit, like `fit-factor`.
+// interpolation on a power law.
+//
+// Text reflowing in a fixed width is close to `metric(f) ∝ f²` (both the line
+// height and the characters per line scale with `f`), which is a straight line
+// in log–log coordinates but not in the linear coordinates the first version of
+// this function interpolated in: there the first guess was far off, and it spent
+// a full layout measuring `f = min`, which is almost never near the answer.
+// Instead:
+//
+//   1. `metric(max) <= limit` returns `max` after one measurement.
+//   2. The first probe comes from the power law: `f = max × (limit/metric(max))^½`.
+//   3. After that, the next probe is the `f` at which a line through the two
+//      measured points in (ln f, ln metric) space would hit `ln limit`. It only
+//      interpolates when both `ln`s are usable and the line is falling; with one
+//      point measured, or a `metric` of 0 (no logarithm), it bisects.
+//   4. `min` is measured only when the search actually descends that far.
+//
+// Reflow changes the line count and makes the metric a step function, which a
+// pure interpolation can get stuck on: every step is clamped to the middle 80%
+// of the bracket (in log space, matching the interpolation), so the bracket
+// shrinks by at least 10% per round whatever the metric does. Returns `none`
+// when even `min` is over the limit, like `fit-factor`. `metric` may return a
+// length or a plain ratio (`fit-metric-value`).
 #let fit-scale(metric, limit, min: fit-min, max: 1, rounds: 10, tolerance: 0.005) = {
   // The interpolation works on numbers; `limit` may be authored as a length.
   let bound = fit-metric-value(limit)
-  // The metric at each end of the bracket, carried along so every round measures once.
   let upper = fit-metric-value(metric(max))
   if upper <= bound { return max }
+  // Nothing fits once the smallest factor is over the limit too; that is the only
+  // reason to measure it.
   let lower = fit-metric-value(metric(min))
   if lower > bound { return none }
   let (lo, hi) = (min, max)
+  // Carry `ln metric` alongside the metric: the power law is linear there, and the
+  // log of a ratio or a length in points is a plain number either way. `ln-high` is
+  // the marker for "the high end has been measured with a usable logarithm".
+  let (ln-low, ln-high) = (calc.ln(lower), calc.ln(upper))
+  let ln-bound = calc.ln(bound)
+  // Probe 2: solve the power law at the high end (exponent 2) — that is where the
+  // measurement above landed, so the line is anchored on it — clamped into
+  // [lo, hi]. Clamped to `min` it only repeats the `min` measurement.
+  let next = calc.clamp(max * calc.pow(bound / upper, 0.5), lo, hi)
+  if next > lo {
+    let value = fit-metric-value(metric(next))
+    if value <= bound { (lo, ln-low) = (next, calc.ln(value)) } else { (hi, ln-high) = (next, calc.ln(value)) }
+  }
   for _ in range(rounds) {
     if hi - lo <= tolerance { break }
-    let next = if upper <= lower {
-      (lo + hi) / 2
+    let ln-next = if ln-low > 0 and ln-high > 0 and ln-high > ln-low {
+      // Both ends measured: the slope of the log–log line, and where it crosses the
+      // limit. `ln-low > ln-high` (a metric that grows as `f` shrinks) is not a line
+      // the model can be trusted to extrapolate, so it bisects instead.
+      let slope = (ln-high - ln-low) / (calc.ln(hi) - calc.ln(lo))
+      calc.ln(lo) + (ln-bound - ln-low) / slope
     } else {
-      lo + (hi - lo) * (bound - lower) / (upper - lower)
+      (calc.ln(lo) + calc.ln(hi)) / 2
     }
-    let next = calc.clamp(next, lo + 0.1 * (hi - lo), hi - 0.1 * (hi - lo))
+    // Clamping to the middle 80% of the bracket (in log space, to match the
+    // interpolation) is what makes the search converge when the metric is a step
+    // function: whatever the model says, the bracket shrinks by at least 10% per
+    // round, and a target outside the bracket is pulled back inside it.
+    let ln-guess = calc.clamp(
+      ln-next,
+      calc.ln(lo) + 0.1 * (calc.ln(hi) - calc.ln(lo)),
+      calc.ln(hi) - 0.1 * (calc.ln(hi) - calc.ln(lo)),
+    )
+    let next = calc.exp(ln-guess)
     let value = fit-metric-value(metric(next))
-    if value <= bound { (lo, lower) = (next, value) } else { (hi, upper) = (next, value) }
+    if value <= bound { (lo, ln-low) = (next, calc.ln(value)) } else { (hi, ln-high) = (next, calc.ln(value)) }
   }
   lo
 }
