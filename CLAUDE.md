@@ -456,6 +456,31 @@ Step2 详情大图、演示主画面、Step3 实时预览仍是 `SlideRenderer`�
   `slideItems` 的蓝图（含取自日志的蓝图），下标就是 `item.index`；不要再从 `props.blueprints` 切片加偏移。
 - 性能：release 下 560px 宽每页约 5ms（光栅化）+ 整副增量编译约 20ms；`tauri dev` 是 debug 编译，
   20 页要约 1.6 秒，dev 下的慢不代表发布版。
+- **演示主画面**（第二步）也走同一个组合函数的另一个实例：`wanted` = 当前页 ±2（预取）、`maxCached: 8`、
+  宽度 = 覆盖舞台所需的像素宽（拉伸模式取 `max(舞台宽, 舞台高 × 页宽/页高) × dpr`）。`<img>` 放在
+  `.pres-slide-wrapper` 里、CSS 尺寸就是舞台尺寸，**不要**放进带 `transform: scale()` 的 `.pres-slide`（会发糊）。
+  还没有图（首次进入、跳页超出预取范围）时**必须**回退到 `SlideRenderer`，主画面不能空白。
+  `localStorage['huanshu.typstStage'] = '0'` 关掉。封面/结尾/SWOT 的入场动画、spotlight 轮播、图表动画因此没有了。
+- `wanted` 只决定请求哪几页，发给 Rust 的仍是整副牌（键里有子集位置，裁剪牌组会让翻页时全部失效）。
+  `thumbs` / `lastUsed` 以数组下标为键，`shownKeys` / `pendingKeys` 以子集位置为键，淘汰时要换算。
+- **comemo 缓存要回收**：`Renderer::compile` 每次编译后 `typst::comemo::evict(50)`。不回收的话 Typst 的
+  记忆化缓存只增不减，应用开得越久内存越大。typst CLI 用 10，这里太紧：缩略图、主画面、PDF 导出交替编译
+  不同的牌组，同一页两次编辑之间缓存就被清掉了。
+
+### 自适应缩放（`fit-scale`）
+
+`lib/base.typ` 的 `fit-scale(metric, limit)` 用**带保护的插值搜索**找最大可行的 `f`：维持 [可行 lo, 不可行 hi]，
+按两端 metric 线性插值猜下一个点，并夹到区间内侧 10%–90%（折行让 metric 成台阶，纯插值会卡住），
+区间 ≤ 0.005 停止。`fit-height` 用它，`center: true` 直接用搜索时测过的高度居中。
+「单个数值 ≤ 上限」的调用点都用 `fit-scale`；多条件的 `fits`（split-layers、section-intro 引导卡）和
+metric 随 `f` 不单调的 overview 保留二分的 `fit-factor`。
+
+- 比二分更贴近可行边界，字号会略大一点，但折行不变：与二分版对比，fixture/stress 两副牌在便签与星图主题下
+  最大平均像素差 5.5（压力页的整页子像素位移），没有折行变化。
+- 测量工具：`examples/bench_edit.rs`（逐版式编辑延迟；末尾的「clip branch」段是**持续追加正文**，最接近真实
+  打字，也是最慢的情况）、`examples/png_diff.rs`（两目录同名 PNG 的平均差与差异像素占比）。
+- 本机基准噪声很大（LM Studio 等负载下同一版本 98→342ms 漂移），比较版本时要交替多轮、取中位数，
+  不要拿单次结果下结论。「替换一个等长字符」的编辑能命中缓存，不能代表真实输入。
 
 ## 多比例幻灯片支持 (16:9 / 32:9 / 48:9)
 
