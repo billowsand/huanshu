@@ -322,8 +322,7 @@ mod tests {
 
     #[test]
     fn display_math_spanning_blank_lines_stays_in_one_paragraph() {
-        let raw =
-            "# 标题\n\n## 章节\n\n公式如下\n$$\n\\frac{a}{b}\n\n= c\n$$\n\n后续段落。\n";
+        let raw = "# 标题\n\n## 章节\n\n公式如下\n$$\n\\frac{a}{b}\n\n= c\n$$\n\n后续段落。\n";
         let doc = parse_markdown(raw).unwrap();
         assert_eq!(
             doc.sections[0].paragraphs,

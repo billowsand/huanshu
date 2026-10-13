@@ -62,7 +62,14 @@ pub fn derive_page_plans(doc: &ParsedDocument, granularity: HeadingLevel) -> Vec
         HeadingLevel::H2 => {
             for (chapter, sec) in doc.sections.iter().enumerate() {
                 let first = pages.len();
-                push_text_unit(&mut pages, &mut global_idx, &sec.title, None, &sec.paragraphs, &sec.charts);
+                push_text_unit(
+                    &mut pages,
+                    &mut global_idx,
+                    &sec.title,
+                    None,
+                    &sec.paragraphs,
+                    &sec.charts,
+                );
                 stamp_chapter(&mut pages[first..], chapter);
             }
         }
@@ -71,19 +78,40 @@ pub fn derive_page_plans(doc: &ParsedDocument, granularity: HeadingLevel) -> Vec
                 let first = pages.len();
                 if sec.subsections.is_empty() {
                     // H2 with no children → single content slide
-                    push_text_unit(&mut pages, &mut global_idx, &sec.title, None, &sec.paragraphs, &sec.charts);
+                    push_text_unit(
+                        &mut pages,
+                        &mut global_idx,
+                        &sec.title,
+                        None,
+                        &sec.paragraphs,
+                        &sec.charts,
+                    );
                 } else {
                     // H2 with H3 children: check whether the H2 itself has substantive intro text.
                     // If it does, emit an intro content slide (not a summary/TOC page).
                     // If it doesn't, emit a section_summary overview of the H3 children.
                     let intro_chars: usize = sec.paragraphs.iter().map(|p| p.chars().count()).sum();
                     if intro_chars > 50 {
-                        push_text_unit(&mut pages, &mut global_idx, &sec.title, None, &sec.paragraphs, &sec.charts);
+                        push_text_unit(
+                            &mut pages,
+                            &mut global_idx,
+                            &sec.title,
+                            None,
+                            &sec.paragraphs,
+                            &sec.charts,
+                        );
                     } else {
                         pages.push(build_summary_page(global_idx, sec));
                         global_idx += 1;
                         // The summary page shows no chart: every H2-level chart gets its own page.
-                        append_chart_pages(&mut pages, &mut global_idx, &sec.title, None, &sec.paragraphs, &sec.charts);
+                        append_chart_pages(
+                            &mut pages,
+                            &mut global_idx,
+                            &sec.title,
+                            None,
+                            &sec.paragraphs,
+                            &sec.charts,
+                        );
                     }
                     for sub in &sec.subsections {
                         push_text_unit(
@@ -346,7 +374,14 @@ fn build_content_page(
         takeaway: None,
         content_shape: Some(content_shape),
         layout_intent: None,
-        visual_need: Some(if chart.is_some() { "chart" } else { "text_only" }.to_string()),
+        visual_need: Some(
+            if chart.is_some() {
+                "chart"
+            } else {
+                "text_only"
+            }
+            .to_string(),
+        ),
         object_count: Some(object_count),
         argument_mode: Some(argument_mode),
         density: Some(density),
@@ -393,7 +428,14 @@ fn push_text_unit(
         inline,
     ));
     *global_idx += 1;
-    append_chart_pages(pages, global_idx, section_title, subsection_title, paragraphs, rest);
+    append_chart_pages(
+        pages,
+        global_idx,
+        section_title,
+        subsection_title,
+        paragraphs,
+        rest,
+    );
 }
 
 /// A page that carries only a chart (no body text of its own); `context` is the text unit it
@@ -405,7 +447,11 @@ fn build_chart_page(
     context: &[String],
     chart: crate::types::ChartSpec,
 ) -> PagePlan {
-    let context: String = context.join("\n\n").chars().take(CHART_CONTEXT_CHARS).collect();
+    let context: String = context
+        .join("\n\n")
+        .chars()
+        .take(CHART_CONTEXT_CHARS)
+        .collect();
     PagePlan {
         page_id: idx.to_string(),
         section_title: section_title.to_string(),

@@ -287,7 +287,9 @@ impl ChartSpec {
                     out.push("grouped/stacked chart requires encoding.x".to_string());
                 }
                 if self.series.is_empty() {
-                    out.push("grouped/stacked chart requires at least one series entry".to_string());
+                    out.push(
+                        "grouped/stacked chart requires at least one series entry".to_string(),
+                    );
                 }
                 for s in &self.series {
                     if s.key.trim().is_empty() {

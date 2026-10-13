@@ -79,8 +79,14 @@ pub async fn export_pdf(
     chart_svgs: Option<Vec<ChartSvgInput>>,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<PdfExportReport, String> {
-    let (slides, options, theme_fallback) =
-        prepare_export(project_id, slides, theme, chart_svgs.as_deref(), true, &state)?;
+    let (slides, options, theme_fallback) = prepare_export(
+        project_id,
+        slides,
+        theme,
+        chart_svgs.as_deref(),
+        true,
+        &state,
+    )?;
     tauri::async_runtime::spawn_blocking(move || {
         render_to_file(&slides, &options, Path::new(&path), theme_fallback)
     })
@@ -396,8 +402,14 @@ mod tests {
             chart,
         ];
         let boxes = measure_chart_boxes(&slides, &ExportOptions::default()).unwrap();
-        assert_eq!(boxes.iter().map(|b| b.slide).collect::<Vec<_>>(), vec![1, 3]);
-        assert_eq!((boxes[0].width, boxes[0].height), (boxes[1].width, boxes[1].height));
+        assert_eq!(
+            boxes.iter().map(|b| b.slide).collect::<Vec<_>>(),
+            vec![1, 3]
+        );
+        assert_eq!(
+            (boxes[0].width, boxes[0].height),
+            (boxes[1].width, boxes[1].height)
+        );
         assert!(measure_chart_boxes(&slides[..1], &ExportOptions::default())
             .unwrap()
             .is_empty());

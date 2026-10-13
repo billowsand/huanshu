@@ -320,17 +320,31 @@ fn chart_focus_renders_sanitized_ssr_svg_and_reports_missing() {
 
     // The measuring pass (no SVG yet) and the export pass (with it) must agree on
     // the plot box, otherwise the SVG would not land 1:1.
-    let boxes = renderer().chart_boxes(&slides, &ExportOptions::default()).unwrap();
+    let boxes = renderer()
+        .chart_boxes(&slides, &ExportOptions::default())
+        .unwrap();
     assert_eq!(boxes.len(), 1);
     let measured = &boxes[0];
     assert_eq!(measured.slide, 1);
-    assert!(measured.width > 500.0 && measured.width < 700.0, "{measured:?}");
-    assert!(measured.height > 200.0 && measured.height < 450.0, "{measured:?}");
+    assert!(
+        measured.width > 500.0 && measured.width < 700.0,
+        "{measured:?}"
+    );
+    assert!(
+        measured.height > 200.0 && measured.height < 450.0,
+        "{measured:?}"
+    );
     assert!(measured.scale >= 1.25, "{measured:?}");
     let mut assets = slide_typst::Assets::new();
     assets.insert_bytes(slide_typst::chart_asset_ref(1), svg.as_bytes().to_vec());
     let with_svg = renderer()
-        .compile(&slides, &ExportOptions { assets, ..Default::default() })
+        .compile(
+            &slides,
+            &ExportOptions {
+                assets,
+                ..Default::default()
+            },
+        )
         .unwrap()
         .chart_boxes;
     assert_eq!(with_svg, boxes);
@@ -344,8 +358,14 @@ fn every_chart_type_renders_in_every_theme_and_aspect() {
     let deck = load("tests/fixtures/charts.json");
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/charts/svg/assets.json");
-    let types: Vec<&str> = deck.iter().map(|s| s["chart"]["type"].as_str().unwrap()).collect();
-    assert_eq!(types, ["line", "bar", "donut", "grouped_bar", "stacked_area"]);
+    let types: Vec<&str> = deck
+        .iter()
+        .map(|s| s["chart"]["type"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        types,
+        ["line", "bar", "donut", "grouped_bar", "stacked_area"]
+    );
     for theme in SUPPORTED_THEMES {
         for aspect in ["ratio_16x9", "ratio_32x9"] {
             let options = ExportOptions {
@@ -356,8 +376,16 @@ fn every_chart_type_renders_in_every_theme_and_aspect() {
             };
             let rendered = render(&deck, &options);
             assert_eq!(rendered.pages, deck.len(), "{theme} {aspect}");
-            assert!(rendered.missing_assets.is_empty(), "{theme} {aspect}: {:?}", rendered.missing_assets);
-            assert!(rendered.overflows.is_empty(), "{theme} {aspect}: {:?}", rendered.overflows);
+            assert!(
+                rendered.missing_assets.is_empty(),
+                "{theme} {aspect}: {:?}",
+                rendered.missing_assets
+            );
+            assert!(
+                rendered.overflows.is_empty(),
+                "{theme} {aspect}: {:?}",
+                rendered.overflows
+            );
             let boxes = renderer().chart_boxes(&deck, &options).unwrap();
             assert_eq!(boxes.len(), deck.len(), "{theme} {aspect}");
         }

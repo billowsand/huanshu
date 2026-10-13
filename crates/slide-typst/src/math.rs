@@ -96,7 +96,8 @@ fn rewrite_str(input: &str, rejected: &HashSet<String>, spans: &mut Vec<Span>) -
         let raw = &input[open_end..close];
         let tex = if display { raw.trim() } else { raw };
         let valid = !tex.is_empty()
-            && (display || (!tex.starts_with(char::is_whitespace) && !tex.ends_with(char::is_whitespace)));
+            && (display
+                || (!tex.starts_with(char::is_whitespace) && !tex.ends_with(char::is_whitespace)));
         if !valid {
             i = open_end;
             continue;
@@ -190,7 +191,10 @@ mod tests {
     fn display_math_becomes_display_span() {
         let out = converted("$$E = mc^2$$");
         let start = out.find(SPAN_OPEN).unwrap();
-        assert_eq!(out[start + SPAN_OPEN.len_utf8()..].chars().next(), Some('D'));
+        assert_eq!(
+            out[start + SPAN_OPEN.len_utf8()..].chars().next(),
+            Some('D')
+        );
     }
 
     #[test]

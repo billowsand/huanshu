@@ -131,7 +131,8 @@ pub static LAYOUT_RULES: &[LayoutRule] = &[
         // (`planning::forced_kind`), a page without one cannot use it. Not blocked on any
         // aspect: both renderers split the width proportionally, and blocking would leave
         // ultra-wide decks with no way to show the user's chart.
-        use_when: "page has a ```chart data chart to visualize (left key points + right chart panel)",
+        use_when:
+            "page has a ```chart data chart to visualize (left key points + right chart panel)",
         requirement: Some("an attached ```chart block"),
         blocked_aspects: &[],
         check: |page| page.chart.is_some(),

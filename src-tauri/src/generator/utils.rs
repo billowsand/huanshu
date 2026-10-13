@@ -139,8 +139,9 @@ fn repair_bare_step_items(text: &str) -> Option<String> {
                     let key = skip_ws(&chars, comma + 1);
                     let key_is_key = chars.get(comma) == Some(&',')
                         && chars.get(key) == Some(&'"')
-                        && string_end(&chars, key)
-                            .is_some_and(|key_end| chars.get(skip_ws(&chars, key_end + 1)) == Some(&':'));
+                        && string_end(&chars, key).is_some_and(|key_end| {
+                            chars.get(skip_ws(&chars, key_end + 1)) == Some(&':')
+                        });
                     if key_is_key {
                         out.push_str("{\"step\": ");
                         stack.push('{');
@@ -926,7 +927,10 @@ fn normalize_chart_focus_slide(slide: &mut Map<String, Value>) {
         }
     }
     // chart.title 为空时退回 slide.title（图表渲染与布局都依赖它）
-    let fallback_title = slide.get("title").and_then(Value::as_str).map(str::to_string);
+    let fallback_title = slide
+        .get("title")
+        .and_then(Value::as_str)
+        .map(str::to_string);
     if let Some(chart) = slide.get_mut("chart").and_then(Value::as_object_mut) {
         let title_empty = chart
             .get("title")
@@ -1550,7 +1554,10 @@ mod tests {
     #[test]
     fn bare_step_repair_leaves_other_text_alone() {
         // Strings in arrays followed by another element, and keys inside objects, are not touched.
-        assert_eq!(repair_bare_step_items(r#"{"a": ["x", "y"], "b": {"c": "d"}}"#), None);
+        assert_eq!(
+            repair_bare_step_items(r#"{"a": ["x", "y"], "b": {"c": "d"}}"#),
+            None
+        );
         // Escaped quotes inside strings do not confuse the scanner.
         let fixed = repair_bare_step_items(r#"{"p": [{"t": "a\"b"}, "2", "t": "c"}]}"#).unwrap();
         assert_eq!(fixed, r#"{"p": [{"t": "a\"b"}, {"step": "2", "t": "c"}]}"#);

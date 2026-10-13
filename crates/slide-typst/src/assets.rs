@@ -420,7 +420,10 @@ mod tests {
             "the fallback list must survive"
         );
         // `id="…"` also ends in `d="`: ids (clip paths, gradients) must stay untouched.
-        assert!(text.contains(r#"id="zr0-c0""#), "clip-path id was rewritten");
+        assert!(
+            text.contains(r#"id="zr0-c0""#),
+            "clip-path id was rewritten"
+        );
         assert!(text.contains(r#"id="zr0-g0""#), "gradient id was rewritten");
     }
 }
