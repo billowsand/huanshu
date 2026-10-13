@@ -124,10 +124,11 @@
     box(stroke: 1 * px + th.primary-border, radius: th.radius.pill * px, inset: (x: 0.55 * rem, y: 0.35 * rem), stamped)
   }
   place(top + right, dx: -28 * px, dy: size.height - measure(mark).height, mark)
-  pad(x: 48 * px, center-v(width, size.height, fit-height(
+  pad(x: 48 * px, fit-height(
     width,
     size.height,
     f => column(ctx, slide, f),
     slide-index: ctx.index,
-  )))
+    center: true,
+  ))
 })

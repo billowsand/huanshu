@@ -142,7 +142,7 @@
   let card-h = (avail - footer-h - gap * (cards.len() - 1)) / cards.len()
 
   let tallest(f) = calc.max(..cards.map(card => natural-height(ctx, card, rows-mode, width, f)))
-  let f = fit-factor(f => tallest(f) <= card-h)
+  let f = fit-scale(tallest, card-h)
   if f == none {
     overflow-marker(ctx.index, tallest(fit-min), card-h)
     f = fit-min

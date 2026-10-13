@@ -164,5 +164,5 @@
     }
   }
 
-  center-v(w, h, fit-height(w, h, build, slide-index: ctx.index))
+  fit-height(w, h, build, slide-index: ctx.index, center: true)
 })

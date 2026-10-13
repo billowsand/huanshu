@@ -119,5 +119,5 @@
       note-bar(ctx, "i-carbon:collaborate", note, f: f)
     }
   }
-  center-v(width, avail, fit-height(width, avail, build, slide-index: ctx.index))
+  fit-height(width, avail, build, slide-index: ctx.index, center: true)
 })

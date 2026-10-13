@@ -79,7 +79,7 @@
     let parts = lead-parts(ctx, slide, count, f)
     parts.map(p => measure(block(width: inner-w, p)).height).sum() + min-gap * (parts.len() - 1)
   }
-  let f = fit-factor(f => natural(f) <= inner-h)
+  let f = fit-scale(natural, inner-h)
   if f == none {
     overflow-marker(ctx.index, natural(fit-min), inner-h)
     f = fit-min

@@ -177,7 +177,7 @@
     let b = measure-bands(ctx, events, col-w, f)
     b.up + b.down
   }
-  let f = fit-factor(f => total(f) <= avail)
+  let f = fit-scale(total, avail)
   if f == none {
     overflow-marker(ctx.index, total(fit-min), avail)
     f = fit-min

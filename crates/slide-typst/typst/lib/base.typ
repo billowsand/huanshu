@@ -185,12 +185,56 @@
 )
 
 // ── Fit to box ────────────────────────────────────────────────────────────────
-// `build(f)` renders the content at fit factor `f`. `fit-factor` returns the
-// largest `f` in [min, 1] whose measured height fits, by bisection. This
-// replaces the browser templates' pre-estimated `contentScale` buckets with an
-// exact measurement.
+// `build(f)` renders the content at fit factor `f`. `fit-height` returns the
+// largest `f` in [min, 1] whose measured height fits. This replaces the browser
+// templates' pre-estimated `contentScale` buckets with an exact measurement.
 #let fit-min = 0.4
 
+// Vertically centers `body` in `height` without `align(horizon)`, which would
+// leak into every nested grid cell and paragraph. Defined before `fit-height`
+// because `fit-height(center: true)` calls it.
+#let center-v(width, height, body) = {
+  let measured = measure(block(width: width, body)).height
+  v(calc.max(0pt, (height - measured) / 2))
+  body
+}
+
+// Numeric view of a fit metric, so both "a length is at most a length" and "a
+// ratio is at most 1" can be interpolated on the same scale.
+#let fit-metric-value(metric) = if type(metric) == length { metric / 1pt } else { metric }
+
+// Largest `f` in [min, max] with `metric(f) <= limit`, found by guarded
+// interpolation. The metric is the thing being measured (a height, or a
+// ratio), so the next probe is the `f` at which a linear model of the metric
+// would reach the limit. Wrapping changes a line count and makes the metric a
+// step function, which a pure interpolation can get stuck on; every step is
+// therefore clamped to the middle 80% of the bracket, so the bracket shrinks by
+// at least 10% per round whatever the metric does. Returns `none` when even
+// `min` is over the limit, like `fit-factor`.
+#let fit-scale(metric, limit, min: fit-min, max: 1, rounds: 10, tolerance: 0.005) = {
+  let over(f) = metric(f) > limit
+  if not over(max) { return max }
+  if over(min) { return none }
+  // The interpolation works on numbers; `limit` may be authored as a length.
+  let bound = fit-metric-value(limit)
+  let (lo, hi) = (min, max)
+  for _ in range(rounds) {
+    if hi - lo <= tolerance { break }
+    let (lower, upper) = (fit-metric-value(metric(lo)), fit-metric-value(metric(hi)))
+    let next = if upper <= lower {
+      (lo + hi) / 2
+    } else {
+      lo + (hi - lo) * (bound - lower) / (upper - lower)
+    }
+    let next = calc.clamp(next, lo + 0.1 * (hi - lo), hi - 0.1 * (hi - lo))
+    if fit-metric-value(metric(next)) <= bound { lo = next } else { hi = next }
+  }
+  lo
+}
+
+// Kept for the layouts whose `fits` is not a single "one number <= a limit"
+// condition (a whole grid of cards, or a metric that is only valid at some `f`);
+// `fit-scale` is what new call sites should use.
 #let fit-factor(fits, min: fit-min, rounds: 7) = {
   if fits(1) { return 1 }
   if not fits(min) { return none }
@@ -211,11 +255,17 @@
 
 // Fits `build` into `width × height`. If nothing fits, renders at `fit-min`,
 // clips like the browser's `overflow: hidden`, and emits an overflow marker.
-#let fit-height(width, height, build, slide-index: none) = {
-  let fits(f) = measure(block(width: width, build(f))).height <= height
-  let f = fit-factor(fits)
-  if f != none { return build(f) }
-  let needed = measure(block(width: width, build(fit-min))).height
+// `center: true` vertically centers the fitted content as well, reusing the
+// height that the last fit probe measured instead of measuring it again.
+#let fit-height(width, height, build, slide-index: none, center: false) = {
+  let probe-at(f) = measure(block(width: width, build(f))).height
+  let f = fit-scale(probe-at, height)
+  if f != none {
+    let content = build(f)
+    if center { return center-v(width, height, content) }
+    return content
+  }
+  let needed = probe-at(fit-min)
   overflow-marker(slide-index, needed, height)
   // The inner block gets its full natural height: laid out in the clipped
   // region instead, breakable children would be split into fragments drawn on
@@ -233,12 +283,4 @@
     if measure(block(width: width * mid, body)).height <= full { hi = mid } else { lo = mid }
   }
   block(width: width * hi, body)
-}
-
-// Vertically centers `body` in `height` without `align(horizon)`, which would
-// leak into every nested grid cell and paragraph.
-#let center-v(width, height, body) = {
-  let h = measure(block(width: width, body)).height
-  v(calc.max(0pt, (height - h) / 2))
-  body
 }

@@ -53,5 +53,5 @@
     v(12 * px * f) // `mt-3`, inside the centered block as in the template
     stack(spacing: 16 * px * f, ..items.map(item => item-card(ctx, item, width, f)))
   }
-  center-v(width, avail, fit-height(width, avail, build, slide-index: ctx.index))
+  fit-height(width, avail, build, slide-index: ctx.index, center: true)
 })

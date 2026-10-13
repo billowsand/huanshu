@@ -267,7 +267,7 @@
   let col-w = (width - col-gap * (n - 1)) / n
 
   let tightest(f) = calc.max(0pt, ..phases.map(p => column-need(ctx, p, d, col-w, f)))
-  let f = fit-factor(f => tightest(f) <= board-h)
+  let f = fit-scale(tightest, board-h)
   if f == none {
     overflow-marker(ctx.index, tightest(fit-min), board-h)
     f = fit-min

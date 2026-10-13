@@ -71,7 +71,7 @@
     let pad = 0.5 * rem
     // One factor for all four sheets keeps the quadrants visually consistent.
     let tallest(f) = calc.max(0pt, ..quadrants.map(q => measure(block(width: cell-w - 2 * pad, quadrant(ctx, q, f))).height))
-    let f = fit-factor(f => tallest(f) <= cell-h - 2 * pad)
+    let f = fit-scale(tallest, cell-h - 2 * pad)
     if f == none {
       overflow-marker(ctx.index, tallest(fit-min) + 2 * pad, cell-h)
       f = fit-min

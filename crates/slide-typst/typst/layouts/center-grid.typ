@@ -91,9 +91,10 @@
   }
 }
 
-#let render(ctx, slide) = layout(size => center-v(size.width, size.height, fit-height(
+#let render(ctx, slide) = layout(size => fit-height(
   size.width,
   size.height,
   f => column(ctx, slide, size.width, f),
   slide-index: ctx.index,
-)))
+  center: true,
+))

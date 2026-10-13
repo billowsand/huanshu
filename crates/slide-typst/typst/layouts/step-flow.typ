@@ -97,7 +97,7 @@
       )
     })
   }
-  center-v(w, h, fit-height(w, h, build, slide-index: ctx.index))
+  fit-height(w, h, build, slide-index: ctx.index, center: true)
 }
 
 #let vertical(ctx, steps, w, h) = {
@@ -149,7 +149,7 @@
         block(below: gap, card),
       )
     }))
-  center-v(w, h, fit-height(w, h, build, slide-index: ctx.index))
+  fit-height(w, h, build, slide-index: ctx.index, center: true)
 }
 
 #let render(ctx, slide) = content-page(ctx, slide, footer: slide.at("footer", default: none), (w, h) => {
