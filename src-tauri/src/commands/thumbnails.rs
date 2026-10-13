@@ -30,6 +30,10 @@ pub struct Thumbnail {
     /// The slide's kind has no Typst layout, so this page is a placeholder: the view must
     /// keep its slide component for it instead of showing the image.
     pub placeholder: bool,
+    /// The page is clipped: its content did not fit even at the smallest fit factor, so the
+    /// overflowing part is cut off (`overflows` of the compile behind this page). The editor
+    /// warns about it; the image itself shows the clipped page, exactly like the PDF.
+    pub overflow: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -89,6 +93,13 @@ fn render_thumbnails(
     let rendered = renderer()
         .render_png(slides, options, width_px, only)
         .map_err(|e| e.to_string())?;
+    // `render_png` compiles the whole deck, so it reports the clipped pages of the whole deck
+    // even when only a few were rasterized; the caller maps this onto its own page keys.
+    let clipped: Vec<usize> = rendered
+        .overflows
+        .iter()
+        .filter_map(|overflow| overflow.slide)
+        .collect();
     let thumbnails = rendered
         .pages
         .into_iter()
@@ -103,6 +114,7 @@ fn render_thumbnails(
                 .and_then(|slide| slide.get("kind"))
                 .and_then(|kind| kind.as_str())
                 .is_none_or(|kind| !slide_typst::SUPPORTED_KINDS.contains(&kind)),
+            overflow: clipped.contains(&page.index),
         })
         .collect();
     Ok(ThumbnailBatch {
@@ -158,5 +170,48 @@ mod tests {
         assert_eq!(batch.pages.len(), 1);
         assert_eq!(batch.pages[0].index, 1);
         assert!(batch.pages[0].placeholder);
+    }
+
+    /// A page whose content does not fit even at `fit-min` is clipped and must say so, because
+    /// the editor warns the user about it; a page that only fits after scaling must not.
+    #[test]
+    fn clipped_pages_are_flagged_and_scaled_pages_are_not() {
+        // Long enough to overflow a `feature_grid` card at `fit-min` even after `normalize`
+        // truncates the body: 90 copies still fit, 150 already clip, so this leaves margin.
+        let long = "这是一段刻意写得很长的说明文字，用来把卡片撑到放不下。".repeat(200);
+        let slides = vec![
+            serde_json::json!({
+                "kind": "feature_grid",
+                "title": "内容过多",
+                "cards": [
+                    { "title": "卡片一", "body": long, "icon": "i-carbon:square" },
+                    { "title": "卡片二", "body": long, "icon": "i-carbon:square" },
+                ],
+            }),
+            serde_json::json!({
+                "kind": "feature_grid",
+                "title": "内容正常",
+                "cards": [{ "title": "卡片", "body": "短文本", "icon": "i-carbon:square" }],
+            }),
+        ];
+        let batch = render_thumbnails(&slides, &ExportOptions::default(), 320, None, None).unwrap();
+        assert_eq!(batch.pages.len(), 2);
+        assert!(
+            batch.pages[0].overflow,
+            "the oversized page is clipped at fit-min"
+        );
+        assert!(
+            !batch.pages[1].overflow,
+            "the short page fits without clipping"
+        );
+        assert!(!batch.pages[0].placeholder && !batch.pages[1].placeholder);
+
+        // `only` limits the rasterized pages but the compile behind them covers the whole deck,
+        // so a clipped page is still reported when a different page was asked for.
+        let batch =
+            render_thumbnails(&slides, &ExportOptions::default(), 320, Some(&[1]), None).unwrap();
+        assert_eq!(batch.pages.len(), 1);
+        assert_eq!(batch.pages[0].index, 1);
+        assert!(!batch.pages[0].overflow);
     }
 }
