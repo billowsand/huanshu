@@ -220,6 +220,60 @@ function overviewThumb(idx: number) {
   return thumb && !thumb.placeholder && !thumbnails.failed.value ? thumb : null
 }
 
+// ── 演示主画面 ────────────────────────────────────────────────────────────────
+// 与全览那个实例分开：全览只要 256px 宽、一次要整副，主画面要覆盖整个舞台、
+// 只要当前页前后各 2 页（翻页时下一页已经就绪），两者的宽度档位和缓存都不同。
+
+/** `'0'` 时主画面整体回退到幻灯片组件，用于 A/B 对比（与缩略图开关同一约定）。 */
+const TYPST_STAGE_KEY = 'huanshu.typstStage'
+
+function stageImageEnabled(): boolean {
+  try {
+    return localStorage.getItem(TYPST_STAGE_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+/**
+ * 要覆盖舞台所需的位图宽度。页面比例固定，拉伸模式下舞台可能非等比，所以取
+ * 「舞台宽」和「按页高铺满所需的宽」的较大者，再乘 devicePixelRatio；Rust 侧夹到 3840。
+ */
+function stageImageWidth(): number {
+  const size = stageSize.value
+  const dims = slideDimensions.value
+  return (Math.max(size.width, (size.height * dims.w) / dims.h) * (window.devicePixelRatio || 1)) || 1
+}
+
+const stage = useTypstThumbnails({
+  slides: () => props.blueprints,
+  projectId: () => props.projectId ?? null,
+  widthPx: stageImageWidth,
+  // 演示中、且不在全览模式（全览时主画面根本不在 DOM 里）。
+  enabled: () => !showOverview.value && stageImageEnabled(),
+  wanted: () => {
+    const last = props.blueprints.length - 1
+    return [presentSlide.value - 2, presentSlide.value - 1, presentSlide.value, presentSlide.value + 1, presentSlide.value + 2]
+      .filter(index => index >= 0 && index <= last)
+  },
+  maxCached: 8,
+})
+
+watch(presentSlide, () => {
+  void stage.refresh()
+})
+
+function stageImageSize() {
+  return { width: `${stageSize.value.width}px`, height: `${stageSize.value.height}px` }
+}
+
+/** 当前页可用的位图；还没有图、是占位页或失败时返回 null，走 `.pres-slide` 里的幻灯片组件。 */
+function stageThumb() {
+  if (!stageImageEnabled()) return null
+  const thumb = stage.thumbs.value[presentSlide.value]
+  return thumb && !thumb.placeholder && !stage.failed.value ? thumb : null
+}
+
 function handleStageClick() {
   if (showOverview.value) return
   if (didSwipe) { didSwipe = false; return }
@@ -355,7 +409,27 @@ onBeforeUnmount(() => {
       >
         <Transition :name="slideTransitionName">
           <div :key="presentSlide" class="pres-slide-wrapper">
+            <!--
+              Typst 光栅化的当前页。img 直接放在 wrapper 里、尺寸就是舞台尺寸：放进
+              `.pres-slide` 的 `transform: scale()` 里会先按 1280×720 排版再放大，
+              位图可能按小尺寸栅格化而发糊。拉伸模式本来就要非等比铺满，所以 fill。
+            -->
+            <img
+              v-if="stageThumb()"
+              class="pres-slide-img"
+              :src="stageThumb()!.url"
+              :style="stageImageSize()"
+              draggable="false"
+              alt=""
+            >
             <div
+              v-else-if="stageImageEnabled() && !stage.failed.value && !stage.thumbs.value[presentSlide]"
+              class="pres-slide-loading"
+              :style="stageImageSize()"
+              aria-hidden="true"
+            />
+            <div
+              v-else
               class="pres-slide"
               :style="{
                 width: `${slideDimensions.w}px`,

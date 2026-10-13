@@ -2919,6 +2919,17 @@ kbd {
   overflow: hidden;
 }
 
+/* 演示主画面的 Typst 位图：宽高就是舞台尺寸，拉伸模式要非等比铺满。 */
+.pres-slide-img {
+  display: block;
+  object-fit: fill;
+}
+
+/* 图还没到时的底：透明占位（不能白一下，翻页动画期间会闪）。 */
+.pres-slide-loading {
+  background: transparent;
+}
+
 /* ─── Slide page transitions ─── */
 
 /* Shared active state: stack absolutely, GPU-accelerated */

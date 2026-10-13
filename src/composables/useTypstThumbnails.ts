@@ -73,6 +73,11 @@ export function useTypstThumbnails(opts: {
 }): {
   thumbs: Ref<Record<number, TypstThumbnail>>
   failed: Ref<boolean>
+  /**
+   * 立刻按当前状态重新评估一次（不过 debounce）。`wanted()` 变化已经被内部盯着了，
+   * 这个出口是给「不看 `wanted` 的输入变了、但要马上出图」的调用方用的（演示翻页）。
+   */
+  refresh: () => void
 } {
   const appSettings = useAppSettingsStore()
   const thumbs = ref<Record<number, TypstThumbnail>>({})
@@ -254,5 +259,5 @@ export function useTypstThumbnails(opts: {
     themeObserver.disconnect()
   })
 
-  return { thumbs, failed }
+  return { thumbs, failed, refresh }
 }
