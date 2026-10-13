@@ -6,6 +6,13 @@
       "runtimeExecutable": "bunx",
       "runtimeArgs": ["vite"],
       "port": 5173
+    },
+    {
+      "name": "tauri-dev",
+      "runtimeExecutable": "bunx",
+      "runtimeArgs": ["tauri", "dev"],
+      "env": { "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": "--remote-debugging-port=9223" },
+      "port": 5173
     }
   ]
 }

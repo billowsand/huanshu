@@ -436,6 +436,27 @@ cargo run -p slide-typst --example render_fixture -- --png
   屏幕上一行放不下的超长标题会被裁掉（如 cover），PDF 版换行显示；未知图标在 PDF 里渲染为兜底图标
   （屏幕上 unocss 缺图标时不显示）。
 
+### Typst 缩略图（迁移第一步）
+
+长期目标是让 Typst 成为唯一的幻灯片渲染器。第一步只换**缩略图**：Step2 生成看板的卡片预览、演示全览。
+Step2 详情大图、演示主画面、Step3 实时预览仍是 `SlideRenderer`。
+
+- 链路：`useTypstThumbnails` → `render_slide_thumbnails`（`commands/thumbnails.rs`）→
+  `Renderer::render_png`（**整副编译**，按 `only` 光栅化，返回 `data:image/png` 给 `<img>`）。
+  命令复用 `pdf.rs` 的 `renderer()` / `prepare_export()`，主题、比例、字体、素材映射与 PDF 导出一致；
+  图表 SVG 与导出共用 `composables/chartSvgs.ts` 的 `buildChartSvgs`。启动时 `.setup` 在后台预热字体扫描。
+- **不能单页编译**：`ctx.index` 决定 `chart:<index>` 素材键和溢出标记。Step2 生成中有空位时只发已有蓝图组成的
+  子集，Typst 的页序、返回的 `index`、`chart:<index>` 都是**子集位置**，组合函数再映射回传入数组的下标；
+  图表 SVG 也必须用同一个子集构建。
+- 缓存键 = 蓝图 JSON + 子集位置 + 主题 id + 字体 + 宽度档位（64px）。响应按**键**落图，不按请求序号整批丢弃：
+  后一次请求只含它那一刻变了的页，整批丢弃会让前一批的页永远等不到图（Step2 会一直显示加载底）。
+- `enabled()` 为假只是不发请求、保留已有的图（全览关了再开不重渲）；`localStorage['huanshu.typstThumbnails'] = '0'`
+  才整体关掉、回退到 `SlideRenderer`，用于 A/B 对比。`placeholder`（模板还没有 Typst 版式）与命令失败时也回退。
+- Step2 的 `slideItems` 下标是**内容页序号**（牌组装配后前面有封面+目录、末尾有结尾页），缩略图直接用
+  `slideItems` 的蓝图（含取自日志的蓝图），下标就是 `item.index`；不要再从 `props.blueprints` 切片加偏移。
+- 性能：release 下 560px 宽每页约 5ms（光栅化）+ 整副增量编译约 20ms；`tauri dev` 是 debug 编译，
+  20 页要约 1.6 秒，dev 下的慢不代表发布版。
+
 ## 多比例幻灯片支持 (16:9 / 32:9 / 48:9)
 
 ### 功能说明
