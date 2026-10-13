@@ -7,13 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-14
+
 ### Added
+
+- **原生 PDF 导出（内嵌 Typst）**：新增 `slide-typst` crate，在进程内用 Typst 把蓝图直接排版成矢量 PDF，不需要浏览器或外部 CLI；编辑器预览栏的「导出 PDF」与首页导出弹窗的「PDF 文档」走同一流程，导出的是当前**已应用**的牌组（与预览、演示一致），完成后可一键在文件管理器中定位文件。18 种模板 × 6 个主题全部移植，尚未移植的模板渲染为「Typst 版式尚未实现」占位页而不是丢页；结果弹窗列出占位页、内容放不下被裁切的页、缺失的图片，以及主题 id 不受支持时的回落提示。一页幻灯片恰好对应一个 PDF 页面：内容先按实测二分缩放（下限 0.4×），仍放不下才裁切并如实报告；图片沿用生成时同一套引用规则解析（项目 `figure/`、`public/` 与素材库 `media:<id>`），编译前逐张完整解码校验（BMP 转 PNG、SVG 校验），单张坏图或缺失文件只在对应位置显示占位图，不会让整份导出失败。模型输出的文本一律按纯文本渲染，绝不作为 Typst 标记求值。
 
 - **报刊·钴蓝主题**（`light-editorial`）：取样自报刊/杂志版式——暖米白新闻纸、近黑墨色、唯一强调色钴蓝，无阴影、无圆角；卡片在屏幕上打开成「上方一条细线」的报刊分栏，标题落在 2px 墨色线上，副标题为浅蓝带，封面/结尾徽章为实心钴蓝标签，页面顶部一条钴蓝色带。封面与结尾标题在第一个全角逗号/冒号（或破折号、竖线）后断开，后半句换行并改用钴蓝（双色大标题，屏幕 `src/utils/titleTail.ts` 与 PDF `title-tail` 同一规则，其他主题无视觉变化）。PDF 导出同步支持（第一期沿用终端主题几何，卡片保留细线全框），应用界面配色随主题切换。
 
 - **数据图表页（ChartFocus）**：Markdown 正文新增 ` ```chart ` 围栏块携带图表数据（line / bar / donut / grouped_bar / stacked_area），归属所在 H2/H3 小节；正文较短时每小节首图与文字同页生成「要点解读 + 图表」版式，正文较长时文字页与图表页拆成两页，多图自动各追加一页；带图表的页固定使用 `chart_focus`（不经 LLM 选版式，也不会在 repair 中被换掉），图表数据由代码从文档原样挂载、模型只写解读。图表渲染单一实现（`buildChartOption`，ECharts）：webview 直接挂载，导出 PDF 时在 webview 内 SSR 出 SVG、经 asset 管道（`chart:<页码>`）嵌入 typst，双端一致；导出前先由 typst 测量每张图的绘图框与字号比例（`pdf_chart_boxes`），SVG 按实测尺寸渲染、在 PDF 中 1:1 落位，图表字号随 `--type-scale` 与其他文字一起缩放；Rust 侧修正 SSR SVG 里 font-family 的裸引号后经 usvg 校验。5 套主题新增 `--chart-*` token（palette/grid/axis），配色随主题切换（屏幕上切换主题/字体会即时重绘）。Step3 编辑器可直接编辑图表数据 JSON（与生成端同一套校验）。
 - **第 18 种幻灯片模板** `chart_focus`：布局规则、评分、schema 提示词、校验（chart 必填、type/encoding 合法、数值列必须为数字；数据错误在解析 Markdown 时直接报给用户，不进入 LLM 修复）、Step3 编辑器字段（要点列表 + 图表标题）全部接入。
 - **行内数学公式**：蓝图文本中的 `$...$` / `$$...$$` 现在会真正渲染——屏幕与预览由 `src/utils/richText.ts` 用 KaTeX 输出 HTML（白名单标签只输出裸标签，属性一律丢弃，结果进 `v-html`），PDF 由 `crates/slide-typst/src/math.rs` 经 mitex 转成 Typst 数学后在 `rich()` 里 `eval`。三处定界规则（前端、生成侧 `generator/utils.rs` 的公式保护、PDF 侧）保持一致：`$$` 块可跨行，`$` 内联不跨行且首尾不得为空白，`$` 后紧跟数字不算闭合，`\$` 为字面美元号；输入里的哨兵字符会先清除，防止伪造公式段注入 Typst 代码（有单测）。Typst 的 `eval` 出错无法捕获，导出前先用 `math-check.typ` 一次性试编译全部公式，失败的公式退回原文显示；内嵌的 mitex spec 在 `standard.typ` 打了本地补丁（上游 xarrow 依赖 Typst 已删除的 `style()`，且为 GPL-3.0，故不 vendor）。
+
+### Fixed
+
+- **PDF 终端主题章节号位置**：终端主题下的小号章节号保持 CSS 的 `top: 16px; right: 32px` 盒位（内容角上方 21px、右侧内缩 5px），不再与页面标题齐平，也不再被 `section_intro` 的卡片压住。
+- **PDF split_layers 标题被长副标题挤扁**：改为按实测宽度等比收缩（等价 CSS `flex-shrink`），不再用会让右侧先取走整个自然宽度的 `(1fr, auto)` 网格，长 meta 不会把标题挤成一字一行。
+- **PDF 主题回落提示**：主题 id 不受支持而回落到便签·稿纸时按警告列出，不再显示为正常的绿色对勾。
 
 ## [0.3.0] - 2026-10-11
 
