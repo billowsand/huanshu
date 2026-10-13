@@ -425,3 +425,52 @@ fn spotlight_accepts_data_uris_and_dense_panels() {
         rendered.missing_assets
     );
 }
+
+/// Text runs of a page with their fill, for checks on how text is colored.
+fn text_fills(frame: &typst::layout::Frame, out: &mut Vec<(String, typst::visualize::Paint)>) {
+    for (_, item) in frame.items() {
+        match item {
+            typst::layout::FrameItem::Group(group) => text_fills(&group.frame, out),
+            typst::layout::FrameItem::Text(text) => {
+                out.push((text.text.to_string(), text.fill.clone()))
+            }
+            _ => {}
+        }
+    }
+}
+
+#[test]
+fn editorial_headline_sets_the_tail_in_the_accent() {
+    // light-editorial splits cover / closing titles after the first full-width
+    // comma or colon (src/utils/titleTail.ts) and colors the tail; other themes
+    // keep one color.
+    let slides = [
+        json!({ "kind": "cover", "title": "拿件真事试，再判断行不行" }),
+        json!({ "kind": "closing", "title": "谢谢阅读：少争论强不强" }),
+    ];
+    let fill_of = |theme: &str, page: usize, needle: &str| {
+        let options = ExportOptions {
+            theme: theme.to_string(),
+            ..Default::default()
+        };
+        let document = renderer().compile(&slides, &options).unwrap().document;
+        let mut runs = Vec::new();
+        text_fills(&document.pages()[page].frame, &mut runs);
+        runs.into_iter()
+            .find(|(text, _)| text.contains(needle))
+            .unwrap_or_else(|| panic!("{theme}: no text run containing {needle}"))
+            .1
+    };
+    for (page, head, tail) in [(0, "拿件", "再判断"), (1, "谢谢", "少争论")] {
+        assert_ne!(
+            fill_of("light-editorial", page, head),
+            fill_of("light-editorial", page, tail),
+            "editorial page {page}: the tail must be set in the accent"
+        );
+        assert_eq!(
+            fill_of("light-terminal", page, head),
+            fill_of("light-terminal", page, tail),
+            "terminal page {page}: the title stays one color"
+        );
+    }
+}

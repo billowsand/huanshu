@@ -256,8 +256,8 @@ export function buildChartOption(spec: ChartSpec, theme: ChartTheme, mode: 'scre
 
 /**
  * 从 CSS 变量收集图表主题（webview 侧入口）。
- * 读取 slide-shell 上生效的主题 token，5 套主题（dark-yellow / dark-blue /
- * dark-terminal / light-terminal / light-notes）都映射到统一的 --bg/--text/... 名，
+ * 读取 slide-shell 上生效的主题 token，各套主题（dark-yellow / dark-blue /
+ * dark-terminal / light-terminal / light-notes / light-editorial）都映射到统一的 --bg/--text/... 名，
  * 图表专有 token（--chart-*）在缺少时退回主色派生值。
  */
 export function themeFromCssVars(style: CSSStyleDeclaration): ChartTheme {

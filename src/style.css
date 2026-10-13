@@ -445,7 +445,8 @@ iframe {
 
 /* ============================================================
    THEME VARIABLES
-   4 themes: dark-yellow | dark-blue | dark-terminal | light-terminal
+   dark-yellow | dark-blue here; terminal, notes and editorial themes live in
+   src/themes/ (the list is src/themes/catalog.ts)
    Switched via: document.documentElement.setAttribute('data-theme', id)
    ============================================================ */
 

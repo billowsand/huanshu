@@ -35,8 +35,14 @@
 // The terminal themes (light-terminal / dark-terminal) flatten the stationery
 // decorations of light-notes into plain panel cards; their CSS forces solid
 // primary dividers, filled pills and single 1px borders, so layouts branch on
-// this where the theme dictionary has no matching switch.
-#let is-terminal(ctx) = ctx.theme.family == "terminal"
+// this where the theme dictionary has no matching switch. The editorial theme
+// (light-editorial) is flat in the same way and shares these branches.
+#let is-terminal(ctx) = ctx.theme.family in ("terminal", "editorial")
+
+// The editorial theme (light-editorial, src/themes/editorial.css): terminal
+// geometry plus a few newspaper touches — ink title rules, solid cobalt
+// badges and the two-tone cover / closing headline.
+#let is-editorial(ctx) = ctx.theme.family == "editorial"
 
 // The dark glass themes (dark-yellow / dark-blue) live in src/style.css alone:
 // no per-layout CSS ever applies, so the raw Vue template styles win — glass
@@ -60,6 +66,9 @@
       radius: height / 2,
       fill: gradient.linear((base, 0%), (base.transparentize(100%), 100%), angle: 0deg),
     )
+  } else if is-editorial(ctx) {
+    // Ink rules at their CSS height: 2px under titles, 1px elsewhere.
+    line(length: length, stroke: height + ctx.theme.ink)
   } else {
     // 65% primary on light-notes, solid on the terminal themes; both draw 1px.
     line(length: length, stroke: 1 * px + if is-terminal(ctx) { ctx.theme.primary } else if paint != auto {
@@ -80,6 +89,29 @@
     if type(body) == str { rich(body) } else { body },
   ),
 )
+
+// Two-tone headline split (light-editorial): after the first full-width comma /
+// colon / bar or em dash (ASCII `:` / `|` only before whitespace), skipping the
+// whitespace that follows — the same rule as src/utils/titleTail.ts. Returns
+// (head, tail), or none when there is no split.
+#let title-tail(title) = {
+  if type(title) != str or title.contains("$") { return none }
+  let m = title.match(regex("[，：｜]|——|[:|]\\s"))
+  if m == none { return none }
+  let tail = title.slice(m.end).trim(at: start)
+  if title.slice(0, m.start).trim() == "" or tail == "" { return none }
+  (title.slice(0, m.end), tail)
+}
+
+// Cover / closing headline: on the editorial theme the tail after the split
+// is set in the accent on its own line (`.semantic-title__tail`); everywhere
+// else this is a plain title `txt`.
+#let headline(ctx, size, lh, title, ..args) = {
+  let split = if is-editorial(ctx) { title-tail(title) } else { none }
+  if split == none { return txt(ctx, "title", size, lh, title, ..args) }
+  txt(ctx, "title", size, lh, split.at(0), ..args)
+  txt(ctx, "title", size, lh, split.at(1), fill: ctx.theme.primary, ..args)
+}
 
 // Large chapter number in the top-right corner (`.section-num`). The theme's
 // `deco.section-num` picks the style: "outline" is the giant stroked digit of

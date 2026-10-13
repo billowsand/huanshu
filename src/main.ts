@@ -14,6 +14,7 @@ import './themes/terminal.css'
 import './themes/notes.css'
 import './themes/notes-layouts.css'
 import './themes/notes-studio.css'
+import './themes/editorial.css'
 import { DEFAULT_THEME, isKnownTheme } from './themes/catalog'
 
 // Keynote slide components

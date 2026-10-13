@@ -276,11 +276,31 @@ caption 只说图片「是什么」，说不出它「该放哪」。所以 `gene
   应 0 命中（数字用 `--font-number` 或 `.slide-number`，`font-mono`/`font-sans` 会被角色组的
   `!important` 覆盖成死代码，只会误导后来人）。
 
+## 报刊·钴蓝主题（`light-editorial`）
+
+取样自报刊/杂志版式：暖米白新闻纸、近黑墨色、唯一强调色钴蓝 `#1d4ed8`；无阴影、无圆角、无网格。
+屏幕样式在 `src/themes/editorial.css`，PDF 在 `crates/slide-typst/typst/themes/light-editorial.typ`（`family: "editorial"`）。
+
+- 卡片「打开」成报刊分栏：`.glass-card` 只留上边一条细线（`--glass-border`），`--glass` 是**不透明**的纸色而不是
+  `transparent`——时间线、步骤流的卡片要盖住下面的轴线和连接线。`GlassCard` 用内联样式写 background/borderColor，
+  所以只能靠 token 改它的颜色，不能靠类选择器。
+- 标题下 2px 墨色线（`.slide-title-divider`、`.process-summary__line`），其余分隔线 1px 墨色；副标题标签是浅蓝带，
+  封面/结尾徽章 `.amber-badge` 是实心钴蓝白字；`.section-num` 退化为小号页码（同终端主题）。
+- **双色大标题**：封面与结尾标题在第一个全角逗号/冒号/竖线或破折号之后断开（ASCII `:` / `|` 必须后跟空白，
+  `10:30` 不会断），后半句换行并改用钴蓝。规则有两份，必须一致：`src/utils/titleTail.ts`（`SlideTitle.vue` 把
+  后半句包进 `.semantic-title__tail`，只有本主题的 CSS 给它上色换行，其他主题无视觉变化）和
+  `lib/components.typ` 的 `title-tail` / `headline`（Typst 正则走 Rust regex，不支持前瞻，所以写成 `[:|]\s`）。
+  有单测 `editorial_headline_sets_the_tail_in_the_accent`。普通内容页标题不分色。
+- 字体：主题带不了字体（字体是用户在设置里统一选的），而 `typography.css` 把所有字重拍平成常规体。要还原报刊的
+  粗宋标题，标题字体须直接选一个粗体字族（如思源宋体 Heavy、方正大标宋）。
+- 第二期待办：PDF 的卡片改成同样的「上细线、无框」（需要 editorial 独立于 terminal 几何，逐个版式过一遍）；
+  设置页「套用主题推荐字体」；报头（刊名 + 日期期号）需要新的数据字段。
+
 ## Typst 原生 PDF 导出（实验中，`crates/slide-typst`）
 
 独立的 workspace crate，由 `src-tauri/src/commands/pdf.rs` 接入应用（见下方「应用接入」）。它在进程内嵌入 Typst 编译器，把 `SlideBlueprint`
 JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍然负责屏幕渲染，Typst 侧是另一套
-版式实现。18 个模板（`SUPPORTED_KINDS`）与全部 5 个主题（`SUPPORTED_THEMES`：便签·稿纸、终端·纸/墨、暗·琥珀/星图）都已移植；
+版式实现。18 个模板（`SUPPORTED_KINDS`）与全部 6 个主题（`SUPPORTED_THEMES`：便签·稿纸、终端·纸/墨、报刊·钴蓝、暗·琥珀/星图）都已移植；
 未知主题 id 回落到便签（`main.typ` 的 `themes` 表兜底，`pdf.rs` 会把回落记进导出报告）。以后新增的模板在移植前
 会渲染成「Typst 版式尚未实现」占位页，不会丢页，导出结果弹窗会列出这些页。
 
@@ -307,9 +327,11 @@ JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍
   `tracking`（title/label）、`deco`（ruled/tape/double-frame/certificate/stamp/section-num 开关）和
   `tones`（neutral/blue/green/amber/red，各含 solid/text/bg/border/contrast，对应屏幕版 `toneVars()` 的
   `--*-bg/--*-border/--*-light/--*-contrast/--*`）。键集合由 `themes/_check.typ` 编译期校验
-  （`Renderer::check_theme_interface`，有单测守护），新增键要五个主题一起加。
+  （`Renderer::check_theme_interface`，有单测守护），新增键要所有主题一起加。
 - 主题分支：版式里优先用 `deco` 开关和 token 表达差异；不够时再按主题的 `family` 分支（`"notes"` /
-  `"terminal"` / `"glass"`，对应屏幕版三层 CSS：`notes-layouts.css`、`terminal.css`、无专属版式 CSS）。
+  `"terminal"` / `"glass"` / `"editorial"`，对应屏幕版 CSS：`notes-layouts.css`、`terminal.css`、无专属版式 CSS、
+  `editorial.css`）。`"editorial"` 目前**同时让 `is-terminal(ctx)` 为真**（第一期借用终端几何），
+  只在 `is-editorial(ctx)` 处另走分支：墨色标题线、实心钴蓝徽章、双色大标题。
   `is-terminal(ctx)`（终端 CSS 把所有元素拍平成面板）和 `is-glass(ctx)`（模板原始样式生效：玻璃卡、999px 胶囊、
   primary→透明的渐变分隔线——`divider-line()` 用渐变 rect 画，Typst 的 line 带不了渐变）都读 `family`，
   **不要按主题 id 判断**：新主题只要声明所属 family 就会走对分支，`_check.typ` 会校验它的取值。
@@ -392,6 +414,9 @@ cargo run -p slide-typst --example render_fixture -- --png
   按主题分：
   - 便签·稿纸：基本没有省略，装饰（稿线、纸胶带、双线框、证书框）全画。
   - 终端·纸/墨：玻璃阴影、inset 高光和 backdrop-filter 省略（终端卡片本来就是纯色面板）；动画一律取静止态。
+  - 报刊·钴蓝：屏幕上卡片是「上方一条细线、无框」的报刊分栏，PDF 第一期走终端几何，卡片仍画细线全框
+    （与纸同色、不显底）；Typst 侧不少 `else { 2 * px }` 硬编码圆角也保留着。其余（顶部 6px 钴蓝条、2px 墨色
+    标题线、浅蓝副标题带、实心钴蓝徽章、双色封面/结尾标题）两边一致。
   - 暗·琥珀/星图：backdrop-filter 的模糊/饱和度丢弃，玻璃卡画半透明平铺填充（恰好等于 GlassCard 的内联样式）；
     `.slide-shell__ambient` 的动画模糊光斑按 preset 0 位置画静态径向渐斑（PDF 无模糊，且背景函数拿不到
     每页的预设选择）；`--shell-frame` 顶部约 1% 白的光泽低于可见阈值，省略；`.section-num` 水印在屏幕上被卡片的

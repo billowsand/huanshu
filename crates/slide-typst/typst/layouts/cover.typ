@@ -42,6 +42,17 @@
             inset: (x: 12 * px, y: 2 * px),
             label,
           )
+        } else if is-editorial(ctx) {
+          // Editorial `.amber-badge`: a solid cobalt label with white text.
+          box(fill: th.primary, stroke: 1 * px + th.primary, radius: th.radius.pill * px, inset: (x: 12 * px, y: 2 * px), txt(
+            ctx,
+            "caption",
+            ty.subtitle,
+            1.5,
+            b,
+            fill: th.tones.neutral.contrast,
+            tracking: th.tracking.label,
+          ))
         } else {
           // Terminal `.amber-badge`: filled with the primary tint.
           box(fill: th.tones.neutral.bg, stroke: 1 * px + th.tones.neutral.border, radius: th.radius.pill * px, inset: (
@@ -53,12 +64,13 @@
       .join(h(12 * px))))
   }
   parts.push({
-    txt(ctx, "title", ty.cover-title, 1.15, slide.title, tracking: th.tracking.title)
+    headline(ctx, ty.cover-title, 1.15, slide.title, tracking: th.tracking.title)
     if has(subtitle) {
       v(0.75 * rem)
-      // `.cover-subtitle`: muted on light-notes, 85% primary elsewhere
+      // `.cover-subtitle`: muted on light-notes, ink on the editorial theme
+      // (the deck line under a two-tone headline), 85% primary elsewhere
       // (style.css sets `color: var(--primary); opacity: 0.85`).
-      txt(ctx, "subtitle", ty.cover-subtitle, 1.5, subtitle, fill: if is-terminal(ctx) or is-glass(ctx) {
+      txt(ctx, "subtitle", ty.cover-subtitle, 1.5, subtitle, fill: if is-editorial(ctx) { th.ink } else if is-terminal(ctx) or is-glass(ctx) {
         th.primary.transparentize(15%)
       } else { th.muted.transparentize(15%) })
     }

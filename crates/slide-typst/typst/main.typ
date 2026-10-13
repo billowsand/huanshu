@@ -6,6 +6,7 @@
 #import "lib/components.typ": frame-inset, unsupported-page
 #import "themes/notes.typ" as notes
 #import "themes/light-terminal.typ" as light-terminal
+#import "themes/light-editorial.typ" as light-editorial
 #import "themes/dark-terminal.typ" as dark-terminal
 #import "themes/dark-yellow.typ" as dark-yellow
 #import "themes/dark-blue.typ" as dark-blue
@@ -30,11 +31,12 @@
 
 #let deck = json("/deck.json")
 
-// 便签·稿纸, the terminal themes and the dark glass themes are ported; every
-// other theme id falls back to light-notes.
+// 便签·稿纸, the terminal themes, 报刊·钴蓝 and the dark glass themes are
+// ported; every other theme id falls back to light-notes.
 #let themes = (
   "light-notes": notes,
   "light-terminal": light-terminal,
+  "light-editorial": light-editorial,
   "dark-terminal": dark-terminal,
   "dark-yellow": dark-yellow,
   "dark-blue": dark-blue,

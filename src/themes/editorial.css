@@ -1,0 +1,314 @@
+/* 报刊·钴蓝 (light-editorial): a newspaper / magazine layout language.
+   Warm newsprint, near-black ink, a single cobalt accent; no shadows, no
+   radii, no grid. Cards open up into "rule above, text below" columns, the
+   title sits on a 2px ink rule, labels are solid cobalt and asides are a pale
+   blue band. The PDF port (crates/slide-typst/typst/themes/light-editorial.typ)
+   reuses the terminal geometry, so cards there keep a hairline frame. */
+[data-theme="light-editorial"] {
+  color-scheme: light;
+  --editorial-paper: #f3efe6;
+  --editorial-ink: #1c2723;
+  --editorial-muted: #63675e;
+  --editorial-rule: #cbc5b8;
+  --editorial-cobalt: #1d4ed8;
+  --editorial-cobalt-deep: #1a43bf;
+  --editorial-tint: #e1e7f3;
+  --editorial-tint-border: #b7c5e6;
+
+  --bg: var(--editorial-paper);
+  --bg-gradient: var(--editorial-paper);
+  --text: var(--editorial-ink);
+  --text-muted: var(--editorial-muted);
+  --primary: var(--editorial-cobalt);
+  --primary-light: var(--editorial-cobalt);
+  --primary-bg: var(--editorial-tint);
+  --primary-border: var(--editorial-tint-border);
+  /* Opaque paper rather than transparent: cards still cover the axes and
+     connectors drawn underneath them (timeline, step flow). */
+  --glass: var(--editorial-paper);
+  --glass-border: var(--editorial-rule);
+  --glass-highlight: transparent;
+  --glass-sheen: transparent;
+  --glass-blur: 0px;
+  --glass-saturate: 100%;
+  --glass-shadow: none;
+  --glass-shadow-strong: none;
+  --glow: transparent;
+  --shell-frame: transparent;
+  --shell-frame-border: transparent;
+  --shell-frame-shadow: none;
+  --section-num-stroke: var(--editorial-rule);
+  --success: #2e6e4f;
+  --success-light: #2e6e4f;
+  --success-bg: #e2ede5;
+  --success-border: #a9c7b4;
+  --success-contrast: #ffffff;
+  --info: #23407a;
+  --info-light: #23407a;
+  --info-bg: #e3e8f1;
+  --info-border: #afbcd6;
+  --info-contrast: #ffffff;
+  --warning: #9a6212;
+  --warning-light: #9a6212;
+  --warning-bg: #f3e7d2;
+  --warning-border: #d8be91;
+  --warning-contrast: #ffffff;
+  --danger: #a8322a;
+  --danger-light: #a8322a;
+  --danger-bg: #f4e1dc;
+  --danger-border: #d7a9a1;
+  --danger-contrast: #ffffff;
+
+  /* chart tokens（ECharts 主题，hexA() 依赖 #hex 格式） */
+  --chart-grid:  #e4ded2;
+  --chart-axis:  #cbc5b8;
+  --chart-palette-0: #1d4ed8;
+  --chart-palette-1: #2e6e4f;
+  --chart-palette-2: #9a6212;
+  --chart-palette-3: #a8322a;
+  --chart-palette-4: #5b6f86;
+  --chart-palette-5: #7a5c99;
+
+  --studio-bg: #eae5da;
+  --studio-panel: #f6f3ec;
+  --studio-panel-2: #f1ede4;
+  --studio-surface: #e6e0d3;
+  --studio-border: #d3ccbe;
+  --studio-border-hover: #a39b8b;
+  --studio-text: var(--editorial-ink);
+  --studio-muted: var(--editorial-muted);
+  --studio-primary: var(--editorial-cobalt);
+  --studio-primary-light: var(--editorial-cobalt-deep);
+  --studio-primary-contrast: #ffffff;
+  --studio-primary-bg: var(--editorial-tint);
+  --studio-primary-border: var(--editorial-tint-border);
+  --studio-success: #2e6e4f;
+  --studio-success-bg: #e2ede5;
+  --studio-error: #a8322a;
+  --studio-error-bg: #f4e1dc;
+  --studio-error-border: #d7a9a1;
+  --slidev-code-background: #ebe6db !important;
+}
+
+/* Plain newsprint with the cobalt band across the top edge. */
+[data-theme="light-editorial"] .slide-shell {
+  background: var(--bg);
+}
+
+[data-theme="light-editorial"] .slide-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: var(--primary);
+  z-index: 2;
+  pointer-events: none;
+}
+
+[data-theme="light-editorial"] .slide-shell__ambient {
+  display: none;
+}
+
+[data-theme="light-editorial"] .slide-shell__frame {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Cards open up into newspaper columns: a hairline above, no box. GlassCard
+   sets background and border-color inline, which the tokens above already
+   resolve to paper and the rule color. */
+[data-theme="light-editorial"] :is(.slide-shell, .slidev-slide) .glass-card {
+  border-width: 1px 0 0;
+  border-style: solid;
+  border-radius: 0;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Image mats keep a full hairline frame. */
+[data-theme="light-editorial"] :is(.slide-shell, .slidev-slide) .spotlight-media {
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+}
+
+/* Square corners and no elevation anywhere on the slide. */
+[data-theme="light-editorial"] :is(.slide-shell, .slidev-slide) :is(
+  [rounded-lg], [rounded-xl], [rounded-2xl], [rounded-full],
+  .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-full,
+  .tag-pill, .tool-badge, .cp-panel, .cp-header, .cp-footer, .cp-item,
+  .cp-mode-badge, .cp-vs-badge, .cp-balance-badge,
+  .sf-hnode, .sf-vnode, .sf-num, .tl-card, .tl-node,
+  .phase-chip, .step-dot, .swot-flag, .swot-flag-icon, .swot-summary,
+  .split-left-step, .issue-card__pill, .spotlight-media
+) {
+  border-radius: 0;
+  box-shadow: none !important;
+  text-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+[data-theme="light-editorial"] :is(
+  .slide-title, .cover-title, .closing-title, .slide-section-title
+) {
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+/* Two-tone headline: the clause after the first comma / colon turns cobalt
+   and starts its own line (SlideTitle.vue + utils/titleTail.ts). */
+[data-theme="light-editorial"] :is(.cover-title, .closing-title) .semantic-title__tail {
+  display: block;
+  color: var(--primary);
+}
+
+/* The title sits on a 2px ink rule; other rules are 1px ink. */
+[data-theme="light-editorial"] :is(.slide-title-divider, .process-summary__line) {
+  height: 2px;
+  background: var(--text);
+  opacity: 1;
+}
+
+[data-theme="light-editorial"] .divider-amber {
+  height: 1px;
+  background: var(--text);
+  opacity: 1;
+}
+
+/* Solid cobalt labels (cover / closing badges); other pills are pale bands. */
+[data-theme="light-editorial"] .amber-badge {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+[data-theme="light-editorial"] .amber-header {
+  background: var(--primary-bg);
+}
+
+/* Eyebrows and labels: cobalt, slightly tracked. */
+[data-theme="light-editorial"] :is(
+  .tag-pill, .tool-badge, .closing-kicker, .closing-mark,
+  .section-intro__meta-label, .section-intro__card-index,
+  .phase-chip, .phase-steps-wrap__title, .split-left-index, .issue-card__eyebrow
+) {
+  letter-spacing: 0.06em;
+}
+
+[data-theme="light-editorial"] .closing-kicker {
+  color: var(--primary);
+}
+
+[data-theme="light-editorial"] :is(
+  .section-intro__meta-label, .section-intro__card-index,
+  .closing-subtitle, .closing-note, .closing-mark
+) {
+  color: var(--text-muted);
+}
+
+/* The deck line under the cover headline is ink, not accent. */
+[data-theme="light-editorial"] .cover-subtitle {
+  color: var(--text);
+  opacity: 1;
+}
+
+/* The chapter number becomes a small folio label, as on the terminal themes. */
+[data-theme="light-editorial"] .section-num {
+  font-size: var(--type-meta);
+  font-weight: 400;
+  color: var(--text-muted);
+  -webkit-text-stroke: 0;
+  letter-spacing: 0.08em;
+}
+
+[data-theme="light-editorial"] :is(.cp-divider-line, .cp-simple-divider, .tl-axis-line, .split-left-connector, .sf-track, .sf-connector) {
+  background: var(--glass-border) !important;
+  opacity: 1;
+}
+
+[data-theme="light-editorial"] :is(.phase-chip, .step-dot) {
+  background: var(--phase-solid) !important;
+}
+
+[data-theme="light-editorial"] .phase-highlight {
+  background: var(--glass) !important;
+}
+
+[data-theme="light-editorial"] .phase-head::after,
+[data-theme="light-editorial"] .section-intro__card::after,
+[data-theme="light-editorial"] .phase-steps-wrap__glow {
+  display: none;
+}
+
+/* Section opener: the lead panel is the pale cobalt aside band. */
+[data-theme="light-editorial"] :is(.slide-shell, .slidev-slide) .section-intro__lead {
+  background: var(--primary-bg) !important;
+  border-width: 0;
+}
+
+[data-theme="light-editorial"] .section-intro__meta {
+  border-color: var(--primary-border);
+}
+
+[data-theme="light-editorial"] .section-intro__note {
+  border-color: var(--primary-border);
+}
+
+[data-theme="light-editorial"] .section-intro__card-item {
+  color: var(--text);
+}
+
+[data-theme="light-editorial"] .sf-num {
+  color: var(--step-contrast);
+}
+
+[data-theme="light-editorial"] .carousel-indicator {
+  background: var(--text-muted);
+}
+
+[data-theme="light-editorial"] .carousel-indicator.is-active {
+  background: var(--primary);
+}
+
+[data-theme="light-editorial"] .swot-flag-icon {
+  color: var(--quadrant-contrast);
+}
+
+[data-theme="light-editorial"] .swot-flag-icon > div {
+  color: inherit;
+}
+
+/* App chrome: flat, square-cornered panels on newsprint. */
+[data-theme="light-editorial"] :is(
+  .btn, input, textarea, select, .project-card, .card-icon-wrap,
+  .heading-mark, .titlebar-brand-chip, .empty-icon-circle, .slide-card-bg,
+  .theme-popover, .modal-box, .badge, .slide-card, .kind-badge
+) {
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+[data-theme="light-editorial"] :is(.theme-popover, .modal-box) {
+  box-shadow: 0 8px 24px rgba(28, 39, 35, 0.14);
+}
+
+[data-theme="light-editorial"] .project-card:hover {
+  transform: none;
+}
+
+[data-theme="light-editorial"] :is(input, textarea, select):focus-visible {
+  outline: 2px solid var(--studio-primary);
+  outline-offset: 2px;
+}
+
+[data-theme="light-editorial"] .card-accent {
+  background: var(--studio-primary);
+}
+
+[data-theme="light-editorial"] .slide-card .kind-badge {
+  background: var(--studio-primary-bg) !important;
+  border-color: var(--studio-primary-border) !important;
+  color: var(--studio-primary) !important;
+}

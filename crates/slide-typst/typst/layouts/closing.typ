@@ -11,21 +11,24 @@
   let badges = slide.at("badges", default: none)
   let terminal = is-terminal(ctx)
   let glass = is-glass(ctx)
+  let editorial = is-editorial(ctx)
   if has(badges) {
     out.push((
       block(below: 0pt, badges
         .map(b => box(
           // `.amber-badge`: a 135deg primary-tint gradient on the glass themes,
-          // a flat tint elsewhere.
+          // solid cobalt on the editorial theme, a flat tint elsewhere.
           fill: if glass {
             gradient.linear((th.tones.neutral.bg, 0%), (th.tones.neutral.bg.transparentize(100%), 100%), angle: 45deg)
-          } else { th.tones.neutral.bg },
-          stroke: 1 * px + th.tones.neutral.border,
+          } else if editorial { th.primary } else { th.tones.neutral.bg },
+          stroke: 1 * px + if editorial { th.primary } else { th.tones.neutral.border },
           radius: if glass { th.radius.pill * px } else { 2 * px },
           inset: (x: 12 * px, y: 2 * px),
           // `.tag-pill` letter spacing comes from the theme; the text is
           // `--primary-light` (the neutral tone's text).
-          txt(ctx, "caption", ty.subtitle * f, 1.5, b, fill: th.tones.neutral.text, tracking: th.tracking.label),
+          txt(ctx, "caption", ty.subtitle * f, 1.5, b, fill: if editorial { th.tones.neutral.contrast } else {
+            th.tones.neutral.text
+          }, tracking: th.tracking.label),
         ))
         .join(h(12 * px))),
       1.5 * rem,
@@ -47,7 +50,7 @@
         block(stroke: (left: 3 * px + th.primary), inset: (left: 0.8 * rem), kicker)
       }
       v(1 * rem * f)
-      txt(ctx, "title", 2.8 * rem * (ty.meta / rem) * f, 1.08, slide.title, tracking: if terminal {
+      headline(ctx, 2.8 * rem * (ty.meta / rem) * f, 1.08, slide.title, tracking: if terminal {
         th.tracking.title
       } else { -0.04em })
       if has(slide.at("subtitle", default: none)) {

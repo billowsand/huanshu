@@ -173,7 +173,7 @@ Markdown 正文中可以用 ` ```chart ` 围栏块直接携带图表数据，归
 图表渲染只有一份实现（`src/components/chartOptions.ts` 的 `buildChartOption`）：
 webview 预览直接挂载 ECharts；导出 PDF 时在同一 webview 里用 SSR 模式产出 SVG，
 经 asset 管道（`chart:<页码>`）交给内嵌 typst 的 `image()` 嵌入，两端视觉一致。
-图表配色来自各主题的 `--chart-*` token（5 套主题均已定义），换主题自动跟随。
+图表配色来自各主题的 `--chart-*` token（6 套主题均已定义），换主题自动跟随。
 
 ### 核心数据结构
 

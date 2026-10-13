@@ -49,6 +49,10 @@ const TEMPLATES: &[(&str, &str)] = &[
         include_str!("../typst/themes/light-terminal.typ"),
     ),
     (
+        "/themes/light-editorial.typ",
+        include_str!("../typst/themes/light-editorial.typ"),
+    ),
+    (
         "/themes/dark-terminal.typ",
         include_str!("../typst/themes/dark-terminal.typ"),
     ),
@@ -184,6 +188,7 @@ const DEFAULT_FONT: &str = "Microsoft YaHei";
 pub const SUPPORTED_THEMES: &[&str] = &[
     "light-notes",
     "light-terminal",
+    "light-editorial",
     "dark-terminal",
     "dark-yellow",
     "dark-blue",
