@@ -43,11 +43,14 @@ function thumbnailsEnabledByPreference(): boolean {
  *   发给 Rust，`deckIndex` 记下子集位置到传入数组下标的映射。Typst 的页序、返回的 `index`、
  *   `chart:<index>` 都是**子集位置**，所以图表 SVG 也用同一份子集构建（见 `render`），
  *   缩略图结果再映射回 `thumbs` 的下标。
- * - **增量**：每页的缓存键是 蓝图 JSON + 子集位置 + 主题 id + 字体设置 + 宽度档位；
- *   只有键变了的页进 `only`，全都没变就不调用命令。
- * - **主题与字体**：`data-theme` 变化、字体设置变化都会让全部缩略图失效。
- * - **防抖与竞态**：200ms 防抖 + 递增请求序号，过期响应直接丢弃；新图到达前保留旧图，不闪烁。
- * - **失败**：命令报错时 `failed` 为真（调用方回退到幻灯片组件），并 `console.warn` 一次。
+ * - **增量**：每页的键是 蓝图 JSON + 子集位置 + 主题 id + 字体设置 + 宽度档位（主题、字体变了
+ *   键就全变）。只有「当前显示的图」和「正在请求的图」的键都对不上的页才进 `only`。
+ * - **按键落图，不按请求序号**：响应到达时，只有键仍等于这一页当前键的图才会落下。不能整批丢弃
+ *   过期响应——后一次请求只含它那一刻键变了的页，被丢掉的那批页就再也没人请求了。
+ * - **失败**：命令报错时 `failed` 为真（调用方回退到幻灯片组件），并 `console.warn` 一次；
+ *   不自动重试，下一次内容/主题/尺寸变化时这些页会重新请求。
+ * - **停用**：`enabled()` 为假时只是不发请求，已有的图保留（全览关了再开不用重渲）；
+ *   localStorage 开关关掉时才清空，让调用方回退到幻灯片组件。
  *
  * `thumbs` 以传入数组的下标为键（不是子集位置），没有缩略图的页不出现。
  */
@@ -57,13 +60,11 @@ export function useTypstThumbnails(opts: {
   projectId: () => number | null
   /** 显示宽度 × devicePixelRatio。 */
   widthPx: () => number
-  /** 为假时（例如全览没打开）不渲染，也不发起请求。 */
+  /** 为假时（例如全览没打开）不发请求，已有的图保留。 */
   enabled?: () => boolean
 }): {
   thumbs: Ref<Record<number, TypstThumbnail>>
   failed: Ref<boolean>
-  /** `renderDeck[i]` 在传入数组里的下标（缩略图下标 = 它，`chart:<i>` = 子集位置 i）。 */
-  deckIndex: Ref<number[]>
 } {
   const appSettings = useAppSettingsStore()
   const thumbs = ref<Record<number, TypstThumbnail>>({})
@@ -71,60 +72,44 @@ export function useTypstThumbnails(opts: {
 
   /** 已有蓝图的页组成子集；空位留在原数组里，不发给 Rust。 */
   const presentSlides = computed(() => opts.slides().filter(Boolean) as SlideBlueprint[])
-  const deckIndex = computed(() =>
-    opts.slides().flatMap((slide, index) => (slide ? [index] : [])),
-  )
 
-  /** 每页上一次渲染用的键，用来算出这一轮要重渲哪些页。 */
-  let cacheKeys: Record<number, string> = {}
+  /** 子集位置 → 当前显示的图的键 / 在途请求的键。 */
+  let shownKeys: Record<number, string> = {}
+  let pendingKeys: Record<number, string> = {}
+  /** 最近一次 `refresh` 时的键与页序映射，响应到达时用它判断图是否仍然有效、该落到哪一页。 */
+  let latestKeys: string[] = []
+  let latestIndices: number[] = []
   let timer: ReturnType<typeof setTimeout> | null = null
-  let requestSeq = 0
+  let disposed = false
   let warned = false
 
-  function isEnabled(): boolean {
-    return (opts.enabled?.() ?? true) && thumbnailsEnabledByPreference()
-  }
-
-  function renderKey(slide: SlideBlueprint, position: number, width: number, theme: string | null): string {
-    return JSON.stringify([slide, position, theme, appSettings.settings.fonts, width])
-  }
-
-  function invalidate() {
-    cacheKeys = {}
-    schedule()
+  function widthBucket(): number {
+    return Math.max(WIDTH_BUCKET, Math.ceil(Math.max(opts.widthPx(), 1) / WIDTH_BUCKET) * WIDTH_BUCKET)
   }
 
   function refresh() {
-    if (!isEnabled()) {
+    if (!thumbnailsEnabledByPreference()) {
       thumbs.value = {}
-      cacheKeys = {}
+      shownKeys = {}
       return
     }
+    if (!(opts.enabled?.() ?? true)) return
+
+    const all = opts.slides()
     const deck = presentSlides.value
-    const indices = deckIndex.value
-    // 子集为空时清掉缓存，免得切回有内容的牌组时命中过期键。
-    if (!deck.length) {
-      thumbs.value = {}
-      cacheKeys = {}
-      return
-    }
-    const width = Math.max(WIDTH_BUCKET, Math.ceil(Math.max(opts.widthPx(), 1) / WIDTH_BUCKET) * WIDTH_BUCKET)
+    const width = widthBucket()
     const theme = document.documentElement.getAttribute('data-theme')
-    const keys = deck.map((slide, position) => renderKey(slide, position, width, theme))
-    // 张数变了也算全部失效：子集位置整体平移过，旧图和新页对不上。
-    const changed = Object.keys(cacheKeys).length !== keys.length
-    const only = keys.flatMap((key, position) =>
-      changed || cacheKeys[position] !== key ? [position] : [],
+    const fonts = appSettings.settings.fonts
+    latestKeys = deck.map((slide, position) => JSON.stringify([slide, position, theme, fonts, width]))
+    latestIndices = all.flatMap((slide, index) => (slide ? [index] : []))
+
+    const only = latestKeys.flatMap((key, position) =>
+      shownKeys[position] !== key && pendingKeys[position] !== key ? [position] : [],
     )
     if (!only.length) return
-
-    // 先记下键：请求失败时这一页不会再被反复请求，等下次内容/主题变化再试。
-    const nextKeys: Record<number, string> = {}
-    keys.forEach((key, position) => { nextKeys[position] = key })
-    cacheKeys = nextKeys
-
-    const seq = ++requestSeq
-    void render(deck, theme, width, only, indices, seq)
+    const requestKeys = [...latestKeys]
+    for (const position of only) pendingKeys[position] = requestKeys[position]
+    void render(deck, theme, width, only, requestKeys)
   }
 
   /**
@@ -136,8 +121,7 @@ export function useTypstThumbnails(opts: {
     theme: string | null,
     width: number,
     only: number[],
-    indices: number[],
-    seq: number,
+    requestKeys: string[],
   ) {
     let chartSvgs: Array<{ index: number, svg: string }> | null = null
     try {
@@ -155,18 +139,26 @@ export function useTypstThumbnails(opts: {
         widthPx: width,
         only,
       })
-      // 过期响应（内容又变了 / 组件已卸载）直接丢弃，否则会把旧图盖回去。
-      if (seq !== requestSeq) return
+      if (disposed) return
       const next = { ...thumbs.value }
       for (const page of batch.pages) {
-        const index = indices[page.index]
+        const key = requestKeys[page.index]
+        if (pendingKeys[page.index] === key) delete pendingKeys[page.index]
+        // 这一页在请求期间又变了（内容、页序、主题或尺寸）：这张图已过期，等下一轮的新图。
+        if (latestKeys[page.index] !== key) continue
+        const index = latestIndices[page.index]
         if (index === undefined) continue
         next[index] = { url: page.data_url, placeholder: page.placeholder }
+        shownKeys[page.index] = key
       }
       thumbs.value = next
       failed.value = false
     } catch (e) {
-      if (seq === requestSeq) failed.value = true
+      if (disposed) return
+      for (const position of only) {
+        if (pendingKeys[position] === requestKeys[position]) delete pendingKeys[position]
+      }
+      failed.value = true
       if (!warned) {
         warned = true
         console.warn('[thumbnails] Typst 缩略图渲染失败，回退到幻灯片组件：', e)
@@ -182,15 +174,15 @@ export function useTypstThumbnails(opts: {
     }, DEBOUNCE_MS)
   }
 
-  // 牌组内容变化（页序也会影响子集位置）。
+  // 牌组内容、页序、宽度档位、启用状态、字体变化都会改变键或请求条件；键的比较决定重渲哪些页。
   watch(presentSlides, schedule, { deep: true })
-  // 宽度档位：窗口尺寸变化不改牌组，要单独触发。
+  watch(() => opts.slides().length, schedule)
   watch(() => Math.ceil(Math.max(opts.widthPx(), 1) / WIDTH_BUCKET), schedule)
   watch(() => opts.enabled?.() ?? true, schedule)
-  watch(() => appSettings.settings.fonts, invalidate, { deep: true })
+  watch(() => appSettings.settings.fonts, schedule, { deep: true })
 
-  // 主题切换会改 --chart-* / 主题 token，缩略图必须整副重渲。
-  const themeObserver = new MutationObserver(invalidate)
+  // 主题切换会改 --chart-* / 主题 token，键里带主题 id，触发一次刷新即可。
+  const themeObserver = new MutationObserver(schedule)
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
 
   schedule()
@@ -198,13 +190,9 @@ export function useTypstThumbnails(opts: {
   onBeforeUnmount(() => {
     if (timer) clearTimeout(timer)
     timer = null
-    requestSeq += 1
+    disposed = true
     themeObserver.disconnect()
   })
 
-  return {
-    thumbs,
-    failed,
-    deckIndex,
-  }
+  return { thumbs, failed }
 }

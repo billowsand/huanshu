@@ -201,9 +201,10 @@ function selectSlide(idx: number) {
 const OVERVIEW_WIDTH = 256
 const OVERVIEW_HEIGHT = 144
 
-function overviewScale(slide: SlideBlueprint | undefined) {
+function overviewImgSize(slide: SlideBlueprint | undefined) {
   const dims = ASPECT_DIMENSIONS[slide?.aspect_ratio ?? 'ratio_16x9']
-  return Math.min(OVERVIEW_WIDTH / dims.w, OVERVIEW_HEIGHT / dims.h)
+  const scale = Math.min(OVERVIEW_WIDTH / dims.w, OVERVIEW_HEIGHT / dims.h)
+  return { width: `${Math.round(dims.w * scale)}px`, height: `${Math.round(dims.h * scale)}px` }
 }
 
 const thumbnails = useTypstThumbnails({
@@ -212,6 +213,12 @@ const thumbnails = useTypstThumbnails({
   widthPx: () => Math.ceil(OVERVIEW_WIDTH * (window.devicePixelRatio || 1)),
   enabled: () => showOverview.value,
 })
+
+/** 可直接显示的缩略图；占位页（模板还没有 Typst 版式）和失败时返回 null，走幻灯片组件。 */
+function overviewThumb(idx: number) {
+  const thumb = thumbnails.thumbs.value[idx]
+  return thumb && !thumb.placeholder && !thumbnails.failed.value ? thumb : null
+}
 
 function handleStageClick() {
   if (showOverview.value) return
@@ -380,16 +387,14 @@ onBeforeUnmount(() => {
         >
           <div class="pres-overview-thumb">
             <img
-              v-if="thumbnails.thumbs.value[idx] && !thumbnails.thumbs.value[idx]!.placeholder && !thumbnails.failed.value"
+              v-if="overviewThumb(idx)"
               class="pres-overview-img"
-              :src="thumbnails.thumbs.value[idx]!.url"
-              :style="{
-                width: `${Math.round(ASPECT_DIMENSIONS[bp.aspect_ratio ?? 'ratio_16x9'].w * overviewScale(bp))}px`,
-                height: `${Math.round(ASPECT_DIMENSIONS[bp.aspect_ratio ?? 'ratio_16x9'].h * overviewScale(bp))}px`,
-              }"
+              :src="overviewThumb(idx)!.url"
+              :style="overviewImgSize(bp)"
               draggable="false"
               alt=""
             >
+            <div v-else-if="!thumbnails.failed.value && !thumbnails.thumbs.value[idx]" class="pres-overview-loading" :style="overviewImgSize(bp)" aria-hidden="true" />
             <div v-else class="pres-overview-slide">
               <SlideRenderer :slide="(bp as unknown as SlideBlueprint)" :slide-index="idx" :media-map="mediaMap" />
             </div>

@@ -162,26 +162,6 @@ const detailPreviewScale = computed(() => {
   return 0.315
 })
 
-// 生成看板的缩略图走 Typst 光栅化的 PNG：一次要展示很多页，每页挂一个完整幻灯片组件（玻璃主题
-// 还带 backdrop-filter）太重。牌组开头是封面/目录，`slideItems` 的序号是内容页码，所以这里传入的
-// 是内容页那一段，缩略图下标 = `item.index + CONTENT_PAGE_OFFSET`（详见 useTypstThumbnails）。
-const CONTENT_PAGE_OFFSET = computed(() =>
-  props.blueprints[0]?.kind === 'cover' ? props.blueprints.slice(0, 2).length : 0,
-)
-const contentBlueprints = computed(() =>
-  props.blueprints[0]?.kind === 'cover' ? props.blueprints.slice(2, -1) : props.blueprints,
-)
-const thumbnails = useTypstThumbnails({
-  slides: () => contentBlueprints.value,
-  projectId: () => props.projectId ?? null,
-  widthPx: () => Math.ceil(slideDims.value.w * previewScale.value * (window.devicePixelRatio || 1)),
-})
-
-/** 缩略图键 = 内容页序号 + 牌组里封面/目录占的前缀长度。 */
-function thumbnailFor(index: number) {
-  return thumbnails.thumbs.value[index + CONTENT_PAGE_OFFSET.value]
-}
-
 const pagePlans = computed(() => extractArrayDetail<PagePlan>('page_plans'))
 const layoutPlans = computed(() => extractArrayDetail<LayoutPlan>('layout_plans'))
 const contentLogBySlideIndex = computed(() => {
@@ -223,6 +203,26 @@ const slideItems = computed<SlideProgressItem[]>(() => {
     }
   })
 })
+
+// 生成看板的缩略图走 Typst 光栅化的 PNG：一次要展示很多页，每页挂一个完整幻灯片组件（玻璃主题
+// 还带 backdrop-filter）太重。直接用卡片自己的蓝图（含生成中的空位和取自日志的蓝图），
+// 缩略图下标就是 `item.index`。必须定义在 `slideItems` 之后：组合函数初始化时就会读取它。
+const thumbnails = useTypstThumbnails({
+  slides: () => slideItems.value.map(item => item.blueprint ?? null),
+  projectId: () => props.projectId ?? null,
+  widthPx: () => Math.ceil(slideDims.value.w * previewScale.value * (window.devicePixelRatio || 1)),
+})
+
+/** 有可用的 Typst 缩略图时返回它；占位页（模板还没有 Typst 版式）和失败时返回 null。 */
+function thumbnailFor(index: number) {
+  const thumb = thumbnails.thumbs.value[index]
+  return thumb && !thumb.placeholder && !thumbnails.failed.value ? thumb : null
+}
+
+/** 缩略图还在路上：显示加载底，不挂幻灯片组件。占位页与失败时走幻灯片组件。 */
+function thumbnailPending(index: number) {
+  return !thumbnails.failed.value && !thumbnails.thumbs.value[index]
+}
 
 function preferredSlideIndex(): number | null {
   for (let i = slideItems.value.length - 1; i >= 0; i -= 1) {
@@ -492,13 +492,13 @@ onBeforeUnmount(() => {
                 :style="{ aspectRatio: `${slideDims.w} / ${slideDims.h}` }"
               >
                 <img
-                  v-if="thumbnailFor(item.index) && !thumbnailFor(item.index)!.placeholder && !thumbnails.failed.value"
+                  v-if="thumbnailFor(item.index)"
                   class="spc-preview-img"
                   :src="thumbnailFor(item.index)!.url"
                   draggable="false"
                   alt=""
                 >
-                <div v-else-if="!thumbnails.failed.value" class="spc-preview-loading" aria-hidden="true">
+                <div v-else-if="thumbnailPending(item.index)" class="spc-preview-loading" aria-hidden="true">
                   <span class="i-carbon:image" />
                 </div>
                 <div v-else class="spc-preview-canvas" :style="{ width: slideDims.w + 'px', height: slideDims.h + 'px', transform: `scale(${previewScale})` }">

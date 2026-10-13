@@ -2858,6 +2858,11 @@ kbd {
   object-fit: contain;
 }
 
+/* 缩略图还没到时的加载底：按本页比例占位，不挂完整的幻灯片组件。 */
+.pres-overview-loading {
+  background: color-mix(in srgb, var(--studio-border-hover) 24%, transparent);
+}
+
 .pres-overview-slide {
   width: 1280px;
   height: 720px;

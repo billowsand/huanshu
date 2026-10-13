@@ -445,8 +445,9 @@ impl Renderer {
                 height: pixmap.height(),
             });
         }
-        // An overflow marker carries the index of the slide that was clipped; pages the caller
-        // did not ask for are dropped here too, so the diagnostics match `pages`.
+        // An overflow marker carries the index of the slide that was clipped; markers pointing
+        // past the deck are dropped. Markers of slides outside `only` are kept: the compile
+        // covered the whole deck either way.
         let overflows = overflows
             .into_iter()
             .filter(|overflow| {
