@@ -256,6 +256,14 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(state)
+        .setup(|_app| {
+            // Scanning system fonts takes ~0.5 s; warm the shared renderer in the background
+            // so the first thumbnail or export does not pay for it.
+            std::thread::spawn(|| {
+                commands::pdf::renderer();
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             text::segment_title,
             fonts::list_system_fonts,
@@ -296,6 +304,7 @@ pub fn run() {
             commands::pdf::export_pdf,
             commands::pdf::pdf_chart_boxes,
             commands::pdf::reveal_exported_file,
+            commands::thumbnails::render_slide_thumbnails,
             commands::storage::import_project,
             commands::storage::is_encrypted_file,
         ])

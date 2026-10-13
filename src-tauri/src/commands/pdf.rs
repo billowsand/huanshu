@@ -15,8 +15,9 @@ use crate::db::{self, MediaAsset};
 use crate::types::{AspectRatio, FontSettings, SlideBlueprint};
 use crate::AppState;
 
-/// Scanning system fonts takes ~0.5 s; do it once per process, on first export.
-fn renderer() -> &'static Renderer {
+/// Scanning system fonts takes ~0.5 s; do it once per process, on first export. The Tauri
+/// builder warms it in the background so the first thumbnail does not wait for it.
+pub(crate) fn renderer() -> &'static Renderer {
     static RENDERER: OnceLock<Renderer> = OnceLock::new();
     RENDERER.get_or_init(Renderer::with_system_fonts)
 }
@@ -59,7 +60,7 @@ fn resolve_theme(theme: Option<String>) -> (String, Option<String>) {
 /// A chart_focus slide's SSR SVG, rendered in the app webview with the same
 /// ECharts option builder as the on-screen preview (static mode).
 #[derive(Debug, serde::Deserialize)]
-pub struct ChartSvgInput {
+pub(crate) struct ChartSvgInput {
     /// Index into the exported `slides` array; the asset pipe keys it `chart:<index>`.
     pub index: usize,
     pub svg: String,
@@ -139,8 +140,10 @@ fn measure_chart_boxes(
 }
 
 /// Resolves the deck, theme, fonts and aspect ratio shared by the measuring pass and the
-/// export, so both lay the charts out identically.
-fn prepare_export(
+/// export, so both lay the charts out identically. Also reused by `commands::thumbnails`, so a
+/// thumbnail and the exported page can never resolve a theme, aspect ratio or image reference
+/// differently.
+pub(crate) fn prepare_export(
     project_id: Option<i64>,
     slides: Option<Vec<SlideBlueprint>>,
     theme: Option<String>,
