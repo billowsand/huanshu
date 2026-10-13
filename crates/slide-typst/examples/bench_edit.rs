@@ -5,7 +5,7 @@
 //! field". This example prints that number per layout, plus a few controlled
 //! experiments that isolate where the time goes.
 //!
-//!   cargo run --release -p slide-typst --example bench_edit -- [--theme light-notes] [--runs 20] [--fixture <path>]
+//!   cargo run --release -p slide-typst --example bench_edit -- [--theme light-notes] [--runs 20] [--fixture <path>] [--only clip] [--rounds 5]
 //!
 //! Every experiment compiles through `Renderer::compile`, which is what
 //! `render_png` (thumbnails, the presentation stage) and `render_pdf` (export)
@@ -22,6 +22,12 @@
 //! factor and theme are all new) pays a cold layout of about 100ms; the timings
 //! below that are warm, which is the state the editor is in after the first
 //! keystroke on a page.
+//!
+//! `--only clip` runs the clip branch sweep alone and prints nothing else, so a
+//! before/after comparison of the fit search is not buried in the other blocks;
+//! `--rounds <n>` repeats that sweep `n` times and reports the median per size
+//! instead of the single sample the full run prints. The medians are the number
+//! to compare between builds: this machine drifts by 100ms+ within one version.
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -59,11 +65,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     let mut theme = "light-notes".to_string();
     let mut runs = 20usize;
+    let mut rounds = 1usize;
+    let mut only_clip = false;
     let mut fixture: Option<PathBuf> = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--theme" => theme = args.next().unwrap_or(theme),
             "--runs" => runs = args.next().and_then(|v| v.parse().ok()).unwrap_or(runs),
+            "--rounds" => rounds = args.next().and_then(|v| v.parse().ok()).unwrap_or(rounds),
+            "--only" => only_clip = args.next().as_deref() == Some("clip"),
             "--fixture" => fixture = args.next().map(PathBuf::from),
             _ => {}
         }
@@ -92,6 +102,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         result.expect("compile");
         elapsed
     };
+
+    if only_clip {
+        clip_experiment(&renderer, &opts, &deck, runs, rounds);
+        return Ok(());
+    }
 
     // ── Whole-deck experiments ────────────────────────────────────────────────
     // Each line is one compile of the whole deck; the caches are warm from the
@@ -224,7 +239,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    clip_experiment(&renderer, &opts, &deck, runs);
+    clip_experiment(&renderer, &opts, &deck, runs, rounds);
     Ok(())
 }
 
@@ -233,24 +248,70 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// overflow marker is emitted). This grows one `feature_grid` card until the
 /// clip branch is definitely taken and prints the cost of each edit, so the
 /// report can say which branch is slow.
-fn clip_experiment(renderer: &Renderer, opts: &ExportOptions, deck: &[Value], runs: usize) {
+///
+/// This is the slowest case the editor hits and the one the fit search is tuned
+/// for: every edit is new text, so no two compiles share a memoized layout, and
+/// each probe of `fit-scale` lays the whole card out again. `rounds` repeats the
+/// whole size sweep; each sweep visits every size once and the samples are
+/// medianed per size, and a median over every sample of every size is printed as
+/// `total`. Alternating two builds over several rounds and comparing that number
+/// is the only way to compare them here — a single run of this machine drifts by
+/// more than the difference between the two algorithms.
+fn clip_experiment(
+    renderer: &Renderer,
+    opts: &ExportOptions,
+    deck: &[Value],
+    runs: usize,
+    rounds: usize,
+) {
+    let rounds = rounds.max(1);
     let Some(slide) = deck.iter().find(|s| s["kind"] == "feature_grid") else {
+        println!("clip branch: no feature_grid page in this fixture, nothing to measure");
         return;
     };
-    let mut base = slide.clone();
-    for i in 0..=runs {
-        let times = 4 + i * 3;
-        base["cards"][0]["body"] = Value::String("测试文本".repeat(times));
-        let page = vec![base.clone()];
-        let started = Instant::now();
-        let compiled = renderer.compile(&page, opts).expect("compile");
-        let elapsed = started.elapsed();
-        let width = compiled.document.pages().len();
+    println!("== clip branch · feature_grid card body grown until the content no longer fits ==");
+    println!(
+        "{} size(s) × {rounds} round(s) · one compile per edit · deck = one page\n",
+        runs + 1
+    );
+    let mut samples: Vec<Vec<f64>> = vec![Vec::with_capacity(rounds); runs + 1];
+    for _ in 0..rounds {
+        let mut base = slide.clone();
+        for (i, bucket) in samples.iter_mut().enumerate() {
+            let times = 4 + i * 3;
+            base["cards"][0]["body"] = Value::String("测试文本".repeat(times));
+            let page = vec![base.clone()];
+            let started = Instant::now();
+            renderer.compile(&page, opts).expect("compile");
+            bucket.push(started.elapsed().as_secs_f64() * 1000.0);
+        }
+    }
+    let mut all = Vec::new();
+    for (i, bucket) in samples.iter().enumerate() {
+        let median = median_ms(bucket);
+        all.extend_from_slice(bucket);
         println!(
-            "\nclip branch · feature_grid card body = 4×{times} characters · {} page(s) · {:?}",
-            width, elapsed
+            "body = 4×{:<3} characters ({:>4} chars)   median {:>7}",
+            i as i64 * 3 + 4,
+            (i as i64 * 3 + 4) * 4,
+            ms_f64(median)
         );
     }
+    println!(
+        "\ntotal median over all sizes   {}",
+        ms_f64(median_ms(&all))
+    );
+}
+
+/// Median of a sample of milliseconds.
+fn median_ms(samples: &[f64]) -> f64 {
+    let mut sorted = samples.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).expect("finite timing"));
+    sorted[sorted.len() / 2]
+}
+
+fn ms_f64(value: f64) -> String {
+    format!("{value:.1}ms")
 }
 
 /// Compiles `pristine` (a one-page deck) `runs + 1` times. Every iteration
