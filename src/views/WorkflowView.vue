@@ -505,6 +505,7 @@ onMounted(() => {
         :page-statuses="gen.pageStatuses"
         :retrying-pages="gen.retryingPages"
         :run-id="gen.currentRun?.id"
+        :project-id="projectId"
         @update:selected-slide-index="selectedSlideIndex = $event"
         @go-to-step-3="currentStep = 3"
         @go-to-step-1="currentStep = 1"
@@ -563,6 +564,7 @@ onMounted(() => {
       :blueprints="(gen.blueprints as unknown as SlideBlueprint[])"
       :media-map="mediaLib.mediaMap.value"
       :initial-slide="activeSlide"
+      :project-id="projectId"
       @exit="presenting = false"
     />
   </div>
@@ -2845,6 +2847,15 @@ kbd {
   border-radius: 10px;
   background: var(--studio-bg);
   border: 1px solid color-mix(in srgb, var(--studio-border-hover) 72%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Typst 光栅化缩略图：按本页比例等比落位，32:9 / 48:9 不再被 1280×720 的框裁掉。 */
+.pres-overview-img {
+  display: block;
+  object-fit: contain;
 }
 
 .pres-overview-slide {

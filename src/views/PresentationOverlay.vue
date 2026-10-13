@@ -6,11 +6,13 @@ import SlideRenderer from '../components/SlideRenderer.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import type { SlideBlueprint, AspectRatio } from '../components/types'
 import { ASPECT_DIMENSIONS } from '../components/types'
+import { useTypstThumbnails } from '../composables/useTypstThumbnails'
 
 const props = defineProps<{
   blueprints: SlideBlueprint[]
   mediaMap: Record<string, string>
   initialSlide?: number
+  projectId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -194,6 +196,23 @@ function selectSlide(idx: number) {
   showOverview.value = false
 }
 
+// 全览里的缩略图：256×144 的框装不下完整幻灯片组件（原来写死 1280×720 scale(0.2)，32:9 / 48:9
+// 的页面直接被裁掉），改用 Typst 光栅化的 PNG，按各页自己的比例等比缩放。只在全览打开时渲染。
+const OVERVIEW_WIDTH = 256
+const OVERVIEW_HEIGHT = 144
+
+function overviewScale(slide: SlideBlueprint | undefined) {
+  const dims = ASPECT_DIMENSIONS[slide?.aspect_ratio ?? 'ratio_16x9']
+  return Math.min(OVERVIEW_WIDTH / dims.w, OVERVIEW_HEIGHT / dims.h)
+}
+
+const thumbnails = useTypstThumbnails({
+  slides: () => props.blueprints,
+  projectId: () => props.projectId ?? null,
+  widthPx: () => Math.ceil(OVERVIEW_WIDTH * (window.devicePixelRatio || 1)),
+  enabled: () => showOverview.value,
+})
+
 function handleStageClick() {
   if (showOverview.value) return
   if (didSwipe) { didSwipe = false; return }
@@ -360,7 +379,18 @@ onBeforeUnmount(() => {
           @click="selectSlide(idx)"
         >
           <div class="pres-overview-thumb">
-            <div class="pres-overview-slide">
+            <img
+              v-if="thumbnails.thumbs.value[idx] && !thumbnails.thumbs.value[idx]!.placeholder && !thumbnails.failed.value"
+              class="pres-overview-img"
+              :src="thumbnails.thumbs.value[idx]!.url"
+              :style="{
+                width: `${Math.round(ASPECT_DIMENSIONS[bp.aspect_ratio ?? 'ratio_16x9'].w * overviewScale(bp))}px`,
+                height: `${Math.round(ASPECT_DIMENSIONS[bp.aspect_ratio ?? 'ratio_16x9'].h * overviewScale(bp))}px`,
+              }"
+              draggable="false"
+              alt=""
+            >
+            <div v-else class="pres-overview-slide">
               <SlideRenderer :slide="(bp as unknown as SlideBlueprint)" :slide-index="idx" :media-map="mediaMap" />
             </div>
           </div>

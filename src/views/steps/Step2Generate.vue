@@ -4,6 +4,7 @@ import SlideRenderer from '../../components/SlideRenderer.vue'
 import RetryLayoutDialog from '../../components/RetryLayoutDialog.vue'
 import type { SlideBlueprint, AspectRatio, SlideKind } from '../../components/types'
 import { ASPECT_DIMENSIONS } from '../../components/types'
+import { useTypstThumbnails } from '../../composables/useTypstThumbnails'
 import type { GenerationLogEntry } from '../../stores/generation'
 import { PAGE_STAGES, pageStepState, resolveProgressStage, summarizeProgress } from '../../utils/generationProgress'
 import type { PageProgressStatus, PipelineStage } from '../../utils/generationProgress'
@@ -52,6 +53,7 @@ const props = defineProps<{
   pageStatuses: Map<number, PageProgressStatus>
   retryingPages: Set<number>
   runId?: number
+  projectId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -159,6 +161,26 @@ const detailPreviewScale = computed(() => {
   if (slideAspectRatio.value === 'ratio_32x9') return 0.158
   return 0.315
 })
+
+// 生成看板的缩略图走 Typst 光栅化的 PNG：一次要展示很多页，每页挂一个完整幻灯片组件（玻璃主题
+// 还带 backdrop-filter）太重。牌组开头是封面/目录，`slideItems` 的序号是内容页码，所以这里传入的
+// 是内容页那一段，缩略图下标 = `item.index + CONTENT_PAGE_OFFSET`（详见 useTypstThumbnails）。
+const CONTENT_PAGE_OFFSET = computed(() =>
+  props.blueprints[0]?.kind === 'cover' ? props.blueprints.slice(0, 2).length : 0,
+)
+const contentBlueprints = computed(() =>
+  props.blueprints[0]?.kind === 'cover' ? props.blueprints.slice(2, -1) : props.blueprints,
+)
+const thumbnails = useTypstThumbnails({
+  slides: () => contentBlueprints.value,
+  projectId: () => props.projectId ?? null,
+  widthPx: () => Math.ceil(slideDims.value.w * previewScale.value * (window.devicePixelRatio || 1)),
+})
+
+/** 缩略图键 = 内容页序号 + 牌组里封面/目录占的前缀长度。 */
+function thumbnailFor(index: number) {
+  return thumbnails.thumbs.value[index + CONTENT_PAGE_OFFSET.value]
+}
 
 const pagePlans = computed(() => extractArrayDetail<PagePlan>('page_plans'))
 const layoutPlans = computed(() => extractArrayDetail<LayoutPlan>('layout_plans'))
@@ -469,7 +491,17 @@ onBeforeUnmount(() => {
                 class="spc-preview-frame"
                 :style="{ aspectRatio: `${slideDims.w} / ${slideDims.h}` }"
               >
-                <div class="spc-preview-canvas" :style="{ width: slideDims.w + 'px', height: slideDims.h + 'px', transform: `scale(${previewScale})` }">
+                <img
+                  v-if="thumbnailFor(item.index) && !thumbnailFor(item.index)!.placeholder && !thumbnails.failed.value"
+                  class="spc-preview-img"
+                  :src="thumbnailFor(item.index)!.url"
+                  draggable="false"
+                  alt=""
+                >
+                <div v-else-if="!thumbnails.failed.value" class="spc-preview-loading" aria-hidden="true">
+                  <span class="i-carbon:image" />
+                </div>
+                <div v-else class="spc-preview-canvas" :style="{ width: slideDims.w + 'px', height: slideDims.h + 'px', transform: `scale(${previewScale})` }">
                   <SlideRenderer :slide="item.blueprint" :slide-index="item.index" :media-map="props.mediaMap" />
                 </div>
               </div>
@@ -934,6 +966,30 @@ onBeforeUnmount(() => {
   height: 720px;
   transform: scale(0.2);
   transform-origin: top left;
+}
+
+/* Typst 光栅化的缩略图：整块 frame 就是这页的比例，图片按 contain 落位。 */
+.spc-preview-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* 缩略图还没到时的加载底：沿用 frame 的比例，不再挂完整的幻灯片组件。 */
+.spc-preview-loading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--studio-bg);
+  color: var(--studio-muted);
+}
+
+.spc-preview-loading span {
+  font-size: 1.4rem;
+  opacity: 0.35;
 }
 
 .spc-preview-placeholder,
