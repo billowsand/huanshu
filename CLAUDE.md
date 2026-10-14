@@ -469,18 +469,39 @@ Step2 详情大图、演示主画面、Step3 实时预览仍是 `SlideRenderer`�
 
 ### 自适应缩放（`fit-scale`）
 
-`lib/base.typ` 的 `fit-scale(metric, limit)` 用**带保护的插值搜索**找最大可行的 `f`：维持 [可行 lo, 不可行 hi]，
-按两端 metric 线性插值猜下一个点，并夹到区间内侧 10%–90%（折行让 metric 成台阶，纯插值会卡住），
-区间 ≤ 0.005 停止。`fit-height` 用它，`center: true` 直接用搜索时测过的高度居中。
-「单个数值 ≤ 上限」的调用点都用 `fit-scale`；多条件的 `fits`（split-layers、section-intro 引导卡）和
-metric 随 `f` 不单调的 overview 保留二分的 `fit-factor`。
+`lib/base.typ` 的 `fit-scale(metric, limit)` 找最大可行的 `f`（区间 ≤ 0.005 停止），每次探测都要把整块内容重新排版：
 
-- 比二分更贴近可行边界，字号会略大一点，但折行不变：与二分版对比，fixture/stress 两副牌在便签与星图主题下
-  最大平均像素差 5.5（压力页的整页子像素位移），没有折行变化。
-- 测量工具：`examples/bench_edit.rs`（逐版式编辑延迟；末尾的「clip branch」段是**持续追加正文**，最接近真实
-  打字，也是最慢的情况）、`examples/png_diff.rs`（两目录同名 PNG 的平均差与差异像素占比）。
-- 本机基准噪声很大（LM Studio 等负载下同一版本 98→342ms 漂移），比较版本时要交替多轮、取中位数，
-  不要拿单次结果下结论。「替换一个等长字符」的编辑能命中缓存，不能代表真实输入。
+1. 先测 `f = max`，可行直接返回；
+2. 按幂律 `metric ∝ f²` 从不可行端往下猜（瞄准预测点略低处），直到找到一个可行点；
+3. 之后在 (ln f, ln metric) 上做 **Illinois 修正的试位法**：同一端连续保留两次就把它的值减半，下一次探测
+   会越过边界，而不是从一侧慢慢逼近（纯插值会这样，区间收不拢，探测次数和二分差不多）；
+4. **只有**没找到更大的可行点时才测 `min`，它一个人决定返回 none。每次插值探测都夹在区间内侧 10%–90%。
+
+`fit-height` 用它，`center: true` 直接用搜索时测过的高度居中。「单个数值 ≤ 上限」的调用点都用 `fit-scale`；
+多条件的 `fits`（split-layers、section-intro 引导卡）和 metric 随 `f` 不单调的 overview 保留二分的 `fit-factor`。
+
+- 与二分版对比：字号略大（更贴近可行边界），折行不变；fixture/stress 两副牌最大平均像素差约 4.6（整行子像素位移）。
+- **性能结论**：`feature_grid` 持续追加正文时探测次数从 8–12（第二版插值）降到 5–7，但冷编译耗时与二分版
+  打平（约 95–115ms，随机器负载漂移）。新内容的成本主要是首次排版与文字整形，不在搜索次数上；
+  编辑器流畅靠的是前端的 `serial` + `progressive`，不是再抠搜索。
+- 测量工具：`examples/bench_edit.rs`（`--only clip` 只跑持续追加正文的一段）、`examples/png_diff.rs`
+  （`--align` 容忍整页平移）。**性能对比必须每次起新进程、`--rounds 1`**：同一进程里重复同样的内容会全部命中
+  comemo 缓存（第三轮的「5 轮中位数」测出来的全是缓存命中，约 43ms）；新旧版本用改代码前复制出来的
+  example 程序（模板是 `include_str!` 编进去的），交替多轮、取中位数。「替换一个等长字符」同样只测到缓存。
+- 本机基准噪声很大（LM Studio 等负载下同一版本可漂移 2–3 倍），单次结果不能下结论。
+
+### 编辑器实时预览与 Step2 详情（第三步）
+
+- 编辑器只发**当前这一页**（`slides: () => [editorPreviewSlide]`，图在 `thumbs[0]`）：版式只依赖本页数据，单页编译最快。
+- `useTypstThumbnails` 的 `serial`（同一时刻一个请求，期间变化合并成尾部请求）+ `progressive`（比画面新的过期图先落）
+  让打字时预览每隔一次渲染更新一次、停手后落在最新内容；`resetKey: () => activeSlide` 换页时清空。
+  换页作废在途响应靠 **generation 计数**（`resetAll` +1，响应带着发出时的值比较），不能靠键：
+  换页后 `latestKeys` 要等下一次 `refresh` 才更新，旧页响应的键此刻仍然「相等」，会把上一页的图落到新页上。
+- 编辑器、Step2 详情、演示主画面在还没有图时**一律回退 `SlideRenderer`**，不放空白占位（三轮里两次犯过）。
+- 位图一律放在舞台层、铺满舞台，**不要**放进带 `transform: scale()` 的画布：Step2 详情曾把按舞台尺寸写的
+  `<img>` 放进 `scale(舞台宽/1280)` 的画布，图被缩两次，只剩左上角四分之一。
+- 内容缩到 `fit-min` 仍放不下时，`Thumbnail.overflow` 为真，编辑器在预览下方提示「超出部分被裁切」。
+  `localStorage['huanshu.typstEditorPreview'] = '0'` 关掉编辑器预览的 Typst 出图。
 
 ## 多比例幻灯片支持 (16:9 / 32:9 / 48:9)
 
