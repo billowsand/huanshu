@@ -1,0 +1,37 @@
+[workspace]
+
+# Every C build script in this workspace (`stacker`, `tree-sitter`,
+# `tree-sitter-md`) fails on this machine while cc-rs passes MSVC `-Z7`:
+# "cl : Command line error D8050 : failed to put the command line into the debug
+# record". The failure depends on where the target directory lives, not on the
+# command line length — the same `-Z7` invocation builds under `E:\huanshu\target\`
+# and fails under `E:\huanshu\spikes\` (reproduced from a three-line crate, see
+# docs/spikes/gpui-kit.md §A1). cc-rs only passes `-Z7` when the profile has debug
+# info, so the debug profile of this standalone workspace turns it off; release
+# never passed it and is unaffected. Panic locations survive without debug info.
+[profile.dev]
+debug = false
+
+[package]
+name = "gpui-kit-spike"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# Pinned exactly: `gpui-kit` pins the matching GPUI revision itself, so `gpui` must
+# not be depended on directly. `tree-sitter-markdown` is what makes the Markdown
+# code editor highlight (gpui-kit 0.7.3 Cargo.toml:168).
+gpui-kit = { version = "=0.7.3", features = ["tree-sitter-markdown"] }
+rfd = "0.15"
+serde_json = "1"
+slide-typst = { path = "../../crates/slide-typst" }
+# PNG decoding for the "render_png + decode" transfer mode, so both modes end in the
+# same BGRA buffer and only the encode/decode difference is measured.
+image = { version = "0.25", default-features = false, features = ["png"] }
+# Process working set, for the memory numbers in the report.
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+] }
