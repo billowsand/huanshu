@@ -488,7 +488,7 @@ impl SettingsPage {
                 .child(
                     div()
                         .text_size(px(13.0))
-                        .child("离开前要保存吗？放弃后，主题与字体恢复为上次保存的样式。"),
+                        .child("离开前要保存吗？放弃后，主题与字体会恢复为上次保存的样式。"),
                 )
                 .footer(footer)
         });

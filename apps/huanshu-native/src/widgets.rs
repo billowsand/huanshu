@@ -20,6 +20,21 @@ pub fn brand_mark(size: f32) -> impl IntoElement {
     img("brand/mark.svg").size(px(size)).flex_none()
 }
 
+/// 品牌图标的深色底座（原版 `.titlebar-brand-chip` / 向导的 logo 块）：固定的深色底，不随主题变。
+pub fn brand_chip(size: f32, radius: f32, mark: f32) -> Div {
+    div()
+        .flex_none()
+        .size(px(size))
+        .rounded(px(radius))
+        .flex()
+        .items_center()
+        .justify_center()
+        .bg(gpui_kit::rgb(0x111a28))
+        .border_1()
+        .border_color(gpui_kit::rgba(0x78aadc29))
+        .child(brand_mark(mark))
+}
+
 /// 自绘标题栏（原版 `TitleBar.vue`）：品牌图标 + 「幻述」，最小化/最大化/关闭由 GPUI Kit
 /// 的 `TitleBar` 画（Windows 上靠系统的命中测试实现拖动、贴靠、双击最大化）。
 pub fn title_bar(cx: &App) -> impl IntoElement {
@@ -30,19 +45,7 @@ pub fn title_bar(cx: &App) -> impl IntoElement {
             .flex_row()
             .items_center()
             .gap(px(6.0))
-            .child(
-                div()
-                    .size(px(22.0))
-                    .rounded(px(7.0))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    // 原版是固定的深色渐变底（不随主题变）。
-                    .bg(gpui_kit::rgb(0x111a28))
-                    .border_1()
-                    .border_color(gpui_kit::rgba(0x78aadc29))
-                    .child(brand_mark(16.0)),
-            )
+            .child(brand_chip(22.0, 7.0, 16.0))
             .child(
                 div()
                     .text_size(px(12.3))

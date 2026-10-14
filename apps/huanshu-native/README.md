@@ -23,6 +23,9 @@ cargo run -p huanshu-native --release
 截图：`powershell -NoProfile -ExecutionPolicy Bypass -File apps/huanshu-native/tools/shots.ps1 [-Only home,project-step3]`
 → `docs/native/shell/`，与 `docs/native/reference/` 同名对照。
 
+交互验证：`tools/drive.ps1 -Route settings -Steps "click:0.21,0.29;wait:1.5;shot:a;key:^s" -Out target/drive`
+（按窗口比例点击、SendKeys、截图；同样只在沙箱里跑）。页面刚打开时字体等数据还在加载、布局会挪动，第一次点击前多等几秒（`-Boot 12`）。
+
 ## 框架
 
 ```

@@ -652,16 +652,7 @@ impl Render for WizardPage {
                             .gap(px(10.0))
                             .mb(px(4.0))
                             .child(
-                                div()
-                                    .size(px(88.0))
-                                    .rounded(px(28.0))
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .bg(gpui_kit::rgb(0x111a28))
-                                    .border_1()
-                                    .border_color(gpui_kit::rgba(0x78aadc29))
-                                    .child(widgets::brand_mark(52.0)),
+                                widgets::brand_chip(88.0, 28.0, 52.0),
                             ),
                     )
                     .child(
@@ -838,18 +829,7 @@ impl Render for WizardPage {
                                     .flex_row()
                                     .items_center()
                                     .gap(px(12.0))
-                                    .child(
-                                        div()
-                                            .size(px(56.0))
-                                            .rounded(px(18.0))
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .bg(gpui_kit::rgb(0x111a28))
-                                            .border_1()
-                                            .border_color(gpui_kit::rgba(0x78aadc29))
-                                            .child(widgets::brand_mark(28.0)),
-                                    )
+                                    .child(widgets::brand_chip(56.0, 18.0, 28.0))
                                     .child(
                                         div()
                                             .flex()
