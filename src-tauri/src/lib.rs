@@ -1,7 +1,5 @@
 mod commands;
 mod fonts;
-mod render;
-mod text;
 
 use huanshu_core::AppState;
 
@@ -23,7 +21,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            text::segment_title,
             fonts::list_system_fonts,
             commands::editor::get_editor_schema,
             commands::editor::chart_problems,

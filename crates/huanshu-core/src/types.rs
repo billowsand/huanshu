@@ -1,21 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-pub struct DeckSpec {
-    pub title: String,
-    pub export_filename: String,
-    pub slides: Vec<SlideSpec>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-pub struct SlideSpec {
-    pub layout: Option<String>,
-    pub component: String,
-}
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AspectRatio {
     #[serde(rename = "ratio_16x9")]
