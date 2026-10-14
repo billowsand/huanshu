@@ -197,6 +197,9 @@ pub fn service_location(base_url: &str) -> &'static str {
 pub struct ServiceForm {
     target: ModelTarget,
     shared: AppShared,
+    /// 向导紧凑模式：只渲染「API 地址 / API Key / 模型」三个字段（照原版
+    /// `FirstRunWizard.vue` 的 model-config-panel），无代理、无下拉、无获取列表。
+    compact: bool,
     /// 当前草稿（原版 `draft[activeService]`）。
     pub draft: ModelServiceSettings,
     /// 「获取列表」拉到的模型（原版 `modelLists[target]`）。
@@ -225,6 +228,28 @@ impl ServiceForm {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        Self::build(target, draft, shared, false, window, cx)
+    }
+
+    /// 向导第二步用的紧凑表单（原版 `FirstRunWizard.vue` 的三个 model-config-panel）。
+    pub fn compact(
+        target: ModelTarget,
+        draft: ModelServiceSettings,
+        shared: AppShared,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        Self::build(target, draft, shared, true, window, cx)
+    }
+
+    fn build(
+        target: ModelTarget,
+        draft: ModelServiceSettings,
+        shared: AppShared,
+        compact: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let base_url = cx.new(|cx| {
             InputState::new(window, cx)
                 .placeholder("http://127.0.0.1:1234")
@@ -232,13 +257,21 @@ impl ServiceForm {
         });
         let api_key = cx.new(|cx| {
             InputState::new(window, cx)
-                .placeholder("本地服务可留空")
+                .placeholder(if compact {
+                    "sk-..."
+                } else {
+                    "本地服务可留空"
+                })
                 .masked(true)
                 .default_value(draft.api_key.clone())
         });
         let model_manual = cx.new(|cx| {
             InputState::new(window, cx)
-                .placeholder("输入模型 ID")
+                .placeholder(if compact {
+                    draft.model.clone()
+                } else {
+                    "输入模型 ID".to_string()
+                })
                 .default_value(draft.model.clone())
         });
         let model_select = cx.new(|cx| SelectState::new(Vec::<String>::new(), None, window, cx));
@@ -301,6 +334,7 @@ impl ServiceForm {
         let mut this = Self {
             target,
             shared,
+            compact,
             draft,
             model_list: Vec::new(),
             testing: false,
@@ -323,6 +357,11 @@ impl ServiceForm {
     /// 当前状态（原版 `serviceState(activeService)`）。
     pub fn state(&self) -> ServiceState {
         service_state(self.testing, self.result.as_ref(), &self.draft)
+    }
+
+    /// 服务类型（向导按目标收集草稿时用）。
+    pub fn target(&self) -> ModelTarget {
+        self.target
     }
 
     /// 当前草稿生效的测试结果（签名必须匹配，原版 `activeResult`）。
@@ -445,6 +484,79 @@ impl Render for ServiceForm {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let c = cx.studio().colors;
         let info = self.target.info();
+
+        // 向导紧凑模式：三个字段竖排（原版 FirstRunWizard.vue 的 model-config-panel）。
+        if self.compact {
+            let field = |label: &'static str, note: Option<&'static str>, control: AnyElement| {
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(3.0))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap(px(4.0))
+                            .child(div().text_size(px(12.0)).text_color(c.muted).child(label))
+                            .when_some(note, |label_row, note| {
+                                label_row.child(
+                                    div()
+                                        .text_size(px(12.0))
+                                        .text_color(c.muted)
+                                        .opacity(0.5)
+                                        .child(note),
+                                )
+                            }),
+                    )
+                    .child(control)
+                    .into_any_element()
+            };
+            let eye = widgets::icon_button(
+                "toggle-key",
+                if self.show_key { "view-off" } else { "view" },
+                if self.show_key {
+                    "隐藏 API Key"
+                } else {
+                    "显示 API Key"
+                },
+            )
+            .on_click(cx.listener(|this, _event, window, cx| {
+                this.show_key = !this.show_key;
+                this.api_key
+                    .update(cx, |state, cx| state.set_masked(!this.show_key, window, cx));
+                cx.notify();
+            }));
+            return div()
+                .flex()
+                .flex_col()
+                .gap(px(10.0))
+                .child(field(
+                    "API 地址",
+                    None,
+                    div().child(Input::new(&self.base_url)).into_any_element(),
+                ))
+                .child(field(
+                    "API Key",
+                    Some("（本地留空）"),
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap(px(6.0))
+                        .child(Input::new(&self.api_key).flex_1())
+                        .child(eye)
+                        .into_any_element(),
+                ))
+                .child(field(
+                    "模型",
+                    None,
+                    div()
+                        .child(Input::new(&self.model_manual))
+                        .into_any_element(),
+                ));
+        }
+
         let can_fetch = !self.testing && !self.draft.base_url.trim().is_empty();
 
         let row = |label: &'static str, control: AnyElement, help: Option<&'static str>| {

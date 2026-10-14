@@ -64,11 +64,11 @@
 
 | 功能 | 状态 | 说明 / 依据 |
 |---|---|---|
-| 品牌头、四步指示、上一步 / 下一步 / 跳过 | ✅ | |
-| 存储目录（默认值来自 core，尊重沙箱） | 🟡 | 只展示；「浏览...」与保存未做（`browseDataDir`） |
-| 配置大模型（三类服务）并校验 | ⬜ | `verifyModels`；与设置页共用表单组件 |
-| 初始化向量库 | ⬜ | `startEmbeddingInit` |
-| 完成页摘要、进入 Studio | 🟡 | `complete_first_run` 已接；目录改动后的保存与「需要重启」未做 |
+| 品牌头、四步指示（含 skipped / 连线 done 态）、上一步 / 下一步 / 跳过 | ✅ | 显隐逻辑照原版 `wizard-footer` |
+| 存储目录（默认值来自 core，尊重沙箱） | ✅ | 可编辑 + `rfd::FileDialog::pick_folder`；联动规则照原版（媒体目录非 `/projects/` 时设为 `<选中>/media`，`\`/`/` 都容忍）；单测 `browsing_data_dir_refreshes_media_dir_unless_it_is_a_projects_dir` |
+| 配置大模型（三类服务）并校验 | ✅ | 复用 `settings/service_form.rs::ServiceForm::compact`；「下一步」前照 `verifyModels` 依次 `list_models`，失败不翻页 |
+| 初始化向量库 | ✅ | `startEmbeddingInit`：先 `save_settings` 再 `ensure_icon_embeddings`（`run_async`），进度/状态文案逐字 |
+| 完成页摘要、进入 Studio | ✅ | 摘要六行 + `dataDirChanged` 重启警告；`finishWizard` 顺序 `save_app_settings` → `save_settings` → `complete_first_run` |
 
 ## 工作流 `WorkflowView.vue` → `pages/workflow/mod.rs`
 
