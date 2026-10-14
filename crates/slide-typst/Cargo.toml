@@ -12,6 +12,8 @@ typst-layout = "0.15.1"
 typst-pdf = "0.15.1"
 # Rasterizes laid-out pages to PNG for the app's thumbnails (see `render_png`).
 typst-render = "0.15.1"
+# The pixmap type typst-render returns (not re-exported); same version as typst-render uses.
+tiny-skia = "0.12.0"
 typst-kit = { version = "0.15.1", default-features = false, features = ["scan-fonts"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

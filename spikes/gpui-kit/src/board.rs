@@ -586,6 +586,10 @@ impl Board {
     }
 
     fn type_bench_char(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.edit_bench.is_none() {
+            return;
+        }
+        self.forget_selected_thumb(window, cx);
         let Some(bench) = self.edit_bench.as_mut() else {
             return;
         };
@@ -596,7 +600,6 @@ impl Board {
         if let Some(slide) = self.deck.get_mut(self.selected) {
             slide["title"] = Value::String(next.clone());
         }
-        self.thumbs.remove(&self.selected);
         if last {
             bench.target = next.clone();
             bench.started = Instant::now();
@@ -697,7 +700,17 @@ impl Board {
         _cx.notify();
     }
 
-    fn soak_tick(&mut self, base: &str, reset: bool, window: &mut Window, cx: &mut Context<Self>) {        let next = if reset {
+    /// Forgets the selected page's thumbnail and frees its atlas tile. A `RenderImage` that is
+    /// only dropped (not `drop_image`d) keeps its tile: every title edit used to leak one
+    /// thumbnail this way (~0.3 MiB at 384 px, 6 MiB/s in the soak).
+    fn forget_selected_thumb(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(old) = self.thumbs.remove(&self.selected) {
+            cx.drop_image(old, Some(window));
+        }
+    }
+
+    fn soak_tick(&mut self, base: &str, reset: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let next = if reset {
             base.to_string()
         } else if self.title_text.ends_with('·') {
             self.title_text.clone()
@@ -708,7 +721,7 @@ impl Board {
         if let Some(slide) = self.deck.get_mut(self.selected) {
             slide["title"] = Value::String(next.clone());
         }
-        self.thumbs.remove(&self.selected);
+        self.forget_selected_thumb(window, cx);
         self.title
             .update(cx, |state, cx| state.set_value(next, window, cx));
         self.pump(window, cx);
@@ -743,9 +756,13 @@ impl Board {
         self.selected = 0;
         self.epoch += 1;
         self.reported_ready = false;
-        self.thumbs.clear();
+        for (_, image) in self.thumbs.drain() {
+            cx.drop_image(image, Some(window));
+        }
         self.thumb_key = None;
-        self.stage = None;
+        if let Some(old) = self.stage.take() {
+            cx.drop_image(old, Some(window));
+        }
         self.stage_key = None;
         self.title_text = slide_title(&self.deck, 0);
         let text = self.title_text.clone();

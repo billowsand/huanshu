@@ -7086,6 +7086,7 @@ dependencies = [
  "mitex",
  "serde",
  "serde_json",
+ "tiny-skia 0.12.0",
  "typst",
  "typst-kit",
  "typst-layout",

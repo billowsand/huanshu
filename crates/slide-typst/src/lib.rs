@@ -420,30 +420,10 @@ impl Renderer {
         width_px: u32,
         only: Option<&[usize]>,
     ) -> Result<RenderedPages, RenderError> {
-        let Compiled {
-            document,
-            overflows,
-            missing_assets,
-            ..
-        } = self.compile(slides, options)?;
-        let width_px = width_px.clamp(MIN_PNG_WIDTH, MAX_PNG_WIDTH);
-        let all = document.pages();
-        let mut pages = Vec::new();
-        for (index, page) in all.iter().enumerate().take(slides.len()) {
-            if only.is_some_and(|wanted| !wanted.contains(&index)) {
-                continue;
-            }
-            let page_width_pt = page.frame.size().x.to_pt();
-            if page_width_pt <= 0.0 {
-                continue;
-            }
-            let pixmap = typst_render::render(
-                page,
-                &typst_render::RenderOptions {
-                    pixel_per_pt: typst::utils::Scalar::new(width_px as f64 / page_width_pt),
-                    render_bleed: false,
-                },
-            );
+        let (rasters, overflows, missing_assets) =
+            self.rasterize(slides, options, width_px, only)?;
+        let mut pages = Vec::with_capacity(rasters.len());
+        for (index, pixmap) in rasters {
             let png = pixmap.encode_png().map_err(|err| RenderError {
                 diagnostics: vec![format!("encode slide {index} as PNG: {err}")],
             })?;
@@ -454,17 +434,6 @@ impl Renderer {
                 height: pixmap.height(),
             });
         }
-        // An overflow marker carries the index of the slide that was clipped; markers pointing
-        // past the deck are dropped. Markers of slides outside `only` are kept: the compile
-        // covered the whole deck either way.
-        let overflows = overflows
-            .into_iter()
-            .filter(|overflow| {
-                overflow
-                    .slide
-                    .is_none_or(|slide| slides.get(slide).is_some())
-            })
-            .collect();
         Ok(RenderedPages {
             pages,
             overflows,
@@ -477,10 +446,7 @@ impl Renderer {
     ///
     /// A host with its own GPU pipeline (GPUI / wgpu in a native shell) uploads
     /// these directly and skips both the PNG encoding here and the decoding on
-    /// the other side. `width_px` and `only` follow `render_png`: the width is
-    /// clamped to the same range, each page is rasterized at
-    /// `width_px / page width` pixels per point, and out-of-range indices are
-    /// ignored.
+    /// the other side. `width_px` and `only` follow `render_png`.
     pub fn render_pixels(
         &self,
         slides: &[serde_json::Value],
@@ -488,6 +454,41 @@ impl Renderer {
         width_px: u32,
         only: Option<&[usize]>,
     ) -> Result<RenderedFrames, RenderError> {
+        let (rasters, overflows, missing_assets) =
+            self.rasterize(slides, options, width_px, only)?;
+        let pages = rasters
+            .into_iter()
+            .map(|(index, pixmap)| RenderedPixels {
+                index,
+                width: pixmap.width(),
+                height: pixmap.height(),
+                pixels: unpremultiply(pixmap.data()),
+            })
+            .collect();
+        Ok(RenderedFrames {
+            pages,
+            overflows,
+            missing_assets,
+        })
+    }
+
+    /// The compile and rasterization shared by `render_png` and `render_pixels`: the
+    /// requested pages as tiny-skia pixmaps (premultiplied), plus the diagnostics.
+    #[allow(clippy::type_complexity)]
+    fn rasterize(
+        &self,
+        slides: &[serde_json::Value],
+        options: &ExportOptions,
+        width_px: u32,
+        only: Option<&[usize]>,
+    ) -> Result<
+        (
+            Vec<(usize, tiny_skia::Pixmap)>,
+            Vec<Overflow>,
+            Vec<MissingAsset>,
+        ),
+        RenderError,
+    > {
         let Compiled {
             document,
             overflows,
@@ -495,9 +496,8 @@ impl Renderer {
             ..
         } = self.compile(slides, options)?;
         let width_px = width_px.clamp(MIN_PNG_WIDTH, MAX_PNG_WIDTH);
-        let all = document.pages();
         let mut pages = Vec::new();
-        for (index, page) in all.iter().enumerate().take(slides.len()) {
+        for (index, page) in document.pages().iter().enumerate().take(slides.len()) {
             if only.is_some_and(|wanted| !wanted.contains(&index)) {
                 continue;
             }
@@ -512,15 +512,11 @@ impl Renderer {
                     render_bleed: false,
                 },
             );
-            pages.push(RenderedPixels {
-                index,
-                width: pixmap.width(),
-                height: pixmap.height(),
-                pixels: unpremultiply(pixmap.data()),
-            });
+            pages.push((index, pixmap));
         }
-        // Mirrors `render_png`: an overflow marker carries the index of the slide that was
-        // clipped; markers pointing past the deck are dropped.
+        // An overflow marker carries the index of the slide that was clipped; markers pointing
+        // past the deck are dropped. Markers of slides outside `only` are kept: the compile
+        // covered the whole deck either way.
         let overflows = overflows
             .into_iter()
             .filter(|overflow| {
@@ -529,11 +525,7 @@ impl Renderer {
                     .is_none_or(|slide| slides.get(slide).is_some())
             })
             .collect();
-        Ok(RenderedFrames {
-            pages,
-            overflows,
-            missing_assets,
-        })
+        Ok((pages, overflows, missing_assets))
     }
 
     /// Lays out the deck without exporting, e.g. to rasterize pages for visual checks.
