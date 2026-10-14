@@ -1,16 +1,12 @@
 //! 缩略图光栅化的 Tauri 命令。实现见 `huanshu_core::services::export`——与 PDF 导出
 //! 共用同一套主题、比例、字体与素材解析。
 
-use std::sync::{Arc, Mutex};
-
 use tauri::State;
+
+use super::Shared;
 
 use huanshu_core::services::export::{self as service, ThumbnailBatch};
 use huanshu_core::types::SlideBlueprint;
-use huanshu_core::AppState;
-
-/// Tauri 侧持有的状态句柄：core 的 `AppState` 外面套一层可跨线程共享的锁。
-type Shared = Arc<Mutex<AppState>>;
 
 /// Rasterizes `slides` (the deck currently on screen) into PNG thumbnails.
 ///

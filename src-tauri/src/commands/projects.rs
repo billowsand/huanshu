@@ -1,17 +1,13 @@
 //! 项目相关的 Tauri 命令：只取参数、锁状态、转错误。实现见 `huanshu_core::services::projects`。
 
-use std::sync::{Arc, Mutex};
-
 use tauri::State;
+
+use super::Shared;
 
 use huanshu_core::db::{Project, ProjectSummary};
 use huanshu_core::types::AspectRatio;
-use huanshu_core::AppState;
 
 use huanshu_core::services::projects as service;
-
-/// Tauri 侧持有的状态句柄：core 的 `AppState` 外面套一层可跨线程共享的锁。
-type Shared = Arc<Mutex<AppState>>;
 
 #[tauri::command]
 pub fn list_projects(state: State<'_, Shared>) -> Result<Vec<ProjectSummary>, String> {

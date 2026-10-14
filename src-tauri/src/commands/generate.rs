@@ -1,18 +1,16 @@
 //! 生成流水线相关的 Tauri 命令：取参数、锁状态、构造事件通道、转错误。
 //! 实现见 `huanshu_core::services::generation`。
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use tauri::{AppHandle, State};
+
+use super::Shared;
 
 use huanshu_core::db::GenerationRun;
 use huanshu_core::events::{CoreEvent, EventSink, GenerationLogEvent};
 use huanshu_core::services::generation::{self as service, RetryLayoutOptions, RetryPageResult};
 use huanshu_core::types::{AspectRatio, SlideBlueprint, SlideKind};
-use huanshu_core::AppState;
-
-/// Tauri 侧持有的状态句柄：core 的 `AppState` 外面套一层可跨线程共享的锁。
-type Shared = Arc<Mutex<AppState>>;
 
 /// The `(event name, payload)` pair Tauri publishes. Identical to what `AppHandle::emit`
 /// received before the pipeline moved into core — `tests/fixtures/generation-events.json`

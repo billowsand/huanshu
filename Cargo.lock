@@ -189,24 +189,13 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "auto-slidev-studio"
 version = "0.4.0"
 dependencies = [
- "anyhow",
- "base64 0.22.1",
- "chrono",
- "dirs 5.0.1",
  "huanshu-core",
- "parking_lot",
- "rusqlite",
- "serde",
  "serde_json",
- "slide-typst",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "tauri-plugin-shell",
- "tokio",
- "uuid",
- "zip",
 ]
 
 [[package]]
@@ -595,10 +584,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c673075a2e0e5f4a1dde27ce9dee1ea4558c7ffe648f576438a20ca1d2acc4b0"
 dependencies = [
  "iana-time-zone",
- "js-sys",
  "num-traits",
  "serde",
- "wasm-bindgen",
  "windows-link 0.2.1",
 ]
 

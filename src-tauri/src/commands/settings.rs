@@ -1,16 +1,12 @@
 //! 模型服务设置的 Tauri 命令。实现见 `huanshu_core::services::settings`。
 
-use std::sync::{Arc, Mutex};
-
 use tauri::State;
 
+use super::Shared;
+
 use huanshu_core::config::{LlmSettings, ModelServiceSettings};
-use huanshu_core::AppState;
 
 use huanshu_core::services::settings as service;
-
-/// Tauri 侧持有的状态句柄：core 的 `AppState` 外面套一层可跨线程共享的锁。
-type Shared = Arc<Mutex<AppState>>;
 
 #[tauri::command]
 pub async fn get_settings(state: State<'_, Shared>) -> Result<LlmSettings, String> {

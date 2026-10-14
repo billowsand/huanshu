@@ -1,3 +1,19 @@
+# 代码结构：`huanshu-core` 与界面层
+
+业务逻辑都在 `crates/huanshu-core`（**不依赖 Tauri**，`cargo tree -p huanshu-core | grep -i tauri` 必须为空），
+界面层只做转发。界面正从 Tauri + Vue 逐页迁往原生 GPUI（`spikes/gpui-kit/`、`docs/spikes/gpui-kit.md`），两套界面共用 core。
+
+- `huanshu_core::AppState`（`state.rs`）：设置、当前牌组、SQLite 连接与存储根；界面层用自己的锁包住它
+  （Tauri：`commands::Shared = Arc<Mutex<AppState>>`），服务函数只认 `&Mutex<AppState>`。
+- `services/`：`generation`（流水线、重试、图标）、`projects`、`storage`（`.keynn` 导入导出与加密）、`media`、
+  `settings`、`export`（PDF 与缩略图，包装 `slide-typst`）。错误类型是 `String`，命令层直接透传。
+- 事件：core 只认 `events::EventSink` / `CoreEvent`，`CoreEvent::wire()` 给出 `(事件名, 载荷)`；Tauri 的 `TauriEventSink`
+  转发给 `AppHandle::emit`。线上格式由 `tests/fixtures/generation-events.json` 锁定（`src-tauri` 的单测比对）。
+- 带 `async` 的服务函数要求调用方处于 tokio 运行时中；同步重活（PDF、缩略图、字体枚举）由命令层放进 `spawn_blocking`。
+- `src-tauri/src/commands/*.rs` 的每个命令只做「取参数 → 调 core → 转错误」，**不要**再把 SQL、文件读写或业务分支写回命令层。
+- 前端的「规则」也在 core：编辑器版式表 `editor_schema.rs`（`get_editor_schema`，前端缓存在 `stores/editorSchema.ts`）、
+  图表校验 `chart_check.rs`（`chart_problems`）。
+
 # Auto-Slidev 模板扩展说明
 
 ## 新增一个 Slide 模板的标准流程
@@ -6,26 +22,30 @@ Rust 生成侧只产出 blueprint，前端没有幻灯片组件）：
 
 1. `crates/slide-typst/typst/layouts/`
    新建 `<kind>.typ` 版式，并按「新增一个版式」登记（`main.typ`、`lib.rs` 的 `TEMPLATES` / `SUPPORTED_KINDS`、fixture）。
-2. `src-tauri/src/types.rs`
+2. `crates/huanshu-core/src/types.rs`
    新增 `SlideKind` 枚举项，以及该模板对应的数据结构。
-3. `src-tauri/src/generator/layout_rules.rs`
+3. `crates/huanshu-core/src/generator/layout_rules.rs`
    在 `LAYOUT_RULES` 表里加一行（布局提示词由这张表生成，代码过滤也用它）：
    - `use_when`：什么时候应该选这个模板、它和相邻模板的边界是什么
    - `requirement` + `check`：什么时候**不能**选（硬条件，宜宽松，多个信号取 OR）
    - `blocked_aspects`：哪些比例下版式会崩（如超宽下的双栏/单图）
-   另在 `src-tauri/src/generator/layout_scoring.rs` 的 `PRIORS` 加一行先验分，并在 `SCORE_RULES`
+   另在 `crates/huanshu-core/src/generator/layout_scoring.rs` 的 `PRIORS` 加一行先验分，并在 `SCORE_RULES`
    写上哪些页面信号该给它加分（LLM 失败时的兜底排序靠这张表）。
-4. `src-tauri/src/generator/utils.rs`
+4. `crates/huanshu-core/src/generator/utils.rs`
    在 `blueprint_schema_hint()` 里加入严格 JSON 示例。
-5. `src-tauri/src/generator/slides.rs`
+5. `crates/huanshu-core/src/generator/slides.rs`
    在内容生成提示词里加入该模板的字段要求。
-6. `src-tauri/src/generator/normalize.rs`
+6. `crates/huanshu-core/src/generator/normalize.rs`
    增加默认值修复、长度收敛、tone/icon 修复。
-7. `src-tauri/src/validate.rs`
+7. `crates/huanshu-core/src/validate.rs`
    增加结构校验，避免生成结果进入非法状态。
-8. 文档
-   更新 `CLAUDE.md`，把版式用途、字段和新增流程记录下来；前端 `src/components/types.ts`、`useSlideEditor.ts`
-   的 `KIND_META` / `KIND_FIELDS` / `KIND_DEFAULTS`、Step3 的 `FIELD_DEFS` 补上编辑器字段。
+8. `crates/huanshu-core/src/editor_schema.rs`
+   编辑器的版式表（中文名、图标、说明、字段、默认内容）与表单定义（`list_sections` / `object_sections` 的字段、
+   「新增一项」模板 `new_item`）。改完同步更新快照 `crates/huanshu-core/tests/fixtures/editor-schema.json`
+   （单测逐字比对，并检查每个 kind 都有条目、字段名真实存在、默认值能反序列化）。前端经 `get_editor_schema` 读取，
+   **不要在 TypeScript 里另写字段表**；`src/components/types.ts` 只补类型。
+9. 文档
+   更新 `CLAUDE.md`，把版式用途、字段和新增流程记录下来。
 
 
 ## 做新模板时最容易漏掉的点
@@ -52,28 +72,28 @@ Typst 与前端：
 1. `crates/slide-typst/typst/layouts/<kind>.typ` 删文件，去掉 `main.typ` 的 `layouts` 表、`lib.rs` 的 `TEMPLATES` /
    `SUPPORTED_KINDS` 中的项，以及 fixture 里该 kind 的页（2026-09 那次删的还是 Vue 模板；Vue 模板已于 2026-10 全部移除）
 2. `src/components/types.ts`：`SlideKind` 联合类型、`SlideBlueprint` 中该模板专属字段
-3. `src/composables/useSlideEditor.ts`：`KIND_META`、`KIND_FIELDS`、`KIND_DEFAULTS`
-4. `src/views/steps/Step3Editor.vue`：`FIELD_DEFS` 中该模板专属字段
+3. `crates/huanshu-core/src/editor_schema.rs`：该 kind 的条目与表单定义，并更新快照 `tests/fixtures/editor-schema.json`
+4. （编辑器字段表已全部在 Rust，前端无需再改）
 
 Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 struct 字面量编译不过）：
-6. `src-tauri/src/types.rs`：`SlideKind` 变体 + `SlideBlueprint` 字段
-7. `src-tauri/src/generator/layout_rules.rs`：`LAYOUT_RULES` 中该模板的行（提示词白名单与规则文案由它生成）；`src-tauri/src/generator/layout_scoring.rs`：`PRIORS` 与 `SCORE_RULES` 中该模板的行；`src-tauri/src/generator/planning.rs`：各 `SlideBlueprint { .. }` 字面量
-8. `src-tauri/src/generator/slides.rs`：内容生成提示词的字段要求
-9. `src-tauri/src/generator/utils.rs`：`slide_kind_name`（`SlideKind → snake_case`）映射、`blueprint_schema_hint`
-10. `src-tauri/src/generator/normalize.rs`：默认值修复分支 + 字面量
-11. `src-tauri/src/validate.rs`：结构校验
+6. `crates/huanshu-core/src/types.rs`：`SlideKind` 变体 + `SlideBlueprint` 字段
+7. `crates/huanshu-core/src/generator/layout_rules.rs`：`LAYOUT_RULES` 中该模板的行（提示词白名单与规则文案由它生成）；`crates/huanshu-core/src/generator/layout_scoring.rs`：`PRIORS` 与 `SCORE_RULES` 中该模板的行；`crates/huanshu-core/src/generator/planning.rs`：各 `SlideBlueprint { .. }` 字面量
+8. `crates/huanshu-core/src/generator/slides.rs`：内容生成提示词的字段要求
+9. `crates/huanshu-core/src/generator/utils.rs`：`slide_kind_name`（`SlideKind → snake_case`）映射、`blueprint_schema_hint`
+10. `crates/huanshu-core/src/generator/normalize.rs`：默认值修复分支 + 字面量
+11. `crates/huanshu-core/src/validate.rs`：结构校验
 12. 文档：README 模板数、CHANGELOG（新增 `[Unreleased]`，不要改已发布版本号条目）
 
 必查两点：
 - `grep -rn "<模板名>" src src-tauri/src` 应 0 命中（仅剩迁移说明/测试里的字符串）
-- **旧数据兼容**：`SlideKind` 是 `#[serde(rename_all = "snake_case")]` 外部标签枚举，删变体后 DB / `.keynn` 里带旧 kind 的牌组会**整体反序列化失败**，而 `commands/projects.rs` 用的是 `unwrap_or_default()` → 项目静默变空。所以 `SlideBlueprint.kind` 挂了
+- **旧数据兼容**：`SlideKind` 是 `#[serde(rename_all = "snake_case")]` 外部标签枚举，删变体后 DB / `.keynn` 里带旧 kind 的牌组会**整体反序列化失败**，而 `services/projects.rs` 用的是 `unwrap_or_default()` → 项目静默变空。所以 `SlideBlueprint.kind` 挂了
   `#[serde(deserialize_with = "de_slide_kind")]`（未知 kind → `Cover`），并有回归测试 `legacy_infographic_kind_degrades_without_losing_slides`。
   Typst 侧对没有版式的 kind 渲染「Typst 版式尚未实现」占位页，不会丢页。
 
 
 ## 布局选择：候选 + 全局分配
 
-生成流水线（`commands/generate.rs` 的 `run_pipeline`）分三段，布局**不再逐页即时决定**：
+生成流水线（`crates/huanshu-core/src/services/generation.rs` 的 `run_pipeline`）分三段，布局**不再逐页即时决定**：
 
 1. **2a 并发规划**（`slides.rs::plan_single_page`）：每页 enrich + `planning::layout_candidates_for_page`，
    LLM 只按「本页适配度」给 2-3 个候选打分，**提示词里不要再加多样性信息**。
@@ -117,8 +137,11 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
   - 画不出来的数据（类型未知、缺列、非数字、环形图没有正数、chart 不是对象）由 `chart-read` 判定，卡片里显示占位和原因，
     **绝不能编译失败**：一张坏图会让整份导出和整副缩略图一起失败（有单测）。图表里的字符串一律当纯文本（有注入单测）。
 - 内容量估算（typst `content-load`）跳过 `chart` 键：数据行不是排版文字，计入会让图表页一律落到最小字号。
-- 图表数据校验两份，规则一致：Rust `ChartSpec::problems()`（解析 Markdown、`validate.rs`）与 TS `chartProblems()`
-  （Step3 编辑器「图表数据（JSON）」框与高级 JSON 的语义错误；只有通过校验的 JSON 才写回牌组）。
+- 图表数据校验只有一份：`crates/huanshu-core/src/chart_check.rs`（`ChartProblem` 枚举，`chart_problems_json` 接受任意 JSON）。
+  `ChartSpec::problems()` 用 `message_en()`（解析 Markdown、`validate.rs`，措辞被测试与 LLM 报错依赖）；Step3 编辑器
+  「图表数据（JSON）」框与高级 JSON 经 `chart_problems` 命令取 `message_zh()`。编辑框的校验是异步的：输入后 150ms 防抖，
+  只有最新一次输入、且仍在发起校验的那一页时结果才生效；只有通过校验的 JSON 才写回牌组；失焦时立即校验还在等待的输入
+  （否则粘贴后马上点别处会丢掉修改）。
 - 配色两份：屏幕 CSS（`--chart-*`，`themeFromCssVars` 读取）与每个 typst 主题字典的 `chart`（`palette` 6 色、`grid`、`axis`、
   `success`，`_check.typ` 校验键集合与色数），文字色用主题的 `ink` / `muted`。改主题的图表色两边一起改。
 - 卡片校准结果（删除 Vue 模板前在对照页实测）：绘图框宽度一致（646/647），高度差 ≤ 5px（仅「有副标题、无页脚」时，源自通用 `content-page` 几何）；
@@ -179,10 +202,10 @@ LLM 没给出可用候选、repair 最后一轮换模板、生成兜底页时，
 调权重、改规则或换模型后，用真机探针在固定文档上对比（需 LM Studio 在跑，读应用的 settings.json）：
 
 ```bash
-cargo test -p auto-slidev-studio --lib layout_probe -- --ignored --nocapture
+cargo test -p huanshu-core --lib layout_probe -- --ignored --nocapture
 ```
 
-默认文档 `src-tauri/fixtures/layout-probe-sample.md`（覆盖对比/架构/流程/时间线/SWOT/风险等页型）；
+默认文档 `crates/huanshu-core/fixtures/layout-probe-sample.md`（覆盖对比/架构/流程/时间线/SWOT/风险等页型）；
 环境变量 `LAYOUT_PROBE_MD` / `LAYOUT_PROBE_ASPECT`（`16x9`/`32x9`/`48x9`）/ `LAYOUT_PROBE_OUT` /
 `LAYOUT_PROBE_SETTINGS` 可覆盖。只跑 enrich → 候选 → 分配，18 页约 90 秒（qwen3.5-9b，并发 4）。
 LLM 回复即使不是合法 JSON（实测出现过单引号字符串），`candidate_parsing` 也会按模式抢救出 kind/score。
@@ -190,7 +213,7 @@ LLM 回复即使不是合法 JSON（实测出现过单引号字符串），`cand
 
 ## 素材库图片与生成链路
 
-素材有两个来源，统一由 `src-tauri/src/assets.rs` 的 `AssetCatalog` 表达：
+素材有两个来源，统一由 `crates/huanshu-core/src/assets.rs` 的 `AssetCatalog` 表达：
 
 - 项目目录下的 `figure/`、`public/` 文件：`collect_assets` 会为每个文件产出 `figure/x.png`、`/figure/x.png`、`x.png` 三种拼写；
 - 素材库图片：文件在 `<media_dir>/projects/<id>/images/`，元数据在 `media_assets` 表，引用形式是 `media:<id>`。
@@ -199,11 +222,11 @@ LLM 回复即使不是合法 JSON（实测出现过单引号字符串），`cand
 
 要点：
 
-- `run_pipeline` / `retry_generation_page` / 反馈修复三处都通过 `commands/generate.rs::load_asset_catalog` 构造目录
+- `run_pipeline` / `retry_generation_page` / 反馈修复三处都通过 `services/generation.rs::load_asset_catalog` 构造目录
   （项目文件 + 该项目的素材库图片）。**不要把 `collect_assets` 直接当素材全集**——它扫不到素材库。
 - 素材库图片只有在目录里出现，`preferred_assets` 才可能带上它（`planning::normalize_preferred_assets` 丢弃未知引用），
   `layout_rules::has_image` 才会放行 `spotlight`。
-- 导入素材时 `commands/storage.rs` 用 `image_size::image_dimensions` 读文件头写 `media_assets.width/height`
+- 导入素材时 `services/media.rs` 用 `image_size::image_dimensions` 读文件头写 `media_assets.width/height`
   （零依赖，支持 PNG/JPEG/GIF/BMP/WebP/SVG）；`.keynn` 导出/导入携带宽高，旧包回退到读还原后的字节。
 - 给模型的素材清单一律走 `AssetCatalog::prompt_section()`，不要手写路径列表——`media:` 条目必须带 caption 与比例，模型才选得准。
 - `spotlight` 是唯一渲染图片的模板：`normalize::ensure_image_from_page_plan` 会在它缺图时用 `page.preferred_assets[0]` 兜底填充。
@@ -248,7 +271,7 @@ caption 只说图片「是什么」，说不出它「该放哪」。所以 `gene
 用户在「设置 → 外观与字体」里独立选择 6 类字体：标题、副标题、正文、注释与标签、数字与序号、代码。
 幻灯片里每一处文字都落到其中一类（界面字体 `--font-interface` 只服务 Studio 外壳）。
 
-- Typst 侧：`pdf.rs` 的 `font_roles` 把设置写进 `ExportOptions.fonts`，`main.typ` 放进 `ctx.fonts`，版式里用
+- Typst 侧：`services/export.rs` 的 `font_roles` 把设置写进 `ExportOptions.fonts`，`main.typ` 放进 `ctx.fonts`，版式里用
   `txt(ctx, "<role>", …)`（`components.typ`）。判断依据是「这段话在版式里扮演什么角色」，**不是字号大小**：
   例如 SWOT 的策略结论借用注释字号但属于正文，Process「关键动作 03」里的计数属于数字。
 - 字重：全局 `set text(weight: "regular")`，要粗体标题须在设置里直接选粗体字族。
@@ -271,11 +294,11 @@ caption 只说图片「是什么」，说不出它「该放哪」。所以 `gene
 
 ## Typst 原生 PDF 导出（实验中，`crates/slide-typst`）
 
-独立的 workspace crate，由 `src-tauri/src/commands/pdf.rs` 接入应用（见下方「应用接入」）。它在进程内嵌入 Typst 编译器，把 `SlideBlueprint`
+独立的 workspace crate，由 `crates/huanshu-core/src/services/export.rs` 接入应用（命令外壳在 `src-tauri/src/commands/pdf.rs`）（见下方「应用接入」）。它在进程内嵌入 Typst 编译器，把 `SlideBlueprint`
 JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。它也是**唯一的幻灯片渲染器**（屏幕上的缩略图、演示、编辑器预览都是它
 光栅化的 PNG，见下方「Typst 缩略图」），Vue 模板已于 2026-10 删除。原先它是 Vue 模板之外的另一套
 版式实现。18 个模板（`SUPPORTED_KINDS`）与全部 6 个主题（`SUPPORTED_THEMES`：便签·稿纸、终端·纸/墨、报刊·钴蓝、暗·琥珀/星图）都已移植；
-未知主题 id 回落到便签（`main.typ` 的 `themes` 表兜底，`pdf.rs` 会把回落记进导出报告）。以后新增的模板在移植前
+未知主题 id 回落到便签（`main.typ` 的 `themes` 表兜底，`services/export.rs` 会把回落记进导出报告）。以后新增的模板在移植前
 会渲染成「Typst 版式尚未实现」占位页，不会丢页，导出结果弹窗会列出这些页。
 
 - Rust（`src/lib.rs`）：`Renderer::with_system_fonts()` 扫描一次系统字体（约 0.5 秒，进程内复用），
@@ -409,7 +432,7 @@ cargo run -p slide-typst --example render_fixture -- --png
 
 - 链路：`useTypstThumbnails` → `render_slide_thumbnails`（`commands/thumbnails.rs`）→
   `Renderer::render_png`（**整副编译**，按 `only` 光栅化，返回 `data:image/png` 给 `<img>`）。
-  命令复用 `pdf.rs` 的 `renderer()` / `prepare_export()`，主题、比例、字体、素材映射与 PDF 导出一致；
+  命令复用 `services/export.rs` 的 `renderer()` / `prepare_export()`，主题、比例、字体、素材映射与 PDF 导出一致；
   图表由 Typst 直接绘制，不经过 WebView。启动时 `.setup` 在后台预热字体扫描。
 - **页序**：`ctx.index` 决定溢出标记的页号。Step2 生成中有空位时只发已有蓝图组成的子集，Typst 的页序、返回的
   `index` 都是**子集位置**，组合函数再映射回传入数组的下标。
@@ -487,13 +510,13 @@ cargo run -p slide-typst --example render_fixture -- --png
 #### 后端 (Rust)
 | 文件 | 改动 |
 |------|------|
-| `src-tauri/src/types.rs` | 新增 `AspectRatio` 枚举和辅助方法，`SlideBlueprint` 增加 `aspect_ratio` 字段 |
-| `src-tauri/src/config.rs` | `GenerationConfig` 增加 `aspect_ratio` 字段 |
-| `src-tauri/src/db.rs` | `Project` 增加 `aspect_ratio` 字段，projects 表增加 `aspect_ratio TEXT` 列 |
+| `crates/huanshu-core/src/types.rs` | 新增 `AspectRatio` 枚举和辅助方法，`SlideBlueprint` 增加 `aspect_ratio` 字段 |
+| `crates/huanshu-core/src/config.rs` | `GenerationConfig` 增加 `aspect_ratio` 字段 |
+| `crates/huanshu-core/src/db.rs` | `Project` 增加 `aspect_ratio` 字段，projects 表增加 `aspect_ratio TEXT` 列 |
 | `src-tauri/src/commands/projects.rs` | 新增 `update_project_aspect_ratio` 和 `get_project_aspect_ratio` 命令 |
 | `src-tauri/src/commands/generate.rs` | `generate_slides` 接受 `aspect_ratio` 参数，传递给 Generator |
-| `src-tauri/src/generator/planning.rs` | 布局规划提示词增加比例相关的布局规则（32:9 用 6-8 列，48:9 用 8-12 列等） |
-| `src-tauri/src/generator/normalize.rs` | `apply_component_defaults` 根据比例调整 `cards.truncate` 等数量限制 |
+| `crates/huanshu-core/src/generator/planning.rs` | 布局规划提示词增加比例相关的布局规则（32:9 用 6-8 列，48:9 用 8-12 列等） |
+| `crates/huanshu-core/src/generator/normalize.rs` | `apply_component_defaults` 根据比例调整 `cards.truncate` 等数量限制 |
 
 #### 前端 (TypeScript/Vue)
 | 文件 | 改动 |
@@ -539,10 +562,10 @@ payload.bin (加密的原始 ZIP 内容)
 #### 后端 (Rust)
 | 文件 | 改动 |
 |------|------|
-| `src-tauri/Cargo.toml` | 新增 `aes-gcm`, `argon2`, `rand`, `base64` 依赖 |
-| `src-tauri/src/crypto.rs` | 新增加密解密模块 `CryptoService` |
+| `crates/huanshu-core/Cargo.toml` | 新增 `aes-gcm`, `argon2`, `rand`, `base64` 依赖 |
+| `crates/huanshu-core/src/crypto.rs` | 新增加密解密模块 `CryptoService` |
 | `src-tauri/src/commands/storage.rs` | `export_project` 增加 `encrypted` 和 `password` 参数，`import_project` 增加 `password` 参数 |
-| `src-tauri/src/lib.rs` | 注册 `crypto` 模块和 `is_encrypted_file` 命令 |
+| `src-tauri/src/lib.rs` | 注册 `is_encrypted_file` 命令（`crypto` 模块现在在 core） |
 
 #### 前端 (TypeScript/Vue)
 | 文件 | 改动 |

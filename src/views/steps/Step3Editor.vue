@@ -180,7 +180,12 @@ watch(
     const seq = advancedChartSeq
     advancedChartTimer = setTimeout(async () => {
       advancedChartTimer = null
-      const problems = await invoke<string[]>('chart_problems', { chart })
+      let problems: string[]
+      try {
+        problems = await invoke<string[]>('chart_problems', { chart })
+      } catch (e) {
+        problems = [`校验失败：${e instanceof Error ? e.message : String(e)}`]
+      }
       if (seq !== advancedChartSeq) return
       advancedChartErrors.value = problems.map((problem) => `chart：${problem}`)
     }, 150)
@@ -238,6 +243,8 @@ const chartJsonFocused = ref(false)
 const chartChecking = ref(false)
 let chartCheckSeq = 0
 let chartCheckTimer: ReturnType<typeof setTimeout> | null = null
+let pendingChart: unknown = null
+let pendingSlide = -1
 
 function chartJsonFromDraft() {
   const chart = getFieldValue('chart')
@@ -282,31 +289,51 @@ function scheduleChartCheck(chart: unknown) {
   chartChecking.value = true
   chartJsonError.value = ''
   const seq = ++chartCheckSeq
-  chartCheckTimer = setTimeout(async () => {
-    chartCheckTimer = null
-    let problems: string[]
-    try {
-      problems = await invoke<string[]>('chart_problems', { chart })
-    } catch (e) {
-      if (seq !== chartCheckSeq) return
-      chartChecking.value = false
-      chartJsonError.value = `校验失败：${e instanceof Error ? e.message : String(e)}`
-      return
-    }
+  pendingChart = chart
+  pendingSlide = props.activeSlide
+  const slide = pendingSlide
+  chartCheckTimer = setTimeout(() => runChartCheck(seq, chart, slide), 150)
+}
+
+/** 跳过防抖、立刻校验还在等待的输入（失焦时用：粘贴后马上点别处不能丢掉这次修改）。 */
+function flushChartCheck() {
+  if (chartCheckTimer === null) return
+  clearTimeout(chartCheckTimer)
+  runChartCheck(chartCheckSeq, pendingChart, pendingSlide)
+}
+
+/** `slide`：输入时所在的页。结果只能写回那一页，换页后迟到的结果直接丢弃。 */
+async function runChartCheck(seq: number, chart: unknown, slide: number) {
+  chartCheckTimer = null
+  let problems: string[]
+  try {
+    problems = await invoke<string[]>('chart_problems', { chart })
+  } catch (e) {
     if (seq !== chartCheckSeq) return
     chartChecking.value = false
-    if (problems.length) {
-      chartJsonError.value = problems.join('；')
-      return
-    }
-    chartJsonError.value = ''
-    updatePath('chart', chart)
-  }, 150)
+    chartJsonError.value = `校验失败：${e instanceof Error ? e.message : String(e)}`
+    return
+  }
+  if (seq !== chartCheckSeq) return
+  chartChecking.value = false
+  if (slide !== props.activeSlide) return
+  if (problems.length) {
+    chartJsonError.value = problems.join('；')
+    return
+  }
+  chartJsonError.value = ''
+  updatePath('chart', chart)
+  // 已失焦：把输入规范化成牌组里的实际内容（内容没变时上面的 watch 不会触发）。
+  if (!chartJsonFocused.value) chartJsonText.value = chartJsonFromDraft()
 }
 
 function onChartJsonBlur() {
   chartJsonFocused.value = false
-  cancelChartCheck()
+  // 还在校验：等结果回来再决定写回与规范化（见 runChartCheck）。
+  if (chartChecking.value) {
+    flushChartCheck()
+    return
+  }
   // 离开时若仍有错误，保留输入让用户继续改；否则规范化成牌组里的实际内容
   if (!chartJsonError.value) chartJsonText.value = chartJsonFromDraft()
 }

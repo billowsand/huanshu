@@ -1,17 +1,13 @@
 //! 应用设置、`.keynn` 导入导出与加密检测的 Tauri 命令。
 //! 实现见 `huanshu_core::services::storage`，素材库命令在 [`super::media`]。
 
-use std::sync::{Arc, Mutex};
-
 use tauri::State;
 
+use super::Shared;
+
 use huanshu_core::types::AppGlobalSettings;
-use huanshu_core::AppState;
 
 use huanshu_core::services::storage as service;
-
-/// Tauri 侧持有的状态句柄：core 的 `AppState` 外面套一层可跨线程共享的锁。
-type Shared = Arc<Mutex<AppState>>;
 
 #[tauri::command]
 pub fn get_app_settings(state: State<'_, Shared>) -> Result<AppGlobalSettings, String> {

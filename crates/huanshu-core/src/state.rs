@@ -1,6 +1,6 @@
 //! 应用状态：设置、当前牌组、SQLite 连接与存储根同步。
 //!
-//! 这份状态原来住在 Tauri 的 `lib.rs` 里，界面层（Tauri 命令、将来�� GPUI）都只是把它
+//! 这份状态原来住在 Tauri 的 `lib.rs` 里，界面层（Tauri 命令、将来的 GPUI）都只是把它
 //! 放在自己的互斥锁后面再取用：`Mutex<AppState>`。锁定与线程模型留给界面层，core 只管状态本身。
 
 use std::path::PathBuf;
