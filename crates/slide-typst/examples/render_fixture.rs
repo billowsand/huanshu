@@ -1,12 +1,10 @@
 //! Renders the layout fixture to PDF (and optionally one PNG per page).
 //!
-//!   cargo run -p slide-typst --example render_fixture -- [fixture.json] [out-dir] [--png] [--thumbs 560] [--kinds a,b] [--aspect ratio_32x9] [--assets manifest.json] [--theme light-notes] [--chart-boxes]
+//!   cargo run -p slide-typst --example render_fixture -- [fixture.json] [out-dir] [--png] [--thumbs 560] [--kinds a,b] [--aspect ratio_32x9] [--assets manifest.json] [--theme light-notes]
 //!
 //! Defaults: fixtures/all-layout-blueprints.json → target/slide-typst/, only the
 //! kinds that have a Typst layout (pass `--kinds all` to include placeholders),
-//! theme `light-notes`. `--chart-boxes` also writes `chart-boxes.json`: the
-//! plot box of every chart_focus slide, to render chart SVGs at (see
-//! scripts/chart-fixtures.ts). `--thumbs <width_px>` writes `thumb-NN-<kind>.png`
+//! theme `light-notes`. `--thumbs <width_px>` writes `thumb-NN-<kind>.png`
 //! per page through `Renderer::render_png` (the path the app's thumbnails take)
 //! and prints the whole-deck and per-page timings.
 
@@ -21,7 +19,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut aspect = "ratio_16x9".to_string();
     let mut theme = "light-notes".to_string();
     let mut manifest: Option<PathBuf> = None;
-    let mut chart_boxes = false;
     let mut thumbs: Option<u32> = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -30,7 +27,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--aspect" => aspect = args.next().unwrap_or(aspect),
             "--theme" => theme = args.next().unwrap_or(theme),
             "--assets" => manifest = args.next().map(PathBuf::from),
-            "--chart-boxes" => chart_boxes = true,
             "--thumbs" => {
                 thumbs = Some(
                     args.next()
@@ -97,13 +93,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     for missing in &rendered.missing_assets {
         println!("  missing image: {missing:?}");
-    }
-
-    if chart_boxes {
-        let boxes = renderer.chart_boxes(&slides, &options)?;
-        let path = out_dir.join("chart-boxes.json");
-        std::fs::write(&path, serde_json::to_string_pretty(&boxes)?)?;
-        println!("  {} chart boxes → {}", boxes.len(), path.display());
     }
 
     if png {

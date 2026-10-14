@@ -1,7 +1,6 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useAppSettingsStore } from '../stores/appSettings'
-import { buildChartSvgs } from './chartSvgs'
 import type { SlideBlueprint } from '../components/types'
 
 /** 与 `commands::thumbnails::ThumbnailBatch`（src-tauri/src/commands/thumbnails.rs）对应。 */
@@ -40,9 +39,8 @@ function thumbnailsEnabledByPreference(): boolean {
  *
  * 要点：
  * - **子集与页序**：`slides()` 里还没有蓝图的页（生成中的空位）被跳过，只有已有蓝图组成子集
- *   发给 Rust，`latestIndices` 记下子集位置到传入数组下标的映射。Typst 的页序、返回的 `index`、
- *   `chart:<index>` 都是**子集位置**，所以图表 SVG 也用同一份子集构建（见 `render`），
- *   缩略图结果再映射回下标。
+ *   发给 Rust，`latestIndices` 记下子集位置到传入数组下标的映射。Typst 的页序和返回的 `index`
+ *   都是**子集位置**，缩略图结果再映射回下标。
  * - **两套下标**：`thumbs` / `overflow` / `lastUsed` / `shownSequence` 以**数组下标**为键；
  *   `shownKeys` / `pendingKeys` / `wantedPositions` 以**子集位置**为键（生成中有空位时两者不同）。
  *   换算一律经过 `latestIndices`（子集位置 → 数组下标）；`positionOf` 是它反过来。
@@ -252,10 +250,6 @@ export function useTypstThumbnails(opts: {
     void render(deck, theme, width, only, requestKeys, requestSequence)
   }
 
-  /**
-   * chart_focus 页的图表在 typst 里是一张按绘图框渲染的 SVG，缩略图也必须带上，否则这一页只剩
-   * 空卡片。`chart:<index>` 的下标是子集位置，所以用同一份 `deck` 调用 buildChartSvgs。
-   */
   async function render(
     deck: SlideBlueprint[],
     theme: string | null,
@@ -266,23 +260,11 @@ export function useTypstThumbnails(opts: {
   ) {
     inFlight = true
     const requestGeneration = generation
-    let chartSvgs: Array<{ index: number, svg: string }> | null = null
-    try {
-      chartSvgs = await buildChartSvgs(deck, { projectId: opts.projectId(), themeId: theme })
-    } catch (e) {
-      // 图表渲染失败不该拖垮整页缩略图：图表页会退回占位卡片。
-      console.warn('[thumbnails] 图表 SVG 渲染失败：', e)
-    }
-    if (disposed) {
-      inFlight = false
-      return
-    }
     try {
       const batch = await invoke<ThumbnailBatch>('render_slide_thumbnails', {
         projectId: opts.projectId(),
         slides: deck,
         theme,
-        chartSvgs,
         widthPx: width,
         only,
       })
@@ -384,7 +366,7 @@ export function useTypstThumbnails(opts: {
     schedule()
   })
 
-  // 主题切换会改 --chart-* / 主题 token，键里带主题 id，触发一次刷新即可。
+  // 主题切换：键里带主题 id，触发一次刷新即可。
   const themeObserver = new MutationObserver(schedule)
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
 

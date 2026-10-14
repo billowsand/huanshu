@@ -1,10 +1,11 @@
 /* ============================================================
- * ChartSpec → ECharts option 的唯一实现（双端共享）
+ * ChartSpec → ECharts option（屏幕回退渲染用）
  * 支持类型：line / bar / donut / grouped_bar / stacked_area
- * - webview 预览：主题 token 来自 CSS 变量（themeFromCssVars）
- * - PDF 导出：同一 buildChartOption 以 static 模式 SSR 出 SVG，
- *   经 asset 管道交给 typst image() 嵌入，保证与预览一致
- * mode: 'screen'（带动画）| 'static'（导出用，动画关闭、无交互）
+ * - 主题 token 来自 CSS 变量（themeFromCssVars）
+ * - 缩略图、演示、编辑器预览与 PDF 的图表由 Typst 原生绘制
+ *   （crates/slide-typst/typst/lib/chart.typ，按本文件的参数移植）：
+ *   改这里的几何、字号、配色时要同步改那边
+ * mode: 'screen'（带动画）| 'static'（动画关闭、无交互）
  * ============================================================ */
 import * as echarts from 'echarts/core'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
@@ -15,7 +16,7 @@ import { SVGRenderer } from 'echarts/renderers'
 // 新增图表类型或组件时在这里补注册，否则 setOption 会静默不画。
 echarts.use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, MarkPointComponent, TooltipComponent, SVGRenderer])
 
-/** 屏幕端与 SSR 共用同一个已注册组件的 echarts 实例 */
+/** 已注册组件的 echarts 实例（KeynoteChartSlide 使用） */
 export { echarts }
 
 export type ChartType = 'line' | 'bar' | 'donut' | 'grouped_bar' | 'stacked_area'
@@ -56,7 +57,7 @@ export interface ChartSpec {
   source_note?: string
 }
 
-/** 图表主题 token（键名与 Rust 侧 chart-tokens 对齐） */
+/** 图表主题 token（Typst 侧对应各主题字典的 `chart` 与 ink/muted/primary） */
 export interface ChartTheme {
   bg: string
   text_primary: string
@@ -68,7 +69,7 @@ export interface ChartTheme {
   chart_grid: string
   chart_axis: string
   chart_palette: string[]
-  /** 图表文字字体：幻灯片「正文」字体角色（--font-body），屏幕与 PDF 里的 SVG 文字一致 */
+  /** 图表文字字体：幻灯片「正文」字体角色（--font-body），与 Typst 绘制的图表一致 */
   font_family: string
 }
 
@@ -76,8 +77,7 @@ export interface ChartTheme {
 export const TYPE_SCALE_BASE = 1.25
 
 /**
- * @param typeScale 该页的 --type-scale：图表文字和其他文字一起随内容量缩放。
- *   屏幕从图表容器上读 CSS 变量，PDF 用 typst 测量时报告的同一个值（`pdf_chart_boxes`）。
+ * @param typeScale 该页的 --type-scale：图表文字和其他文字一起随内容量缩放（从图表容器上读 CSS 变量）。
  */
 export function buildChartOption(spec: ChartSpec, theme: ChartTheme, mode: 'screen' | 'static', typeScale = TYPE_SCALE_BASE) {
   const staticMode = mode === 'static'
@@ -288,34 +288,6 @@ export function chartSourceLabel(spec: ChartSpec): string {
   if (spec.source_note?.trim()) return `数据来源：${spec.source_note.trim()}`
   if (spec.source === 'tool') return '数据来源：工具生成'
   return '数据来源：文档'
-}
-
-/**
- * 图表在 PDF 里的绘图框：typst 排版 chart-focus.typ 时实测的内框（CSS px）与该页 --type-scale，
- * 由 `pdf_chart_boxes` 命令返回（Rust `slide_typst::ChartBox`）。
- * SVG 必须按它渲染：画布比内框大多少，标签就缩小多少（曾固定 920×440，PDF 里 12px 的标签只剩约 8px）。
- */
-export interface ChartBox {
-  slide: number
-  width: number
-  height: number
-  scale: number
-}
-
-/** 用与屏幕预览完全相同的 buildChartOption 以 SSR 模式渲染一张图表（返回 SVG 字符串）。 */
-export function renderChartSvg(spec: ChartSpec, theme: ChartTheme, box: Pick<ChartBox, 'width' | 'height' | 'scale'>): string {
-  const chart = echarts.init(null, null, {
-    renderer: 'svg',
-    ssr: true,
-    width: Math.max(1, Math.round(box.width)),
-    height: Math.max(1, Math.round(box.height)),
-  })
-  try {
-    chart.setOption(buildChartOption(spec, theme, 'static', box.scale))
-    return chart.renderToSVGString()
-  } finally {
-    chart.dispose()
-  }
 }
 
 const CHART_TYPES: ChartType[] = ['line', 'bar', 'donut', 'grouped_bar', 'stacked_area']

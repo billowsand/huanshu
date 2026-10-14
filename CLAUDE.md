@@ -101,28 +101,33 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
 - **chart 由代码挂载，不让 LLM 抄**：内容提示词只让模型写 `points`；`normalize::ensure_chart_from_page_plan` 在**校验之前**
   和每轮 repair 之后用 page plan 的原值覆盖。数据错误 LLM 修不了，绝不能让它进 repair 循环（否则最后一轮换模板丢图）。
   反馈修复（`repair_slide`）同样保留原 chart。enrich 不会把 `visual_need=chart` 降回 `text_only`。
-- 渲染只有一份：`src/components/chartOptions.ts` 的 `buildChartOption`。屏幕直接挂 ECharts（换主题/字体靠 MutationObserver 重绘，
-  内容变化引起 `--type-scale` 变化也会重绘）。图表字号写成「scale=1 时的 px」再乘本页 `--type-scale`，与其他文字一起缩放。
-- PDF 导出三步（`usePdfExport`）：① 首页导出没有内存牌组时先 `get_project` 读出牌组；② `pdf_chart_boxes` 命令让 typst 按与导出
-  完全相同的参数只排版图表页，`chart-focus.typ` 发出 `<chart-box>` 标记（绘图框 CSS px + 本页 type scale，`Renderer::chart_boxes`）；
-  ③ webview 按这个框的尺寸和字号比例 SSR 出 SVG，以 `chart:<页序>` 经 asset 管道交给 `export_pdf`。所以 SVG 在 PDF 里 1:1 落位，
-  **不要**再在前端按画布尺寸估算图表框（曾固定 920×440，PDF 里 12px 标签只剩约 8px；按比例估的高度也差 10%）。
-  typst 侧 `fit: "contain"`（默认 `cover` 会裁掉坐标轴）；无 SVG 时卡片结构不变，只把绘图区换成占位，测量与导出两遍排版一致（有单测）。
+- **图表由 Typst 原生绘制**（`crates/slide-typst/typst/lib/chart.typ`）：缩略图、演示、编辑器预览、PDF 全走它，不需要 WebView。
+  它是 `src/components/chartOptions.ts` 的 `buildChartOption` 的移植，几何按旧 ECharts SSR 输出逐项对过（栅格边距、平滑曲线的
+  控制点与防过冲钳制、pin 气泡路径、环形图 48%/66% 半径与圆角、图例），五种图与旧 SVG 的平均像素差 ≤ 0.43。
+  屏幕上只剩 `KeynoteChartSlide.vue`（Typst 出图前的回退）还挂 ECharts；**改 `buildChartOption` 的几何、字号、配色要同步改
+  `chart.typ`**。与 option 一样，只有 `fs(n)` 的字号乘本页 `--type-scale`（`ctx.scale`），边距、线宽、符号尺寸是固定 CSS px。
+  - 数值轴：ECharts 的 `nice` 取整（`{1,2,3,5}×10ᵏ`，目标 5 段，含 0）；数字千分位、最多两位小数、无浮点尾巴（`format-number`）。
+  - 类目太多时隔 k 个显示一个标签（不旋转、不缩小）；相邻数据标签会相撞时整组不画（高亮 pin 照画）。
+  - 环形图：扇区之间切出约 2px 缝隙露出卡片（ECharts 用页面底色描边，主题里没有不透明的页面色）；0 和负值扇区不画；
+    标签按左右两侧推开、引线避开圆环，扇区很多又挤在一侧时仍可能重叠（ECharts 同样会）。
+  - 堆叠面积的负值按 0 处理；负值柱从 0 向下画，圆角在远端，标签在柱下。
+  - 画不出来的数据（类型未知、缺列、非数字、环形图没有正数、chart 不是对象）由 `chart-read` 判定，卡片里显示占位和原因，
+    **绝不能编译失败**：一张坏图会让整份导出和整副缩略图一起失败（有单测）。图表里的字符串一律当纯文本（有注入单测）。
 - 内容量估算（`SlideRenderer.vue` 的 `contentLoad` / typst `content-load`）跳过 `chart` 键：数据行不是排版文字，计入会让图表页
   一律落到最小字号。两边的跳过列表必须一致。
 - 图表数据校验两份，规则一致：Rust `ChartSpec::problems()`（解析 Markdown、`validate.rs`）与 TS `chartProblems()`
   （Step3 编辑器「图表数据（JSON）」框与高级 JSON 的语义错误；只有通过校验的 JSON 才写回牌组）。
-- 配色只在 CSS（`--chart-*` 与主题 token，`themeFromCssVars` 读取）；typst 主题里**没有**图表色，SVG 自带颜色。
-- 校准结果（Vue 对照页实测）：绘图框宽度一致（646/647），高度差 ≤ 5px（仅「有副标题、无页脚」时，源自通用 `content-page` 几何）；
+- 配色两份：屏幕 CSS（`--chart-*`，`themeFromCssVars` 读取）与每个 typst 主题字典的 `chart`（`palette` 6 色、`grid`、`axis`、
+  `success`，`_check.typ` 校验键集合与色数），文字色用主题的 `ink` / `muted`。改主题的图表色两边一起改。
+- 卡片校准结果（Vue 对照页实测）：绘图框宽度一致（646/647），高度差 ≤ 5px（仅「有副标题、无页脚」时，源自通用 `content-page` 几何）；
   左栏要点与 focus_example 同一套度量（card-title 标题、caption 正文 70%、序号同标题字号）；卡片底色取 `paper`；
   图表标题为墨色（模板里的 `text="var(--primary)"` 在屏幕上不生效，13 处模板都如此，typst 一律按屏幕实测）。
-- 回归与目检：`crates/slide-typst/tests/fixtures/charts.json`（五种图）+ `charts/svg/`（由 `scripts/chart-fixtures.ts` 生成的原始 SSR 输出）
-  + `charts/themes/*.json`（Vue 对照页读出的五套 `ChartTheme`）。改了 `buildChartOption` 后重新生成：
+- 回归与目检：`crates/slide-typst/tests/fixtures/charts.json`（五种图）与 `charts-edge.json`（负值、千分位、小数、30 个类目、
+  单点、全零、含 0/负值扇区、12 扇区、6 系列、四种占位）。改了 `chart.typ` 后渲染出图目检：
 
   ```bash
-  cargo run -p slide-typst --example render_fixture -- crates/slide-typst/tests/fixtures/charts.json target/chart-check --chart-boxes
-  bun scripts/chart-fixtures.ts crates/slide-typst/tests/fixtures/charts.json target/chart-check/chart-boxes.json crates/slide-typst/tests/fixtures/charts/themes/light-notes.json crates/slide-typst/tests/fixtures/charts/svg
-  cargo run -p slide-typst --example render_fixture -- crates/slide-typst/tests/fixtures/charts.json target/chart-check --assets crates/slide-typst/tests/fixtures/charts/svg/assets.json --png
+  cargo run --release -p slide-typst --example render_fixture -- crates/slide-typst/tests/fixtures/charts.json target/chart-check --png --theme dark-blue
+  cargo run --release -p slide-typst --example render_fixture -- crates/slide-typst/tests/fixtures/charts-edge.json target/chart-check/edge --png
   ```
 - 来源角标 `chartSourceLabel()` 与 `chart-focus.typ` 的 `source-caption` 必须同步；`source` 是内部枚举，不能原样显示。
 
@@ -444,10 +449,9 @@ Step2 详情大图、演示主画面、Step3 实时预览仍是 `SlideRenderer`�
 - 链路：`useTypstThumbnails` → `render_slide_thumbnails`（`commands/thumbnails.rs`）→
   `Renderer::render_png`（**整副编译**，按 `only` 光栅化，返回 `data:image/png` 给 `<img>`）。
   命令复用 `pdf.rs` 的 `renderer()` / `prepare_export()`，主题、比例、字体、素材映射与 PDF 导出一致；
-  图表 SVG 与导出共用 `composables/chartSvgs.ts` 的 `buildChartSvgs`。启动时 `.setup` 在后台预热字体扫描。
-- **不能单页编译**：`ctx.index` 决定 `chart:<index>` 素材键和溢出标记。Step2 生成中有空位时只发已有蓝图组成的
-  子集，Typst 的页序、返回的 `index`、`chart:<index>` 都是**子集位置**，组合函数再映射回传入数组的下标；
-  图表 SVG 也必须用同一个子集构建。
+  图表由 Typst 直接绘制，不经过 WebView。启动时 `.setup` 在后台预热字体扫描。
+- **页序**：`ctx.index` 决定溢出标记的页号。Step2 生成中有空位时只发已有蓝图组成的子集，Typst 的页序、返回的
+  `index` 都是**子集位置**，组合函数再映射回传入数组的下标。
 - 缓存键 = 蓝图 JSON + 子集位置 + 主题 id + 字体 + 宽度档位（64px）。响应按**键**落图，不按请求序号整批丢弃：
   后一次请求只含它那一刻变了的页，整批丢弃会让前一批的页永远等不到图（Step2 会一直显示加载底）。
 - `enabled()` 为假只是不发请求、保留已有的图（全览关了再开不重渲）；`localStorage['huanshu.typstThumbnails'] = '0'`

@@ -19,7 +19,7 @@ use tauri::State;
 use crate::types::SlideBlueprint;
 use crate::AppState;
 
-use super::pdf::{prepare_export, renderer, ChartSvgInput};
+use super::pdf::{prepare_export, renderer};
 
 /// One rasterized page, addressed by its index in the `slides` array of the request.
 #[derive(Debug, Serialize)]
@@ -47,15 +47,12 @@ pub struct ThumbnailBatch {
 
 /// Rasterizes `slides` (the deck currently on screen) into PNG thumbnails.
 ///
-/// `only` limits the rasterized pages; positions refer to `slides`, which is also the array the
-/// caller must pass to `pdf_chart_boxes`/`buildChartSvgs`, because `chart:<index>` is keyed by
-/// that deck order.
+/// `only` limits the rasterized pages; positions refer to `slides`.
 #[tauri::command]
 pub async fn render_slide_thumbnails(
     project_id: Option<i64>,
     slides: Vec<SlideBlueprint>,
     theme: Option<String>,
-    chart_svgs: Option<Vec<ChartSvgInput>>,
     width_px: u32,
     only: Option<Vec<usize>>,
     state: State<'_, Mutex<AppState>>,
@@ -67,14 +64,8 @@ pub async fn render_slide_thumbnails(
             elapsed_ms: 0,
         });
     }
-    let (slides, options, theme_fallback) = prepare_export(
-        project_id,
-        Some(slides),
-        theme,
-        chart_svgs.as_deref(),
-        true,
-        &state,
-    )?;
+    let (slides, options, theme_fallback) =
+        prepare_export(project_id, Some(slides), theme, &state)?;
     tauri::async_runtime::spawn_blocking(move || {
         render_thumbnails(&slides, &options, width_px, only.as_deref(), theme_fallback)
     })

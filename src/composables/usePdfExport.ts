@@ -2,7 +2,6 @@ import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import type { SlideBlueprint } from '../components/types'
-import { buildChartSvgs } from './chartSvgs'
 
 /** Mirrors `commands::pdf::PdfExportReport` (src-tauri/src/commands/pdf.rs). */
 export interface PdfExportReport {
@@ -52,23 +51,12 @@ export function usePdfExport() {
     error.value = ''
     note.value = request.note ?? ''
     try {
-      // 首页导出不带 slides：先读出项目保存的牌组（SSR 需要 chart 数据）。之后两次调用都
-      // 显式传同一份 slides，保证 chart:<index> 与 Rust 侧排版的页序一致。
-      let slides = request.slides
-      if (!slides && request.projectId != null) {
-        const project = await invoke<{ blueprints_json: string }>('get_project', { id: request.projectId })
-        if (project.blueprints_json.trim()) slides = JSON.parse(project.blueprints_json) as SlideBlueprint[]
-      }
-      const themeId = document.documentElement.getAttribute('data-theme')
-      const chartSvgs = slides?.length
-        ? await buildChartSvgs(slides, { projectId: request.projectId, themeId })
-        : null
+      // 不带 slides（首页导出）时 Rust 侧读取项目保存的牌组；图表由 Typst 直接绘制。
       report.value = await invoke<PdfExportReport>('export_pdf', {
         projectId: request.projectId,
-        slides: slides ?? null,
+        slides: request.slides ?? null,
         path,
-        theme: themeId,
-        chartSvgs,
+        theme: document.documentElement.getAttribute('data-theme'),
       })
     } catch (e) {
       error.value = typeof e === 'string' ? e : e instanceof Error ? e.message : String(e)

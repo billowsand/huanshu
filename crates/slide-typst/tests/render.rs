@@ -275,89 +275,18 @@ fn fixture_assets() -> slide_typst::Assets {
     slide_typst::Assets::from_manifest(std::path::Path::new(&path)).unwrap()
 }
 
-#[test]
-fn chart_focus_renders_sanitized_ssr_svg_and_reports_missing() {
-    // Mimics ECharts SSR output: compact path data (letter glued to numbers)
-    // and bare double quotes inside the style attribute (invalid XML) — the
-    // asset pipe must normalize both before Typst sees the SVG.
-    let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="920" height="440"><path d="M48 400.5L880 100V50" style="fill:#f59e0b"/><text x="10" y="20" style="font-family:"Microsoft YaHei", "PingFang SC", sans-serif;font-size:12px;fill:#333">标签</text></svg>"#;
-    let slides = vec![
-        json!({ "kind": "cover", "title": "封面" }),
-        json!({
-            "kind": "chart_focus",
-            "title": "交付量解读",
-            "points": [{ "step": "01", "title": "趋势", "body": "逐季上升" }],
-            "chart": {
-                "type": "bar", "title": "季度交付量",
-                "data": [{ "q": "Q1", "n": 12 }],
-                "encoding": { "x": "q", "y": "n" },
-                "source": "user_input"
-            }
-        }),
-    ];
-    let mut assets = slide_typst::Assets::new();
-    assets.insert_bytes(slide_typst::chart_asset_ref(1), svg.as_bytes().to_vec());
-    let options = ExportOptions {
-        assets,
-        ..Default::default()
-    };
-    let rendered = render(&slides, &options);
-    assert!(
-        rendered.missing_assets.is_empty(),
-        "{:?}",
-        rendered.missing_assets
-    );
-
-    // Without the SVG the page still renders (placeholder card) and the
-    // synthetic chart:<index> reference is reported.
-    let rendered = render(&slides, &ExportOptions::default());
-    let missing: Vec<_> = rendered
-        .missing_assets
-        .iter()
-        .map(|m| (m.slide, m.reference.as_str()))
-        .collect();
-    assert_eq!(missing, vec![(1, "chart:1")]);
-
-    // The measuring pass (no SVG yet) and the export pass (with it) must agree on
-    // the plot box, otherwise the SVG would not land 1:1.
-    let boxes = renderer()
-        .chart_boxes(&slides, &ExportOptions::default())
-        .unwrap();
-    assert_eq!(boxes.len(), 1);
-    let measured = &boxes[0];
-    assert_eq!(measured.slide, 1);
-    assert!(
-        measured.width > 500.0 && measured.width < 700.0,
-        "{measured:?}"
-    );
-    assert!(
-        measured.height > 200.0 && measured.height < 450.0,
-        "{measured:?}"
-    );
-    assert!(measured.scale >= 1.25, "{measured:?}");
-    let mut assets = slide_typst::Assets::new();
-    assets.insert_bytes(slide_typst::chart_asset_ref(1), svg.as_bytes().to_vec());
-    let with_svg = renderer()
-        .compile(
-            &slides,
-            &ExportOptions {
-                assets,
-                ..Default::default()
-            },
-        )
-        .unwrap()
-        .chart_boxes;
-    assert_eq!(with_svg, boxes);
+/// Every text run on a page, in drawing order.
+fn page_texts(document: &typst_layout::PagedDocument, page: usize) -> Vec<String> {
+    let mut runs = Vec::new();
+    text_fills(&document.pages()[page].frame, &mut runs);
+    runs.into_iter().map(|(text, _)| text).collect()
 }
 
-/// All five chart types, as raw ECharts SSR output from the app's own option
-/// builder (regenerate with scripts/chart-fixtures.ts, see the header there),
-/// through the asset pipe in every theme and in 16:9 and 32:9.
+/// The five chart types are drawn natively (lib/chart.typ) in every theme and
+/// aspect: one page each, nothing clipped, no assets involved.
 #[test]
 fn every_chart_type_renders_in_every_theme_and_aspect() {
     let deck = load("tests/fixtures/charts.json");
-    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/charts/svg/assets.json");
     let types: Vec<&str> = deck
         .iter()
         .map(|s| s["chart"]["type"].as_str().unwrap())
@@ -367,28 +296,162 @@ fn every_chart_type_renders_in_every_theme_and_aspect() {
         ["line", "bar", "donut", "grouped_bar", "stacked_area"]
     );
     for theme in SUPPORTED_THEMES {
-        for aspect in ["ratio_16x9", "ratio_32x9"] {
+        for aspect in ["ratio_16x9", "ratio_32x9", "ratio_48x9"] {
             let options = ExportOptions {
                 theme: theme.to_string(),
                 aspect_ratio: aspect.to_string(),
-                assets: slide_typst::Assets::from_manifest(&manifest).unwrap(),
                 ..Default::default()
             };
             let rendered = render(&deck, &options);
-            assert_eq!(rendered.pages, deck.len(), "{theme} {aspect}");
-            assert!(
-                rendered.missing_assets.is_empty(),
-                "{theme} {aspect}: {:?}",
-                rendered.missing_assets
-            );
             assert!(
                 rendered.overflows.is_empty(),
                 "{theme} {aspect}: {:?}",
                 rendered.overflows
             );
-            let boxes = renderer().chart_boxes(&deck, &options).unwrap();
-            assert_eq!(boxes.len(), deck.len(), "{theme} {aspect}");
+            assert!(
+                rendered.missing_assets.is_empty(),
+                "{theme} {aspect}: {:?}",
+                rendered.missing_assets
+            );
         }
+    }
+}
+
+/// Axis ticks follow ECharts' nice intervals, values print with thousands
+/// separators and without float tails, and donut percentages add up.
+#[test]
+fn chart_axes_and_labels_print_like_echarts() {
+    let deck = load("tests/fixtures/charts.json");
+    let document = renderer()
+        .compile(&deck, &ExportOptions::default())
+        .unwrap()
+        .document;
+    let line = page_texts(&document, 0);
+    for tick in ["0", "10", "20", "30", "40", "50", "1月", "6月", "36", "41"] {
+        assert!(
+            line.iter().any(|t| t == tick),
+            "line chart lacks {tick}: {line:?}"
+        );
+    }
+    let bar = page_texts(&document, 1);
+    assert!(
+        bar.iter().any(|t| t == "600"),
+        "530 must round up to 600: {bar:?}"
+    );
+    assert!(!bar.iter().any(|t| t == "540"), "{bar:?}");
+    let grouped = page_texts(&document, 3);
+    assert!(
+        grouped.iter().any(|t| t == "180"),
+        "170 → 0..180 by 30: {grouped:?}"
+    );
+    let stacked = page_texts(&document, 4);
+    assert!(
+        stacked.iter().any(|t| t == "120"),
+        "stack total 119 → 120: {stacked:?}"
+    );
+    let donut = page_texts(&document, 2);
+    for label in ["46%", "18%", "13%", "9%", "14%", "100", "合计"] {
+        assert!(
+            donut.iter().any(|t| t == label),
+            "donut lacks {label}: {donut:?}"
+        );
+    }
+
+    let edge = load("tests/fixtures/charts-edge.json");
+    let document = renderer()
+        .compile(&edge, &ExportOptions::default())
+        .unwrap()
+        .document;
+    let big = page_texts(&document, 2);
+    for label in ["1,234,567", "2,345,678.5", "3,456,789", "3,500,000"] {
+        assert!(big.iter().any(|t| t == label), "lacks {label}: {big:?}");
+    }
+    let decimals = page_texts(&document, 3);
+    assert!(decimals.iter().any(|t| t == "0.3"), "{decimals:?}");
+    assert!(
+        !decimals.iter().any(|t| t.contains("0000")),
+        "float tail printed: {decimals:?}"
+    );
+    let negative = page_texts(&document, 0);
+    for label in ["-45", "-80.5", "-100", "150"] {
+        assert!(
+            negative.iter().any(|t| t == label),
+            "lacks {label}: {negative:?}"
+        );
+    }
+    // Zero and negative sectors get no label; the rest still add up to 100%.
+    let donut = page_texts(&document, 7);
+    assert!(
+        !donut.iter().any(|t| t == "零值" || t == "负值"),
+        "{donut:?}"
+    );
+    assert!(donut.iter().any(|t| t == "50%"), "{donut:?}");
+}
+
+/// Malformed charts from old or hand-edited decks degrade to the placeholder
+/// with the reason; they never fail the compile (one bad chart would fail the
+/// whole export and every thumbnail of the deck).
+#[test]
+fn undrawable_charts_render_a_placeholder_instead_of_failing() {
+    let edge = load("tests/fixtures/charts-edge.json");
+    let rendered = render(&edge, &ExportOptions::default());
+    assert!(rendered.overflows.is_empty(), "{:?}", rendered.overflows);
+    let document = renderer()
+        .compile(&edge, &ExportOptions::default())
+        .unwrap()
+        .document;
+    let placeholder = |page: usize| {
+        page_texts(&document, page)
+            .iter()
+            .any(|t| t == "图表待补充")
+    };
+    for (page, slide) in edge.iter().enumerate() {
+        let expected = slide["title"].as_str().unwrap().starts_with("占位");
+        assert_eq!(placeholder(page), expected, "page {page}");
+    }
+    let broken = vec![
+        json!({ "kind": "chart_focus", "title": "缺 chart" }),
+        json!({ "kind": "chart_focus", "title": "chart 不是对象", "chart": "bar" }),
+        json!({ "kind": "chart_focus", "title": "data 不是数组", "chart": { "type": "bar", "data": 3 } }),
+        json!({ "kind": "chart_focus", "title": "行不是对象", "chart": { "type": "bar", "data": [1, 2], "encoding": { "x": "a", "y": "b" } } }),
+        json!({ "kind": "chart_focus", "title": "series 坏", "chart": { "type": "grouped_bar", "data": [{ "x": "a" }], "encoding": { "x": "x" }, "series": [3] } }),
+        json!({ "kind": "chart_focus", "title": "布尔与 null", "chart": {
+            "type": "bar", "title": "t", "data": [{ "x": true, "y": "1e3" }, { "x": null, "y": 2 }],
+            "encoding": { "x": "x", "y": "y" }, "emphasis": { "highlight": "x" }
+        } }),
+    ];
+    render(&broken, &ExportOptions::default());
+}
+
+/// Chart strings are data: markup in categories, series names or highlights
+/// renders as text and never reaches Typst as code.
+#[test]
+fn chart_strings_are_never_evaluated_as_typst_markup() {
+    let hostile = r#"#panic("x") ] [ $x$ <lbl> @ref *b*"#;
+    let slides = vec![
+        json!({ "kind": "chart_focus", "title": "t", "chart": {
+            "type": "line", "title": hostile,
+            "data": [{ "k": hostile, "v": 1 }, { "k": "b", "v": 2 }],
+            "encoding": { "x": "k", "y": "v" }, "emphasis": { "highlight": [hostile] }
+        } }),
+        json!({ "kind": "chart_focus", "title": "t", "chart": {
+            "type": "grouped_bar", "title": "t",
+            "data": [{ "k": "a", "a": 1 }],
+            "encoding": { "x": "k" }, "series": [{ "key": "a", "name": hostile }]
+        } }),
+        json!({ "kind": "chart_focus", "title": "t", "chart": {
+            "type": "donut", "title": "t",
+            "data": [{ "k": hostile, "v": 1 }, { "k": "b", "v": 3 }],
+            "encoding": { "label": "k", "value": "v" }
+        } }),
+    ];
+    let document = renderer()
+        .compile(&slides, &ExportOptions::default())
+        .unwrap()
+        .document;
+    for page in 0..slides.len() {
+        let text = page_texts(&document, page).concat();
+        assert!(text.contains(r#"#panic("x")"#), "page {page}: {text}");
     }
 }
 

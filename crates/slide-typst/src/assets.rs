@@ -136,17 +136,6 @@ fn image_refs(slide: &serde_json::Value) -> Vec<&str> {
         .collect()
 }
 
-/// Synthetic reference of a chart_focus slide's SSR SVG. The app renders the
-/// chart in the webview (ECharts SSR) and hands the SVG bytes over `Assets`;
-/// the template looks the result up by this exact spelling.
-pub fn chart_asset_ref(slide_index: usize) -> String {
-    format!("chart:{slide_index}")
-}
-
-fn is_chart_slide(slide: &serde_json::Value) -> bool {
-    slide.get("kind").and_then(|v| v.as_str()) == Some("chart_focus")
-}
-
 /// ECharts SSR SVG → 合法 XML。SSR 把字体列表原样写进 style 属性：
 /// `style="font-family:"Microsoft YaHei", "PingFang SC", sans-serif;"`，内层裸双引号会提前
 /// 结束属性值，XML 解析直接失败。把 `font-family:` 值里的双引号换成单引号即可（保留整条回退列表）。
@@ -184,11 +173,7 @@ pub(crate) fn prepare(slides: &[serde_json::Value], assets: &Assets) -> Prepared
     // Failures are cached per reference but reported for every slide using it.
     let mut failures: HashMap<String, String> = HashMap::new();
     for (index, slide) in slides.iter().enumerate() {
-        let mut refs: Vec<String> = image_refs(slide).iter().map(|r| r.to_string()).collect();
-        if is_chart_slide(slide) {
-            refs.push(chart_asset_ref(index));
-        }
-        for reference in refs {
+        for reference in image_refs(slide).into_iter().map(str::to_string) {
             if prepared.paths.contains_key(&reference) {
                 continue;
             }

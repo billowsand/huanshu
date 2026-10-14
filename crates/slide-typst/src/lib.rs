@@ -15,7 +15,7 @@ mod assets;
 mod icons;
 mod math;
 
-pub use assets::{chart_asset_ref, AssetData, Assets, MissingAsset};
+pub use assets::{AssetData, Assets, MissingAsset};
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -40,6 +40,7 @@ const TEMPLATES: &[(&str, &str)] = &[
         "/lib/components.typ",
         include_str!("../typst/lib/components.typ"),
     ),
+    ("/lib/chart.typ", include_str!("../typst/lib/chart.typ")),
     (
         "/themes/notes.typ",
         include_str!("../typst/themes/notes.typ"),
@@ -289,24 +290,11 @@ pub struct Overflow {
     pub available_pt: f64,
 }
 
-/// The plot box of a `chart_focus` slide (`<chart-box>` marker in chart-focus.typ), in CSS px
-/// of the slide canvas, plus the slide's `--type-scale`. The app renders each chart's SVG at
-/// exactly this size and scale so it embeds 1:1 (see `Renderer::chart_boxes`).
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct ChartBox {
-    /// Index into the `slides` passed to the renderer.
-    pub slide: usize,
-    pub width: f64,
-    pub height: f64,
-    pub scale: f64,
-}
-
 /// A laid-out deck plus layout diagnostics.
 pub struct Compiled {
     pub document: PagedDocument,
     pub overflows: Vec<Overflow>,
     pub missing_assets: Vec<MissingAsset>,
-    pub chart_boxes: Vec<ChartBox>,
 }
 
 /// Exported PDF bytes plus layout diagnostics.
@@ -399,7 +387,7 @@ impl Renderer {
     /// Compiles the whole deck once and rasterizes the requested pages (all when `only` is None).
     ///
     /// The whole deck is compiled even when one page is wanted: the slide index (`ctx.index`)
-    /// keys the `chart:<index>` assets and the overflow markers, so pages cannot be rasterized
+    /// keys the overflow markers (and layouts may depend on it), so pages cannot be rasterized
     /// from a subset compile. `width_px` is the thumbnail width in device pixels; each page is
     /// rasterized at `width_px / page width` pixels per point, so its height follows the page's
     /// own aspect ratio. Pages beyond `slides.len()` (a layout that overflowed its canvas) and
@@ -461,18 +449,6 @@ impl Renderer {
             overflows,
             missing_assets,
         })
-    }
-
-    /// Plot boxes of every chart_focus slide. The chart SVGs are rendered by the app (ECharts
-    /// SSR) and must be sized before the export, so the app lays the deck out once without them
-    /// (the layout does not depend on whether the SVG is present), renders each chart at its
-    /// box, and then calls `render_pdf` with the SVGs in `options.assets`.
-    pub fn chart_boxes(
-        &self,
-        slides: &[serde_json::Value],
-        options: &ExportOptions,
-    ) -> Result<Vec<ChartBox>, RenderError> {
-        Ok(self.compile(slides, options)?.chart_boxes)
     }
 
     /// Lays out the deck without exporting, e.g. to rasterize pages for visual checks.
@@ -548,12 +524,10 @@ impl Renderer {
             );
         }
         let overflows = query_markers(&document, "slide-overflow");
-        let chart_boxes = query_markers(&document, "chart-box");
         Ok(Compiled {
             document,
             overflows,
             missing_assets: prepared.missing,
-            chart_boxes,
         })
     }
 

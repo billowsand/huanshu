@@ -1,16 +1,14 @@
 // chart_focus — port of KeynoteChartSlide.vue: interpretation points on the
-// left (5/12), a chart card on the right (7/12). The chart itself is NOT
-// drawn in Typst: the app renders the same ECharts option in SSR mode, the
-// PDF export hands the SVG over the asset pipe (`chart:<slide index>`), and
-// this template embeds it with image(). Colors inside the SVG already carry
-// the theme palette; the card chrome (fill/stroke/title/caption) reads the
-// theme dictionary here.
+// left (5/12), a chart card on the right (7/12). The chart is drawn natively by
+// lib/chart.typ (a port of the app's ECharts option builder) inside the card's
+// plot box; the card chrome (fill/stroke/title/caption) reads the theme here.
 
 #import "../lib/components.typ": *
+#import "../lib/chart.typ": as-text, chart-plot, chart-read
 
 #let gap = 20 // `gap-5` between the columns
 
-// Shown when the chart data or its SSR SVG asset is missing.
+// Shown when there is no chart or its data cannot be drawn (`chart-read`).
 #let placeholder(ctx, w, h, label, detail: none) = block(
   width: w,
   height: h,
@@ -65,8 +63,8 @@
   let note = chart.at("source_note", default: none)
   let text = if source == "llm_generated" {
     "⚠ 示例数据"
-  } else if has(note) and str(note).trim() != "" {
-    "数据来源：" + str(note).trim()
+  } else if has(note) and as-text(note).trim() != "" {
+    "数据来源：" + as-text(note).trim()
   } else if source == "tool" {
     "数据来源：工具生成"
   } else {
@@ -79,10 +77,10 @@
 #let chart-card(ctx, slide, width, height, f) = {
   let th = ctx.theme
   let chart = slide.at("chart", default: none)
-  if not has(chart) {
+  if type(chart) != dictionary {
     return placeholder(ctx, width, height, "图表待补充", detail: "缺少 chart 字段")
   }
-  let info = ctx.assets.at("chart:" + str(ctx.index), default: none)
+  let spec = chart-read(chart)
   let card-pad = 20 * px // `p-5`
   // Card chrome, measured on the Vue page: title `mb-2`; caption `mt-2`, then a
   // 1px top border and `pt-2` (the stroke takes no layout space here, so it is
@@ -92,29 +90,18 @@
   let rule-pad = 1 + 8
   // Ink, like focus_example's example title: the template's `text="var(--primary)"`
   // attribute does not take effect on screen (measured in all five themes).
-  let title = txt(ctx, "title", ctx.ty.card-title * f, 1.3, chart.at("title", default: ""))
+  let title = txt(ctx, "title", ctx.ty.card-title * f, 1.3, as-text(chart.at("title", default: "")))
   let caption = source-caption(ctx, chart, f)
   let title-h = measure(block(width: width - 2 * card-pad, title)).height
   let caption-h = measure(block(width: width - 2 * card-pad, caption)).height
   let inner-w = width - 2 * card-pad
   let inner-h = height - 2 * card-pad - title-h - caption-h - (title-gap + caption-gap + rule-pad) * px * f
-  // Exact plot box in CSS px plus the slide's type scale: the app compiles the
-  // deck once without charts (`Renderer::chart_boxes`), renders each SVG at
-  // this size and scale in the webview, then exports. So the SVG lands 1:1 and
-  // its labels have the same size as on screen. Emitted with or without the
-  // SVG, so the measuring pass sees the same layout as the export.
-  let marker = [#metadata((
-    slide: ctx.index,
-    width: inner-w / px,
-    height: inner-h / px,
-    scale: ctx.scale,
-  )) <chart-box>]
-  // `contain`, not Typst's default `cover`: a size mismatch (e.g. an SVG from
-  // an older measurement) must letterbox, never crop axis labels.
-  let plot = if info == none {
-    placeholder(ctx, inner-w, inner-h, "图表待补充")
+  // Data that cannot be drawn shows the placeholder with the reason, never a
+  // compile error: one bad chart must not fail the export or the thumbnails.
+  let plot = if spec.ok {
+    chart-plot(ctx, spec, inner-w, inner-h)
   } else {
-    image(info.path, width: inner-w, height: inner-h, fit: "contain")
+    placeholder(ctx, inner-w, inner-h, "图表待补充", detail: spec.reason)
   }
   block(
     width: width,
@@ -127,7 +114,6 @@
     pad(
       card-pad,
       {
-        marker
         title
         v(title-gap * px * f)
         box(width: inner-w, height: inner-h, plot)
