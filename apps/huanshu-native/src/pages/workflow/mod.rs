@@ -399,10 +399,12 @@ impl WorkflowPage {
         self.autosave_task = None;
         let snapshot = DraftSnapshot::capture(self.model.read(cx));
         self.autosave_task = Some(cx.spawn_in(window, async move |this, window| {
-            {
-                let _guard = crate::tasks::tokio().enter();
-                tokio::time::sleep(std::time::Duration::from_millis(800)).await;
-            }
+            // GPUI 自己的计时器。不要在这里用 tokio 的 sleep：那要 `tokio().enter()`，而守卫跨 `.await`
+            // 留在 UI 线程上，两个计时同时在等时会乱序释放，tokio 直接 panic。
+            window
+                .background_executor()
+                .timer(std::time::Duration::from_millis(800))
+                .await;
             let _ = this.update_in(window, |this, window, cx| {
                 this.flush_draft(snapshot, window, cx);
             });
@@ -676,10 +678,10 @@ impl WorkflowPage {
                 // 原版 watch：完成且无失败页 800ms 后自动跳到第 3 步（用户已离开第 2 步则不跳）。
                 // 本轮没有页级失败状态跟踪，Ok 即视为无失败页。
                 self.advance_task = Some(cx.spawn_in(window, async move |this, window| {
-                    {
-                        let _guard = crate::tasks::tokio().enter();
-                        tokio::time::sleep(std::time::Duration::from_millis(800)).await;
-                    }
+                    window
+                        .background_executor()
+                        .timer(std::time::Duration::from_millis(800))
+                        .await;
                     let _ = this.update_in(window, |this, window, cx| {
                         if this.step == Step::Generate && !this.model.read(cx).generation_failed {
                             this.show_step(Step::Edit, window, cx);

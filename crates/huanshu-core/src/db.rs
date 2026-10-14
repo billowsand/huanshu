@@ -506,6 +506,11 @@ pub fn set_app_setting(conn: &Connection, key: &str, value: &str) -> Result<()> 
     Ok(())
 }
 
+pub fn delete_app_setting(conn: &Connection, key: &str) -> Result<()> {
+    conn.execute("DELETE FROM app_settings WHERE key = ?1", params![key])?;
+    Ok(())
+}
+
 pub fn is_first_run(conn: &Connection) -> Result<bool> {
     let configured = get_app_setting(conn, "storage_configured")?;
     Ok(configured.is_none())

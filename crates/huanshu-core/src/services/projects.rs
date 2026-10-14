@@ -77,6 +77,8 @@ pub fn delete_project(state: &SharedState, id: i64) -> Result<()> {
         let st = state.lock().unwrap();
         let db = st.db.lock().unwrap();
         db::delete_project(&*db, id).map_err(|e| e.to_string())?;
+        // 第一步的附加信息（文件名、粒度、比例）随项目一起删。
+        db::delete_app_setting(&*db, &step1_meta_key(id)).map_err(|e| e.to_string())?;
     }
 
     let project_media_dir = PathBuf::from(&media_dir)
@@ -218,6 +220,20 @@ mod tests {
         };
         set_step1_project_meta(&state, 7, &next).unwrap();
         assert_eq!(get_step1_project_meta(&state, 7).unwrap(), Some(next));
+    }
+
+    #[test]
+    fn deleting_a_project_drops_its_step1_meta() {
+        let state = test_state();
+        let id = create_project(&state, "临时".to_string(), "# 临时".to_string()).unwrap();
+        let meta = Step1ProjectMeta {
+            md_filename: "a.md".to_string(),
+            granularity: "h2".to_string(),
+            aspect_ratio: "ratio_16x9".to_string(),
+        };
+        set_step1_project_meta(&state, id, &meta).unwrap();
+        delete_project(&state, id).unwrap();
+        assert_eq!(get_step1_project_meta(&state, id).unwrap(), None);
     }
 
     #[test]

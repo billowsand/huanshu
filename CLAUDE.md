@@ -47,6 +47,8 @@ bootstrap 所在目录为目标。Tauri 版用 `.claude/launch.json` 的 `tauri-
   **每张不再显示的 `RenderImage` 都要 `drop_image`**，GPUI 不会回收图集。
 - `PreviewCache::set_deck` / `set_wanted` 只在内容真变了时才重新打开失败闸：界面每帧都会调用它们，无条件打开会让编译不过的牌组每帧重试。
 - 页面快捷键用 `track_focus` + `on_key_down`；**不要用 `observe_keystrokes`**（全应用的，会收到其他窗口和其他页面的按键）。
+- 界面里的延时（防抖、自动跳页）用 GPUI 的 `background_executor().timer(..)`，**不要用 `tokio::time::sleep`**：它需要
+  `tokio().enter()`，守卫跨 `.await` 留在 UI 线程上，两个计时同时在等就会乱序释放，tokio 直接 panic。tokio 只给 core 的 async 服务用（`tasks::run_async`）。
 - 演示是盖在当前页上的覆盖层（与原版一致），打开即全屏，Esc 先关全览再退出并退出全屏。
 - 主题存在 `app_settings` 的 `app_theme` 键，与 Tauri 版（WebView localStorage）暂不同步。
 - 量内存要量**本进程**：PowerShell 里的 `$PID` 是 PowerShell 自己。只读查看器阶段实测（release，5 分钟每 100ms 翻一页）工作集稳定在 385–412 MiB。
