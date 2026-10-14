@@ -96,12 +96,39 @@ impl Step2 {
 impl Render for Step2 {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let c = cx.studio().colors;
-        let (deck, aspect, generating) = {
+        let (deck, aspect, generating, generation_failed, gen_stage, gen_message) = {
             let model = self.model.read(cx);
-            (model.deck.clone(), model.aspect_ratio(), model.generating)
+            (
+                model.deck.clone(),
+                model.aspect_ratio(),
+                model.generating,
+                model.generation_failed,
+                model.gen_stage.clone(),
+                model.gen_message.clone(),
+            )
         };
         let count = deck.len();
         self.selected = self.selected.min(count.saturating_sub(1));
+
+        // 顶部状态三态（原版 Step2Generate.vue 头部 + `gen.stageLabel`）：
+        // 生成中 → 阶段标签 + 最新进度文案；出错 → 生成出错 + 错误信息；否则 生成完成。
+        let (status_title, status_sub, status_color) = if generation_failed {
+            ("生成出错".to_string(), gen_message.clone(), c.error)
+        } else if generating {
+            let label = super::stage_label(&gen_stage);
+            let sub = if gen_message.trim().is_empty() {
+                label.clone()
+            } else {
+                format!("{label} · {gen_message}")
+            };
+            ("生成中…".to_string(), sub, c.primary)
+        } else {
+            (
+                format!("生成完成 · {count} 张幻灯片"),
+                format!("已加载 {count} 张幻灯片"),
+                c.success,
+            )
+        };
 
         let slots: Vec<Option<serde_json::Value>> = deck.iter().cloned().map(Some).collect();
         self.thumbs.set_deck(slots.clone());
@@ -144,26 +171,18 @@ impl Render for Step2 {
             .bg(c.panel)
             .border_b_1()
             .border_color(c.border)
-            .child(div().size(px(10.0)).rounded_full().bg(if generating {
-                c.primary
-            } else {
-                c.success
-            }))
+            .child(div().size(px(10.0)).rounded_full().bg(status_color))
             .child(
                 div()
                     .flex_1()
                     .flex()
                     .flex_col()
-                    .child(div().text_size(px(16.0)).child(if generating {
-                        "生成中…".to_string()
-                    } else {
-                        format!("生成完成 · {count} 张幻灯片")
-                    }))
+                    .child(div().text_size(px(16.0)).child(status_title))
                     .child(
                         div()
                             .text_size(px(12.5))
                             .text_color(c.muted)
-                            .child(format!("已加载 {count} 张幻灯片")),
+                            .child(status_sub),
                     ),
             )
             .child(stat(count.to_string(), "幻灯片"))

@@ -77,16 +77,16 @@
 | 加载中 / 加载失败（返回首页） | ✅ | |
 | 侧栏：返回、项目名、三步（状态、说明、连线）、主题、设置 | ✅ | |
 | 初始步骤（生成中→2，有蓝图→3，否则→1）与可点击规则 | ✅ | `clickable` |
-| 项目改名（点名字编辑，回车/失焦保存，Esc 取消） | ⬜ | `saveName` |
-| 新建项目的草稿（名称、文稿、粒度、比例）保存与恢复 | ⬜ | `saveStep1Draft` / `persistStep1Meta` |
-| 生成完成后自动跳到第 3 步 | ⬜ | 原版 800ms 后切换 |
+| 项目改名（点名字编辑，回车/失焦保存，Esc 取消） | ✅ | `mod.rs::start_rename` / `save_name`（空名不保存、保持编辑态，照原版）；待截图对比 |
+| 新建项目的草稿（名称、文稿、粒度、比例）保存与恢复 | ✅ | 800ms 防抖自动保存（`WorkflowPage::schedule_autosave` / `persist_draft`，新建落库后 `retarget_route` 对准路由）；meta 存 `app_settings` 的 `project_meta:<id>`（`services::projects::Step1ProjectMeta`，单测 `step1_meta_*`）；待截图对比 |
+| 生成完成后自动跳到第 3 步 | ✅ | `on_generation_finished`：800ms 后若还在第 2 步且未失败则切（Ok 视为无失败页——页级状态跟踪下一轮）；待截图对比 |
 
 ## 第一步 `Step1Prepare.vue` + `MarkdownWorkbench.vue` → `workflow/step1.rs`
 
 | 功能 | 状态 | 说明 / 依据 |
 |---|---|---|
 | 名称输入（原版占位文案）、字数（UTF-16 码元数，与原版 `mdContent.length` 一致） | ✅ | `ProjectModel::md_len`；待截图对比 |
-| 草稿保存状态（保存中… / 已保存 / 失败） | 🟡 | 展示与文案已做（`DraftSaveState`）；防抖自动保存落库在 C 节 |
+| 草稿保存状态（保存中… / 已保存 / 失败） | ✅ | `WorkflowPage` 800ms 防抖自动保存置位（`DraftSaveState`）；失败原因显示在格式工具行（原版 `draftSaveError`）；待截图对比 |
 | Markdown 编辑器（高亮、行号） | ✅ | GPUI Kit `Editor`（tree-sitter markdown） |
 | Markdown 预览按页卡片（P1/P2…，`TextView::markdown`） | ✅ | `markdown_tools::split_preview_pages`（auto 先 `detect_granularity`）；空态「预览区将实时显示 Markdown 渲染效果」；待截图对比 |
 | 编辑区 ↔ 预览区滚动同步（按比例） | 🟡 | 预览容器 `ScrollHandle`（精确）↔ 编辑器 `scroll_offset`/`set_scroll_offset`；**已知偏差**：编辑器最大滚动量无公开 API，按「行数 × 行高 − 视口」估计，soft-wrap 折行时中段比例有偏差；预览侧滚动条拖拽不触发编辑器同步（只挂了滚轮）；双向均有回声守卫 |
@@ -96,16 +96,16 @@
 | 格式工具（自动标题、清除加粗、删除序号、三种编号） | ✅ | `markdown_tools::{auto_detect_headings, clear_heading_bold, remove_heading_numbers, add_heading_numbers}`；`replace_all` 保留撤销历史；快照单测 `markdown_tools.rs` |
 | 分页粒度（自动推荐 / 二级 / 三级，各自页数与标题数） | ✅ | `estimate_slides` / `detect_granularity` / `count_exact_headings`；待截图对比 |
 | 幻灯片比例三选一（写回项目） | ✅ | `update_project_aspect_ratio` |
-| 素材库（添加、拖入、列表、删除） | ✅ | `services::media::{import_media_asset, delete_media_asset, get_project_media}`；新建项目先 `create_project` + `open_project`（路由对准留 C 节）；图注编辑原版不在第一步（第三步高级 JSON）；待截图对比 |
-| 开始 AI 生成（建项目、保存文稿、切到第 2 步） | ⬜ | `onStep1StartGenerate`，C 节 |
+| 素材库（添加、拖入、列表、删除） | ✅ | `services::media::{import_media_asset, delete_media_asset, get_project_media}`；新建项目先 `create_project` + `open_project`，落库后 `retarget_route` 对准路由（原版 `router.replace`）；图注编辑原版不在第一步（第三步高级 JSON）；待截图对比 |
+| 开始 AI 生成（建项目、保存文稿、切到第 2 步） | ✅ | `WorkflowPage::start_generation`：取消防抖 → 立即落库 → 切第 2 步 → `generate_slides`（granularity auto 传 None）；事件经 `listen_events` 回 WorkflowPage 层驱动模型；出错显示「生成出错」不崩；**生成流程未真机验证**（需 LM Studio） |
 | 图表围栏的校验提示 | ⬜ | `input.rs` 的解析报错 |
 
 ## 第二步 `Step2Generate.vue` + `stores/generation.ts` → `workflow/step2.rs`
 
 | 功能 | 状态 | 说明 / 依据 |
 |---|---|---|
-| 顶部状态与统计（幻灯片数 / 关键事件 / 生成记录） | 🟡 | 只有幻灯片数 |
-| 生成流水线与事件 | ⬜ | `services::generation::generate_slides` + `tasks::listen_events`（`CoreEvent`） |
+| 顶部状态与统计（幻灯片数 / 关键事件 / 生成记录） | 🟡 | 幻灯片数；状态三态（生成中… 阶段标签+进度文案 / 生成出错+message / 生成完成·N 张）；「关键事件」「生成记录」待做 |
+| 生成流水线与事件 | ✅ | `services::generation::generate_slides` + `tasks::listen_events`（`CoreEvent`），事件处理在 `WorkflowPage` 层（Step2 会被切来切去，不挂它身上）；看板逐页状态消费在下一轮 |
 | 整体进度、五个阶段 n/N、查看详情 | ⬜ | `utils/generationProgress.ts` |
 | 看板卡片：序号、标题、状态、版式、缩略图 | 🟡 | 状态固定「已完成」；阶段标签未做 |
 | 看板只渲染可见卡片 | ⬜ | 现在整副请求；改成虚拟列表 + `wanted` |

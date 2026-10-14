@@ -13,14 +13,16 @@ use gpui_kit::component::Disableable as _;
 use gpui_kit::prelude::*;
 use gpui_kit::{
     div, img, point, px, Context, Entity, ExternalPaths, Render, ScrollHandle, SharedString,
-    Subscription, Window,
+    Subscription, WeakEntity, Window,
 };
 use huanshu_core::markdown_tools::{self, Granularity, HeadingNumberStyle};
+use huanshu_core::services::projects::Step1ProjectMeta;
 use huanshu_core::services::{generation, media, projects};
 use huanshu_core::types::AspectRatio;
 
-use super::ProjectModel;
+use super::{ProjectModel, WorkflowPage};
 use crate::icons::carbon;
+use crate::router::Route;
 use crate::shell::ShellHandle;
 use crate::tasks::{run_async, run_bg};
 use crate::theme::StudioExt as _;
@@ -89,6 +91,7 @@ fn apply_format_tool(md: &str, index: usize) -> String {
 pub struct Step1 {
     model: Entity<ProjectModel>,
     handle: ShellHandle,
+    page: WeakEntity<WorkflowPage>,
     name: Entity<InputState>,
     editor: Entity<EditorState>,
     /// AI 优化进行中（原版 `optimizing`）。
@@ -115,6 +118,7 @@ impl Step1 {
     pub fn new(
         model: Entity<ProjectModel>,
         handle: ShellHandle,
+        page: WeakEntity<WorkflowPage>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -141,8 +145,7 @@ impl Step1 {
                         model.name = value;
                         cx.notify();
                     });
-                    // TODO(parity): 原版草稿自动保存（防抖 800ms 后落库）在 C 节实现；
-                    // 届时任何改动都会把 draft_save_state 置为 Saving/Saved/Error。
+                    // 自动保存（防抖 800ms 落库）在 WorkflowPage 层观察这个模型统一处理。
                 }
             }),
             cx.observe(&editor, |this: &mut Self, editor, cx| {
@@ -160,6 +163,7 @@ impl Step1 {
         Self {
             model,
             handle,
+            page,
             name,
             editor,
             optimizing: false,
@@ -193,7 +197,7 @@ impl Step1 {
             model.granularity = granularity;
             cx.notify();
         });
-        // TODO(parity): C 节「项目附加信息」把粒度（连同文件名、比例）持久化，原版 `persistStep1Meta`。
+        // 持久化随 WorkflowPage 的自动保存一起写（`Step1ProjectMeta`）。
     }
 
     /// 把一份文稿载入编辑器（原版 `loadFilePath` / `onDrop`）：
@@ -361,7 +365,7 @@ impl Step1 {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let (name, md) = {
+        let (name, md, aspect) = {
             let model = self.model.read(cx);
             (
                 if model.name.trim().is_empty() {
@@ -370,6 +374,7 @@ impl Step1 {
                     model.name.trim().to_string()
                 },
                 model.md_content.clone(),
+                model.aspect,
             )
         };
         let shared = self.handle.shared().clone();
@@ -379,6 +384,18 @@ impl Step1 {
             move || {
                 let id = projects::create_project(&shared, name, md)?;
                 projects::open_project(&shared, id)?;
+                // 原版 `persistStep1Meta`：新建即写下附加信息。
+                let meta = Step1ProjectMeta {
+                    md_filename: String::new(),
+                    granularity: Granularity::Auto.as_str().to_string(),
+                    aspect_ratio: match aspect {
+                        AspectRatio::Ratio16x9 => "ratio_16x9",
+                        AspectRatio::Ratio32x9 => "ratio_32x9",
+                        AspectRatio::Ratio48x9 => "ratio_48x9",
+                    }
+                    .to_string(),
+                };
+                projects::set_step1_project_meta(&shared, id, &meta)?;
                 Ok::<i64, String>(id)
             },
             move |this: &mut Self, result, window, cx| {
@@ -388,8 +405,15 @@ impl Step1 {
                             model.id = Some(id);
                             cx.notify();
                         });
-                        // TODO(parity): 原版这里把路由换成 `/project/<id>`（`router.replace`），
-                        // 需要「只改路由不重建页面」的能力——C 节（工作流改名/自动保存）一并处理。
+                        // 原版 `router.replace(/project/<id>)`：只改路由、不重建页面
+                        // （`navigate` 会丢掉本页的编辑器与撤销历史）。
+                        this.handle.retarget_route(
+                            Route::Project {
+                                id: Some(id),
+                                step: None,
+                            },
+                            cx,
+                        );
                         this.import_media(paths, window, cx);
                     }
                     Err(error) => eprintln!("[native] 创建项目失败：{error}"),
@@ -575,6 +599,7 @@ impl Render for Step1 {
         let has_name = !model.name.trim().is_empty();
         let has_md = !md.trim().is_empty();
         let can_generate = model.can_generate_local();
+        let generating = model.generating;
         // `MediaAssetResponse` 不带 Clone，渲染前把列表需要的字段拷出来。
         let media: Vec<(i64, String, String, bool, Option<i64>, Option<i64>)> = model
             .media
@@ -1183,10 +1208,14 @@ impl Render for Step1 {
             .child(
                 widgets::primary_button("generate", "开始 AI 生成")
                     .icon(carbon("magic-wand"))
-                    // 原版 `canGenerate` 的本地部分（名称、文稿非空）+ `optimizing`；
-                    // TODO(parity): `!gen.running && retryingPages.size === 0` 与点击动作
-                    // （保存草稿、切第 2 步、启动流水线）在 C 节接上生成状态后实现。
-                    .disabled(!can_generate || optimizing),
+                    // 原版 `canGenerate`：名称、文稿非空、不在生成中（`retryingPages`
+                    // 是单页重试的状态，下一轮才有）+ `optimizing`。
+                    .disabled(!can_generate || generating || optimizing)
+                    .on_click(cx.listener(|this, _event, window, cx| {
+                        let _ = this.page.update(cx, |page, cx| {
+                            page.start_generation(window, cx);
+                        });
+                    })),
             )
             .child(
                 div()

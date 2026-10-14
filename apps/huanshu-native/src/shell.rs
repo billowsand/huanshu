@@ -52,6 +52,16 @@ impl ShellHandle {
             .update(cx, |shell, cx| shell.navigate(route, window, cx));
     }
 
+    /// 只改路由、不重建页面（原版 `router.replace`）。
+    ///
+    /// 工作流第一步的自动保存把新建项目落库后用它对准路由：`navigate` 会重建
+    /// `WorkflowPage`，Step1 的编辑器实体（连同撤销历史）会整个丢掉，所以不能用。
+    pub fn retarget_route(&self, route: Route, cx: &mut App) {
+        let _ = self
+            .shell
+            .update(cx, |shell, cx| shell.retarget_route(route, cx));
+    }
+
     /// 切换主题。`save` 为真时写入设置（`app_settings.app_theme`）；设置页的「点击预览」传假。
     pub fn set_theme(&self, theme_id: &str, save: bool, window: &mut Window, cx: &mut App) {
         if save {
@@ -126,6 +136,12 @@ impl Shell {
         self.release_page(cx);
         let handle = self.handle(cx);
         self.page = build_page(&route, handle, window, cx);
+        self.route = route;
+        cx.notify();
+    }
+
+    /// 只更新路由字段、不动当前页面（[`ShellHandle::retarget_route`] 的实现）。
+    fn retarget_route(&mut self, route: Route, cx: &mut Context<Self>) {
         self.route = route;
         cx.notify();
     }

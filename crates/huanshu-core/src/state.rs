@@ -295,6 +295,25 @@ impl AppState {
 }
 
 #[cfg(test)]
+impl AppState {
+    /// 单测用的最小状态：数据库用调用方给的连接（`db::open(临时目录)` 已建好 schema），
+    /// 其余字段取默认，不碰真实数据目录。`settings_path` 是私有字段，构造器只能放这里。
+    pub fn for_tests(conn: Connection) -> Self {
+        Self {
+            settings: Default::default(),
+            app_settings: Default::default(),
+            blueprints: Vec::new(),
+            generation_running: false,
+            last_error: None,
+            active_project_id: None,
+            project_dir: PathBuf::from("."),
+            db: Arc::new(Mutex::new(conn)),
+            settings_path: PathBuf::from("settings.json"),
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::path::Path;

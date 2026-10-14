@@ -4,19 +4,24 @@
 //! Step1 改文稿、Step2 生成、Step3 改蓝图，都改这一个模型，侧栏与其他步骤自动更新
 //! （原版是 Pinia 的 `generation` / `projects` store 加一堆 props）。
 //!
-//! 已实现：加载 / 加载失败、侧栏（返回、项目名、三步状态与说明、主题圆点、设置）、
-//! 按原版规则选初始步骤与判断能否点击、步骤切换时交还位图。
-//! 待实现：项目改名、新建项目时的草稿保存、生成状态（见 step2）。
+//! 已实现：加载 / 加载失败、侧栏（返回、项目名与改名、三步状态与说明、主题圆点、设置）、
+//! 按原版规则选初始步骤与判断能否点击、步骤切换时交还位图、第一步草稿防抖自动保存
+//! （含新建项目落库与路由对准）、项目附加信息读写、开始 AI 生成与事件回写。
+//! 待实现：第 2 步的整体进度 / 看板逐页状态 / 单页重试（见 step2），都在下一轮。
 
 pub mod step1;
 pub mod step2;
 pub mod step3;
 
 use gpui_kit::prelude::*;
-use gpui_kit::{div, px, Context, Entity, Render, SharedString, Subscription, Window};
+use gpui_kit::{
+    div, px, Context, Entity, Focusable as _, Render, SharedString, Subscription, Task, Window,
+};
 use huanshu_core::db::GenerationRun;
+use huanshu_core::events::CoreEvent;
 use huanshu_core::markdown_tools::{self, Granularity};
 use huanshu_core::services::media::MediaAssetResponse;
+use huanshu_core::services::projects::Step1ProjectMeta;
 use huanshu_core::services::{generation, projects};
 use huanshu_core::types::AspectRatio;
 
@@ -51,6 +56,29 @@ pub struct ProjectModel {
     pub generating: bool,
     /// 最近一次生成失败（原版 `gen.stage === 'error'`）。
     pub generation_failed: bool,
+    /// 生成阶段（原版 `gen.stage`，core 的 `GenerationEvent.stage`）。
+    pub gen_stage: String,
+    /// 最新一条进度文案（原版 `gen.message`）。
+    pub gen_message: String,
+    /// 整体进度 0–1（原版 `gen.progress`）。
+    pub gen_progress: Option<f32>,
+}
+
+/// 原版 `stores/generation.ts` 的 `STAGE_LABELS`。
+pub fn stage_label(stage: &str) -> String {
+    match stage {
+        "idle" => "等待",
+        "start" => "初始化",
+        "init" => "验证连接",
+        "page_plan" => "规划页面",
+        "generating" => "生成中",
+        "assembling" => "组装中",
+        "validate" => "校验中",
+        "done" => "完成",
+        "error" => "出错",
+        other => other,
+    }
+    .to_string()
 }
 
 /// 草稿自动保存状态（原版 `'idle' | 'saving' | 'saved' | 'error'`）。
@@ -98,10 +126,10 @@ impl ProjectModel {
         markdown_tools::estimate_slides(&self.md_content, self.granularity)
     }
 
-    /// 「开始 AI 生成」本地可用条件（原版 `canGenerate` 的名称、文稿部分；
-    /// `!gen.running && retryingPages.size === 0` 待 C 节接上生成状态后补充）。
+    /// 「开始 AI 生成」可用条件（原版 `canGenerate` 的名称、文稿、`!gen.running` 部分；
+    /// `retryingPages.size === 0` 是单页重试的状态，下一轮才有）。
     pub fn can_generate_local(&self) -> bool {
-        !self.md_content.trim().is_empty() && !self.name.trim().is_empty()
+        !self.md_content.trim().is_empty() && !self.name.trim().is_empty() && !self.generating
     }
 }
 
@@ -117,6 +145,75 @@ enum StepView {
     Edit(Entity<step3::Step3>),
 }
 
+/// 第一步草稿的内容指纹（原版对 `step1State` 的 deep watch）：任何一个字段变了
+/// 都触发自动保存；落库状态机（draft_save_state）的变化不影响指纹，不会引发循环。
+#[derive(Debug, PartialEq)]
+struct DraftSnapshot {
+    name: String,
+    md: String,
+    md_filename: String,
+    granularity: Granularity,
+    aspect: AspectRatio,
+}
+
+impl DraftSnapshot {
+    fn capture(model: &ProjectModel) -> Self {
+        Self {
+            name: model.name.clone(),
+            md: model.md_content.clone(),
+            md_filename: model.md_filename.clone(),
+            granularity: model.granularity,
+            aspect: model.aspect,
+        }
+    }
+}
+
+/// 比例的存储字符串（`Step1ProjectMeta.aspect_ratio` 用）。
+fn aspect_str(aspect: AspectRatio) -> &'static str {
+    match aspect {
+        AspectRatio::Ratio16x9 => "ratio_16x9",
+        AspectRatio::Ratio32x9 => "ratio_32x9",
+        AspectRatio::Ratio48x9 => "ratio_48x9",
+    }
+}
+
+fn parse_aspect(text: &str) -> Option<AspectRatio> {
+    match text {
+        "ratio_16x9" => Some(AspectRatio::Ratio16x9),
+        "ratio_32x9" => Some(AspectRatio::Ratio32x9),
+        "ratio_48x9" => Some(AspectRatio::Ratio48x9),
+        _ => None,
+    }
+}
+
+/// 去掉扩展名的文件名（原版 `filename.replace(/\.[^.]+$/, '')`）。
+fn strip_extension(name: &str) -> String {
+    match name.rfind('.') {
+        Some(i) if i > 0 => name[..i].to_string(),
+        _ => name.to_string(),
+    }
+}
+
+/// 原版 `getDraftProjectName`。
+fn draft_project_name(model: &ProjectModel) -> String {
+    let name = model.name.trim();
+    if !name.is_empty() {
+        return name.to_string();
+    }
+    let filename = model.md_filename.trim();
+    if !filename.is_empty() {
+        return strip_extension(filename);
+    }
+    "未命名演示".to_string()
+}
+
+/// 原版 `hasMeaningfulStep1Draft`。
+fn has_meaningful_draft(model: &ProjectModel) -> bool {
+    !model.md_content.trim().is_empty()
+        || !model.name.trim().is_empty()
+        || !model.md_filename.trim().is_empty()
+}
+
 pub struct WorkflowPage {
     handle: ShellHandle,
     model: Entity<ProjectModel>,
@@ -124,6 +221,21 @@ pub struct WorkflowPage {
     step: Step,
     view: Option<StepView>,
     requested_step: Option<Step>,
+    /// 侧栏改名（原版 `editingName` / `newName`）。
+    editing_name: bool,
+    rename: Entity<gpui_kit::component::input::InputState>,
+    /// 改名输入框请求提交（Enter / 失焦在订阅里没有 window，推迟到 render 提交）。
+    rename_commit: bool,
+    /// 初始加载完成（原版 `step1Bootstrapped`）：置真前不打自动保存。
+    step1_bootstrapped: bool,
+    /// 草稿防抖计时任务（原版 `step1AutosaveTimer`；Task 被替换即取消）。
+    autosave_task: Option<Task<()>>,
+    /// 模型在观察器里变了、待 render 时排入防抖（观察器回调拿不到 window）。
+    draft_dirty: bool,
+    draft_fingerprint: DraftSnapshot,
+    /// 生成完成后 800ms 自动跳第 3 步的计时。
+    advance_task: Option<Task<()>>,
+    /// 持有订阅即保活：字段不读，但 drop 时会退订。
     #[allow(dead_code)]
     subscriptions: Vec<Subscription>,
 }
@@ -150,8 +262,32 @@ impl WorkflowPage {
             latest_run: None,
             generating: false,
             generation_failed: false,
+            gen_stage: "idle".to_string(),
+            gen_message: String::new(),
+            gen_progress: None,
         });
-        let subscriptions = vec![cx.observe(&model, |_page, _model, cx| cx.notify())];
+        let fingerprint = DraftSnapshot::capture(&model.read(cx));
+        let rename = cx.new(|cx| {
+            gpui_kit::component::input::InputState::new(window, cx).placeholder("演示名称")
+        });
+        let subscriptions = vec![
+            cx.observe(&model, |page, _model, cx| page.on_model_changed(cx)),
+            cx.subscribe(
+                &rename,
+                |this: &mut Self, _state, event: &gpui_kit::component::input::InputEvent, cx| {
+                    // Enter / 失焦保存（原版 `@keydown.enter="saveName"` / `@blur="saveName"`）。
+                    // 订阅回调拿不到 window，推迟到 render 里提交。
+                    if matches!(
+                        event,
+                        gpui_kit::component::input::InputEvent::PressEnter { .. }
+                            | gpui_kit::component::input::InputEvent::Blur
+                    ) {
+                        this.rename_commit = true;
+                        cx.notify();
+                    }
+                },
+            ),
+        ];
         let mut page = Self {
             handle,
             model,
@@ -159,6 +295,15 @@ impl WorkflowPage {
             step: Step::Prepare,
             view: None,
             requested_step: step,
+            editing_name: false,
+            rename,
+            rename_commit: false,
+            // 新建项目没有加载过程，立即视为已引导（原版 onMounted 末尾置真）。
+            step1_bootstrapped: id.is_none(),
+            autosave_task: None,
+            draft_dirty: false,
+            draft_fingerprint: fingerprint,
+            advance_task: None,
             subscriptions,
         };
         match id {
@@ -171,6 +316,417 @@ impl WorkflowPage {
         page
     }
 
+    /// 模型变了：更新草稿指纹，待 render 时排入防抖保存。
+    fn on_model_changed(&mut self, cx: &mut Context<Self>) {
+        let fingerprint = DraftSnapshot::capture(self.model.read(cx));
+        if fingerprint != self.draft_fingerprint {
+            self.draft_fingerprint = fingerprint;
+            self.draft_dirty = true;
+        }
+        cx.notify();
+    }
+
+    // ── 侧栏改名（原版 `saveName`：点名字 → 输入框，Enter / 失焦保存，Esc 取消） ──
+
+    fn start_rename(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let name = self.model.read(cx).name.clone();
+        self.rename.update(cx, |state, cx| {
+            state.set_value(name, window, cx);
+        });
+        self.editing_name = true;
+        let focus = self.rename.read(cx).focus_handle(cx);
+        focus.focus(window, cx);
+        cx.notify();
+    }
+
+    fn save_name(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.editing_name {
+            return;
+        }
+        // 原版 `if (!newName.value.trim()) return`：空名不保存，停在编辑态。
+        let new_name = self.rename.read(cx).value().trim().to_string();
+        if new_name.is_empty() {
+            return;
+        }
+        let (id, md) = {
+            let model = self.model.read(cx);
+            (model.id, model.md_content.clone())
+        };
+        if let Some(id) = id {
+            let shared = self.handle.shared().clone();
+            let model_id = self.model.entity_id();
+            let new_name_work = new_name.clone();
+            run_bg(
+                window,
+                cx,
+                move || {
+                    projects::update_project_content(&shared, id, new_name_work, md)
+                        .map_err(|e| e.to_string())
+                },
+                move |this: &mut Self, result, _window, cx| {
+                    if this.model.entity_id() != model_id {
+                        return;
+                    }
+                    match result {
+                        Ok(()) => {
+                            this.model.update(cx, |model, cx| {
+                                model.name = new_name.clone();
+                                cx.notify();
+                            });
+                            this.editing_name = false;
+                        }
+                        // 原版没有错误分支（await 抛到 unhandled）；这里保持编辑态并记日志。
+                        Err(error) => eprintln!("[native] 改名失败：{error}"),
+                    }
+                    cx.notify();
+                },
+            );
+        } else {
+            // 未落库的项目只改模型名，自动保存会随后落库。
+            self.model.update(cx, |model, cx| {
+                model.name = new_name;
+                cx.notify();
+            });
+            self.editing_name = false;
+            cx.notify();
+        }
+    }
+
+    // ── 第一步草稿自动保存（原版 `saveStep1Draft` + 800ms 防抖 watch） ──
+
+    /// 排入 800ms 防抖（原版 `step1AutosaveTimer`；替换 Task 即取消上一轮的计时）。
+    fn schedule_autosave(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.autosave_task = None;
+        let snapshot = DraftSnapshot::capture(self.model.read(cx));
+        self.autosave_task = Some(cx.spawn_in(window, async move |this, window| {
+            {
+                let _guard = crate::tasks::tokio().enter();
+                tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+            }
+            let _ = this.update_in(window, |this, window, cx| {
+                this.flush_draft(snapshot, window, cx);
+            });
+        }));
+    }
+
+    /// 防抖到点：内容与排入时不一致（期间又改了）就再等一轮，防止把旧稿写回去。
+    fn flush_draft(
+        &mut self,
+        scheduled: DraftSnapshot,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.autosave_task = None;
+        if !self.step1_bootstrapped {
+            return;
+        }
+        if DraftSnapshot::capture(self.model.read(cx)) != scheduled {
+            self.schedule_autosave(window, cx);
+            return;
+        }
+        self.persist_draft(
+            window,
+            cx,
+            None::<fn(&mut Self, &mut Window, &mut Context<Self>)>,
+        );
+    }
+
+    /// 立即把当前草稿落库（原版 `saveStep1Draft` 的主体）。`then` 在落库回调后执行
+    /// （「开始 AI 生成」要先保存再启动流水线）。
+    fn persist_draft(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        then: Option<impl FnOnce(&mut Self, &mut Window, &mut Context<Self>) + 'static>,
+    ) {
+        let (id, draft_name, md, meta, aspect, meaningful) = {
+            let model = self.model.read(cx);
+            let meta = Step1ProjectMeta {
+                md_filename: model.md_filename.clone(),
+                granularity: model.granularity.as_str().to_string(),
+                aspect_ratio: aspect_str(model.aspect).to_string(),
+            };
+            (
+                model.id,
+                draft_project_name(&model),
+                model.md_content.clone(),
+                meta,
+                model.aspect,
+                has_meaningful_draft(&model),
+            )
+        };
+        // 原版：新建项目且没有「有意义的草稿」时不落库，状态回 idle。
+        if id.is_none() && !meaningful {
+            self.model.update(cx, |model, cx| {
+                model.draft_save_state = DraftSaveState::Idle;
+                model.draft_save_error.clear();
+                cx.notify();
+            });
+            if let Some(then) = then {
+                then(self, window, cx);
+            }
+            return;
+        }
+
+        let shared = self.handle.shared().clone();
+        let model_id = self.model.entity_id();
+        let draft_name_work = draft_name.clone();
+        self.model.update(cx, |model, cx| {
+            model.draft_save_state = DraftSaveState::Saving;
+            model.draft_save_error.clear();
+            cx.notify();
+        });
+        enum Outcome {
+            Created(i64),
+            Updated,
+        }
+        run_bg(
+            window,
+            cx,
+            move || match id {
+                None => {
+                    let created = projects::create_project(&shared, draft_name_work, md)?;
+                    projects::open_project(&shared, created)?;
+                    projects::set_step1_project_meta(&shared, created, &meta)?;
+                    projects::update_project_aspect_ratio(&shared, created, aspect)?;
+                    Ok(Outcome::Created(created))
+                }
+                Some(id) => {
+                    projects::update_project_content(&shared, id, draft_name_work, md)?;
+                    projects::set_step1_project_meta(&shared, id, &meta)?;
+                    projects::update_project_aspect_ratio(&shared, id, aspect)?;
+                    Ok(Outcome::Updated)
+                }
+            },
+            move |this: &mut Self, result, window, cx| {
+                if this.model.entity_id() != model_id {
+                    return;
+                }
+                match result {
+                    Ok(Outcome::Created(id)) => {
+                        this.model.update(cx, |model, cx| {
+                            model.id = Some(id);
+                            model.name = draft_name.clone();
+                            model.draft_save_state = DraftSaveState::Saved;
+                            cx.notify();
+                        });
+                        // 原版 `router.replace(/project/<id>)`：只改路由、不重建页面
+                        // （重建会丢掉 Step1 的编辑器与撤销历史）。
+                        this.handle.retarget_route(
+                            Route::Project {
+                                id: Some(id),
+                                step: None,
+                            },
+                            cx,
+                        );
+                    }
+                    Ok(Outcome::Updated) => {
+                        this.model.update(cx, |model, cx| {
+                            model.name = draft_name.clone();
+                            model.draft_save_state = DraftSaveState::Saved;
+                            cx.notify();
+                        });
+                    }
+                    Err(error) => {
+                        this.model.update(cx, |model, cx| {
+                            model.draft_save_state = DraftSaveState::Error;
+                            model.draft_save_error = error;
+                            cx.notify();
+                        });
+                    }
+                }
+                if let Some(then) = then {
+                    then(this, window, cx);
+                }
+            },
+        );
+    }
+
+    // ── 开始 AI 生成（原版 `onStep1StartGenerate` + `stores/generation.ts` 的 generate） ──
+
+    pub fn start_generation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (name, md, generating) = {
+            let model = self.model.read(cx);
+            (
+                model.name.clone(),
+                model.md_content.clone(),
+                model.generating,
+            )
+        };
+        if md.trim().is_empty() || name.trim().is_empty() || generating {
+            return;
+        }
+        // 原版：取消防抖计时器，立即同步保存一次草稿，然后切第 2 步、启动生成。
+        self.autosave_task = None;
+        self.persist_draft(
+            window,
+            cx,
+            Some(
+                move |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
+                    this.show_step(Step::Generate, window, cx);
+                    this.launch_generation(window, cx);
+                },
+            ),
+        );
+    }
+
+    /// 启动生成流水线（原版 `gen.generate`）。事件经 `tasks::listen_events` 回到本页，
+    /// 由模型驱动侧栏与 Step2 的显示（Step2 会被切来切去，事件不能挂在它身上）。
+    fn launch_generation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (id, md, name, granularity, aspect) = {
+            let model = self.model.read(cx);
+            (
+                model.id,
+                model.md_content.clone(),
+                model.name.clone(),
+                model.granularity,
+                model.aspect,
+            )
+        };
+        let sink =
+            crate::tasks::listen_events(window, cx, |this: &mut Self, event, _window, cx| {
+                this.on_gen_event(event, cx);
+            });
+        let events: std::sync::Arc<dyn huanshu_core::events::EventSink> = std::sync::Arc::new(sink);
+        let shared = self.handle.shared().clone();
+        // 原版 `granularity === 'auto' ? undefined : granularity`。
+        let granularity = match granularity {
+            Granularity::Auto => None,
+            other => Some(other.as_str().to_string()),
+        };
+        let model_id = self.model.entity_id();
+        self.model.update(cx, |model, cx| {
+            model.generating = true;
+            model.generation_failed = false;
+            model.gen_stage = "start".to_string();
+            model.gen_message = "开始生成流程".to_string();
+            model.gen_progress = Some(0.0);
+            cx.notify();
+        });
+        crate::tasks::run_async(
+            window,
+            cx,
+            async move {
+                // 生成前把 active project 对准本项目（core 会把结果存进当前项目）。
+                if let Some(id) = id {
+                    let _ = projects::open_project(&shared, id);
+                }
+                generation::generate_slides(
+                    events,
+                    &shared,
+                    md,
+                    Some(name),
+                    granularity,
+                    Some(aspect),
+                )
+                .await
+            },
+            move |this, result, window, cx| {
+                // 模型已对准别的项目（用户离开）时结果作废。
+                if this.model.entity_id() != model_id {
+                    return;
+                }
+                this.on_generation_finished(result, window, cx);
+            },
+        );
+    }
+
+    /// 生成事件（原版 `gen:progress` / `gen:error` 监听）。
+    /// SlideReady / PageStatus / Log 的看板消费在下一轮（step2）。
+    fn on_gen_event(&mut self, event: CoreEvent, cx: &mut Context<Self>) {
+        match event {
+            CoreEvent::Progress(event) => {
+                self.model.update(cx, |model, cx| {
+                    model.gen_stage = event.stage;
+                    model.gen_message = event.message;
+                    if let Some(progress) = event.progress {
+                        model.gen_progress = Some(progress);
+                    }
+                    cx.notify();
+                });
+            }
+            CoreEvent::Error(event) => {
+                self.model.update(cx, |model, cx| {
+                    model.generation_failed = true;
+                    model.generating = false;
+                    model.gen_message = event.message;
+                    cx.notify();
+                });
+            }
+            _ => {}
+        }
+    }
+
+    fn on_generation_finished(
+        &mut self,
+        result: Result<usize, String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match result {
+            Ok(count) => {
+                self.model.update(cx, |model, cx| {
+                    model.generating = false;
+                    model.generation_failed = false;
+                    model.gen_stage = "done".to_string();
+                    model.gen_message = format!("生成完成，共 {count} 张幻灯片");
+                    cx.notify();
+                });
+                self.reload_deck(window, cx);
+                // 原版 watch：完成且无失败页 800ms 后自动跳到第 3 步（用户已离开第 2 步则不跳）。
+                // 本轮没有页级失败状态跟踪，Ok 即视为无失败页。
+                self.advance_task = Some(cx.spawn_in(window, async move |this, window| {
+                    {
+                        let _guard = crate::tasks::tokio().enter();
+                        tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+                    }
+                    let _ = this.update_in(window, |this, window, cx| {
+                        if this.step == Step::Generate && !this.model.read(cx).generation_failed {
+                            this.show_step(Step::Edit, window, cx);
+                        }
+                    });
+                }));
+            }
+            Err(error) => {
+                // 出错能显示「生成出错」且不崩；不跳页。
+                self.model.update(cx, |model, cx| {
+                    model.generating = false;
+                    model.generation_failed = true;
+                    model.gen_stage = "error".to_string();
+                    model.gen_message = error;
+                    cx.notify();
+                });
+            }
+        }
+    }
+
+    /// 生成成功后从数据库重读牌组（core 已把结果存进当前项目）。
+    fn reload_deck(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(id) = self.model.read(cx).id else {
+            return;
+        };
+        let shared = self.handle.shared().clone();
+        let model_id = self.model.entity_id();
+        run_bg(
+            window,
+            cx,
+            move || projects::open_project(&shared, id).map_err(|e| e.to_string()),
+            move |this: &mut Self, result, _window, cx| {
+                if this.model.entity_id() != model_id {
+                    return;
+                }
+                if let Ok(project) = result {
+                    let deck: Vec<serde_json::Value> =
+                        serde_json::from_str(&project.blueprints_json).unwrap_or_default();
+                    this.model.update(cx, |model, cx| {
+                        model.deck = deck;
+                        cx.notify();
+                    });
+                }
+            },
+        );
+    }
+
     fn load_project(&mut self, id: i64, window: &mut Window, cx: &mut Context<Self>) {
         let shared = self.handle.shared().clone();
         run_bg(
@@ -180,12 +736,13 @@ impl WorkflowPage {
                 let project = projects::open_project(&shared, id)?;
                 let run = generation::get_latest_generation_run(&shared, id)?;
                 let media = huanshu_core::services::media::get_project_media(&shared, id)?;
-                Ok::<_, String>((project, run, media))
+                let meta = projects::get_step1_project_meta(&shared, id)?;
+                Ok::<_, String>((project, run, media, meta))
             },
             |page: &mut Self, result, window, cx| {
                 match result {
                     Err(error) => page.load = Load::Failed(error),
-                    Ok((project, run, media)) => {
+                    Ok((project, run, media, meta)) => {
                         let deck: Vec<serde_json::Value> =
                             if project.blueprints_json.trim().is_empty() {
                                 Vec::new()
@@ -194,19 +751,41 @@ impl WorkflowPage {
                             };
                         let generating = run.as_ref().is_some_and(|run| run.status == "running");
                         let failed = run.as_ref().is_some_and(|run| run.status == "error");
+                        let run_stage = run
+                            .as_ref()
+                            .and_then(|run| run.current_stage.clone())
+                            .unwrap_or_else(|| "idle".to_string());
+                        let project_aspect = project.aspect_ratio.unwrap_or(AspectRatio::Ratio16x9);
                         page.model.update(cx, |model, cx| {
                             model.name = project.name;
                             model.md_content = project.md_content;
-                            model.aspect = project.aspect_ratio.unwrap_or(AspectRatio::Ratio16x9);
+                            // 原版 `loadStep1Meta`：附加信息里的文件名 / 粒度 / 比例
+                            // 优先于库里的列（localStorage 优先）；非法值回落默认。
+                            if let Some(meta) = meta {
+                                let meta = meta.resolve(
+                                    Granularity::Auto.as_str(),
+                                    aspect_str(project_aspect),
+                                );
+                                model.md_filename = meta.md_filename;
+                                model.granularity = Granularity::parse(&meta.granularity)
+                                    .unwrap_or(Granularity::Auto);
+                                model.aspect =
+                                    parse_aspect(&meta.aspect_ratio).unwrap_or(project_aspect);
+                            } else {
+                                model.aspect = project_aspect;
+                            }
                             model.media = media;
                             model.deck = deck;
                             model.latest_run = run;
                             model.generating = generating;
                             model.generation_failed = failed;
+                            model.gen_stage = if generating || failed {
+                                run_stage
+                            } else {
+                                "idle".to_string()
+                            };
                             cx.notify();
                         });
-                        // TODO(parity): C 节从「项目附加信息」读回 mdFilename / granularity
-                        // （原版 localStorage 的 `persistStep1Meta` / `loadStep1Meta`）。
                         page.load = Load::Ready;
                         // 原版：生成进行中 → 2，有蓝图 → 3，否则 → 1。
                         let model = page.model.read(cx);
@@ -219,6 +798,11 @@ impl WorkflowPage {
                         };
                         let step = page.requested_step.take().unwrap_or(auto);
                         page.show_step(step, window, cx);
+                        // 原版 `step1Bootstrapped`：初始加载完成后才打自动保存。
+                        // 同时把指纹对齐到刚加载的内容，避免加载本身触发一次回写。
+                        page.step1_bootstrapped = true;
+                        page.draft_dirty = false;
+                        page.draft_fingerprint = DraftSnapshot::capture(page.model.read(cx));
                     }
                 }
                 cx.notify();
@@ -244,7 +828,7 @@ impl WorkflowPage {
         let page = cx.weak_entity();
         self.view = Some(match step {
             Step::Prepare => {
-                StepView::Prepare(cx.new(|cx| step1::Step1::new(model, handle, window, cx)))
+                StepView::Prepare(cx.new(|cx| step1::Step1::new(model, handle, page, window, cx)))
             }
             Step::Generate => {
                 StepView::Generate(cx.new(|cx| step2::Step2::new(model, handle, page, window, cx)))
@@ -266,7 +850,15 @@ impl WorkflowPage {
 }
 
 impl Render for WorkflowPage {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // 观察器里攒下的待办：排入防抖保存 / 提交改名（订阅回调里没有 window）。
+        if std::mem::take(&mut self.draft_dirty) && self.step1_bootstrapped {
+            self.schedule_autosave(window, cx);
+        }
+        if std::mem::take(&mut self.rename_commit) {
+            self.save_name(window, cx);
+        }
+
         let c = cx.studio().colors;
         match &self.load {
             Load::Loading => {
@@ -316,7 +908,8 @@ impl Render for WorkflowPage {
             if model.generation_failed {
                 "生成出错".to_string()
             } else if model.generating {
-                "生成中…".to_string()
+                // 原版 `gen.stageLabel`（等待 / 初始化 / 验证连接 / 规划页面 / …）。
+                stage_label(&model.gen_stage)
             } else if slide_count > 0 {
                 format!("已生成 {slide_count} 张")
             } else {
@@ -429,6 +1022,37 @@ impl Render for WorkflowPage {
             self.handle.clone(),
             self.handle.clone(),
         );
+        // 原版 `project-title-wrap`：点名字进编辑（`editingName = true; newName = projectName`），
+        // Enter / 失焦保存、Esc 取消。
+        let rename_focus = self.rename.read(cx).focus_handle(cx);
+        let name_area: gpui_kit::AnyElement = if self.editing_name {
+            div()
+                .flex_1()
+                .min_w_0()
+                .child(gpui_kit::component::input::Input::new(&self.rename))
+                .track_focus(&rename_focus)
+                .on_key_down(
+                    cx.listener(|this, event: &gpui_kit::KeyDownEvent, _window, cx| {
+                        // 原版 `@keydown.escape="editingName = false"`（Esc 不保存）。
+                        if event.keystroke.key.eq_ignore_ascii_case("escape") {
+                            this.editing_name = false;
+                            cx.notify();
+                        }
+                    }),
+                )
+                .into_any_element()
+        } else {
+            div()
+                .id("wf-name")
+                .flex_1()
+                .min_w_0()
+                .truncate()
+                .text_size(px(15.0))
+                .cursor_pointer()
+                .child(name)
+                .on_click(cx.listener(|this, _event, window, cx| this.start_rename(window, cx)))
+                .into_any_element()
+        };
         let sidebar = div()
             .flex_none()
             .w(px(204.0))
@@ -453,15 +1077,7 @@ impl Render for WorkflowPage {
                             move |_event, window, cx| back.navigate(Route::Home, window, cx),
                         ),
                     )
-                    // TODO(parity): 点击项目名进入改名（回车保存、Esc 取消、失焦保存）。
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .truncate()
-                            .text_size(px(15.0))
-                            .child(name),
-                    ),
+                    .child(name_area),
             )
             .child(nav)
             .child(div().flex_1())
