@@ -5,15 +5,21 @@ import { invoke } from '@tauri-apps/api/core'
 import { RouterView } from 'vue-router'
 import TitleBar from './components/TitleBar.vue'
 import { useAppSettingsStore } from './stores/appSettings'
+import { useEditorSchemaStore } from './stores/editorSchema'
 import { applyFonts } from './typography'
 import './themes/typography.css'
 
 const router = useRouter()
 const appSettings = useAppSettingsStore()
+// 编辑器的版式表来自 Rust；先取回来，Step3 与重试弹窗都用它。
+const editorSchema = useEditorSchemaStore()
 watch(() => appSettings.settings.fonts, applyFonts, { deep: true, immediate: true, flush: 'sync' })
 
 onMounted(async () => {
-  await appSettings.load()
+  await Promise.all([
+    appSettings.load(),
+    editorSchema.load().catch((e) => console.error('Failed to load editor schema:', e)),
+  ])
   try {
     const firstRun = await invoke<boolean>('is_first_run')
     if (firstRun) {

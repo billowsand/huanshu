@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { KIND_META } from '../composables/useSlideEditor'
+import { useEditorSchemaStore } from '../stores/editorSchema'
 import { usePdfExport } from '../composables/usePdfExport'
 import { APP_THEMES } from '../themes/catalog'
 import type { SlideKind } from './types'
+
+const schemaStore = useEditorSchemaStore()
 
 // Progress + result of the shared PDF export (composables/usePdfExport.ts).
 // Mounted once per view; renders nothing while idle.
@@ -11,7 +13,7 @@ const { exporting, report, error, note, reveal, dismiss } = usePdfExport()
 
 const visible = computed(() => exporting.value || report.value !== null || error.value !== '')
 
-const kindLabel = (kind: string) => KIND_META[kind as SlideKind]?.label ?? kind
+const kindLabel = (kind: string) => schemaStore.kindMeta[kind as SlideKind]?.label ?? kind
 const pageList = (indices: number[]) => indices.map(i => `第 ${i + 1} 页`).join('、')
 
 const placeholderGroups = computed(() => {

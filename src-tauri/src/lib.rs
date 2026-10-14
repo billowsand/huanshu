@@ -25,6 +25,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             text::segment_title,
             fonts::list_system_fonts,
+            commands::editor::get_editor_schema,
+            commands::editor::chart_problems,
             commands::generate::generate_slides,
             commands::generate::detect_granularity,
             commands::generate::optimize_markdown_headings,

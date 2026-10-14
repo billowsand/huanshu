@@ -9,9 +9,11 @@
 //! 本 crate 不引入 `tauri::async_runtime`。
 
 pub mod assets;
+pub mod chart_check;
 pub mod config;
 pub mod crypto;
 pub mod db;
+pub mod editor_schema;
 pub mod embedded_icons;
 pub mod events;
 pub mod fonts;

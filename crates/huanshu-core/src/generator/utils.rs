@@ -1047,27 +1047,9 @@ pub fn remove_keys(obj: &mut Map<String, Value>, keys: &[&str]) {
     }
 }
 
+/// The kind's snake_case name. See [`SlideKind::as_str`], which is the single source.
 pub fn slide_kind_name(kind: &SlideKind) -> &'static str {
-    match kind {
-        SlideKind::Cover => "cover",
-        SlideKind::Closing => "closing",
-        SlideKind::Overview => "overview",
-        SlideKind::SectionIntro => "section_intro",
-        SlideKind::FeatureGrid => "feature_grid",
-        SlideKind::Spotlight => "spotlight",
-        SlideKind::SplitLayers => "split_layers",
-        SlideKind::SectionList => "section_list",
-        SlideKind::FocusExample => "focus_example",
-        SlideKind::OutcomeGrid => "outcome_grid",
-        SlideKind::CenterGrid => "center_grid",
-        SlideKind::Timeline => "timeline",
-        SlideKind::StepFlow => "step_flow",
-        SlideKind::Process => "process",
-        SlideKind::Compare => "compare",
-        SlideKind::IssueStack => "issue_stack",
-        SlideKind::Swot => "swot",
-        SlideKind::ChartFocus => "chart_focus",
-    }
+    kind.as_str()
 }
 
 pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {

@@ -2,430 +2,23 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import SlideFrame from '../../components/SlideFrame.vue'
-import { chartProblems } from '../../utils/chartSpec'
-import { ALL_KINDS, KIND_FIELDS, KIND_META } from '../../composables/useSlideEditor'
+import { useEditorSchemaStore } from '../../stores/editorSchema'
 import { useTypstThumbnails } from '../../composables/useTypstThumbnails'
 import type { SlideBlueprint, SlideKind } from '../../components/types'
 import type { MediaItem } from '../../composables/useMediaLibrary'
 
-type FieldType = 'text' | 'textarea' | 'select' | 'boolean'
-
-type EditorField = {
-  key: string
-  label: string
-  type: FieldType
-  placeholder?: string
-  rows?: number
-  options?: string[]
-}
-
-type StringListDef = {
-  key: string
-  label: string
-  placeholder?: string
-}
-
-type NestedListDef = {
-  key: string
-  label: string
-  createItem: () => Record<string, unknown>
-  fields: EditorField[]
-}
-
-type ListSectionDef = {
-  key: string
-  label: string
-  emptyText: string
-  createItem: () => Record<string, unknown>
-  fields: EditorField[]
-  stringLists?: StringListDef[]
-  nestedLists?: NestedListDef[]
-  iconQueryKeys?: string[]
-}
-
-type ObjectSectionDef = {
-  key: string
-  label: string
-  fields?: EditorField[]
-  stringLists?: StringListDef[]
-  listSections?: ListSectionDef[]
-}
-
-const TONE_OPTIONS = ['blue', 'emerald', 'green', 'violet', 'amber', 'rose', 'gray', 'red']
-const DIRECTION_OPTIONS = ['horizontal', 'vertical']
-
-const SIMPLE_FIELDS: EditorField[] = [
-  { key: 'section', label: '章节号', type: 'text', placeholder: '01' },
-  { key: 'badge', label: '角标', type: 'text', placeholder: '章节导览' },
-  { key: 'label', label: '标签', type: 'text', placeholder: '重点展示' },
-  { key: 'label_tone', label: '标签颜色', type: 'select', options: TONE_OPTIONS },
-  { key: 'title', label: '标题', type: 'text', placeholder: '输入标题' },
-  { key: 'subtitle', label: '副标题', type: 'textarea', rows: 2, placeholder: '输入副标题' },
-  { key: 'accent', label: '强调语', type: 'text', placeholder: '一句强调信息' },
-  { key: 'note', label: '说明', type: 'textarea', rows: 3, placeholder: '补充说明、背景或提示' },
-  { key: 'footer', label: '页脚说明', type: 'textarea', rows: 2, placeholder: '补充一句收束语' },
-  { key: 'placeholder', label: '图片占位提示', type: 'text', placeholder: '可填写 media:12 或图片 URL' },
-  { key: 'side_width', label: '侧栏宽度', type: 'text', placeholder: '42%' },
-  { key: 'direction', label: '布局方向', type: 'select', options: DIRECTION_OPTIONS },
-  { key: 'example_title', label: '示例标题', type: 'text', placeholder: '类比例子' },
-  { key: 'example_body', label: '示例正文', type: 'textarea', rows: 3, placeholder: '输入示例说明' },
-  { key: 'image', label: '主图路径', type: 'text', placeholder: 'media:12 或 https://...' },
-]
-
-const LIST_SECTIONS: Partial<Record<SlideKind, ListSectionDef[]>> = {
-  overview: [
-    {
-      key: 'overview_items',
-      label: '概览条目',
-      emptyText: '还没有概览条目',
-      createItem: () => ({ number: '', title: '', desc: '' }),
-      fields: [
-        { key: 'number', label: '编号', type: 'text', placeholder: '01' },
-        { key: 'title', label: '标题', type: 'text', placeholder: '现状判断' },
-        { key: 'desc', label: '说明', type: 'textarea', rows: 2, placeholder: '一句话解释本节内容' },
-      ],
-    },
-  ],
-  section_intro: [
-    {
-      key: 'cards',
-      label: '导览卡片',
-      emptyText: '还没有导览卡片',
-      createItem: () => ({ title: '', body: '', tone: 'blue', icon: '', tag: '' }),
-      iconQueryKeys: ['title', 'body', 'tag'],
-      fields: [
-        { key: 'title', label: '标题', type: 'text', placeholder: '目标定义' },
-        { key: 'body', label: '说明', type: 'textarea', rows: 3, placeholder: '卡片正文' },
-        { key: 'tag', label: '标签', type: 'text', placeholder: 'Why' },
-        { key: 'tone', label: '色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-  ],
-  feature_grid: [
-    {
-      key: 'cards',
-      label: '特性卡片',
-      emptyText: '还没有特性卡片',
-      createItem: () => ({ title: '', subtitle: '', body: '', tone: 'blue', icon: '', items: [] }),
-      iconQueryKeys: ['title', 'subtitle', 'body'],
-      stringLists: [{ key: 'items', label: '要点列表', placeholder: '支持语义搜索' }],
-      fields: [
-        { key: 'title', label: '标题', type: 'text', placeholder: '统一知识入口' },
-        { key: 'subtitle', label: '副标题', type: 'text', placeholder: '降低信息查找成本' },
-        { key: 'body', label: '正文', type: 'textarea', rows: 3, placeholder: '卡片正文' },
-        { key: 'conclusion', label: '结论', type: 'text', placeholder: '适合标准化程度高的交付场景' },
-        { key: 'risk', label: '风险', type: 'text', placeholder: '需提前定义记录粒度' },
-        { key: 'footer_tag', label: '底部标签', type: 'text', placeholder: '可复用' },
-        { key: 'footer_tone', label: '标签色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'tag', label: '卡片标签', type: 'text', placeholder: 'Why' },
-        { key: 'tone', label: '主色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-  ],
-  spotlight: [
-    {
-      key: 'panels',
-      label: '右侧信息面板',
-      emptyText: '还没有信息面板',
-      createItem: () => ({ title: '', kind: 'text', body: '', tone: 'blue', icon: '', items: [], steps: [] }),
-      iconQueryKeys: ['title', 'body', 'highlight'],
-      stringLists: [
-        { key: 'items', label: '要点列表', placeholder: '梳理字段' },
-        { key: 'steps', label: '结果列表', placeholder: '线索响应时效缩短 60%' },
-      ],
-      fields: [
-        { key: 'title', label: '标题', type: 'text', placeholder: '关键动作' },
-        { key: 'kind', label: '类型', type: 'text', placeholder: 'flow / text / steps' },
-        { key: 'body', label: '正文', type: 'textarea', rows: 3, placeholder: '面板正文' },
-        { key: 'highlight', label: '高亮信息', type: 'text', placeholder: '一句重点结论' },
-        { key: 'tone', label: '色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-  ],
-  split_layers: [
-    {
-      key: 'left_items',
-      label: '左侧说明项',
-      emptyText: '还没有左侧说明项',
-      createItem: () => ({ step: '', title: '', body: '', icon: '' }),
-      iconQueryKeys: ['title', 'body'],
-      fields: [
-        { key: 'step', label: '步骤号', type: 'text', placeholder: '01' },
-        { key: 'title', label: '标题', type: 'text', placeholder: '业务层' },
-        { key: 'body', label: '说明', type: 'textarea', rows: 2, placeholder: '一句说明' },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-    {
-      key: 'layers',
-      label: '右侧分层',
-      emptyText: '还没有右侧分层',
-      createItem: () => ({ title: '', meta: '', tone: 'blue' }),
-      fields: [
-        { key: 'title', label: '层标题', type: 'text', placeholder: '流程编排' },
-        { key: 'meta', label: '层说明', type: 'textarea', rows: 2, placeholder: '这一层做什么' },
-        { key: 'tone', label: '色调', type: 'select', options: TONE_OPTIONS },
-      ],
-    },
-  ],
-  section_list: [
-    {
-      key: 'list_items',
-      label: '列表项',
-      emptyText: '还没有列表项',
-      createItem: () => ({ step: '', title: '', body: '', icon: '' }),
-      iconQueryKeys: ['title', 'body'],
-      fields: [
-        { key: 'step', label: '编号', type: 'text', placeholder: '01' },
-        { key: 'title', label: '标题', type: 'text', placeholder: '明确目标' },
-        { key: 'body', label: '说明', type: 'textarea', rows: 2, placeholder: '一句说明' },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-  ],
-  focus_example: [
-    {
-      key: 'points',
-      label: '要点',
-      emptyText: '还没有要点',
-      createItem: () => ({ step: '', title: '', body: '', icon: '' }),
-      iconQueryKeys: ['title', 'body'],
-      fields: [
-        { key: 'step', label: '编号', type: 'text', placeholder: '01' },
-        { key: 'title', label: '标题', type: 'text', placeholder: '先给判断标准' },
-        { key: 'body', label: '说明', type: 'textarea', rows: 2, placeholder: '一句说明' },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-    {
-      key: 'ranking',
-      label: '排序/优先级',
-      emptyText: '还没有排序项',
-      createItem: () => ({ index: '', label: '', meta: '', muted: false }),
-      fields: [
-        { key: 'index', label: '编号', type: 'text', placeholder: 'A' },
-        { key: 'label', label: '标题', type: 'text', placeholder: '优先统一口径' },
-        { key: 'meta', label: '说明', type: 'textarea', rows: 2, placeholder: '一句说明' },
-        { key: 'muted', label: '弱化显示', type: 'boolean' },
-      ],
-    },
-  ],
-  outcome_grid: [
-    {
-      key: 'cards',
-      label: '成果卡片',
-      emptyText: '还没有成果卡片',
-      createItem: () => ({ title: '', body: '', tone: 'blue', icon: '' }),
-      iconQueryKeys: ['title', 'body', 'conclusion'],
-      fields: [
-        { key: 'title', label: '标题', type: 'text', placeholder: '效率提升' },
-        { key: 'body', label: '说明', type: 'textarea', rows: 3, placeholder: '成果说明' },
-        { key: 'conclusion', label: '结论', type: 'text', placeholder: '团队可把精力转向深度判断' },
-        { key: 'footer_tag', label: '底部标签', type: 'text', placeholder: '可复用' },
-        { key: 'footer_tone', label: '标签色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'tone', label: '主色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-  ],
-  center_grid: [
-    {
-      key: 'center_items',
-      label: '中心能力点',
-      emptyText: '还没有能力点',
-      createItem: () => ({ title: '', desc: '', tone: 'blue', icon: '' }),
-      iconQueryKeys: ['title', 'desc'],
-      fields: [
-        { key: 'title', label: '标题', type: 'text', placeholder: '目标' },
-        { key: 'desc', label: '说明', type: 'text', placeholder: '先定义成效' },
-        { key: 'tone', label: '色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-  ],
-  timeline: [
-    {
-      key: 'timeline_events',
-      label: '时间线事件',
-      emptyText: '还没有时间线事件',
-      createItem: () => ({ date: '', title: '', body: '', tone: 'blue', icon: '' }),
-      iconQueryKeys: ['date', 'title', 'body'],
-      fields: [
-        { key: 'date', label: '时间', type: 'text', placeholder: '第 1 周' },
-        { key: 'title', label: '标题', type: 'text', placeholder: '需求对齐' },
-        { key: 'body', label: '说明', type: 'textarea', rows: 2, placeholder: '这一阶段做什么' },
-        { key: 'tone', label: '色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-  ],
-  step_flow: [
-    {
-      key: 'steps',
-      label: '流程步骤',
-      emptyText: '还没有流程步骤',
-      createItem: () => ({ title: '', body: '', tone: 'blue', icon: '' }),
-      iconQueryKeys: ['title', 'body'],
-      fields: [
-        { key: 'title', label: '标题', type: 'text', placeholder: '识别问题' },
-        { key: 'body', label: '说明', type: 'textarea', rows: 2, placeholder: '步骤说明' },
-        { key: 'tone', label: '色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-  ],
-  process: [
-    {
-      key: 'phases',
-      label: '流程阶段',
-      emptyText: '还没有流程阶段',
-      createItem: () => ({ phase: '', title: '', tone: 'blue', icon: '', highlight: '', steps: [] }),
-      iconQueryKeys: ['phase', 'title', 'highlight'],
-      nestedLists: [
-        {
-          key: 'steps',
-          label: '阶段步骤',
-          createItem: () => ({ label: '', desc: '' }),
-          fields: [
-            { key: 'label', label: '步骤标题', type: 'text', placeholder: '明确负责人' },
-            { key: 'desc', label: '步骤说明', type: 'textarea', rows: 2, placeholder: '说明这一步做什么' },
-          ],
-        },
-      ],
-      fields: [
-        { key: 'phase', label: '阶段名', type: 'text', placeholder: 'Phase 1' },
-        { key: 'title', label: '标题', type: 'text', placeholder: '准备阶段' },
-        { key: 'highlight', label: '高亮提示', type: 'text', placeholder: '确保启动前信息齐备' },
-        { key: 'tone', label: '色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-  ],
-  issue_stack: [
-    {
-      key: 'cards',
-      label: '问题卡片',
-      emptyText: '还没有问题卡片',
-      createItem: () => ({ title: '', body: '', tone: 'blue', icon: '', items: [] }),
-      iconQueryKeys: ['title', 'body'],
-      stringLists: [{ key: 'items', label: '补充标签', placeholder: '难调试' }],
-      fields: [
-        { key: 'title', label: '标题', type: 'text', placeholder: '黑盒中的黑盒' },
-        { key: 'body', label: '说明', type: 'textarea', rows: 3, placeholder: '问题说明' },
-        { key: 'tone', label: '色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-      ],
-    },
-  ],
-  chart_focus: [
-    {
-      key: 'points',
-      label: '解读要点',
-      emptyText: '还没有解读要点',
-      createItem: () => ({ step: '', title: '', body: '' }),
-      iconQueryKeys: ['title', 'body'],
-      fields: [
-        { key: 'step', label: '编号', type: 'text', placeholder: '01' },
-        { key: 'title', label: '标题', type: 'text', placeholder: '趋势判断' },
-        { key: 'body', label: '说明', type: 'textarea', rows: 2, placeholder: '一句解读' },
-      ],
-    },
-  ],
-}
-
-const OBJECT_SECTIONS: Partial<Record<SlideKind, ObjectSectionDef[]>> = {
-  compare: [
-    {
-      key: 'compare_data',
-      label: '对比设置',
-      fields: [{ key: 'mode', label: '布局模式', type: 'text', placeholder: 'side-by-side' }],
-    },
-    {
-      key: 'compare_data.left',
-      label: '左侧方案',
-      fields: [
-        { key: 'title', label: '标题', type: 'text', placeholder: '方案 A：快速上线' },
-        { key: 'tone', label: '色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-        { key: 'conclusion', label: '结论', type: 'text', placeholder: '适合先跑通闭环' },
-      ],
-      listSections: [
-        {
-          key: 'items',
-          label: '条目',
-          emptyText: '还没有左侧条目',
-          createItem: () => ({ label: '', desc: '', highlight: false }),
-          fields: [
-            { key: 'label', label: '标题', type: 'text', placeholder: '优势' },
-            { key: 'desc', label: '说明', type: 'textarea', rows: 2, placeholder: '一句说明' },
-            { key: 'highlight', label: '高亮', type: 'boolean' },
-          ],
-        },
-      ],
-    },
-    {
-      key: 'compare_data.right',
-      label: '右侧方案',
-      fields: [
-        { key: 'title', label: '标题', type: 'text', placeholder: '方案 B：体系化建设' },
-        { key: 'tone', label: '色调', type: 'select', options: TONE_OPTIONS },
-        { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-        { key: 'conclusion', label: '结论', type: 'text', placeholder: '适合中长期投入' },
-      ],
-      listSections: [
-        {
-          key: 'items',
-          label: '条目',
-          emptyText: '还没有右侧条目',
-          createItem: () => ({ label: '', desc: '', highlight: false }),
-          fields: [
-            { key: 'label', label: '标题', type: 'text', placeholder: '优势' },
-            { key: 'desc', label: '说明', type: 'textarea', rows: 2, placeholder: '一句说明' },
-            { key: 'highlight', label: '高亮', type: 'boolean' },
-          ],
-        },
-      ],
-    },
-  ],
-  swot: [
-    {
-      key: 'swot_data',
-      label: 'SWOT 设置',
-      fields: [
-        { key: 'strategy', label: '战略建议', type: 'textarea', rows: 3, placeholder: '用于总结整体建议' },
-      ],
-      listSections: [
-        {
-          key: 'quadrants',
-          label: '四象限',
-          emptyText: '还没有 SWOT 象限',
-          createItem: () => ({ key: '', title: '', tone: 'blue', icon: '', items: [], summary: '' }),
-          iconQueryKeys: ['key', 'title', 'summary'],
-          stringLists: [{ key: 'items', label: '要点', placeholder: '已有行业案例积累' }],
-          fields: [
-            { key: 'key', label: '象限标识', type: 'text', placeholder: 'S' },
-            { key: 'title', label: '标题', type: 'text', placeholder: '优势 Strengths' },
-            { key: 'summary', label: '总结', type: 'text', placeholder: '内部基础较好' },
-            { key: 'tone', label: '色调', type: 'select', options: TONE_OPTIONS },
-            { key: 'icon', label: '图标', type: 'text', placeholder: '由 AI 推荐，通常无需手填' },
-          ],
-        },
-      ],
-    },
-  ],
-  chart_focus: [
-    {
-      key: 'chart',
-      label: '图表设置',
-      fields: [
-        { key: 'title', label: '图表标题', type: 'text', placeholder: '季度交付量' },
-      ],
-    },
-  ],
-}
+// 版式名称、字段、默认内容与表单定义都来自 Rust（`get_editor_schema`）。
+const schemaStore = useEditorSchemaStore()
+const schemaReady = computed(() => schemaStore.ready)
+const schemaError = computed(() => schemaStore.error)
+const KIND_META = computed(() => schemaStore.kindMeta)
+const ALL_KINDS = computed(() => schemaStore.schema?.kinds.map((entry) => entry.kind) ?? [])
+const KIND_FIELDS = computed(() => schemaStore.kindFields)
+const SIMPLE_FIELDS = computed(() => schemaStore.simpleFields)
+const LIST_SECTIONS = computed(() => schemaStore.listSections)
+const OBJECT_SECTIONS = computed(() => schemaStore.objectSections)
+const TONE_OPTIONS = computed(() => schemaStore.toneOptions)
+const DIRECTION_OPTIONS = computed(() => schemaStore.directionOptions)
 
 const props = defineProps<{
   activeSlide: number
@@ -535,13 +128,13 @@ const errorLine = computed<number | null>(() => {
   return null
 })
 
-const semanticErrors = computed<string[]>(() => {
+const syncSemanticErrors = computed<string[]>(() => {
   const obj = parsedJson.value
   if (!obj || props.jsonError) return []
   const errors: string[] = []
 
   const direction = obj.direction
-  if (typeof direction === 'string' && !DIRECTION_OPTIONS.includes(direction)) {
+  if (typeof direction === 'string' && !schemaStore.directionOptions.includes(direction)) {
     errors.push(`direction "${direction}" 无效，应为 horizontal 或 vertical`)
   }
 
@@ -553,7 +146,7 @@ const semanticErrors = computed<string[]>(() => {
     }
     for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
       if (key === 'tone' || key === 'footer_tone' || key === 'label_tone') {
-        if (typeof value === 'string' && !TONE_OPTIONS.includes(value)) {
+        if (typeof value === 'string' && !schemaStore.toneOptions.includes(value)) {
           errors.push(`${path || 'root'}.${key} "${value}" 无效`)
         }
       } else {
@@ -564,22 +157,53 @@ const semanticErrors = computed<string[]>(() => {
 
   walkTone(obj, '')
 
-  if (obj.kind === 'chart_focus') {
-    if (obj.chart == null) errors.push('chart_focus 页缺少 chart（图表数据）')
-    else errors.push(...chartProblems(obj.chart).map((problem) => `chart：${problem}`))
+  if (obj.kind === 'chart_focus' && obj.chart == null) {
+    errors.push('chart_focus 页缺少 chart（图表数据）')
   }
   return errors
 })
 
+/** 图表的语义错误来自 Rust（`chart_problems` 命令），随输入防抖请求。 */
+const advancedChartErrors = ref<string[]>([])
+let advancedChartSeq = 0
+let advancedChartTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(
+  () => (parsedJson.value?.kind === 'chart_focus' ? parsedJson.value.chart : null),
+  (chart) => {
+    if (advancedChartTimer !== null) clearTimeout(advancedChartTimer)
+    advancedChartSeq += 1
+    if (chart == null || chart === undefined) {
+      advancedChartErrors.value = []
+      return
+    }
+    const seq = advancedChartSeq
+    advancedChartTimer = setTimeout(async () => {
+      advancedChartTimer = null
+      const problems = await invoke<string[]>('chart_problems', { chart })
+      if (seq !== advancedChartSeq) return
+      advancedChartErrors.value = problems.map((problem) => `chart：${problem}`)
+    }, 150)
+  },
+  { deep: true },
+)
+
+const semanticErrors = computed<string[]>(() => [...syncSemanticErrors.value, ...advancedChartErrors.value])
+
+
 const simpleFields = computed(() => {
-  const allowed = new Set(KIND_FIELDS[props.editorKind] ?? [])
-  return SIMPLE_FIELDS.filter((field) => allowed.has(field.key))
+  const allowed = new Set(schemaStore.kindFields[props.editorKind] ?? [])
+  return schemaStore.simpleFields.filter((field) => allowed.has(field.key))
 })
 
-const listSections = computed(() => LIST_SECTIONS[props.editorKind] ?? [])
-const objectSections = computed(() => OBJECT_SECTIONS[props.editorKind] ?? [])
-const showBadges = computed(() => (KIND_FIELDS[props.editorKind] ?? []).includes('badges'))
-const showImages = computed(() => (KIND_FIELDS[props.editorKind] ?? []).includes('images'))
+const listSections = computed(() => schemaStore.listSections[props.editorKind] ?? [])
+const objectSections = computed(() => schemaStore.objectSections[props.editorKind] ?? [])
+const showBadges = computed(() =>
+  (schemaStore.kindFields[props.editorKind] ?? []).includes('badges'),
+)
+const showImages = computed(() =>
+  (schemaStore.kindFields[props.editorKind] ?? []).includes('images'),
+)
 
 function syncGutterScroll(event: Event) {
   if (gutterRef.value) {
@@ -603,11 +227,17 @@ function updatePath(path: string, value: unknown) {
 }
 
 // ── chart_focus 图表数据：整块 JSON 编辑 ──────────────────────────────────────
-// 只有语法正确且通过 chartProblems（与 Rust ChartSpec::problems 同一套规则）时才写回牌组，
+// 只有语法正确且通过校验（规则在 Rust 侧，见 `huanshu_core::chart_check`）时才写回牌组，
 // 输入中途的半截 JSON 不会把正在预览的图表弄坏。编辑框获得焦点期间不被外部改动覆盖。
+// 校验是一次命令调用：输入后 150ms 防抖，期间不写回、也不显示「校验通过」；
+// 只有「最新一次输入」的结果才生效，早到的旧请求直接丢弃。
 const chartJsonText = ref('')
 const chartJsonError = ref('')
 const chartJsonFocused = ref(false)
+/** 校验进行中：等待期间既不显示通过，也不写回牌组。 */
+const chartChecking = ref(false)
+let chartCheckSeq = 0
+let chartCheckTimer: ReturnType<typeof setTimeout> | null = null
 
 function chartJsonFromDraft() {
   const chart = getFieldValue('chart')
@@ -630,20 +260,53 @@ function onChartJsonInput(text: string) {
   try {
     parsed = JSON.parse(text)
   } catch (e) {
+    cancelChartCheck()
     chartJsonError.value = `JSON 语法错误：${e instanceof Error ? e.message : String(e)}`
     return
   }
-  const problems = chartProblems(parsed)
-  if (problems.length) {
-    chartJsonError.value = problems.join('；')
-    return
+  scheduleChartCheck(parsed)
+}
+
+function cancelChartCheck() {
+  if (chartCheckTimer !== null) {
+    clearTimeout(chartCheckTimer)
+    chartCheckTimer = null
   }
+  chartChecking.value = false
+  // 作废在途请求：它的结果回来时序号已经不匹配。
+  chartCheckSeq += 1
+}
+
+function scheduleChartCheck(chart: unknown) {
+  if (chartCheckTimer !== null) clearTimeout(chartCheckTimer)
+  chartChecking.value = true
   chartJsonError.value = ''
-  updatePath('chart', parsed)
+  const seq = ++chartCheckSeq
+  chartCheckTimer = setTimeout(async () => {
+    chartCheckTimer = null
+    let problems: string[]
+    try {
+      problems = await invoke<string[]>('chart_problems', { chart })
+    } catch (e) {
+      if (seq !== chartCheckSeq) return
+      chartChecking.value = false
+      chartJsonError.value = `校验失败：${e instanceof Error ? e.message : String(e)}`
+      return
+    }
+    if (seq !== chartCheckSeq) return
+    chartChecking.value = false
+    if (problems.length) {
+      chartJsonError.value = problems.join('；')
+      return
+    }
+    chartJsonError.value = ''
+    updatePath('chart', chart)
+  }, 150)
 }
 
 function onChartJsonBlur() {
   chartJsonFocused.value = false
+  cancelChartCheck()
   // 离开时若仍有错误，保留输入让用户继续改；否则规范化成牌组里的实际内容
   if (!chartJsonError.value) chartJsonText.value = chartJsonFromDraft()
 }
@@ -666,11 +329,12 @@ function getArrayValue(path: string): unknown[] {
   return Array.isArray(value) ? value : []
 }
 
-function addItem(path: string, factory: () => Record<string, unknown>) {
+/** `template` 来自 schema 的 `new_item`：Rust 已经算好了「新增一项」的内容。 */
+function addItem(path: string, template: Record<string, unknown>) {
   const draft = cloneDraft()
   if (!draft) return
   const items = getArrayValue(path)
-  setAtPath(draft as unknown as Record<string, unknown>, path, [...items, factory()])
+  setAtPath(draft as unknown as Record<string, unknown>, path, [...items, deepClone(template)])
   replaceDraft(draft)
 }
 
@@ -974,7 +638,16 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="edit-json-inner">
+        <!-- 版式表来自 Rust：还没取到时不渲染表单，避免显示一个空的编辑器。 -->
+        <div v-if="!schemaReady" class="edit-json-inner">
+          <p v-if="schemaError" class="ej-error">
+            <span class="i-carbon:warning-filled ej-error-icon" />
+            <span class="ej-error-text">读取版式信息失败：{{ schemaError }}</span>
+          </p>
+          <p v-else class="ej-hint" role="status">正在读取版式信息…</p>
+        </div>
+
+        <div v-else class="edit-json-inner">
           <div class="ej-field-group">
             <label class="ej-label">幻灯片类型</label>
             <div class="ej-kind-row">
@@ -1117,7 +790,7 @@ onBeforeUnmount(() => {
           <div v-for="section in listSections" :key="section.key" class="ej-field-group">
             <div class="ej-label-row">
               <label class="ej-label">{{ section.label }}</label>
-              <button class="btn btn-ghost edit-add-btn" @click="addItem(section.key, section.createItem)">
+              <button class="btn btn-ghost edit-add-btn" @click="addItem(section.key, section.new_item)">
                 <span class="i-carbon:add" /> 添加
               </button>
             </div>
@@ -1237,7 +910,7 @@ onBeforeUnmount(() => {
               <div v-for="nested in section.nestedLists ?? []" :key="`${section.key}-${index}-${nested.key}`" class="ej-list-stack">
                 <div class="ej-label-row">
                   <label class="ej-qf-label">{{ nested.label }}</label>
-                  <button class="btn btn-ghost edit-add-btn" @click="addItem(`${section.key}[${index}].${nested.key}`, nested.createItem)">
+                  <button class="btn btn-ghost edit-add-btn" @click="addItem(`${section.key}[${index}].${nested.key}`, nested.new_item)">
                     <span class="i-carbon:add" /> 添加
                   </button>
                 </div>
@@ -1328,7 +1001,7 @@ onBeforeUnmount(() => {
             <div v-for="subList in section.listSections ?? []" :key="`${section.key}-${subList.key}`" class="ej-list-stack">
               <div class="ej-label-row">
                 <label class="ej-qf-label">{{ subList.label }}</label>
-                <button class="btn btn-ghost edit-add-btn" @click="addItem(`${section.key}.${subList.key}`, subList.createItem)">
+                <button class="btn btn-ghost edit-add-btn" @click="addItem(`${section.key}.${subList.key}`, subList.new_item)">
                   <span class="i-carbon:add" /> 添加
                 </button>
               </div>
@@ -1449,7 +1122,10 @@ onBeforeUnmount(() => {
           <div v-if="editorKind === 'chart_focus'" class="ej-field-group">
             <div class="ej-label-row">
               <label class="ej-label">图表数据（JSON）</label>
-              <span class="ej-hint">type / data / encoding / series，校验通过才会应用到预览</span>
+              <span class="ej-hint">
+                <template v-if="chartChecking">正在校验…</template>
+                <template v-else>type / data / encoding / series，校验通过才会应用到预览</template>
+              </span>
             </div>
             <div class="ej-wrap" :class="{ 'ej-wrap--error': !!chartJsonError }">
               <textarea
@@ -1548,10 +1224,10 @@ onBeforeUnmount(() => {
             :class="{ 'kp-card--current': kindPickerMode === 'change' && k === editorKind }"
             @click="$emit('kind-picked', k)"
           >
-            <span :class="KIND_META[k].icon" class="kp-card-icon" />
-            <span class="kp-card-label">{{ KIND_META[k].label }}</span>
+            <span :class="KIND_META[k]?.icon" class="kp-card-icon" />
+            <span class="kp-card-label">{{ KIND_META[k]?.label }}</span>
             <span class="kp-card-key">{{ k }}</span>
-            <span class="kp-card-desc">{{ KIND_META[k].desc }}</span>
+            <span class="kp-card-desc">{{ KIND_META[k]?.desc }}</span>
           </button>
         </div>
       </div>

@@ -188,6 +188,56 @@ pub enum SlideKind {
     ChartFocus,
 }
 
+impl SlideKind {
+    /// Every kind, in declaration order. Used by the editor schema and the layout tables so
+    /// none of them can silently miss a kind.
+    pub const ALL: &'static [SlideKind] = &[
+        SlideKind::Cover,
+        SlideKind::Closing,
+        SlideKind::Overview,
+        SlideKind::SectionIntro,
+        SlideKind::FeatureGrid,
+        SlideKind::Spotlight,
+        SlideKind::SplitLayers,
+        SlideKind::SectionList,
+        SlideKind::FocusExample,
+        SlideKind::OutcomeGrid,
+        SlideKind::CenterGrid,
+        SlideKind::Timeline,
+        SlideKind::StepFlow,
+        SlideKind::Process,
+        SlideKind::Compare,
+        SlideKind::IssueStack,
+        SlideKind::Swot,
+        SlideKind::ChartFocus,
+    ];
+
+    /// The snake_case name this kind serializes to, matching the layout tables'
+    /// `LAYOUT_RULES` keys and `SUPPORTED_KINDS`.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SlideKind::Cover => "cover",
+            SlideKind::Closing => "closing",
+            SlideKind::Overview => "overview",
+            SlideKind::SectionIntro => "section_intro",
+            SlideKind::FeatureGrid => "feature_grid",
+            SlideKind::Spotlight => "spotlight",
+            SlideKind::SplitLayers => "split_layers",
+            SlideKind::SectionList => "section_list",
+            SlideKind::FocusExample => "focus_example",
+            SlideKind::OutcomeGrid => "outcome_grid",
+            SlideKind::CenterGrid => "center_grid",
+            SlideKind::Timeline => "timeline",
+            SlideKind::StepFlow => "step_flow",
+            SlideKind::Process => "process",
+            SlideKind::Compare => "compare",
+            SlideKind::IssueStack => "issue_stack",
+            SlideKind::Swot => "swot",
+            SlideKind::ChartFocus => "chart_focus",
+        }
+    }
+}
+
 /// 图表 DSL：markdown 中 ```chart 围栏块的内容，原样贯穿 生成 → blueprint → 双端渲染。
 /// LLM 不得改写其中的数据（validate.rs 把关），normalize 只做默认值修复。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -243,87 +293,20 @@ pub struct ChartEmphasis {
 pub const CHART_TYPES: &[&str] = &["line", "bar", "donut", "grouped_bar", "stacked_area"];
 
 impl ChartSpec {
-    /// Structural problems that make the chart unrenderable. The data comes from the user's
-    /// markdown, so these are reported at parse time (`input.rs`) where the user can fix them;
-    /// `validate.rs` re-checks edited decks. The LLM repair loop cannot fix chart data and must
-    /// never be asked to.
+    /// Structural problems that make the chart unrenderable, in English. The data comes from the
+    /// user's markdown, so these are reported at parse time (`input.rs`) where the user can fix
+    /// them; `validate.rs` re-checks edited decks. The LLM repair loop cannot fix chart data and
+    /// must never be asked to.
+    ///
+    /// The rules live in [`crate::chart_check`] so the editor's JSON check cannot drift from
+    /// these; this only re-serializes and reuses them.
     pub fn problems(&self) -> Vec<String> {
-        let mut out = Vec::new();
-        if !CHART_TYPES.contains(&self.chart_type.as_str()) {
-            out.push(format!(
-                "chart type '{}' is invalid; must be one of {}",
-                self.chart_type,
-                CHART_TYPES.join(", ")
-            ));
-            return out;
-        }
-        if self.title.trim().is_empty() {
-            out.push("chart title is empty".to_string());
-        }
-        if self.data.is_empty() {
-            out.push("chart data is empty".to_string());
-        }
-        let enc = &self.encoding;
-        let present = |key: &Option<String>| key.as_deref().is_some_and(|k| !k.trim().is_empty());
-        // (column, what) pairs whose values must be numeric in every row.
-        let mut numeric: Vec<(&str, &str)> = Vec::new();
-        match self.chart_type.as_str() {
-            "line" | "bar" => {
-                if !present(&enc.x) || !present(&enc.y) {
-                    out.push("line/bar chart requires encoding.x and encoding.y".to_string());
-                } else {
-                    numeric.push((enc.y.as_deref().unwrap_or_default(), "encoding.y"));
-                }
-            }
-            "donut" => {
-                if !present(&enc.label) || !present(&enc.value) {
-                    out.push("donut chart requires encoding.label and encoding.value".to_string());
-                } else {
-                    numeric.push((enc.value.as_deref().unwrap_or_default(), "encoding.value"));
-                }
-            }
-            _ => {
-                if !present(&enc.x) {
-                    out.push("grouped/stacked chart requires encoding.x".to_string());
-                }
-                if self.series.is_empty() {
-                    out.push(
-                        "grouped/stacked chart requires at least one series entry".to_string(),
-                    );
-                }
-                for s in &self.series {
-                    if s.key.trim().is_empty() {
-                        out.push("chart series entry has empty key".to_string());
-                    } else {
-                        numeric.push((s.key.as_str(), "series"));
-                    }
-                }
-            }
-        }
-        for (row_idx, row) in self.data.iter().enumerate() {
-            let Some(obj) = row.as_object() else {
-                out.push(format!("chart data row {} is not an object", row_idx + 1));
-                continue;
-            };
-            for (key, what) in &numeric {
-                if !obj.get(*key).is_some_and(is_numeric) {
-                    out.push(format!(
-                        "chart data row {} is missing a numeric value for {what} '{key}'",
-                        row_idx + 1
-                    ));
-                }
-            }
-        }
-        out
+        let value = serde_json::to_value(self).unwrap_or(Value::Null);
+        crate::chart_check::chart_problems_json(&value)
+            .iter()
+            .map(crate::chart_check::ChartProblem::message_en)
+            .collect()
     }
-}
-
-/// Numbers, or strings that parse as one (the renderer applies `Number()` to every value).
-fn is_numeric(value: &serde_json::Value) -> bool {
-    value.is_number()
-        || value
-            .as_str()
-            .is_some_and(|s| s.trim().parse::<f64>().is_ok_and(f64::is_finite))
 }
 
 /// Tolerant kind deserialization for persisted decks: a kind that no longer exists (for example the

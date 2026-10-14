@@ -2,7 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import type { SlideKind } from './types'
-import { KIND_META } from '../composables/useSlideEditor'
+import { useEditorSchemaStore } from '../stores/editorSchema'
+
+const schemaStore = useEditorSchemaStore()
 
 const emit = defineEmits<{ confirm: [index: number, kind: SlideKind] }>()
 const dialog = ref<HTMLDialogElement | null>(null)
@@ -11,7 +13,9 @@ const choices = ref<SlideKind[]>([])
 const selectedKind = ref<SlideKind | ''>('')
 const loading = ref(false)
 const error = ref('')
-const description = computed(() => selectedKind.value ? KIND_META[selectedKind.value]?.desc : '')
+const description = computed(() =>
+  selectedKind.value ? schemaStore.kindMeta[selectedKind.value]?.desc : '',
+)
 let requestVersion = 0
 
 function close() {
@@ -64,7 +68,7 @@ defineExpose({ open, close })
       <template v-else>
         <label for="retry-layout-kind">页面布局</label>
         <select id="retry-layout-kind" v-model="selectedKind" autofocus>
-          <option v-for="kind in choices" :key="kind" :value="kind">{{ KIND_META[kind]?.label ?? kind }}</option>
+          <option v-for="kind in choices" :key="kind" :value="kind">{{ schemaStore.kindMeta[kind]?.label ?? kind }}</option>
         </select>
         <p class="retry-layout-description">{{ description }}</p>
       </template>

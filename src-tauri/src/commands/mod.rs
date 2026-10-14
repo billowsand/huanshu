@@ -1,3 +1,4 @@
+pub mod editor;
 pub mod generate;
 pub mod media;
 pub mod pdf;
