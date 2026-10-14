@@ -23,12 +23,15 @@ pub async fn export_pdf(
 ) -> Result<PdfExportReport, String> {
     let state = state.inner().clone();
     // Core works on the stored JSON; the editor sends typed blueprints, so convert once here.
-    let slides = slides.map(|slides| {
-        slides
-            .iter()
-            .filter_map(|slide| serde_json::to_value(slide).ok())
-            .collect::<Vec<serde_json::Value>>()
-    });
+    let slides = slides
+        .map(|slides| {
+            slides
+                .iter()
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()
+        .map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         service::export_pdf(&state, project_id, slides, path, theme)
     })

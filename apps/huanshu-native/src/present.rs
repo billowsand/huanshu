@@ -12,8 +12,9 @@ use std::sync::Arc;
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    div, img, px, rgb, size, App, Bounds, Context, KeystrokeEvent, MouseButton, ObjectFit, Render,
-    RenderImage, SharedString, Subscription, Window, WindowBounds, WindowOptions,
+    div, img, px, rgb, size, AnyWindowHandle, App, Bounds, Context, KeystrokeEvent, MouseButton,
+    ObjectFit, Render, RenderImage, SharedString, Subscription, Window, WindowBounds,
+    WindowOptions,
 };
 use huanshu_core::preview::{PreviewCache, PreviewOptions, PreviewStyle};
 
@@ -36,6 +37,8 @@ pub struct Present {
     cache: PreviewCache<Arc<RenderImage>>,
     width: u32,
     failure: Option<String>,
+    /// 演示窗口自己。按键观察者是全应用的：看板窗口里的按键（尤其 Esc）不能作用到这里。
+    window_handle: AnyWindowHandle,
     #[allow(dead_code)]
     subscriptions: Vec<Subscription>,
 }
@@ -84,17 +87,18 @@ impl Present {
             .unwrap_or(0)
             .min(deck.len().saturating_sub(1));
         let subscriptions = vec![cx.observe_keystrokes(
-            |this: &mut Present, event: &KeystrokeEvent, window, cx| match event
-                .keystroke
-                .key
-                .as_str()
-            {
-                "right" | "space" | "down" | "pagedown" | "enter" => this.step(1, cx),
-                "left" | "up" | "pageup" => this.step(-1, cx),
-                "home" => this.jump(0, cx),
-                "end" => this.jump(this.deck.len().saturating_sub(1), cx),
-                "escape" => this.close(window, cx),
-                _ => {}
+            |this: &mut Present, event: &KeystrokeEvent, window, cx| {
+                if window.window_handle() != this.window_handle {
+                    return;
+                }
+                match event.keystroke.key.as_str() {
+                    "right" | "space" | "down" | "pagedown" | "enter" => this.step(1, cx),
+                    "left" | "up" | "pageup" => this.step(-1, cx),
+                    "home" => this.jump(0, cx),
+                    "end" => this.jump(this.deck.len().saturating_sub(1), cx),
+                    "escape" => this.close(window, cx),
+                    _ => {}
+                }
             },
         )];
         Self {
@@ -109,6 +113,7 @@ impl Present {
             }),
             width,
             failure: None,
+            window_handle: window.window_handle(),
             subscriptions,
         }
     }
@@ -129,12 +134,13 @@ impl Present {
         cx.notify();
     }
 
-    /// 关闭：把剩下的图交还——演示窗口一关，GPUI 就没人替我们释放了。
+    /// 关闭演示窗口（只关它自己，应用与看板照常）：先把剩下的图交还——
+    /// 窗口一关，GPUI 就没人替我们释放了。
     fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let mut released = self.cache.reset();
         released.extend(self.cache.take_released());
         drop_all(released, Some(window), cx);
-        cx.quit();
+        window.remove_window();
     }
 
     fn deck_values(&self) -> Vec<Option<serde_json::Value>> {
@@ -172,9 +178,10 @@ impl Present {
                 let mut released = present.cache.complete(&request, result);
                 released.extend(present.cache.take_released());
                 drop_all(released, Some(window), cx);
-                if present.cache.failed() {
-                    present.failure = Some("渲染失败".to_string());
-                }
+                present.failure = present
+                    .cache
+                    .failed()
+                    .then(|| "渲染失败（翻页重试）".to_string());
                 cx.notify();
                 present.pump(window, cx);
             });

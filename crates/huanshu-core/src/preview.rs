@@ -207,14 +207,23 @@ impl<Img> PreviewCache<Img> {
     }
 
     /// 换牌组（换项目、生成中页面陆续到达）。旧图保留到新图落下，不闪成加载框。
+    ///
+    /// 只有内容真的变了才重新打开失败闸（`armed`）：界面层往往每一帧都调用它，
+    /// 无条件打开会让一副编译不过的牌组每帧重试一次。
     pub fn set_deck(&mut self, slides: &[Option<Value>], style: PreviewStyle) {
+        if self.deck.as_slice() == slides && self.style == style {
+            return;
+        }
         self.deck = slides.to_vec();
         self.style = style;
         self.armed = true;
     }
 
-    /// 只要这些**牌组下标**的图；空表示全部。
+    /// 只要这些**牌组下标**的图；空表示全部。与 [`Self::set_deck`] 一样，没变就不重新打开失败闸。
     pub fn set_wanted(&mut self, indices: &[usize]) {
+        if self.wanted.as_deref() == Some(indices) {
+            return;
+        }
         self.wanted = Some(indices.to_vec());
         self.armed = true;
     }

@@ -13,6 +13,39 @@
 - `src-tauri/src/commands/*.rs` 的每个命令只做「取参数 → 调 core → 转错误」，**不要**再把 SQL、文件读写或业务分支写回命令层。
 - 前端的「规则」也在 core：编辑器版式表 `editor_schema.rs`（`get_editor_schema`，前端缓存在 `stores/editorSchema.ts`）、
   图表校验 `chart_check.rs`（`chart_problems`）。
+- 暂时允许的两份重复（Tauri 界面下线前，**改一边必须改另一边**）：缩略图调度 `preview.rs` ↔ `useTypstThumbnails.ts`、
+  主题清单 `themes.rs` ↔ `src/themes/catalog.ts`。
+
+## 隔离数据目录（真机验证必读）
+
+**真机验证一律在隔离目录里做，绝不写用户的真实数据**（2026-10 曾有一轮验证把用户真实项目的封面改坏并保存）。
+设置 `HUANSHU_HOME` 后，数据库、`settings.json`、素材与 `bootstrap.json` 全部落在它下面（`state.rs::storage_paths`）；
+未设置时与从前逐字相同。
+
+```powershell
+$env:HUANSHU_HOME = 'E:\huanshu\target\sandbox-home'
+cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库时加 --force 重建
+```
+
+`seed_demo` 建 7 个演示项目（全部版式 16:9 / 32:9 / 48:9、图表、图表边界、压力、图片），拒绝以真实数据目录或
+bootstrap 所在目录为目标。Tauri 版用 `.claude/launch.json` 的 `tauri-dev-sandbox`。
+
+## 原生界面（`apps/huanshu-native`，GPUI Kit）
+
+只读查看器：项目列表 → 看板（缩略图 + 大图）→ 演示 → 导出 PDF。在根 workspace 里但**不在 `default-members`**：
+`bunx tauri dev`、裸 `cargo build` 不编 GPUI，`cargo test --workspace` 与 `-p huanshu-native` 会编。
+命令行开关见它的 README（`--open/--page/--present/--theme/--export-pdf/--quit-after/--flip-soak`），截图用 `tools/shots.ps1`。
+
+- 数据只经 `huanshu_core::services`，位图经 `services::export::render_slide_pixels`（与缩略图、PDF 共用 `prepare_export_values`），
+  调度用 `huanshu_core::preview::PreviewCache`。牌组按**原始 JSON** 处理（Typst 比 `SlideBlueprint` 宽松，强类型往返会挡掉能渲染的牌组）。
+- **每张不再显示的 `RenderImage` 都要 `cx.drop_image`**：`PreviewCache` 的 `complete` 返回值与 `take_released()`、`reset()` 交还的图都要释放，
+  GPUI 不会回收图集。
+- `PreviewCache::set_deck` / `set_wanted` 只在内容真变了时才重新打开失败闸：界面每帧都会调用它们，无条件打开会让编译不过的牌组每帧重试。
+- **按键观察者是全应用的**（`observe_keystrokes` 会收到所有窗口的按键）：每个观察者先比对 `window.window_handle()` 与自己的窗口。
+  演示窗口 Esc 用 `window.remove_window()`，不要 `cx.quit()`。
+- 主题由标题栏（`Root::set_theme`）统一切换：保存设置、外壳明暗、看板渲染主题一起变；存在 `app_settings` 的 `app_theme` 键，
+  与 Tauri 版（WebView localStorage）暂不同步。
+- 量内存要量**本进程**：PowerShell 里的 `$PID` 是 PowerShell 自己。实测（release，5 分钟每 100ms 翻一页）工作集稳定在 385–412 MiB。
 
 # Auto-Slidev 模板扩展说明
 

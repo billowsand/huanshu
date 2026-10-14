@@ -26,3 +26,5 @@ slide-typst = { path = "../../crates/slide-typst" }
 # 把 `render_pixels` 的 RGBA 换成 GPUI 要的 BGRA。
 image = "0.25"
 serde_json = "1"
+# 首页的更新时间按本地时区显示。
+chrono = "0.4"

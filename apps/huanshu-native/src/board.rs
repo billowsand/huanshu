@@ -14,12 +14,11 @@ use gpui_kit::component::button::Button;
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    div, img, px, size, Context, Entity, KeystrokeEvent, ObjectFit, Render, RenderImage,
-    ScrollStrategy, SharedString, Subscription, Window,
+    div, img, px, size, AnyWindowHandle, Context, Entity, KeystrokeEvent, ObjectFit, Render,
+    RenderImage, ScrollStrategy, SharedString, Subscription, Window,
 };
 use huanshu_core::editor_schema;
 use huanshu_core::preview::{PreviewCache, PreviewOptions, PreviewStyle};
-use huanshu_core::services::settings;
 use huanshu_core::themes;
 
 use crate::app::{self, AppShared};
@@ -61,19 +60,21 @@ pub struct Board {
     stage_width: u32,
     visible: (usize, usize),
 
-    pending_since: Option<std::time::Instant>,
-    failure: Option<String>,
+    /// 当前页从什么时候起没有图可显示（换页时重新计时）；300ms 后才显示「渲染中…」。
+    waiting: Option<(usize, std::time::Instant)>,
     exporting: bool,
     export_note: Option<String>,
     /// 上次导出的文件路径，供「在文件夹中显示」使用。
     export_path: Option<String>,
     scroll: VirtualListScrollHandle,
+    /// 看板所在的窗口。按键观察者是全应用的（演示窗口里的按键也会送到这里），只认自己窗口的。
+    window_handle: AnyWindowHandle,
     #[allow(dead_code)]
     subscriptions: Vec<Subscription>,
 }
 
 impl Board {
-    pub fn new(args: BoardArgs, _window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(args: BoardArgs, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let project = huanshu_core::services::projects::get_project(&args.shared, args.project_id)
             .unwrap_or_else(|err| {
                 eprintln!("[native] 打开项目失败：{err}");
@@ -96,9 +97,20 @@ impl Board {
             .map(|entry| (entry.kind, entry.label))
             .collect();
         let selected = args.start_page.min(deck.len().saturating_sub(1));
+        // 比例取项目的设置（旧项目没有就看第一页），与导出时 `prepare_export_values` 同一顺序。
+        let ratio = project.aspect_ratio.or_else(|| {
+            deck.iter()
+                .flatten()
+                .next()
+                .and_then(|slide| slide.get("aspect_ratio").cloned())
+                .and_then(|value| serde_json::from_value(value).ok())
+        });
+        let aspect = ratio.map_or(9.0 / 16.0, |ratio: huanshu_core::types::AspectRatio| {
+            ratio.height() as f32 / ratio.width() as f32
+        });
 
         let board = Self {
-            aspect: 9.0 / 16.0,
+            aspect,
             project_name: project.name,
             deck,
             kind_labels,
@@ -115,29 +127,32 @@ impl Board {
             thumb_width: 0,
             stage_width: 0,
             visible: (0, 0),
-            pending_since: None,
-            failure: None,
+            waiting: None,
             exporting: false,
             export_note: None,
             export_path: None,
             scroll: VirtualListScrollHandle::new(),
+            window_handle: window.window_handle(),
             subscriptions: Vec::new(),
             args,
         };
-        // ↑/↓ 换页。
-        let subscriptions = vec![cx.observe_keystrokes(
-            |board: &mut Board, event: &KeystrokeEvent, _window, _cx| match event
-                .keystroke
-                .key
-                .as_str()
-            {
-                "down" | "pagedown" => board.step(1),
-                "up" | "pageup" => board.step(-1),
-                "home" => board.select_index(0),
-                "end" => board.select_index(board.deck.len().saturating_sub(1)),
-                _ => {}
-            },
-        )];
+        // ↑/↓ 换页。观察者是全应用的，演示窗口里的按键不能也翻看板。
+        let subscriptions =
+            vec![
+                cx.observe_keystrokes(|board: &mut Board, event: &KeystrokeEvent, window, cx| {
+                    if window.window_handle() != board.window_handle {
+                        return;
+                    }
+                    match event.keystroke.key.as_str() {
+                        "down" | "pagedown" => board.step(1),
+                        "up" | "pageup" => board.step(-1),
+                        "home" => board.select_index(0),
+                        "end" => board.select_index(board.deck.len().saturating_sub(1)),
+                        _ => return,
+                    }
+                    cx.notify();
+                }),
+            ];
         Self {
             subscriptions,
             ..board
@@ -162,10 +177,8 @@ impl Board {
         if self.theme == id {
             return;
         }
+        // 保存设置、切换外壳明暗由 `Root::set_theme` 负责，这里只换看板的渲染主题。
         self.theme = id;
-        if let Err(error) = settings::set_app_theme(&self.args.shared, id) {
-            eprintln!("[native] 保存主题失败：{error}");
-        }
         self.deck_changed(cx);
     }
 
@@ -263,13 +276,8 @@ impl Board {
         let stage_request = self.stage.next_request();
         let thumb_request = self.thumbs.next_request();
         if stage_request.is_none() && thumb_request.is_none() {
-            if self.pending_since.is_none() && (self.stage.is_pending() || self.thumbs.is_pending())
-            {
-                self.pending_since = Some(std::time::Instant::now());
-            }
             return;
         }
-        self.pending_since = None;
 
         let project_id = self.args.project_id;
         let shared = self.args.shared.clone();
@@ -336,13 +344,9 @@ impl Board {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let released = self.stage.complete(request, result);
+        let mut released = self.stage.complete(request, result);
+        released.extend(self.stage.take_released());
         drop_all(released, Some(window), cx);
-        self.failure = if self.stage.failed() {
-            Some("渲染失败".to_string())
-        } else {
-            None
-        };
         // 32:9 / 48:9 的牌组按真实像素比摆舞台，否则大图会被压成 16:9。
         if let Some(image) = self.stage.image(self.selected) {
             let size = image.size(0);
@@ -355,9 +359,6 @@ impl Board {
                     drop_all(released, Some(window), cx);
                 }
             }
-        }
-        if self.stage.image(self.selected).is_some() {
-            self.pending_since = None;
         }
         cx.notify();
         // Only after the current page has landed do we prefetch its neighbours.
@@ -390,6 +391,31 @@ impl Board {
         released.extend(self.thumbs.take_released());
         released.extend(self.stage.take_released());
         drop_all(released, None, cx);
+    }
+
+    /// 「重试」：失败不会自动重来（编译不过的牌组会死循环），由用户触发。
+    fn retry(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.stage.refresh();
+        self.thumbs.refresh();
+        self.pump(window, cx);
+        cx.notify();
+    }
+
+    /// 当前页没有图时开始计时，300ms 后重绘一次以显示「渲染中…」（照 `SlideFrame.vue`）。
+    fn track_waiting(&mut self, cx: &mut Context<Self>) {
+        let waiting = self.stage.image(self.selected).is_none() && !self.stage.failed();
+        match (waiting, self.waiting) {
+            (false, _) => self.waiting = None,
+            (true, Some((page, _))) if page == self.selected => {}
+            (true, _) => {
+                self.waiting = Some((self.selected, std::time::Instant::now()));
+                cx.spawn(async move |this, cx| {
+                    cx.background_executor().timer(PENDING_DELAY).await;
+                    let _ = this.update(cx, |_board, cx| cx.notify());
+                })
+                .detach();
+            }
+        }
     }
 
     fn export_pdf(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -445,7 +471,7 @@ fn stage_box(window: &Window, aspect: f32) -> (f32, f32) {
 impl Board {
     /// 左侧缩略图虚拟列表。
     fn sidebar(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        let (thumb_w, row_h) = (THUMB_W, THUMB_W * 9.0 / 16.0 + 24.0);
+        let (thumb_w, row_h) = (THUMB_W, THUMB_W * self.aspect + 24.0);
         let sizes = Rc::new(vec![size(px(thumb_w), px(row_h)); self.deck.len()]);
         let list = v_virtual_list(
             cx.entity(),
@@ -483,6 +509,7 @@ impl Board {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let is_selected = index == self.selected;
+        let thumb_h = thumb_w * self.aspect;
         let frame = self.thumbs.image(index).cloned();
         let pending = self.thumbs.is_page_pending(index);
         let failed = self.thumbs.failed();
@@ -497,13 +524,10 @@ impl Board {
         let picture = match frame {
             Some(image) => div()
                 .w(px(thumb_w))
-                .h(px(thumb_w * 9.0 / 16.0))
+                .h(px(thumb_h))
                 .child(img(image).w_full().h_full()),
             // 没有图时给一个占位框，不留白屏（与 SlideFrame.vue 的 pending 一致）。
-            None => div()
-                .w(px(thumb_w))
-                .h(px(thumb_w * 9.0 / 16.0))
-                .bg(cx.theme().muted),
+            None => div().w(px(thumb_w)).h(px(thumb_h)).bg(cx.theme().muted),
         };
         let row = div()
             .id(("thumb", index))
@@ -537,13 +561,14 @@ impl Board {
 }
 
 /// 「渲染中…」要等一会儿才出现。
-fn show_pending(since: Option<std::time::Instant>) -> bool {
-    since.is_some_and(|since| since.elapsed() >= PENDING_DELAY)
+fn show_pending(waiting: Option<(usize, std::time::Instant)>) -> bool {
+    waiting.is_some_and(|(_, since)| since.elapsed() >= PENDING_DELAY)
 }
 
 impl Render for Board {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.pump(window, cx);
+        self.track_waiting(cx);
 
         let deck_len = self.deck.len();
         let selected = self.selected;
@@ -552,15 +577,14 @@ impl Render for Board {
             .0
             .name
             .to_string();
-        let failure = self.failure.clone();
+        let failed = self.stage.failed() || self.thumbs.failed();
         let exporting = self.exporting;
         let export_note = self.export_note.clone();
         let export_path = self.export_path.clone();
         let stage_image = self.stage.image(selected).cloned();
         let stage_overflow = self.stage.overflow(selected);
-        let stage_showing_pending = show_pending(self.pending_since);
+        let stage_showing_pending = show_pending(self.waiting);
         let root = self.args.root.clone();
-        let theme_ids: Vec<&'static str> = themes::APP_THEMES.iter().map(|t| t.id).collect();
         let page_label = format!("{} / {} · {}", selected + 1, deck_len, theme_name);
 
         let sidebar = self.sidebar(cx);
@@ -586,18 +610,7 @@ impl Render for Board {
                     .text_color(cx.theme().muted_foreground)
                     .child(SharedString::from(page_label)),
             )
-            .child(
-                Button::new("next-theme")
-                    .label("换主题")
-                    .on_click(cx.listener(move |board, _event, _window, cx| {
-                        let index = theme_ids
-                            .iter()
-                            .position(|id| *id == board.theme)
-                            .unwrap_or(0);
-                        board.set_theme(theme_ids[(index + 1) % theme_ids.len()], cx);
-                        cx.notify();
-                    })),
-            )
+            // 主题在标题栏里换（`Root::set_theme`）：外壳明暗、保存的设置与看板一起变。
             .child(Button::new("present").label("演示").on_click(cx.listener(
                 |board, _event, _window, cx| {
                     let (project_id, slides, theme, shared) = board.deck_for_present();
@@ -618,21 +631,31 @@ impl Render for Board {
 
         // 舞台按页面比例定尺寸：显示框与光栅宽度同源，位图正好铺满、不会被裁。
         let (stage_w, stage_h) = stage_box(window, self.aspect);
+        // 没有图时给一个与位图同尺寸的加载框，不留白（与 `SlideFrame.vue` 一致）。
         let stage = match stage_image {
             Some(image) => div()
                 .w(px(stage_w))
                 .h(px(stage_h))
                 .child(img(image).w_full().h_full().object_fit(ObjectFit::Contain)),
-            None => div()
+            None if deck_len == 0 => div()
                 .text_sm()
                 .text_color(cx.theme().muted_foreground)
-                .child(SharedString::from(
-                    match (failure.is_some(), stage_showing_pending) {
-                        (true, _) => "渲染失败",
-                        (_, true) => "渲染中…",
-                        _ => "没有可显示的幻灯片",
-                    },
-                )),
+                .child(SharedString::from("没有可显示的幻灯片")),
+            None => div()
+                .w(px(stage_w))
+                .h(px(stage_h))
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(cx.theme().muted)
+                .text_sm()
+                .text_color(cx.theme().muted_foreground)
+                .when(failed, |element| {
+                    element.child(SharedString::from("渲染失败"))
+                })
+                .when(!failed && stage_showing_pending, |element| {
+                    element.child(SharedString::from("渲染中…"))
+                }),
         };
 
         let notices =
@@ -642,8 +665,13 @@ impl Render for Board {
                 .gap_4()
                 .text_xs()
                 .text_color(cx.theme().muted_foreground)
-                .when(stage_showing_pending, |element| {
-                    element.child(SharedString::from("渲染中…"))
+                // 失败时旧图（若有）照常显示，这里给出原因与重试。
+                .when(failed, |element| {
+                    element.child(SharedString::from("渲染失败")).child(
+                        Button::new("retry").label("重试").on_click(
+                            cx.listener(|board, _event, window, cx| board.retry(window, cx)),
+                        ),
+                    )
                 })
                 .when(stage_overflow, |element| {
                     element.child(SharedString::from("超出部分被裁切"))

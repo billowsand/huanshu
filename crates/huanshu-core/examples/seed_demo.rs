@@ -53,9 +53,16 @@ fn guard_target(home: &Path, force: bool) -> Result<StoragePaths> {
     let absolute = std::fs::canonicalize(home)
         .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default().join(home));
     let system = storage_paths(None);
+    // Compare against the *directory* that holds bootstrap.json: `home` is a directory, and a
+    // sandbox rooted there would overwrite (with --force: delete) the real bootstrap file.
+    let bootstrap_dir = system
+        .bootstrap
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_default();
     for (what, candidate) in [
         ("data directory", &system.data_dir),
-        ("bootstrap directory", &system.bootstrap),
+        ("bootstrap directory", &bootstrap_dir),
     ] {
         if std::fs::canonicalize(candidate).is_ok_and(|real| real == absolute) {
             bail!("refusing to seed the real {what}: {}", candidate.display());

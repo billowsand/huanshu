@@ -235,7 +235,7 @@ fn progressive_lands_a_stale_but_newer_bitmap_and_still_asks_for_the_latest() {
     slides[0].as_mut().unwrap()["title"] = json!("第三版");
     cache.set_deck(&slides, style(560.0));
 
-    let mut released = render(&second, &mut cache);
+    let released = render(&second, &mut cache);
     assert_ne!(
         *cache.image(0).unwrap(),
         shown,
@@ -325,6 +325,30 @@ fn a_failure_keeps_the_old_bitmap_and_does_not_retry_by_itself() {
     assert!(
         cache.next_request().is_some(),
         "refresh() re-arms the request"
+    );
+}
+
+/// GPUI 每一帧都会把牌组与 `wanted` 原样再交一遍。失败之后，没变的输入不能重新打开请求，
+/// 否则一副编译不过的牌组会每帧重试一次（原生看板第一版就是这样）。
+#[test]
+fn re_submitting_the_same_deck_and_wanted_every_frame_does_not_retry_a_failure() {
+    let mut cache = cache();
+    cache.set_deck(&deck(3), style(560.0));
+    cache.set_wanted(&[1]);
+    let request = cache.next_request().unwrap();
+    let _ = cache.complete(&request, Err("Typst 编译失败".to_string()));
+    for _frame in 0..5 {
+        cache.set_deck(&deck(3), style(560.0));
+        cache.set_wanted(&[1]);
+        assert!(
+            cache.next_request().is_none(),
+            "an unchanged frame must not retry the failed request"
+        );
+    }
+    cache.set_wanted(&[2]);
+    assert!(
+        cache.next_request().is_some(),
+        "a real change (another page wanted) does re-arm it"
     );
 }
 

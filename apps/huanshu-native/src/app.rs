@@ -101,7 +101,11 @@ pub fn working_set_mib() -> f64 {
             .args([
                 "-NoProfile",
                 "-Command",
-                "[math]::Round((Get-Process -Id $PID).WorkingSet64 / 1MB, 1)",
+                // `$PID` would be the PowerShell child itself; ask for this process.
+                &format!(
+                    "[math]::Round((Get-Process -Id {}).WorkingSet64 / 1MB, 1)",
+                    std::process::id()
+                ),
             ])
             .creation_flags(CREATE_NO_WINDOW)
             .output();
