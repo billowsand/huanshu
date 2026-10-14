@@ -15,6 +15,8 @@ pub mod step3;
 use gpui_kit::prelude::*;
 use gpui_kit::{div, px, Context, Entity, Render, SharedString, Subscription, Window};
 use huanshu_core::db::GenerationRun;
+use huanshu_core::markdown_tools::{self, Granularity};
+use huanshu_core::services::media::MediaAssetResponse;
 use huanshu_core::services::{generation, projects};
 use huanshu_core::types::AspectRatio;
 
@@ -31,6 +33,16 @@ pub struct ProjectModel {
     pub id: Option<i64>,
     pub name: String,
     pub md_content: String,
+    /// 上传的文稿文件名（原版 `step1State.mdFilename`，顶栏标签与侧栏说明会显示）。
+    pub md_filename: String,
+    /// 分页粒度（原版 `step1State.granularity`）。
+    pub granularity: Granularity,
+    /// 素材库（原版 `mediaLib.mediaItems`，`services::media` 的记录）。
+    pub media: Vec<MediaAssetResponse>,
+    /// 草稿自动保存状态（原版 `draftSaveState`；防抖保存逻辑在 C 节，这里只存状态与展示）。
+    pub draft_save_state: DraftSaveState,
+    /// 草稿保存失败原因（原版 `draftSaveError`，格式工具行内错误会显示）。
+    pub draft_save_error: String,
     /// 牌组按**原始 JSON** 保存（与 core 的导出、预览一致；强类型往返会挡掉能渲染的牌组）。
     pub deck: Vec<serde_json::Value>,
     pub aspect: AspectRatio,
@@ -41,10 +53,55 @@ pub struct ProjectModel {
     pub generation_failed: bool,
 }
 
+/// 草稿自动保存状态（原版 `'idle' | 'saving' | 'saved' | 'error'`）。
+/// Saving / Saved / Error 由 C 节的自动保存逻辑置位，本轮只有展示。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[allow(dead_code)]
+pub enum DraftSaveState {
+    #[default]
+    Idle,
+    Saving,
+    Saved,
+    Error,
+}
+
+impl DraftSaveState {
+    /// 原版 `draftStatusText`。
+    pub fn text(self) -> &'static str {
+        match self {
+            Self::Idle => "",
+            Self::Saving => "草稿保存中...",
+            Self::Saved => "草稿已保存",
+            Self::Error => "草稿保存失败",
+        }
+    }
+}
+
 impl ProjectModel {
     /// 页面高宽比（16:9 → 0.5625）。
     pub fn aspect_ratio(&self) -> f32 {
         self.aspect.height() as f32 / self.aspect.width() as f32
+    }
+
+    /// 文稿长度（原版 `mdContent.length`，JS 的 UTF-16 码元数；中文每字 1，与原版一致）。
+    pub fn md_len(&self) -> usize {
+        self.md_content.encode_utf16().count()
+    }
+
+    /// 原版 `detectedGranularityLocal`：自动推荐解析成 H2 / H3。
+    pub fn detected_granularity(&self) -> Granularity {
+        markdown_tools::detect_granularity(&self.md_content)
+    }
+
+    /// 原版 `estimatedSlideCount`。
+    pub fn estimated_slides(&self) -> usize {
+        markdown_tools::estimate_slides(&self.md_content, self.granularity)
+    }
+
+    /// 「开始 AI 生成」本地可用条件（原版 `canGenerate` 的名称、文稿部分；
+    /// `!gen.running && retryingPages.size === 0` 待 C 节接上生成状态后补充）。
+    pub fn can_generate_local(&self) -> bool {
+        !self.md_content.trim().is_empty() && !self.name.trim().is_empty()
     }
 }
 
@@ -83,6 +140,11 @@ impl WorkflowPage {
             id,
             name: String::new(),
             md_content: String::new(),
+            md_filename: String::new(),
+            granularity: Granularity::Auto,
+            media: Vec::new(),
+            draft_save_state: DraftSaveState::Idle,
+            draft_save_error: String::new(),
             deck: Vec::new(),
             aspect: AspectRatio::Ratio16x9,
             latest_run: None,
@@ -117,12 +179,13 @@ impl WorkflowPage {
             move || {
                 let project = projects::open_project(&shared, id)?;
                 let run = generation::get_latest_generation_run(&shared, id)?;
-                Ok::<_, String>((project, run))
+                let media = huanshu_core::services::media::get_project_media(&shared, id)?;
+                Ok::<_, String>((project, run, media))
             },
             |page: &mut Self, result, window, cx| {
                 match result {
                     Err(error) => page.load = Load::Failed(error),
-                    Ok((project, run)) => {
+                    Ok((project, run, media)) => {
                         let deck: Vec<serde_json::Value> =
                             if project.blueprints_json.trim().is_empty() {
                                 Vec::new()
@@ -134,13 +197,16 @@ impl WorkflowPage {
                         page.model.update(cx, |model, cx| {
                             model.name = project.name;
                             model.md_content = project.md_content;
-                            model.deck = deck;
                             model.aspect = project.aspect_ratio.unwrap_or(AspectRatio::Ratio16x9);
+                            model.media = media;
+                            model.deck = deck;
                             model.latest_run = run;
                             model.generating = generating;
                             model.generation_failed = failed;
                             cx.notify();
                         });
+                        // TODO(parity): C 节从「项目附加信息」读回 mdFilename / granularity
+                        // （原版 localStorage 的 `persistStep1Meta` / `loadStep1Meta`）。
                         page.load = Load::Ready;
                         // 原版：生成进行中 → 2，有蓝图 → 3，否则 → 1。
                         let model = page.model.read(cx);
@@ -240,10 +306,12 @@ impl Render for WorkflowPage {
         };
         // 原版 `steps` 的说明文案。
         let descs = [
-            if model.md_content.is_empty() {
-                "上传或粘贴文稿".to_string()
+            if !model.md_filename.is_empty() {
+                model.md_filename.clone()
+            } else if !model.md_content.is_empty() {
+                format!("{} 字符", model.md_len())
             } else {
-                format!("{} 字符", model.md_content.chars().count())
+                "上传或粘贴文稿".to_string()
             },
             if model.generation_failed {
                 "生成出错".to_string()

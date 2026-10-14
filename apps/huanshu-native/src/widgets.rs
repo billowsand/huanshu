@@ -109,6 +109,34 @@ pub fn chip(text: impl Into<SharedString>, tone: Tone2, cx: &App) -> Div {
         .child(text.into())
 }
 
+/// 带图标的徽章（原版 `.filename-tag`：document 图标 + 文件名）。
+pub fn chip_icon(icon: &'static str, text: impl Into<SharedString>, tone: Tone2, cx: &App) -> Div {
+    let c = cx.studio().colors;
+    let (fg, bg, border) = match tone {
+        Tone2::Primary => (c.primary, c.primary_bg, c.primary_border),
+        Tone2::Success => (c.success, c.success_bg, c.success),
+        Tone2::Warning => (c.warning, c.warning_bg, c.warning_border),
+        Tone2::Error => (c.error, c.error_bg, c.error_border),
+        Tone2::Muted => (c.muted, c.surface, c.border),
+    };
+    div()
+        .flex_none()
+        .px(px(8.0))
+        .py(px(1.0))
+        .rounded(px(999.0))
+        .border_1()
+        .border_color(border)
+        .bg(bg)
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap(px(5.0))
+        .text_size(px(11.5))
+        .text_color(fg)
+        .child(carbon(icon))
+        .child(text.into())
+}
+
 /// 面板（原版 `--studio-panel` 底 + `--studio-border` 细边 + 圆角）。
 pub fn panel(cx: &App) -> Div {
     let c = cx.studio().colors;
@@ -218,15 +246,24 @@ pub fn small(button: Button) -> Button {
     button.small()
 }
 
+/// 行内错误小字（原版 `.prepare-inline-error`：红色、小号，跟在格式工具行右侧）。
+pub fn inline_error(text: impl Into<SharedString>, cx: &App) -> Div {
+    div()
+        .text_size(px(12.0))
+        .text_color(cx.studio().colors.error)
+        .child(text.into())
+}
+
 /// 给 `Stateful<Div>` 一个只显示文字的悬停提示（GPUI Kit `Tooltip`）。
 pub trait TooltipText {
-    fn tooltip_text(self, text: &'static str) -> Self;
+    fn tooltip_text(self, text: impl Into<SharedString>) -> Self;
 }
 
 impl TooltipText for Stateful<Div> {
-    fn tooltip_text(self, text: &'static str) -> Self {
+    fn tooltip_text(self, text: impl Into<SharedString>) -> Self {
+        let text = text.into();
         self.tooltip(move |window, cx| {
-            gpui_kit::component::tooltip::Tooltip::new(text).build(window, cx)
+            gpui_kit::component::tooltip::Tooltip::new(text.clone()).build(window, cx)
         })
     }
 }

@@ -85,16 +85,19 @@
 
 | 功能 | 状态 | 说明 / 依据 |
 |---|---|---|
-| 名称输入、字数 | ✅ | |
+| 名称输入（原版占位文案）、字数（UTF-16 码元数，与原版 `mdContent.length` 一致） | ✅ | `ProjectModel::md_len`；待截图对比 |
+| 草稿保存状态（保存中… / 已保存 / 失败） | 🟡 | 展示与文案已做（`DraftSaveState`）；防抖自动保存落库在 C 节 |
 | Markdown 编辑器（高亮、行号） | ✅ | GPUI Kit `Editor`（tree-sitter markdown） |
-| Markdown 预览 | 🟡 | `TextView::markdown` 已显示；按页切成 P1/P2… 卡片、滚动同步未做（`splitSlides`、`syncPreviewToEditor`） |
-| 上传文件、拖入 .md | ⬜ | `openFile` / `onDrop` |
-| AI 优化标题 | ⬜ | `services::generation::optimize_markdown_headings` |
-| 格式工具（自动标题、清除加粗、删除序号、三种编号） | ⬜ | `autoDetectHeadings` / `clearHeadingBold` / `addHeadingNumbers` / `removeHeadingNumbers` |
-| 分页粒度（自动推荐 / 二级 / 三级，各自页数） | ⬜ | `estimateSlides`、`detect_granularity` |
+| Markdown 预览按页卡片（P1/P2…，`TextView::markdown`） | ✅ | `markdown_tools::split_preview_pages`（auto 先 `detect_granularity`）；空态「预览区将实时显示 Markdown 渲染效果」；待截图对比 |
+| 编辑区 ↔ 预览区滚动同步（按比例） | 🟡 | 预览容器 `ScrollHandle`（精确）↔ 编辑器 `scroll_offset`/`set_scroll_offset`；**已知偏差**：编辑器最大滚动量无公开 API，按「行数 × 行高 − 视口」估计，soft-wrap 折行时中段比例有偏差；预览侧滚动条拖拽不触发编辑器同步（只挂了滚轮）；双向均有回声守卫 |
+| 上传文件（rfd `.md`/`.txt`，H1 取名） | ✅ | `open_file` / `load_markdown`；待截图对比 |
+| 拖入 .md / .txt（`on_drop` + `ExternalPaths`，释放以加载 Markdown 文件） | ✅ | 拖入加载可用；**已知偏差**：框架无文件拖入悬停钩子（只有 `on_file_drop_exit`/`on_drop`），拖动中的覆盖层高亮显示不出来；待截图对比 |
+| AI 优化标题（`optimize_markdown_headings`，async） | ✅ | `run_async` + 行内错误（`prepare-inline-error`）；成功 `replace_all` 保留撤销并从 H1 更新名称；迟到结果按模型实体 + 项目 id 作废；待截图对比 |
+| 格式工具（自动标题、清除加粗、删除序号、三种编号） | ✅ | `markdown_tools::{auto_detect_headings, clear_heading_bold, remove_heading_numbers, add_heading_numbers}`；`replace_all` 保留撤销历史；快照单测 `markdown_tools.rs` |
+| 分页粒度（自动推荐 / 二级 / 三级，各自页数与标题数） | ✅ | `estimate_slides` / `detect_granularity` / `count_exact_headings`；待截图对比 |
 | 幻灯片比例三选一（写回项目） | ✅ | `update_project_aspect_ratio` |
-| 素材库（添加、拖入、列表、删除、图注） | ⬜ | `useMediaLibrary.ts`、`services::media` |
-| 开始 AI 生成（建项目、保存文稿、切到第 2 步） | ⬜ | `onStep1StartGenerate` |
+| 素材库（添加、拖入、列表、删除） | ✅ | `services::media::{import_media_asset, delete_media_asset, get_project_media}`；新建项目先 `create_project` + `open_project`（路由对准留 C 节）；图注编辑原版不在第一步（第三步高级 JSON）；待截图对比 |
+| 开始 AI 生成（建项目、保存文稿、切到第 2 步） | ⬜ | `onStep1StartGenerate`，C 节 |
 | 图表围栏的校验提示 | ⬜ | `input.rs` 的解析报错 |
 
 ## 第二步 `Step2Generate.vue` + `stores/generation.ts` → `workflow/step2.rs`
