@@ -1,4 +1,4 @@
-import type { ChartSpec } from './chartOptions'
+import type { ChartSpec } from '../utils/chartSpec'
 
 // TypeScript mirrors of Rust types in src-tauri/src/types.rs
 

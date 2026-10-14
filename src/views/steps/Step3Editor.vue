@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import SlideFrame from '../../components/SlideFrame.vue'
-import { chartProblems } from '../../components/chartOptions'
+import { chartProblems } from '../../utils/chartSpec'
 import { ALL_KINDS, KIND_FIELDS, KIND_META } from '../../composables/useSlideEditor'
 import { useTypstThumbnails } from '../../composables/useTypstThumbnails'
 import type { SlideBlueprint, SlideKind } from '../../components/types'
