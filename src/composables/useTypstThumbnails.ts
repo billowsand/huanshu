@@ -134,9 +134,11 @@ export function useTypstThumbnails(opts: {
   /** `serial` 用：有请求在途时，期间发生的变化合并成一次尾部请求。 */
   let inFlight = false
   let dirty = false
-  /** 换过目标（esetAll）：在途响应已作废，下一次 efresh 必须真的发请求。 */
+  /** 换过目标（`resetAll`）：在途响应已作废，下一次 `refresh` 必须真的发请求。 */
   let resetPending = false
   let lastResetKey: unknown
+  /** 每次 `resetAll` +1；请求记下发出时的值，响应回来时不相等就整批作废。 */
+  let generation = 0
 
   function widthBucket(): number {
     return Math.max(WIDTH_BUCKET, Math.ceil(Math.max(opts.widthPx(), 1) / WIDTH_BUCKET) * WIDTH_BUCKET)
@@ -183,6 +185,7 @@ export function useTypstThumbnails(opts: {
 
   /** 清空全部图和键。`resetKey` 变化与整体关闭开关都走这里，调用方随即回退到幻灯片组件。 */
   function resetAll() {
+    generation += 1
     resetPending = true
     thumbs.value = {}
     overflow.value = {}
@@ -262,6 +265,7 @@ export function useTypstThumbnails(opts: {
     requestSequence: number,
   ) {
     inFlight = true
+    const requestGeneration = generation
     let chartSvgs: Array<{ index: number, svg: string }> | null = null
     try {
       chartSvgs = await buildChartSvgs(deck, { projectId: opts.projectId(), themeId: theme })
@@ -287,7 +291,10 @@ export function useTypstThumbnails(opts: {
         return
       }
       const next = { ...thumbs.value }
-      for (const page of batch.pages) {
+      // 请求发出后调用方换过目标（`resetKey` 变了）：这批图属于上一页，一张都不落。
+      // 不能靠键判断——换页后 `latestKeys` 要等下一次 `refresh` 才更新，旧页的键此刻仍然「相等」。
+      const pages = requestGeneration === generation ? batch.pages : []
+      for (const page of pages) {
         const key = requestKeys[page.index]
         const position = page.index
         const index = latestIndices[position]

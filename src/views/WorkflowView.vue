@@ -2015,17 +2015,6 @@ onMounted(() => {
   object-fit: fill;
 }
 
-/* 舞台还没拿到位图（首次渲染、刚换页）：先留一块与幻灯片同色的底，不要闪出幻灯片组件。 */
-.edit-preview-stage--typst {
-  box-shadow: none;
-}
-
-.edit-preview-loading {
-  width: 100%;
-  height: 100%;
-  background: #fff;
-}
-
 /* 「渲染中」标记：`pending` 持续 150ms 以上才出现，不抢眼、不闪。（Step3Editor 的 scoped
    样式里没有这些类，这一块是全局的。） */
 .edit-rendering {

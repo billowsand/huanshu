@@ -809,12 +809,6 @@ const typstPreviewImage = computed(() => {
   return thumb && !thumb.placeholder ? thumb : null
 })
 
-/** 位图还在路上（防抖或请求在途）：显示与舞台同色的底，不要闪出上一页的画面。 */
-const typstPreviewLoading = computed(() => {
-  if (!editorPreviewEnabled() || !props.editorPreviewSlide)
-    return false
-  return !typstPreview.failed.value && !typstPreviewImage.value
-})
 
 /** 「渲染中」标记：`pending` 持续不足 150ms 就不显示，避免打字时闪个不停。 */
 const renderBusy = ref(false)
@@ -964,7 +958,6 @@ onBeforeUnmount(() => {
           <div
             v-if="editorPreviewSlide"
             class="edit-preview-stage"
-            :class="{ 'edit-preview-stage--typst': typstPreviewImage }"
             :style="{ width: editorStageW + 'px', height: editorStageH + 'px' }"
           >
             <!--
@@ -979,7 +972,7 @@ onBeforeUnmount(() => {
               draggable="false"
               alt=""
             >
-            <div v-else-if="typstPreviewLoading" class="edit-preview-loading" />
+            <!-- 还没有图（首次渲染、刚换页）、占位页或失败：照旧渲染幻灯片组件，预览不能空白。 -->
             <div
               v-else
               class="edit-preview-canvas"
