@@ -1,20 +1,11 @@
-mod assets;
 mod commands;
-mod config;
-mod crypto;
-mod db;
-mod embedded_icons;
 mod fonts;
-mod generator;
-mod icon;
-mod image_size;
-mod input;
-mod lmstudio;
-mod network;
 mod render;
 mod text;
-mod types;
-mod validate;
+
+// 业务逻辑都在 huanshu-core；这里 re-export 一下，让命令层继续写 `crate::db::…` 这样的路径。
+pub use huanshu_core::{assets, config, crypto, db, embedded_icons, generator, icon};
+pub use huanshu_core::{image_size, input, lmstudio, network, types, validate};
 
 use config::LlmSettings;
 use rusqlite::Connection;

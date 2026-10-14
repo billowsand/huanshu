@@ -6,7 +6,7 @@
 //! the effect of weight / rule changes on a fixed document.
 //!
 //! ```text
-//! cargo test -p auto-slidev-studio --lib layout_probe -- --ignored --nocapture
+//! cargo test -p huanshu-core --lib layout_probe -- --ignored --nocapture
 //! ```
 //!
 //! Environment overrides:
