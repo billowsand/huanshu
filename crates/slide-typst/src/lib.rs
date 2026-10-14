@@ -323,6 +323,27 @@ pub struct RenderedPages {
     pub missing_assets: Vec<MissingAsset>,
 }
 
+/// One rasterized deck page as uncompressed pixels: the same raster as
+/// [`RenderedPng`] without the PNG encoding, for hosts that upload the pixels
+/// to a GPU themselves (see [`Renderer::render_pixels`]).
+#[derive(Debug)]
+pub struct RenderedPixels {
+    /// Index into the `slides` passed to the renderer.
+    pub index: usize,
+    pub width: u32,
+    pub height: u32,
+    /// Top-to-bottom rows of `width * 4` bytes, non-premultiplied RGBA8.
+    pub pixels: Vec<u8>,
+}
+
+/// Rasterized deck pages as raw pixels, plus the diagnostics of the single
+/// compile behind them (the counterpart of [`RenderedPages`]).
+pub struct RenderedFrames {
+    pub pages: Vec<RenderedPixels>,
+    pub overflows: Vec<Overflow>,
+    pub missing_assets: Vec<MissingAsset>,
+}
+
 /// Allowed thumbnail widths, in device pixels.
 const MIN_PNG_WIDTH: u32 = 64;
 const MAX_PNG_WIDTH: u32 = 3840;
@@ -445,6 +466,70 @@ impl Renderer {
             })
             .collect();
         Ok(RenderedPages {
+            pages,
+            overflows,
+            missing_assets,
+        })
+    }
+
+    /// Same compile and rasterization as [`Renderer::render_png`], but the pages
+    /// come back as raw non-premultiplied RGBA8 instead of PNG bytes.
+    ///
+    /// A host with its own GPU pipeline (GPUI / wgpu in a native shell) uploads
+    /// these directly and skips both the PNG encoding here and the decoding on
+    /// the other side. `width_px` and `only` follow `render_png`: the width is
+    /// clamped to the same range, each page is rasterized at
+    /// `width_px / page width` pixels per point, and out-of-range indices are
+    /// ignored.
+    pub fn render_pixels(
+        &self,
+        slides: &[serde_json::Value],
+        options: &ExportOptions,
+        width_px: u32,
+        only: Option<&[usize]>,
+    ) -> Result<RenderedFrames, RenderError> {
+        let Compiled {
+            document,
+            overflows,
+            missing_assets,
+            ..
+        } = self.compile(slides, options)?;
+        let width_px = width_px.clamp(MIN_PNG_WIDTH, MAX_PNG_WIDTH);
+        let all = document.pages();
+        let mut pages = Vec::new();
+        for (index, page) in all.iter().enumerate().take(slides.len()) {
+            if only.is_some_and(|wanted| !wanted.contains(&index)) {
+                continue;
+            }
+            let page_width_pt = page.frame.size().x.to_pt();
+            if page_width_pt <= 0.0 {
+                continue;
+            }
+            let pixmap = typst_render::render(
+                page,
+                &typst_render::RenderOptions {
+                    pixel_per_pt: typst::utils::Scalar::new(width_px as f64 / page_width_pt),
+                    render_bleed: false,
+                },
+            );
+            pages.push(RenderedPixels {
+                index,
+                width: pixmap.width(),
+                height: pixmap.height(),
+                pixels: unpremultiply(pixmap.data()),
+            });
+        }
+        // Mirrors `render_png`: an overflow marker carries the index of the slide that was
+        // clipped; markers pointing past the deck are dropped.
+        let overflows = overflows
+            .into_iter()
+            .filter(|overflow| {
+                overflow
+                    .slide
+                    .is_none_or(|slide| slides.get(slide).is_some())
+            })
+            .collect();
+        Ok(RenderedFrames {
             pages,
             overflows,
             missing_assets,
@@ -625,6 +710,32 @@ impl Renderer {
     }
 }
 
+/// Undoes the premultiplied alpha of a `tiny_skia::Pixmap`, which is what the
+/// rasterizer produces but neither PNG nor a GPU upload expects. Every slide
+/// page paints an opaque background, so in practice the alpha is 255 everywhere
+/// and this is a copy; the general case is handled anyway, `a == 0` carrying no
+/// color at all.
+fn unpremultiply(data: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(data.len());
+    for pixel in data.chunks_exact(4) {
+        let alpha = u32::from(pixel[3]);
+        let straight = |channel: u8| -> u8 {
+            if alpha == 0 {
+                0
+            } else {
+                ((u32::from(channel) * 255 + alpha / 2) / alpha).min(255) as u8
+            }
+        };
+        out.extend_from_slice(&[
+            straight(pixel[0]),
+            straight(pixel[1]),
+            straight(pixel[2]),
+            pixel[3],
+        ]);
+    }
+    out
+}
+
 /// Values of every `metadata(..) <label>` marker in the laid-out document.
 fn query_markers<T: serde::de::DeserializeOwned>(document: &PagedDocument, label: &str) -> Vec<T> {
     let label = Label::new(PicoStr::intern(label)).expect("valid label");
@@ -764,5 +875,26 @@ impl World for SlideWorld<'_> {
 
     fn today(&self, _offset: Option<Duration>) -> Option<Datetime> {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unpremultiply;
+
+    #[test]
+    fn unpremultiply_undoes_the_rasterizer_alpha() {
+        // Opaque pixels are copied bit-for-bit, which is every pixel of a rendered slide.
+        assert_eq!(
+            unpremultiply(&[10, 20, 30, 255, 0, 0, 0, 255]),
+            vec![10, 20, 30, 255, 0, 0, 0, 255]
+        );
+        // Half-transparent white is stored premultiplied as (128, 128, 128, 128).
+        assert_eq!(
+            unpremultiply(&[128, 128, 128, 128]),
+            vec![255, 255, 255, 128]
+        );
+        // Fully transparent pixels hold no color, whatever the rasterizer left there.
+        assert_eq!(unpremultiply(&[7, 8, 9, 0]), vec![0, 0, 0, 0]);
     }
 }

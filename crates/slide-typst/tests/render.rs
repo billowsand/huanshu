@@ -597,6 +597,76 @@ fn png_rendering_clamps_the_width_and_covers_the_whole_deck_by_default() {
 }
 
 #[test]
+fn render_pixels_matches_the_decoded_png_of_the_same_compile() {
+    let slides = supported_fixture_slides();
+    let options = ExportOptions::default();
+    let requested = [0usize, 3];
+    let pngs = renderer()
+        .render_png(&slides, &options, 560, Some(&requested))
+        .unwrap();
+    let frames = renderer()
+        .render_pixels(&slides, &options, 560, Some(&requested))
+        .unwrap();
+    assert_eq!(
+        frames.pages.iter().map(|p| p.index).collect::<Vec<_>>(),
+        vec![0, 3],
+        "exactly the requested pages, in slide order"
+    );
+    assert_eq!(pngs.pages.len(), frames.pages.len());
+    for (png, frame) in pngs.pages.iter().zip(&frames.pages) {
+        assert_eq!(frame.index, png.index);
+        assert_eq!((frame.width, frame.height), (png.width, png.height));
+        let decoded = image::load_from_memory(&png.png)
+            .expect("rendered PNG decodes")
+            .to_rgba8();
+        assert_eq!(decoded.dimensions(), (frame.width, frame.height));
+        assert_eq!(
+            frame.pixels.as_slice(),
+            decoded.as_raw().as_slice(),
+            "slide {}: raw pixels differ from the decoded PNG",
+            frame.index
+        );
+    }
+}
+
+#[test]
+fn render_pixels_follows_the_png_width_rules() {
+    let slides = supported_fixture_slides();
+    let options = ExportOptions::default();
+    // Narrower than the floor and wider than the ceiling are both clamped, and the buffer
+    // holds exactly width × height RGBA8 pixels.
+    for (requested, expected) in [(1u32, 64u32), (99_999, 3840)] {
+        let frames = renderer()
+            .render_pixels(&slides, &options, requested, Some(&[0]))
+            .unwrap();
+        assert_eq!(frames.pages.len(), 1);
+        let page = &frames.pages[0];
+        assert_eq!(page.width, expected);
+        assert_eq!(
+            page.pixels.len(),
+            (page.width * page.height * 4) as usize,
+            "pixel buffer does not match the reported size"
+        );
+    }
+
+    // Wide slides keep their own ratio, and out-of-range indices are ignored.
+    let wide = ExportOptions {
+        aspect_ratio: "ratio_32x9".to_string(),
+        ..Default::default()
+    };
+    let frames = renderer()
+        .render_pixels(&slides, &wide, 560, Some(&[0, 9999]))
+        .unwrap();
+    assert_eq!(frames.pages.len(), 1);
+    let expected = (560.0_f64 * 9.0 / 32.0).round() as i32;
+    assert!(
+        (frames.pages[0].height as i32 - expected).abs() <= 1,
+        "32:9 height {} != {expected}",
+        frames.pages[0].height
+    );
+}
+
+#[test]
 fn editorial_headline_sets_the_tail_in_the_accent() {
     // light-editorial splits cover / closing titles after the first full-width
     // comma or colon (src/utils/titleTail.ts) and colors the tail; other themes
