@@ -193,7 +193,7 @@ const slideItems = computed<SlideProgressItem[]>(() => {
 
 // 生成看板的缩略图走 Typst 光栅化的 PNG：一次要展示很多页。直接用卡片自己的蓝图（含生成中的空位和
 // 取自日志的蓝图），缩略图下标就是 `item.index`。必须定义在 `slideItems` 之后：组合函数初始化时
-// 就会读取它。位图宽度取卡片 frame 的实测宽度 × dpr，减去边框（按舞台尺寸缩放后铺满 frame）。
+// 就会读取它。位图宽度 = 卡片 frame 的实测内宽（`clientWidth` 已不含边框）× dpr。
 const slidesGridRef = ref<HTMLElement | null>(null)
 const gridFrameWidth = ref(0)
 let gridResizeObserver: ResizeObserver | null = null
@@ -214,11 +214,12 @@ watch(slidesGridRef, (el) => {
   measure()
 })
 
-/** 卡片预览位的栅格宽度：还没量到时按 260px（`.slides-grid` 的最小列宽）估一个。 */
-const cardPreviewWidth = computed(() => {
-  const frame = gridFrameWidth.value || 260
-  return Math.max(Math.round((frame - 2) * slideDims.value.w / slideDims.value.h), 1)
-})
+/**
+ * 卡片预览位的 CSS 宽度：还没量到时按 260px（`.slides-grid` 的最小列宽）估一个。
+ * frame 本身已按页面比例定高，宽度就是图的宽度——不要再乘页面宽高比（曾因此在 16:9 下多渲 1.8 倍、
+ * 48:9 下多渲 5.3 倍宽的位图）。
+ */
+const cardPreviewWidth = computed(() => Math.max(gridFrameWidth.value || 258, 1))
 
 const thumbnails = useTypstThumbnails({
   slides: () => slideItems.value.map(item => item.blueprint ?? null),

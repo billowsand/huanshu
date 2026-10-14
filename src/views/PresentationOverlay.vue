@@ -225,6 +225,10 @@ function stageImageWidth(): number {
   return (Math.max(size.width, (size.height * dims.w) / dims.h) * (window.devicePixelRatio || 1)) || 1
 }
 
+// `wanted` 要看当前页有没有图，但组合函数初始化时就会调用 `wanted()`，那时还不能碰 `stage`
+// （暂时性死区）。`stageReady` 变真之后 `wanted` 重新求值，依赖里才会出现 `stage.thumbs`。
+const stageReady = ref(false)
+
 const stage = useTypstThumbnails({
   slides: () => props.blueprints,
   projectId: () => props.projectId ?? null,
@@ -232,12 +236,18 @@ const stage = useTypstThumbnails({
   // 演示中、且不在全览模式（全览时主画面根本不在 DOM 里）。
   enabled: () => !showOverview.value,
   wanted: () => {
+    const current = presentSlide.value
+    // 当前页还没有图（刚进入演示、跳到预取范围之外）：先只要这一页。一次请求要等 `only` 里每一页
+    // 都栅格化完才返回，带上 4 张全屏宽的邻页会让眼前这一页多等好几倍；它落图后 `wanted` 变成整个
+    // 窗口，再预取前后页。
+    if (!stageReady.value || !stage.thumbs.value[current]) return [current]
     const last = props.blueprints.length - 1
-    return [presentSlide.value - 1, presentSlide.value, presentSlide.value + 1, presentSlide.value + 2, presentSlide.value + 3]
+    return [current - 1, current, current + 1, current + 2, current + 3]
       .filter(index => index >= 0 && index <= last)
   },
   maxCached: 10,
 })
+stageReady.value = true
 
 watch(presentSlide, () => {
   void stage.refresh()

@@ -245,6 +245,7 @@ export function useTypstThumbnails(opts: {
   ) {
     inFlight = true
     const requestGeneration = generation
+    let requestFailed = false
     try {
       const batch = await invoke<ThumbnailBatch>('render_slide_thumbnails', {
         projectId: opts.projectId(),
@@ -292,18 +293,22 @@ export function useTypstThumbnails(opts: {
         return
       }
       failed.value = true
+      requestFailed = true
       if (!warned) {
         warned = true
         console.warn('[thumbnails] Typst 渲染失败：', e)
       }
     }
-    // 成功或失败都要清掉在途标记：失败的页会留到下一次内容变化时重新请求。
+    // 成功或失败都要清掉在途标记：失败的页会留到下一次内容变化（或调用方的「重试」）时重新请求。
     inFlight = false
     for (const position of only) {
       if (pendingKeys[position] === requestKeys[position]) delete pendingKeys[position]
     }
     // `serial`：期间变化过就立刻用最新状态再请求一次；`dirty` 只在这里清掉，
     // 所以这条链一直走到「返回后再没有新变化」为止，最后一次请求带的就是最新内容。
+    // 失败时不接着请求：`refresh` 每次都会立起 `dirty`，失败的页键又没落下，接着请求只会
+    // 原样再失败一次，变成对 Rust 的死循环（一副编译不过的牌组就会这样）。
+    if (requestFailed) dirty = false
     if (!disposed && dirty) {
       dirty = false
       refresh()

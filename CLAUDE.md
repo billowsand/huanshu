@@ -1,10 +1,11 @@
 # Auto-Slidev 模板扩展说明
 
 ## 新增一个 Slide 模板的标准流程
-当你要给 Auto-Slidev 增加一个新模板时，按下面顺序改（渲染由前端 `SlideRenderer.vue` 完成，Rust 侧只产出 blueprint）：
+当你要给 Auto-Slidev 增加一个新模板时，按下面顺序改（幻灯片只由 Typst 渲染，见「Typst 原生 PDF 导出」一节；
+Rust 生成侧只产出 blueprint，前端没有幻灯片组件）：
 
-1. `src/components/`
-   新建 `KeynoteXxxSlide.vue`，Props 设计需清楚。
+1. `crates/slide-typst/typst/layouts/`
+   新建 `<kind>.typ` 版式，并按「新增一个版式」登记（`main.typ`、`lib.rs` 的 `TEMPLATES` / `SUPPORTED_KINDS`、fixture）。
 2. `src-tauri/src/types.rs`
    新增 `SlideKind` 枚举项，以及该模板对应的数据结构。
 3. `src-tauri/src/generator/layout_rules.rs`
@@ -23,12 +24,13 @@
 7. `src-tauri/src/validate.rs`
    增加结构校验，避免生成结果进入非法状态。
 8. 文档
-   更新 `CLAUDE.md`，把组件用途、Props 和新增流程记录下来。
+   更新 `CLAUDE.md`，把版式用途、字段和新增流程记录下来；前端 `src/components/types.ts`、`useSlideEditor.ts`
+   的 `KIND_META` / `KIND_FIELDS` / `KIND_DEFAULTS`、Step3 的 `FIELD_DEFS` 补上编辑器字段。
 
 
 ## 做新模板时最容易漏掉的点
 
-- 只写了 Vue 组件，没有把它接到 `SlideKind`
+- 只写了 Typst 版式，没有把它接到 `SlideKind`
 - 只改了 layout 选择，没有补内容生成提示词
 - schema hint 不完整，导致 LLM 输出字段漂移
 - 没有 normalize/validate，偶发坏 JSON 会直接进渲染阶段
@@ -46,12 +48,12 @@
 
 反流程比加模板多两个易漏点：**LLM 提示词白名单**和**旧数据兼容**。
 
-前端：
-1. `src/components/KeynoteXxxSlide.vue` 删文件（若有专用渲染器如 `InfographicCanvas.vue` 一并删）
-2. `src/components/SlideRenderer.vue`：`import`、`componentMap`、`kindPresetMap`（氛围图预设）、props 映射 `case 'xxx'`
-3. `src/components/types.ts`：`SlideKind` 联合类型、`SlideBlueprint` 中该模板专属字段
-4. `src/composables/useSlideEditor.ts`：`KIND_META`、`KIND_FIELDS`、`KIND_DEFAULTS`
-5. `src/views/steps/Step3Editor.vue`：`FIELD_DEFS` 中该模板专属字段
+Typst 与前端：
+1. `crates/slide-typst/typst/layouts/<kind>.typ` 删文件，去掉 `main.typ` 的 `layouts` 表、`lib.rs` 的 `TEMPLATES` /
+   `SUPPORTED_KINDS` 中的项，以及 fixture 里该 kind 的页（2026-09 那次删的还是 Vue 模板；Vue 模板已于 2026-10 全部移除）
+2. `src/components/types.ts`：`SlideKind` 联合类型、`SlideBlueprint` 中该模板专属字段
+3. `src/composables/useSlideEditor.ts`：`KIND_META`、`KIND_FIELDS`、`KIND_DEFAULTS`
+4. `src/views/steps/Step3Editor.vue`：`FIELD_DEFS` 中该模板专属字段
 
 Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 struct 字面量编译不过）：
 6. `src-tauri/src/types.rs`：`SlideKind` 变体 + `SlideBlueprint` 字段
@@ -65,7 +67,8 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
 必查两点：
 - `grep -rn "<模板名>" src src-tauri/src` 应 0 命中（仅剩迁移说明/测试里的字符串）
 - **旧数据兼容**：`SlideKind` 是 `#[serde(rename_all = "snake_case")]` 外部标签枚举，删变体后 DB / `.keynn` 里带旧 kind 的牌组会**整体反序列化失败**，而 `commands/projects.rs` 用的是 `unwrap_or_default()` → 项目静默变空。所以 `SlideBlueprint.kind` 挂了
-  `#[serde(deserialize_with = "de_slide_kind")]`（未知 kind → `Cover`，与前端 `SlideRenderer.vue` 的 `?? KeynoteCoverSlide` 兜底一致），并有回归测试 `legacy_infographic_kind_degrades_without_losing_slides`。
+  `#[serde(deserialize_with = "de_slide_kind")]`（未知 kind → `Cover`），并有回归测试 `legacy_infographic_kind_degrades_without_losing_slides`。
+  Typst 侧对没有版式的 kind 渲染「Typst 版式尚未实现」占位页，不会丢页。
 
 
 ## 布局选择：候选 + 全局分配
@@ -102,10 +105,10 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
   和每轮 repair 之后用 page plan 的原值覆盖。数据错误 LLM 修不了，绝不能让它进 repair 循环（否则最后一轮换模板丢图）。
   反馈修复（`repair_slide`）同样保留原 chart。enrich 不会把 `visual_need=chart` 降回 `text_only`。
 - **图表由 Typst 原生绘制**（`crates/slide-typst/typst/lib/chart.typ`）：缩略图、演示、编辑器预览、PDF 全走它，不需要 WebView。
-  它是 `src/components/chartOptions.ts` 的 `buildChartOption` 的移植，几何按旧 ECharts SSR 输出逐项对过（栅格边距、平滑曲线的
+  它移植自已删除的 ECharts 版 `buildChartOption`，几何按旧 ECharts SSR 输出逐项对过（栅格边距、平滑曲线的
   控制点与防过冲钳制、pin 气泡路径、环形图 48%/66% 半径与圆角、图例），五种图与旧 SVG 的平均像素差 ≤ 0.43。
-  屏幕上只剩 `KeynoteChartSlide.vue`（Typst 出图前的回退）还挂 ECharts；**改 `buildChartOption` 的几何、字号、配色要同步改
-  `chart.typ`**。与 option 一样，只有 `fs(n)` 的字号乘本页 `--type-scale`（`ctx.scale`），边距、线宽、符号尺寸是固定 CSS px。
+  它现在是图表的唯一实现（前端已不依赖 ECharts）。与原 option 一样，只有 `fs(n)` 的字号乘本页字号系数（`ctx.scale`），
+  边距、线宽、符号尺寸是固定 CSS px。
   - 数值轴：ECharts 的 `nice` 取整（`{1,2,3,5}×10ᵏ`，目标 5 段，含 0）；数字千分位、最多两位小数、无浮点尾巴（`format-number`）。
   - 类目太多时隔 k 个显示一个标签（不旋转、不缩小）；相邻数据标签会相撞时整组不画（高亮 pin 照画）。
   - 环形图：扇区之间切出约 2px 缝隙露出卡片（ECharts 用页面底色描边，主题里没有不透明的页面色）；0 和负值扇区不画；
@@ -113,13 +116,12 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
   - 堆叠面积的负值按 0 处理；负值柱从 0 向下画，圆角在远端，标签在柱下。
   - 画不出来的数据（类型未知、缺列、非数字、环形图没有正数、chart 不是对象）由 `chart-read` 判定，卡片里显示占位和原因，
     **绝不能编译失败**：一张坏图会让整份导出和整副缩略图一起失败（有单测）。图表里的字符串一律当纯文本（有注入单测）。
-- 内容量估算（`SlideRenderer.vue` 的 `contentLoad` / typst `content-load`）跳过 `chart` 键：数据行不是排版文字，计入会让图表页
-  一律落到最小字号。两边的跳过列表必须一致。
+- 内容量估算（typst `content-load`）跳过 `chart` 键：数据行不是排版文字，计入会让图表页一律落到最小字号。
 - 图表数据校验两份，规则一致：Rust `ChartSpec::problems()`（解析 Markdown、`validate.rs`）与 TS `chartProblems()`
   （Step3 编辑器「图表数据（JSON）」框与高级 JSON 的语义错误；只有通过校验的 JSON 才写回牌组）。
 - 配色两份：屏幕 CSS（`--chart-*`，`themeFromCssVars` 读取）与每个 typst 主题字典的 `chart`（`palette` 6 色、`grid`、`axis`、
   `success`，`_check.typ` 校验键集合与色数），文字色用主题的 `ink` / `muted`。改主题的图表色两边一起改。
-- 卡片校准结果（Vue 对照页实测）：绘图框宽度一致（646/647），高度差 ≤ 5px（仅「有副标题、无页脚」时，源自通用 `content-page` 几何）；
+- 卡片校准结果（删除 Vue 模板前在对照页实测）：绘图框宽度一致（646/647），高度差 ≤ 5px（仅「有副标题、无页脚」时，源自通用 `content-page` 几何）；
   左栏要点与 focus_example 同一套度量（card-title 标题、caption 正文 70%、序号同标题字号）；卡片底色取 `paper`；
   图表标题为墨色（模板里的 `text="var(--primary)"` 在屏幕上不生效，13 处模板都如此，typst 一律按屏幕实测）。
 - 回归与目检：`crates/slide-typst/tests/fixtures/charts.json`（五种图）与 `charts-edge.json`（负值、千分位、小数、30 个类目、
@@ -230,81 +232,48 @@ caption 只说图片「是什么」，说不出它「该放哪」。所以 `gene
 - `planning::merge_page_signal_patch` 只在模型**没有**给出 `preferred_assets` 时才用配对结果兜底（`take(2)`）；
 - 因此配对只提高「选对页的概率」，不剥夺模型按版式改选的能力。
 
-## 幻灯片字号体系（`--type-scale`）
+## 幻灯片字号体系（`type-sizes` / `--type-scale`）
 
-所有幻灯片字号都来自一套变量，**不要**在模板里写裸 `font-size: 0.Nrem`（历史上散落过 17 处，最小 0.68rem）。
+幻灯片只由 Typst 渲染，字号体系在 `crates/slide-typst/typst/lib/base.typ`（它移植自已删除的 Vue 版 `--type-scale`）：
 
-- 变量声明在 `.slide-shell`（`src/style.css`），**不是 `:root`**。原因：自定义属性的 `var()`
-  替换发生在「声明它的那个元素」上，只有放在 `.slide-shell`，`SlideRenderer` 才能对该元素
-  inline 覆盖 `--type-scale` 让整套字号重新求值，实现逐页自适应。想整体调力度就改这里的默认值。
-- 逐页系数在 `SlideRenderer.vue` 的 `slideTypeScale`（由 `contentLoad` 估算内容量）：
-  内容极少的页（封面/结尾）放大到 `1.425`，中等放大到 `1.325`，密集页保持 `1.25`。
-- 模板内要在**局部**收敛字号时，同样不能只覆盖 `--type-scale`——必须像
-  `KeynoteFeatureGridSlide.vue` 的 `contentVars` / `KeynoteSpotlightSlide.vue` 的 `sideVars`
-  那样，在该层把整组 `--type-*` 用 `calc(<基准> * var(--type-scale) * <系数>)` 重新声明。
-- 已知边界：`spotlight` 侧栏在「3 个面板 + 每面板多项」时放不下（实测 3 个面板各自最小高度
-  约 210/276/158px，合计已接近侧栏可用的 ~551px），原始字号下本就溢出。`normalize` 已把
-  面板条目收口到 4 项，但极端内容仍可能溢出，彻底解决需要限制面板数量或调整版式。
+- 逐页系数 `slide-type-scale(slide)`（由 `content-load` 估算内容量）：内容极少的页（封面/结尾）`1.425`，
+  中等 `1.325`，密集页 `1.25`；`main.typ` 把它放进 `ctx.scale`，`type-sizes(scale)` 得出 `ctx.ty` 的整套字号。
+  版式里只用 `ctx.ty.*`（再乘 `fit-height` 的 `f`），**不要**写裸字号。
+- `content-load` 跳过 `chart` 等非排版字段（见「图表页」）。
+- 已知边界：`spotlight` 侧栏在「3 个面板 + 每面板多项」时放不下；`normalize` 已把面板条目收口到 4 项，
+  侧栏用 `fit-height` 实测缩放，仍放不下时裁切并报告溢出。
 
-## 幻灯片字体角色（`src/themes/typography.css`）
+## 幻灯片字体角色
 
-字号之外还有一套**字体角色**：用户在「设置 → 外观与字体」里独立选择的 6 类字体，幻灯片里
-每一处文字都必须落到其中一类（界面字体 `--font-interface` 只服务 Studio 外壳，绝不出现在幻灯片里）：
+用户在「设置 → 外观与字体」里独立选择 6 类字体：标题、副标题、正文、注释与标签、数字与序号、代码。
+幻灯片里每一处文字都落到其中一类（界面字体 `--font-interface` 只服务 Studio 外壳）。
 
-| 角色 | 变量 | 钩子类 | 典型元素 |
-|---|---|---|---|
-| 标题 | `--font-title` | `.slide-font-title` | 页面标题、封面/结尾标题、卡片/象限/阶段标题 |
-| 副标题 | `--font-subtitle` | `.slide-font-subtitle` | 封面副标题、英文副标题、章节说明、卡片副标题 |
-| 正文 | `--font-body` | `.slide-font-body` | 卡片描述、条目、摘要、结论（**默认角色**） |
-| 注释与标签 | `--font-caption` | `.slide-font-caption` | 脚注、页尾、眉标、标签 pill、模式徽章、占位提示 |
-| 数字与序号 | `--font-number` | `.slide-font-number` | 章节号、步骤号、卡片编号、时间轴日期 |
-| 代码与编辑器 | `--font-code` | `.slide-font-code` | `code`/`pre`/`kbd`/`samp`、Markdown 编辑器 |
-
-- 规划表只有一个：`src/themes/typography.css`（由 `App.vue` 引入）。**不要**在模板 scoped style
-  或 `style.css` 里写 `font-family: var(--font-sans)`——标题、封面、章节号、脚注曾经都误指向
-  界面/代码字体，现已全部改掉。
-- 解析分四层，**书写顺序即优先级**（特异性相同时后写的胜出）：① 默认角色 = 正文
-  （`.slide-shell` / `.slidev-slide` / `.md-preview` 内一切文字先算正文，所以漏归类的元素只会
-  退化成正文，不会掉进界面字体）→ ② 语义类名分组（`.slide-title`… 与各模板自有类名
-  `.phase-head__title`…）→ ③ `.slide-font-*` 钩子（模板里逐个打标，用于没有语义类可挂、或需要
-  用正文压过某个字号类默认归组的元素）→ ④ `code`/`pre`/`kbd`/`samp` 永远是代码字体。
-- 判断依据是「这段话在版式里扮演什么角色」，**不是字号大小**。`.slide-text-caption` / `.slide-meta`
-  只是字号类，不在注释分组里，挂在正文上本来就是正文；模板里给它们补 `.slide-font-body` 只是显式标注。
-  真正必须挂钩子的是**被分组接管的类**借作他用时：例如 `.slide-text-note`、`.slide-caption` 属于
-  「注释与标签」组，SWOT 的策略结论借用 `.slide-text-note` 字号时必须再挂 `.slide-font-body`；
-  注释标题里的计数（Process「关键动作 03」）要挂 `.slide-font-number`。同一个元素只挂一个钩子。
-- 所有分组都写成 `:is(.slide-shell, .slidev-slide[, .md-preview]) :is(...)`，特异性一致，书写顺序
-  才等于优先级；也保证 Studio 外壳里同名类（如 `SlideCard` 的 `.slide-title`）不受影响。
-  主题样式（如 `terminal.css`）只调字距/字号，不写 `font-family`——写了也会被角色分组的 `!important` 覆盖。
-- 新增模板时的必查项：模板里每个文本元素要么有上面表格里的语义类名，要么显式挂 `.slide-font-*`，
-  然后在 `typography.css` 第 2 层补一行；`grep -rn "font-mono" src/components/Keynote*.vue`
-  应 0 命中（数字用 `--font-number` 或 `.slide-number`，`font-mono`/`font-sans` 会被角色组的
-  `!important` 覆盖成死代码，只会误导后来人）。
+- Typst 侧：`pdf.rs` 的 `font_roles` 把设置写进 `ExportOptions.fonts`，`main.typ` 放进 `ctx.fonts`，版式里用
+  `txt(ctx, "<role>", …)`（`components.typ`）。判断依据是「这段话在版式里扮演什么角色」，**不是字号大小**：
+  例如 SWOT 的策略结论借用注释字号但属于正文，Process「关键动作 03」里的计数属于数字。
+- 字重：全局 `set text(weight: "regular")`，要粗体标题须在设置里直接选粗体字族。
+- CSS 侧（`src/themes/typography.css`）只剩 Step1 的 Markdown 预览 `.md-preview`：整体正文，标题与代码块单独接管；
+  另有 `#app *` 把 Studio 外壳的字重拍平成常规体。
 
 ## 报刊·钴蓝主题（`light-editorial`）
 
 取样自报刊/杂志版式：暖米白新闻纸、近黑墨色、唯一强调色钴蓝 `#1d4ed8`；无阴影、无圆角、无网格。
-屏幕样式在 `src/themes/editorial.css`，PDF 在 `crates/slide-typst/typst/themes/light-editorial.typ`（`family: "editorial"`）。
+幻灯片样式在 `crates/slide-typst/typst/themes/light-editorial.typ`（`family: "editorial"`）；`src/themes/editorial.css`
+现在只管 Studio 外壳与主题 token（Vue 模板删除后，它的幻灯片规则一并删除）。
 
-- 卡片「打开」成报刊分栏：`.glass-card` 只留上边一条细线（`--glass-border`），`--glass` 是**不透明**的纸色而不是
-  `transparent`——时间线、步骤流的卡片要盖住下面的轴线和连接线。`GlassCard` 用内联样式写 background/borderColor，
-  所以只能靠 token 改它的颜色，不能靠类选择器。
-- 标题下 2px 墨色线（`.slide-title-divider`、`.process-summary__line`），其余分隔线 1px 墨色；副标题标签是浅蓝带，
-  封面/结尾徽章 `.amber-badge` 是实心钴蓝白字；`.section-num` 退化为小号页码（同终端主题）。
+- 顶部 6px 钴蓝条、2px 墨色标题线、浅蓝副标题带、实心钴蓝徽章、`section-num` 退化为小号页码。
 - **双色大标题**：封面与结尾标题在第一个全角逗号/冒号/竖线或破折号之后断开（ASCII `:` / `|` 必须后跟空白，
-  `10:30` 不会断），后半句换行并改用钴蓝。规则有两份，必须一致：`src/utils/titleTail.ts`（`SlideTitle.vue` 把
-  后半句包进 `.semantic-title__tail`，只有本主题的 CSS 给它上色换行，其他主题无视觉变化）和
-  `lib/components.typ` 的 `title-tail` / `headline`（Typst 正则走 Rust regex，不支持前瞻，所以写成 `[:|]\s`）。
-  有单测 `editorial_headline_sets_the_tail_in_the_accent`。普通内容页标题不分色。
-- 字体：主题带不了字体（字体是用户在设置里统一选的），而 `typography.css` 把所有字重拍平成常规体。要还原报刊的
-  粗宋标题，标题字体须直接选一个粗体字族（如思源宋体 Heavy、方正大标宋）。
-- 第二期待办：PDF 的卡片改成同样的「上细线、无框」（需要 editorial 独立于 terminal 几何，逐个版式过一遍）；
+  `10:30` 不会断），后半句换行并改用钴蓝。规则在 `lib/components.typ` 的 `title-tail` / `headline`（Typst 正则走
+  Rust regex，不支持前瞻，所以写成 `[:|]\s`）；有单测 `editorial_headline_sets_the_tail_in_the_accent`。普通内容页标题不分色。
+- 卡片目前借用终端几何（细线全框、与纸同色）。删 Vue 模板之前，屏幕上的卡片是「上方一条细线、无框」的报刊分栏，
+  **这一差异现在对屏幕也生效了**。第二期待办：卡片改成上细线、无框（需要 editorial 独立于 terminal 几何，逐个版式过一遍）；
   设置页「套用主题推荐字体」；报头（刊名 + 日期期号）需要新的数据字段。
 
 ## Typst 原生 PDF 导出（实验中，`crates/slide-typst`）
 
 独立的 workspace crate，由 `src-tauri/src/commands/pdf.rs` 接入应用（见下方「应用接入」）。它在进程内嵌入 Typst 编译器，把 `SlideBlueprint`
-JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍然负责屏幕渲染，Typst 侧是另一套
+JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。它也是**唯一的幻灯片渲染器**（屏幕上的缩略图、演示、编辑器预览都是它
+光栅化的 PNG，见下方「Typst 缩略图」），Vue 模板已于 2026-10 删除。原先它是 Vue 模板之外的另一套
 版式实现。18 个模板（`SUPPORTED_KINDS`）与全部 6 个主题（`SUPPORTED_THEMES`：便签·稿纸、终端·纸/墨、报刊·钴蓝、暗·琥珀/星图）都已移植；
 未知主题 id 回落到便签（`main.typ` 的 `themes` 表兜底，`pdf.rs` 会把回落记进导出报告）。以后新增的模板在移植前
 会渲染成「Typst 版式尚未实现」占位页，不会丢页，导出结果弹窗会列出这些页。
@@ -390,9 +359,8 @@ JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。Vue 模板仍
 - 新增一个主题：写 `themes/<id>.typ`（theme 字典 + `background(w, h)`，键集合照抄现有主题，`family` 填它
   所属的 CSS 层），在 `main.typ`
   的 `themes` 表登记，在 `lib.rs` 的 `TEMPLATES` 和 `SUPPORTED_THEMES` 里各加一项，并在 `themes/_check.typ`
-  里加 import（键集合校验会立刻发现缺漏）。然后用 Vue 对照页逐 kind 校准：`?theme=<id>&kind=<kind>`，
-  token 值可以从 CSS 变量抄，几何和「哪个 CSS 规则实际生效」必须 `measure()` 实测——主题专属 CSS
-  （`terminal.css`、`notes-layouts.css`）会覆盖模板原始样式，暗色玻璃主题则没有覆盖、原始样式生效。
+  里加 import（键集合校验会立刻发现缺漏）。token 值可以从同名主题的 CSS 变量抄（Studio 外壳也用它们），然后用
+  `render_fixture --theme <id> --png` 逐 kind 目检（Vue 对照页已随模板删除，历史版本在 git 的 `experiments/typst/preview/`）。
 - 验证：
 
 ```bash
@@ -405,14 +373,7 @@ cargo run -p slide-typst --example render_fixture -- --png
   以及指定输入：`crates/slide-typst/tests/fixtures/stress.json <out-dir>`（压力用例）、
   `crates/slide-typst/tests/fixtures/spotlight.json`（图片用例，配合 `--assets crates/slide-typst/tests/fixtures/assets.json`，
   覆盖 PNG/JPG/WebP/BMP/SVG、多图、缺图、坏图）。
-- Vue 对照页：`bunx vite` 之后打开 `http://localhost:5173/experiments/typst/preview/index.html?theme=light-notes&kind=swot`，
-  控制台里的 `measure([...selectors])` 可以导出元素的几何尺寸和计算样式，用于校准 Typst 版式。
-  加上 `&deck=/crates/slide-typst/tests/fixtures/spotlight.json&assets=/crates/slide-typst/tests/fixtures/assets.json`
-  可以用同一份图片清单渲染 Vue 版。
-  对照页必须像 `src/main.ts` 一样**全局注册 `GlassCard` / `TagBadge` 等组件**：模板里这些组件不 import 直接用，
-  漏注册时会被当成未知标签渲染，卡片的底色、边框、内边距和副标题的标签样式全都会消失，量出来的数据就是错的
-  （曾因此按错误的参照做过几个版式，后来统一修正）。
-- 有意偏离屏幕版的地方：Vue 的时间线在卡片较高时，节点会偏离时间轴（实测偶数列 y=407、奇数列 y=328，轴在 y=376），
+- 移植时与旧 Vue 版（当时的屏幕版）有意不同的地方，现在屏幕上也是这样：Vue 的时间线在卡片较高时，节点会偏离时间轴（实测偶数列 y=407、奇数列 y=328，轴在 y=376），
   Typst 版按两侧最高的卡片计算上下区域，保证节点都在轴上；spotlight 的多图改为平铺；所有「按字数估算」的
   收缩规则都改成了实测；`center_grid` 的卡片区宽度上限（屏幕版固定 `max-w-2xl` 即 672px）在 32:9 / 48:9 下
   按 2 / 3 倍放宽，否则 8 列、12 列会被挤成细条；`outcome_grid` 卡片没有 `tag` 时不画空标签。
@@ -443,8 +404,8 @@ cargo run -p slide-typst --example render_fixture -- --png
 
 ### Typst 缩略图（迁移第一步）
 
-长期目标是让 Typst 成为唯一的幻灯片渲染器。第一步只换**缩略图**：Step2 生成看板的卡片预览、演示全览。
-Step2 详情大图、演示主画面、Step3 实时预览仍是 `SlideRenderer`。
+迁移分五步完成：缩略图（Step2 看板、演示全览）→ 演示主画面 → Step3 编辑器预览与 Step2 详情 → 图表原生绘制 →
+删除 Vue 模板。现在屏幕上每一处幻灯片都是 `components/SlideFrame.vue` 里的一张 Typst PNG，没有别的渲染器兜底。
 
 - 链路：`useTypstThumbnails` → `render_slide_thumbnails`（`commands/thumbnails.rs`）→
   `Renderer::render_png`（**整副编译**，按 `only` 光栅化，返回 `data:image/png` 给 `<img>`）。
@@ -454,17 +415,24 @@ Step2 详情大图、演示主画面、Step3 实时预览仍是 `SlideRenderer`�
   `index` 都是**子集位置**，组合函数再映射回传入数组的下标。
 - 缓存键 = 蓝图 JSON + 子集位置 + 主题 id + 字体 + 宽度档位（64px）。响应按**键**落图，不按请求序号整批丢弃：
   后一次请求只含它那一刻变了的页，整批丢弃会让前一批的页永远等不到图（Step2 会一直显示加载底）。
-- `enabled()` 为假只是不发请求、保留已有的图（全览关了再开不重渲）；`localStorage['huanshu.typstThumbnails'] = '0'`
-  才整体关掉、回退到 `SlideRenderer`，用于 A/B 对比。`placeholder`（模板还没有 Typst 版式）与命令失败时也回退。
+- `enabled()` 为假只是不发请求、保留已有的图（全览关了再开不重渲）。
+- **没有图时**：`SlideFrame` 显示加载框（`pending` 持续 300ms 后才淡入「渲染中…」，免得翻页就闪）。命令失败时
+  `failed` 为真：有旧图就继续显示旧图、角上给「渲染失败 · 重试」，没有图就显示失败和重试；重试调 `refresh()`。
+  **失败不自动重试**：`refresh` 每次都会立起 `dirty`，失败页的键又没落下，若照常接着请求会变成对 Rust 的死循环
+  （编译不过的牌组每次都失败）。`placeholder` 页（没有 Typst 版式的 kind）照常显示 Typst 返回的占位图。
+- 主题切换、字体变化时旧图一直显示到新图落下（键变了但 `thumbs` 不清），不会闪成加载框；只有 `resetKey` 变化会清空。
 - Step2 的 `slideItems` 下标是**内容页序号**（牌组装配后前面有封面+目录、末尾有结尾页），缩略图直接用
   `slideItems` 的蓝图（含取自日志的蓝图），下标就是 `item.index`；不要再从 `props.blueprints` 切片加偏移。
-- 性能：release 下 560px 宽每页约 5ms（光栅化）+ 整副增量编译约 20ms；`tauri dev` 是 debug 编译，
-  20 页要约 1.6 秒，dev 下的慢不代表发布版。
-- **演示主画面**（第二步）也走同一个组合函数的另一个实例：`wanted` = 当前页 ±2（预取）、`maxCached: 8`、
-  宽度 = 覆盖舞台所需的像素宽（拉伸模式取 `max(舞台宽, 舞台高 × 页宽/页高) × dpr`）。`<img>` 放在
-  `.pres-slide-wrapper` 里、CSS 尺寸就是舞台尺寸，**不要**放进带 `transform: scale()` 的 `.pres-slide`（会发糊）。
-  还没有图（首次进入、跳页超出预取范围）时**必须**回退到 `SlideRenderer`，主画面不能空白。
-  `localStorage['huanshu.typstStage'] = '0'` 关掉。封面/结尾/SWOT 的入场动画、spotlight 轮播、图表动画因此没有了。
+- 性能：release 下 560px 宽每页约 5ms（光栅化）+ 整副增量编译约 20ms。根 `Cargo.toml` 的
+  `[profile.dev.package."*"] opt-level = 2` 让依赖（Typst、光栅化）在 dev 构建里也优化：否则 `tauri dev` 下一页要等
+  几秒，而现在屏幕上的幻灯片全靠它（加了之后编辑器换页约 0.3 秒、`slide-typst` 渲染测试 24–45 秒 → 7 秒）。
+- 位图宽度要按**显示的 CSS 宽度 × dpr** 给：Step2 卡片曾把实测的卡片宽再乘一次页面宽高比，16:9 下多渲 1.8 倍宽、
+  48:9 下 5.3 倍，光栅化代价按像素数涨。
+- **演示主画面**也走同一个组合函数的另一个实例：`wanted` = 当前页前 1 页到后 3 页、`maxCached: 10`、
+  宽度 = 覆盖舞台所需的像素宽（拉伸模式取 `max(舞台宽, 舞台高 × 页宽/页高) × dpr`）。**当前页还没有图时 `wanted`
+  只给当前页**：一次请求要等 `only` 里每一页都栅格化完才返回，带上 4 张全屏宽的邻页会让眼前这页多等几倍
+  （dev 下进入演示从 6 秒降到 0.5 秒）；落图后再预取窗口。`wanted` 读 `stage.thumbs`，但组合函数初始化时就会调用它，
+  所以经 `stageReady` 标志转一手（暂时性死区）。封面/结尾/SWOT 的入场动画、spotlight 轮播、图表动画都没有了。
 - `wanted` 只决定请求哪几页，发给 Rust 的仍是整副牌（键里有子集位置，裁剪牌组会让翻页时全部失效）。
   `thumbs` / `lastUsed` 以数组下标为键，`shownKeys` / `pendingKeys` 以子集位置为键，淘汰时要换算。
 - **comemo 缓存要回收**：`Renderer::compile` 每次编译后 `typst::comemo::evict(50)`。不回收的话 Typst 的
@@ -501,11 +469,10 @@ Step2 详情大图、演示主画面、Step3 实时预览仍是 `SlideRenderer`�
   让打字时预览每隔一次渲染更新一次、停手后落在最新内容；`resetKey: () => activeSlide` 换页时清空。
   换页作废在途响应靠 **generation 计数**（`resetAll` +1，响应带着发出时的值比较），不能靠键：
   换页后 `latestKeys` 要等下一次 `refresh` 才更新，旧页响应的键此刻仍然「相等」，会把上一页的图落到新页上。
-- 编辑器、Step2 详情、演示主画面在还没有图时**一律回退 `SlideRenderer`**，不放空白占位（三轮里两次犯过）。
+- 没有图时一律显示 `SlideFrame` 的加载框，不放裸的空白（这条规则在有 Vue 兜底的三轮里被违反过两次）。
 - 位图一律放在舞台层、铺满舞台，**不要**放进带 `transform: scale()` 的画布：Step2 详情曾把按舞台尺寸写的
   `<img>` 放进 `scale(舞台宽/1280)` 的画布，图被缩两次，只剩左上角四分之一。
 - 内容缩到 `fit-min` 仍放不下时，`Thumbnail.overflow` 为真，编辑器在预览下方提示「超出部分被裁切」。
-  `localStorage['huanshu.typstEditorPreview'] = '0'` 关掉编辑器预览的 Typst 出图。
 
 ## 多比例幻灯片支持 (16:9 / 32:9 / 48:9)
 
@@ -534,16 +501,16 @@ Step2 详情大图、演示主画面、Step3 实时预览仍是 `SlideRenderer`�
 | `src/components/types.ts` | 新增 `AspectRatio` 类型和 `ASPECT_DIMENSIONS` 常量表 |
 | `src/stores/generation.ts` | `generate` 函数接受 `aspectRatio` 参数 |
 | `src/views/steps/Step1Prepare.vue` | 新增比例选择器 UI（16:9 / 32:9 / 48:9 Segmented Control） |
-| `src/views/PresentationOverlay.vue` | 实现拉伸到全屏播放（`scaleX` 和 `scaleY` 独立填满屏幕） |
-| `src/views/steps/Step2Generate.vue` | 预览画布使用动态尺寸和缩放比例 |
+| `src/views/PresentationOverlay.vue` | 拉伸到全屏播放：Typst 位图按舞台尺寸非等比铺满 |
+| `src/views/steps/Step2Generate.vue` | 卡片与详情按页面比例定框 |
 | `src/composables/useSlideEditor.ts` | 编辑器预览根据实际比例计算尺寸 |
-| `src/views/steps/Step3Editor.vue` | 接收 `currentSlideDims` prop，编辑器预览画布使用动态尺寸 |
+| `src/views/steps/Step3Editor.vue` | 编辑器预览舞台按页面比例定尺寸（`editorStageW/H`） |
 | `src/style.css` | `.pres-slide, .slidev-slide` 的 width/height 改为 CSS 变量 |
 
 ### 实现要点
 1. **生成时**：`layout_rules.rs` 按比例屏蔽不适合的模板（`blocked_aspects`）并在布局提示词里加入软偏好
 2. **normalize 时**：`apply_component_defaults` 根据比例调整各项数量限制（如 `cards.truncate(4 * cols_multiplier)`）
-3. **播放时**：PresentationOverlay 计算 `stretchScale = { scaleX: vw/slideW, scaleY: vh/slideH }`，对幻灯片进行非等比缩放到全屏
+3. **播放时**：PresentationOverlay 计算 `stretchScale = { scaleX: vw/slideW, scaleY: vh/slideH }`，据此定出舞台尺寸，Typst 位图非等比铺满舞台（拉伸到全屏）
 
 
 ## 加密导出/导入功能 (.keynn)
