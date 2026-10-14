@@ -87,6 +87,11 @@ const draftStatusText = computed(() => {
   return ''
 })
 
+// 文稿工具函数（countExactHeadings / parseSections / estimateSlides / stripHeadingNumberPrefix /
+// toChineseNumber / addHeadingNumbers / removeHeadingNumbers / autoDetectHeadings / clearHeadingBold /
+// 以及 MarkdownWorkbench.vue 的 splitSlides）已逐字移植到原生版
+// crates/huanshu-core/src/markdown_tools.rs：改一边必须改另一边，快照测试
+// crates/huanshu-core/tests/markdown_tools.rs（fixtures/markdown-tools.json）守住一致性。
 function countExactHeadings(raw: string, level: 2 | 3) {
   return raw
     .split(/\r?\n/)

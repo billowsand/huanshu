@@ -22,6 +22,7 @@ pub mod icon;
 pub mod image_size;
 pub mod input;
 pub mod lmstudio;
+pub mod markdown_tools;
 pub mod network;
 pub mod preview;
 pub mod services;

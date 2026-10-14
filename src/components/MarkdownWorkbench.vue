@@ -58,6 +58,9 @@ function renderSlide(raw: string) {
   return md.render(trimmed)
 }
 
+// splitSlides 已逐字移植到原生版 crates/huanshu-core/src/markdown_tools.rs 的
+// split_preview_pages：改一边必须改另一边，快照测试
+// crates/huanshu-core/tests/markdown_tools.rs（fixtures/markdown-tools.json）守住一致性。
 function splitSlides(raw: string, granularity: 'h2' | 'h3') {
   const lines = raw.split(/\r?\n/)
   const slides: string[] = []

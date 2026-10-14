@@ -1,0 +1,533 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "basic-h2",
+      "md": "# 演示标题\n\n## 章节一\n\n内容描述一的第一段。\n内容描述一第二行同段。\n\n---\n\n## 章节二\n\n内容描述二。",
+      "h2_count": 2,
+      "h3_count": 0,
+      "detected": "h2",
+      "estimate": {
+        "auto": 2,
+        "h2": 2,
+        "h3": 2
+      },
+      "sections": [
+        {
+          "paragraphs": [
+            "内容描述一的第一段。\n内容描述一第二行同段。"
+          ],
+          "subsections": []
+        },
+        {
+          "paragraphs": [
+            "内容描述二。"
+          ],
+          "subsections": []
+        }
+      ],
+      "split_h2": [
+        "# 演示标题",
+        "## 章节一\n\n内容描述一的第一段。\n内容描述一第二行同段。\n\n---",
+        "## 章节二\n\n内容描述二。"
+      ],
+      "split_h3": [
+        "# 演示标题",
+        "## 章节一\n\n内容描述一的第一段。\n内容描述一第二行同段。\n\n---",
+        "## 章节二\n\n内容描述二。"
+      ],
+      "auto_detect": "# 演示标题\n\n## 章节一\n\n内容描述一的第一段。\n内容描述一第二行同段。\n\n---\n\n## 章节二\n\n内容描述二。",
+      "clear_bold": "# 演示标题\n\n## 章节一\n\n内容描述一的第一段。\n内容描述一第二行同段。\n\n---\n\n## 章节二\n\n内容描述二。",
+      "remove_numbers": "# 演示标题\n\n## 章节一\n\n内容描述一的第一段。\n内容描述一第二行同段。\n\n---\n\n## 章节二\n\n内容描述二。",
+      "add_cn_section": "# 演示标题\n\n## 一、 章节一\n\n内容描述一的第一段。\n内容描述一第二行同段。\n\n---\n\n## 二、 章节二\n\n内容描述二。",
+      "add_cn_subsection": "# 演示标题\n\n## 章节一\n\n内容描述一的第一段。\n内容描述一第二行同段。\n\n---\n\n## 章节二\n\n内容描述二。",
+      "add_decimal": "# 演示标题\n\n## 章节一\n\n内容描述一的第一段。\n内容描述一第二行同段。\n\n---\n\n## 章节二\n\n内容描述二。",
+      "h1": "演示标题"
+    },
+    {
+      "name": "h3-subsections",
+      "md": "# 演示标题\n\n## 第一章\n\n引导段落。\n\n### 第一节\n\n第一节内容。\n\n### 第二节\n\n第二节内容。\n\n## 第二章\n\n第二章内容。\n\n### 第一节\n\n内容。",
+      "h2_count": 2,
+      "h3_count": 3,
+      "detected": "h3",
+      "estimate": {
+        "auto": 5,
+        "h2": 2,
+        "h3": 5
+      },
+      "sections": [
+        {
+          "paragraphs": [
+            "引导段落。"
+          ],
+          "subsections": [
+            {
+              "paragraphs": [
+                "第一节内容。"
+              ]
+            },
+            {
+              "paragraphs": [
+                "第二节内容。"
+              ]
+            }
+          ]
+        },
+        {
+          "paragraphs": [
+            "第二章内容。"
+          ],
+          "subsections": [
+            {
+              "paragraphs": [
+                "内容。"
+              ]
+            }
+          ]
+        }
+      ],
+      "split_h2": [
+        "# 演示标题",
+        "## 第一章\n\n引导段落。\n\n### 第一节\n\n第一节内容。\n\n### 第二节\n\n第二节内容。",
+        "## 第二章\n\n第二章内容。\n\n### 第一节\n\n内容。"
+      ],
+      "split_h3": [
+        "# 演示标题",
+        "## 第一章\n\n引导段落。",
+        "### 第一节\n\n第一节内容。",
+        "### 第二节\n\n第二节内容。",
+        "## 第二章\n\n第二章内容。",
+        "### 第一节\n\n内容。"
+      ],
+      "auto_detect": "# 演示标题\n\n## 第一章\n\n引导段落。\n\n### 第一节\n\n第一节内容。\n\n### 第二节\n\n第二节内容。\n\n## 第二章\n\n第二章内容。\n\n### 第一节\n\n内容。",
+      "clear_bold": "# 演示标题\n\n## 第一章\n\n引导段落。\n\n### 第一节\n\n第一节内容。\n\n### 第二节\n\n第二节内容。\n\n## 第二章\n\n第二章内容。\n\n### 第一节\n\n内容。",
+      "remove_numbers": "# 演示标题\n\n##\n\n引导段落。\n\n###\n\n第一节内容。\n\n###\n\n第二节内容。\n\n##\n\n第二章内容。\n\n###\n\n内容。",
+      "add_cn_section": "# 演示标题\n\n## 一、\n\n引导段落。\n\n### 第一节\n\n第一节内容。\n\n### 第二节\n\n第二节内容。\n\n## 二、\n\n第二章内容。\n\n### 第一节\n\n内容。",
+      "add_cn_subsection": "# 演示标题\n\n## 第一章\n\n引导段落。\n\n### （一）\n\n第一节内容。\n\n### （二）\n\n第二节内容。\n\n## 第二章\n\n第二章内容。\n\n### （一）\n\n内容。",
+      "add_decimal": "# 演示标题\n\n## 第一章\n\n引导段落。\n\n### 第一节\n\n第一节内容。\n\n### 第二节\n\n第二节内容。\n\n## 第二章\n\n第二章内容。\n\n### 第一节\n\n内容。",
+      "h1": "演示标题"
+    },
+    {
+      "name": "cn-numbered-plain-lines",
+      "md": "# 演示标题\n\n一、现状分析\n\n现状分析的内容。\n\n（一）子要点\n\n子要点内容。\n\n（二）另一个子要点\n\n二、下一步计划\n\n计划内容。\n\n十、超过十的章节\n\n内容。\n\n二十、二十章",
+      "h2_count": 0,
+      "h3_count": 0,
+      "detected": "h3",
+      "estimate": {
+        "auto": 0,
+        "h2": 0,
+        "h3": 0
+      },
+      "sections": [],
+      "split_h2": [
+        "# 演示标题\n\n一、现状分析\n\n现状分析的内容。\n\n（一）子要点\n\n子要点内容。\n\n（二）另一个子要点\n\n二、下一步计划\n\n计划内容。\n\n十、超过十的章节\n\n内容。\n\n二十、二十章"
+      ],
+      "split_h3": [
+        "# 演示标题\n\n一、现状分析\n\n现状分析的内容。\n\n（一）子要点\n\n子要点内容。\n\n（二）另一个子要点\n\n二、下一步计划\n\n计划内容。\n\n十、超过十的章节\n\n内容。\n\n二十、二十章"
+      ],
+      "auto_detect": "# 演示标题\n\n## 现状分析\n\n现状分析的内容。\n\n### 子要点\n\n子要点内容。\n\n### 另一个子要点\n\n## 下一步计划\n\n计划内容。\n\n## 超过十的章节\n\n内容。\n\n## 二十章",
+      "clear_bold": "# 演示标题\n\n一、现状分析\n\n现状分析的内容。\n\n（一）子要点\n\n子要点内容。\n\n（二）另一个子要点\n\n二、下一步计划\n\n计划内容。\n\n十、超过十的章节\n\n内容。\n\n二十、二十章",
+      "remove_numbers": "# 演示标题\n\n一、现状分析\n\n现状分析的内容。\n\n（一）子要点\n\n子要点内容。\n\n（二）另一个子要点\n\n二、下一步计划\n\n计划内容。\n\n十、超过十的章节\n\n内容。\n\n二十、二十章",
+      "add_cn_section": "# 演示标题\n\n一、现状分析\n\n现状分析的内容。\n\n（一）子要点\n\n子要点内容。\n\n（二）另一个子要点\n\n二、下一步计划\n\n计划内容。\n\n十、超过十的章节\n\n内容。\n\n二十、二十章",
+      "add_cn_subsection": "# 演示标题\n\n一、现状分析\n\n现状分析的内容。\n\n（一）子要点\n\n子要点内容。\n\n（二）另一个子要点\n\n二、下一步计划\n\n计划内容。\n\n十、超过十的章节\n\n内容。\n\n二十、二十章",
+      "add_decimal": "# 演示标题\n\n一、现状分析\n\n现状分析的内容。\n\n（一）子要点\n\n子要点内容。\n\n（二）另一个子要点\n\n二、下一步计划\n\n计划内容。\n\n十、超过十的章节\n\n内容。\n\n二十、二十章",
+      "h1": "演示标题"
+    },
+    {
+      "name": "decimal-and-letter-prefixes",
+      "md": "# 演示标题\n\n## 1. 第一章\n\n## 2) 第二章\n\n## 3：第三章\n\n## A、字母章\n\n## 第3节 数字第节\n\n## 第12章 混合\n\n## （一） 括号章\n\n## (二) 半角括号章",
+      "h2_count": 8,
+      "h3_count": 0,
+      "detected": "h2",
+      "estimate": {
+        "auto": 8,
+        "h2": 8,
+        "h3": 8
+      },
+      "sections": [
+        {
+          "paragraphs": [],
+          "subsections": []
+        },
+        {
+          "paragraphs": [],
+          "subsections": []
+        },
+        {
+          "paragraphs": [],
+          "subsections": []
+        },
+        {
+          "paragraphs": [],
+          "subsections": []
+        },
+        {
+          "paragraphs": [],
+          "subsections": []
+        },
+        {
+          "paragraphs": [],
+          "subsections": []
+        },
+        {
+          "paragraphs": [],
+          "subsections": []
+        },
+        {
+          "paragraphs": [],
+          "subsections": []
+        }
+      ],
+      "split_h2": [
+        "# 演示标题",
+        "## 1. 第一章",
+        "## 2) 第二章",
+        "## 3：第三章",
+        "## A、字母章",
+        "## 第3节 数字第节",
+        "## 第12章 混合",
+        "## （一） 括号章",
+        "## (二) 半角括号章"
+      ],
+      "split_h3": [
+        "# 演示标题",
+        "## 1. 第一章",
+        "## 2) 第二章",
+        "## 3：第三章",
+        "## A、字母章",
+        "## 第3节 数字第节",
+        "## 第12章 混合",
+        "## （一） 括号章",
+        "## (二) 半角括号章"
+      ],
+      "auto_detect": "# 演示标题\n\n## 1. 第一章\n\n## 2) 第二章\n\n## 3：第三章\n\n## A、字母章\n\n## 第3节 数字第节\n\n## 第12章 混合\n\n## （一） 括号章\n\n## (二) 半角括号章",
+      "clear_bold": "# 演示标题\n\n## 1. 第一章\n\n## 2) 第二章\n\n## 3：第三章\n\n## A、字母章\n\n## 第3节 数字第节\n\n## 第12章 混合\n\n## （一） 括号章\n\n## (二) 半角括号章",
+      "remove_numbers": "# 演示标题\n\n## 第一章\n\n## 第二章\n\n## 第三章\n\n## 字母章\n\n## 数字第节\n\n## 混合\n\n## 括号章\n\n## 半角括号章",
+      "add_cn_section": "# 演示标题\n\n## 一、 第一章\n\n## 二、 第二章\n\n## 三、 第三章\n\n## 四、 字母章\n\n## 五、 数字第节\n\n## 六、 混合\n\n## 七、 括号章\n\n## 八、 半角括号章",
+      "add_cn_subsection": "# 演示标题\n\n## 1. 第一章\n\n## 2) 第二章\n\n## 3：第三章\n\n## A、字母章\n\n## 第3节 数字第节\n\n## 第12章 混合\n\n## （一） 括号章\n\n## (二) 半角括号章",
+      "add_decimal": "# 演示标题\n\n## 1. 第一章\n\n## 2) 第二章\n\n## 3：第三章\n\n## A、字母章\n\n## 第3节 数字第节\n\n## 第12章 混合\n\n## （一） 括号章\n\n## (二) 半角括号章",
+      "h1": "演示标题"
+    },
+    {
+      "name": "bold-headings",
+      "md": "# **主标题**\n\n## **加粗章节**\n\n### 普通子节\n\n#### **加粗四级**\n\n正文 **不加粗** 的行。\n\n##  ## 后面紧跟井号",
+      "h2_count": 2,
+      "h3_count": 1,
+      "detected": "h2",
+      "estimate": {
+        "auto": 2,
+        "h2": 2,
+        "h3": 3
+      },
+      "sections": [
+        {
+          "paragraphs": [],
+          "subsections": [
+            {
+              "paragraphs": [
+                "#### **加粗四级**",
+                "正文 **不加粗** 的行。"
+              ]
+            }
+          ]
+        },
+        {
+          "paragraphs": [],
+          "subsections": []
+        }
+      ],
+      "split_h2": [
+        "# **主标题**",
+        "## **加粗章节**\n\n### 普通子节\n\n#### **加粗四级**\n\n正文 **不加粗** 的行。",
+        "##  ## 后面紧跟井号"
+      ],
+      "split_h3": [
+        "# **主标题**",
+        "## **加粗章节**",
+        "### 普通子节\n\n#### **加粗四级**\n\n正文 **不加粗** 的行。",
+        "##  ## 后面紧跟井号"
+      ],
+      "auto_detect": "# **主标题**\n\n## **加粗章节**\n\n### 普通子节\n\n#### **加粗四级**\n\n正文 **不加粗** 的行。\n\n##  ## 后面紧跟井号",
+      "clear_bold": "# 主标题\n\n## 加粗章节\n\n### 普通子节\n\n#### 加粗四级\n\n正文 **不加粗** 的行。\n\n##  ## 后面紧跟井号",
+      "remove_numbers": "# **主标题**\n\n## **加粗章节**\n\n### 普通子节\n\n#### **加粗四级**\n\n正文 **不加粗** 的行。\n\n##  ## 后面紧跟井号",
+      "add_cn_section": "# **主标题**\n\n## 一、 **加粗章节**\n\n### 普通子节\n\n#### **加粗四级**\n\n正文 **不加粗** 的行。\n\n## 二、 ## 后面紧跟井号",
+      "add_cn_subsection": "# **主标题**\n\n## **加粗章节**\n\n### （一） 普通子节\n\n#### **加粗四级**\n\n正文 **不加粗** 的行。\n\n##  ## 后面紧跟井号",
+      "add_decimal": "# **主标题**\n\n## **加粗章节**\n\n### 普通子节\n\n#### 1. **加粗四级**\n\n正文 **不加粗** 的行。\n\n##  ## 后面紧跟井号",
+      "h1": "**主标题**"
+    },
+    {
+      "name": "heading-levels-1-to-6",
+      "md": "# H1\n\n## H2\n\n### H3\n\n#### H4\n\n##### H5\n\n###### H6\n\n#H1无空格\n\n##H2无空格",
+      "h2_count": 1,
+      "h3_count": 1,
+      "detected": "h3",
+      "estimate": {
+        "auto": 2,
+        "h2": 1,
+        "h3": 2
+      },
+      "sections": [
+        {
+          "paragraphs": [],
+          "subsections": [
+            {
+              "paragraphs": [
+                "#### H4",
+                "##### H5",
+                "###### H6",
+                "#H1无空格",
+                "##H2无空格"
+              ]
+            }
+          ]
+        }
+      ],
+      "split_h2": [
+        "# H1",
+        "## H2\n\n### H3\n\n#### H4\n\n##### H5\n\n###### H6\n\n#H1无空格\n\n##H2无空格"
+      ],
+      "split_h3": [
+        "# H1",
+        "## H2",
+        "### H3\n\n#### H4\n\n##### H5\n\n###### H6\n\n#H1无空格\n\n##H2无空格"
+      ],
+      "auto_detect": "# H1\n\n## H2\n\n### H3\n\n#### H4\n\n##### H5\n\n###### H6\n\n#H1无空格\n\n##H2无空格",
+      "clear_bold": "# H1\n\n## H2\n\n### H3\n\n#### H4\n\n##### H5\n\n###### H6\n\n#H1无空格\n\n##H2无空格",
+      "remove_numbers": "# H1\n\n## H2\n\n### H3\n\n#### H4\n\n##### H5\n\n###### H6\n\n#H1无空格\n\n##H2无空格",
+      "add_cn_section": "# H1\n\n## 一、 H2\n\n### H3\n\n#### H4\n\n##### H5\n\n###### H6\n\n#H1无空格\n\n##H2无空格",
+      "add_cn_subsection": "# H1\n\n## H2\n\n### （一） H3\n\n#### H4\n\n##### H5\n\n###### H6\n\n#H1无空格\n\n##H2无空格",
+      "add_decimal": "# H1\n\n## H2\n\n### H3\n\n#### 1. H4\n\n##### H5\n\n###### H6\n\n#H1无空格\n\n##H2无空格",
+      "h1": "H1"
+    },
+    {
+      "name": "math-block",
+      "md": "# 公式测试\n\n## 第一章\n\n$$\n## 公式里的假标题\nx^2\n$$\n\n## 第二章\n\n正文。",
+      "h2_count": 3,
+      "h3_count": 0,
+      "detected": "h2",
+      "estimate": {
+        "auto": 3,
+        "h2": 3,
+        "h3": 3
+      },
+      "sections": [
+        {
+          "paragraphs": [
+            "$$"
+          ],
+          "subsections": []
+        },
+        {
+          "paragraphs": [
+            "x^2\n$$"
+          ],
+          "subsections": []
+        },
+        {
+          "paragraphs": [
+            "正文。"
+          ],
+          "subsections": []
+        }
+      ],
+      "split_h2": [
+        "# 公式测试",
+        "## 第一章\n\n$$\n## 公式里的假标题\nx^2\n$$",
+        "## 第二章\n\n正文。"
+      ],
+      "split_h3": [
+        "# 公式测试",
+        "## 第一章\n\n$$\n## 公式里的假标题\nx^2\n$$",
+        "## 第二章\n\n正文。"
+      ],
+      "auto_detect": "# 公式测试\n\n## 第一章\n\n$$\n## 公式里的假标题\nx^2\n$$\n\n## 第二章\n\n正文。",
+      "clear_bold": "# 公式测试\n\n## 第一章\n\n$$\n## 公式里的假标题\nx^2\n$$\n\n## 第二章\n\n正文。",
+      "remove_numbers": "# 公式测试\n\n##\n\n$$\n## 公式里的假标题\nx^2\n$$\n\n##\n\n正文。",
+      "add_cn_section": "# 公式测试\n\n## 一、\n\n$$\n## 二、 公式里的假标题\nx^2\n$$\n\n## 三、\n\n正文。",
+      "add_cn_subsection": "# 公式测试\n\n## 第一章\n\n$$\n## 公式里的假标题\nx^2\n$$\n\n## 第二章\n\n正文。",
+      "add_decimal": "# 公式测试\n\n## 第一章\n\n$$\n## 公式里的假标题\nx^2\n$$\n\n## 第二章\n\n正文。",
+      "h1": "公式测试"
+    },
+    {
+      "name": "crlf",
+      "md": "# CRLF标题\r\n\r\n## 第一节\r\n\r\n第一段。\r\n\r\n### 小节\r\n\r\n## 第二节\r\n",
+      "h2_count": 2,
+      "h3_count": 1,
+      "detected": "h2",
+      "estimate": {
+        "auto": 2,
+        "h2": 2,
+        "h3": 3
+      },
+      "sections": [
+        {
+          "paragraphs": [
+            "第一段。"
+          ],
+          "subsections": [
+            {
+              "paragraphs": []
+            }
+          ]
+        },
+        {
+          "paragraphs": [],
+          "subsections": []
+        }
+      ],
+      "split_h2": [
+        "# CRLF标题",
+        "## 第一节\n\n第一段。\n\n### 小节",
+        "## 第二节"
+      ],
+      "split_h3": [
+        "# CRLF标题",
+        "## 第一节\n\n第一段。",
+        "### 小节",
+        "## 第二节"
+      ],
+      "auto_detect": "# CRLF标题\n\n## 第一节\n\n第一段。\n\n### 小节\n\n## 第二节\n",
+      "clear_bold": "# CRLF标题\n\n## 第一节\n\n第一段。\n\n### 小节\n\n## 第二节\n",
+      "remove_numbers": "# CRLF标题\n\n##\n\n第一段。\n\n### 小节\n\n##\n",
+      "add_cn_section": "# CRLF标题\n\n## 一、\n\n第一段。\n\n### 小节\n\n## 二、\n",
+      "add_cn_subsection": "# CRLF标题\n\n## 第一节\n\n第一段。\n\n### （一） 小节\n\n## 第二节\n",
+      "add_decimal": "# CRLF标题\n\n## 第一节\n\n第一段。\n\n### 小节\n\n## 第二节\n",
+      "h1": "CRLF标题"
+    },
+    {
+      "name": "no-headings",
+      "md": "只是一段普通文字。\n\n没有标题的文稿。\n\n1. 列表项一\n2. 列表项二",
+      "h2_count": 0,
+      "h3_count": 0,
+      "detected": "h3",
+      "estimate": {
+        "auto": 0,
+        "h2": 0,
+        "h3": 0
+      },
+      "sections": [],
+      "split_h2": [
+        "只是一段普通文字。\n\n没有标题的文稿。\n\n1. 列表项一\n2. 列表项二"
+      ],
+      "split_h3": [
+        "只是一段普通文字。\n\n没有标题的文稿。\n\n1. 列表项一\n2. 列表项二"
+      ],
+      "auto_detect": "只是一段普通文字。\n\n没有标题的文稿。\n\n1. 列表项一\n2. 列表项二",
+      "clear_bold": "只是一段普通文字。\n\n没有标题的文稿。\n\n1. 列表项一\n2. 列表项二",
+      "remove_numbers": "只是一段普通文字。\n\n没有标题的文稿。\n\n1. 列表项一\n2. 列表项二",
+      "add_cn_section": "只是一段普通文字。\n\n没有标题的文稿。\n\n1. 列表项一\n2. 列表项二",
+      "add_cn_subsection": "只是一段普通文字。\n\n没有标题的文稿。\n\n1. 列表项一\n2. 列表项二",
+      "add_decimal": "只是一段普通文字。\n\n没有标题的文稿。\n\n1. 列表项一\n2. 列表项二",
+      "h1": null
+    },
+    {
+      "name": "auto-granularity-h3-wins",
+      "md": "# 演示标题\n\n## 唯一章节\n\n### 子一\n\n### 子二\n\n### 子三",
+      "h2_count": 1,
+      "h3_count": 3,
+      "detected": "h3",
+      "estimate": {
+        "auto": 4,
+        "h2": 1,
+        "h3": 4
+      },
+      "sections": [
+        {
+          "paragraphs": [],
+          "subsections": [
+            {
+              "paragraphs": []
+            },
+            {
+              "paragraphs": []
+            },
+            {
+              "paragraphs": []
+            }
+          ]
+        }
+      ],
+      "split_h2": [
+        "# 演示标题",
+        "## 唯一章节\n\n### 子一\n\n### 子二\n\n### 子三"
+      ],
+      "split_h3": [
+        "# 演示标题",
+        "## 唯一章节",
+        "### 子一",
+        "### 子二",
+        "### 子三"
+      ],
+      "auto_detect": "# 演示标题\n\n## 唯一章节\n\n### 子一\n\n### 子二\n\n### 子三",
+      "clear_bold": "# 演示标题\n\n## 唯一章节\n\n### 子一\n\n### 子二\n\n### 子三",
+      "remove_numbers": "# 演示标题\n\n## 唯一章节\n\n### 子一\n\n### 子二\n\n### 子三",
+      "add_cn_section": "# 演示标题\n\n## 一、 唯一章节\n\n### 子一\n\n### 子二\n\n### 子三",
+      "add_cn_subsection": "# 演示标题\n\n## 唯一章节\n\n### （一） 子一\n\n### （二） 子二\n\n### （三） 子三",
+      "add_decimal": "# 演示标题\n\n## 唯一章节\n\n### 子一\n\n### 子二\n\n### 子三",
+      "h1": "演示标题"
+    },
+    {
+      "name": "empty-and-edge",
+      "md": "",
+      "h2_count": 0,
+      "h3_count": 0,
+      "detected": "h3",
+      "estimate": {
+        "auto": 0,
+        "h2": 0,
+        "h3": 0
+      },
+      "sections": [],
+      "split_h2": [],
+      "split_h3": [],
+      "auto_detect": "",
+      "clear_bold": "",
+      "remove_numbers": "",
+      "add_cn_section": "",
+      "add_cn_subsection": "",
+      "add_decimal": "",
+      "h1": null
+    },
+    {
+      "name": "blank-lines-and-hr",
+      "md": "# 标题\n\n\n\n## 第一章\n\n\n内容。\n\n---\n\n---\n\n## 第二章",
+      "h2_count": 2,
+      "h3_count": 0,
+      "detected": "h2",
+      "estimate": {
+        "auto": 2,
+        "h2": 2,
+        "h3": 2
+      },
+      "sections": [
+        {
+          "paragraphs": [
+            "内容。"
+          ],
+          "subsections": []
+        },
+        {
+          "paragraphs": [],
+          "subsections": []
+        }
+      ],
+      "split_h2": [
+        "# 标题",
+        "## 第一章\n\n\n内容。\n\n---\n\n---",
+        "## 第二章"
+      ],
+      "split_h3": [
+        "# 标题",
+        "## 第一章\n\n\n内容。\n\n---\n\n---",
+        "## 第二章"
+      ],
+      "auto_detect": "# 标题\n\n\n\n## 第一章\n\n\n内容。\n\n---\n\n---\n\n## 第二章",
+      "clear_bold": "# 标题\n\n\n\n## 第一章\n\n\n内容。\n\n---\n\n---\n\n## 第二章",
+      "remove_numbers": "# 标题\n\n\n\n##\n\n\n内容。\n\n---\n\n---\n\n##",
+      "add_cn_section": "# 标题\n\n\n\n## 一、\n\n\n内容。\n\n---\n\n---\n\n## 二、",
+      "add_cn_subsection": "# 标题\n\n\n\n## 第一章\n\n\n内容。\n\n---\n\n---\n\n## 第二章",
+      "add_decimal": "# 标题\n\n\n\n## 第一章\n\n\n内容。\n\n---\n\n---\n\n## 第二章",
+      "h1": "标题"
+    }
+  ]
+}
