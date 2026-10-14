@@ -110,6 +110,10 @@ pub struct Step1 {
     /// 滚动同步的回声守卫：我们设编辑器滚动时期望的比例，编辑器观察器回来比对，
     /// 匹配则说明是回声，不再反向同步（原版 `syncingFromEditor` / `syncingFromPreview`）。
     sync_echo: Option<f32>,
+    /// 模型里的名称被外部改写（自动保存兜底名、侧栏改名、上传/AI 优化取 H1）后，
+    /// 观察器里发现与输入框不同步就置位，推迟到 render 里 `set_value` 回填
+    /// （观察回调拿不到 window；`set_value` 不发 Change 事件，无回声）。
+    name_sync_pending: bool,
     #[allow(dead_code)]
     subscriptions: Vec<Subscription>,
 }
@@ -159,6 +163,14 @@ impl Step1 {
                 this.sync_editor_to_preview(cx);
                 cx.notify();
             }),
+            // 外部改名（自动保存兜底、侧栏 rename、上传/优化取 H1）回写输入框。
+            cx.observe(&model, |this: &mut Self, model, cx| {
+                let name = model.read(cx).name.clone();
+                if name != this.name.read(cx).value().as_ref() {
+                    this.name_sync_pending = true;
+                    cx.notify();
+                }
+            }),
         ];
         Self {
             model,
@@ -172,6 +184,7 @@ impl Step1 {
             media_drop_over: false,
             preview_scroll: ScrollHandle::new(),
             sync_echo: None,
+            name_sync_pending: false,
             subscriptions,
         }
     }
@@ -583,7 +596,17 @@ impl Step1 {
 }
 
 impl Render for Step1 {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // 观察器攒下的名称回填：模型名与输入框不同步时用 `set_value` 对齐
+        // （不发 Change 事件；打字路径是输入框 → 模型，不会回声）。
+        if std::mem::take(&mut self.name_sync_pending) {
+            let name = self.model.read(cx).name.clone();
+            if name != self.name.read(cx).value().as_ref() {
+                self.name.update(cx, |state, cx| {
+                    state.set_value(name, window, cx);
+                });
+            }
+        }
         let c = cx.studio().colors;
         let model = self.model.read(cx);
         let md = model.md_content.clone();
@@ -639,7 +662,13 @@ impl Render for Step1 {
                     .text_color(c.muted)
                     .child("准备素材"),
             )
-            .child(div().w(px(380.0)).child(Input::new(&self.name)))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .max_w(px(420.0))
+                    .child(Input::new(&self.name)),
+            )
             .child(div().flex_1())
             .when(!md_filename.is_empty(), |bar| {
                 bar.child(widgets::chip_icon(
@@ -1151,7 +1180,7 @@ impl Render for Step1 {
         let sidebar = div()
             .id("step1-sidebar")
             .flex_none()
-            .w(px(270.0))
+            .w(px(288.0))
             .h_full()
             .overflow_y_scroll()
             .p(px(16.0))
