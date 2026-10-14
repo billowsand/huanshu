@@ -6,7 +6,7 @@ import type { SlideBlueprint } from '../components/types'
 
 /** 与 `commands::thumbnails::ThumbnailBatch`（src-tauri/src/commands/thumbnails.rs）对应。 */
 export interface ThumbnailBatch {
-  pages: Array<{ index: number, data_url: string, placeholder: boolean }>
+  pages: Array<{ index: number, data_url: string, placeholder: boolean, overflow: boolean }>
   theme_fallback: string | null
   elapsed_ms: number
 }
@@ -40,13 +40,24 @@ function thumbnailsEnabledByPreference(): boolean {
  *
  * 要点：
  * - **子集与页序**：`slides()` 里还没有蓝图的页（生成中的空位）被跳过，只有已有蓝图组成子集
- *   发给 Rust，`deckIndex` 记下子集位置到传入数组下标的映射。Typst 的页序、返回的 `index`、
+ *   发给 Rust，`latestIndices` 记下子集位置到传入数组下标的映射。Typst 的页序、返回的 `index`、
  *   `chart:<index>` 都是**子集位置**，所以图表 SVG 也用同一份子集构建（见 `render`），
- *   缩略图结果再映射回 `thumbs` 的下标。
+ *   缩略图结果再映射回下标。
+ * - **两套下标**：`thumbs` / `overflow` / `lastUsed` / `shownSequence` 以**数组下标**为键；
+ *   `shownKeys` / `pendingKeys` / `wantedPositions` 以**子集位置**为键（生成中有空位时两者不同）。
+ *   换算一律经过 `latestIndices`（子集位置 → 数组下标）；`positionOf` 是它反过来。
  * - **增量**：每页的键是 蓝图 JSON + 子集位置 + 主题 id + 字体设置 + 宽度档位（主题、字体变了
  *   键就全变）。只有「当前显示的图」和「正在请求的图」的键都对不上的页才进 `only`。
- * - **按键落图，不按请求序号**：响应到达时，只有键仍等于这一页当前键的图才会落下。不能整批丢弃
- *   过期响应——后一次请求只含它那一刻键变了的页，被丢掉的那批页就再也没人请求了。
+ * - **按键落图，不按请求序号**：响应到达时，只有键仍等于这一页当前键（`progressive` 下是序号
+ *   更新）的图才会落下。不能整批丢弃过期响应——后一次请求只含它那一刻键变了的页，
+ *   被丢掉的那批页就再也没人请求了。
+ * - **`serial` + `progressive`**：打字时每一页的键每敲一个字都变，`serial` 保证同一时刻只有
+ *   一个请求在途，变化被合并进一次尾部请求；`progressive` 让每个响应只要比当前显示的图新就
+ *   先落下（键记成它自己的序号，所以最新内容仍会被再次请求）。因此预览最多落后一个请求的
+ *   时间、每次响应都可能更新画面，而最后完成的那个响应一定是最新内容；停手后不会再有待请求
+ *   的内容，画面落在最新一版。
+ * - **`resetKey`**：值变化说明调用方换了目标（编辑者换了页），前一页的在途响应整批作废，
+ *   已显示的图和键一并清空，调用方立刻回退到幻灯片组件。
  * - **失败**：命令报错时 `failed` 为真（调用方回退到幻灯片组件），并 `console.warn` 一次；
  *   不自动重试，下一次内容/主题/尺寸变化时这些页会重新请求。
  * - **停用**：`enabled()` 为假时只是不发请求，已有的图保留（全览关了再开不用重渲）；
@@ -70,9 +81,22 @@ export function useTypstThumbnails(opts: {
   wanted?: () => number[]
   /** `thumbs` 里最多保留几张；超出时淘汰最久没请求过、且不在 `wanted` 里的。 */
   maxCached?: number
+  /** 内容变化后等这么久再渲染，默认 200。打字时调小它可以让画面跟得更紧。 */
+  debounceMs?: number
+  /** 为真时同一时刻最多一个请求在途，在途期间的变化合并成一次尾部请求。 */
+  serial?: boolean
+  /** 为真时，过期但比当前显示的图新的响应也先落下（对应页的键记成它自己的序号，所以
+   *  最新内容仍会被再次请求）。 */
+  progressive?: boolean
+  /** 值变化时清空全部图和键（在途响应一并作废），用于「换了一页」。 */
+  resetKey?: () => unknown
 }): {
   thumbs: Ref<Record<number, TypstThumbnail>>
   failed: Ref<boolean>
+  /** 有请求在途，或在防抖窗口里等着发。 */
+  pending: Ref<boolean>
+  /** 该页内容被裁切（缩到 `fit-min` 仍放不下）；键是传入数组的下标。 */
+  overflow: Ref<Record<number, boolean>>
   /**
    * 立刻按当前状态重新评估一次（不过 debounce）。`wanted()` 变化已经被内部盯着了，
    * 这个出口是给「不看 `wanted` 的输入变了、但要马上出图」的调用方用的（演示翻页）。
@@ -82,6 +106,8 @@ export function useTypstThumbnails(opts: {
   const appSettings = useAppSettingsStore()
   const thumbs = ref<Record<number, TypstThumbnail>>({})
   const failed = ref(false)
+  const pending = ref(false)
+  const overflow = ref<Record<number, boolean>>({})
 
   /** 已有蓝图的页组成子集；空位留在原数组里，不发给 Rust。 */
   const presentSlides = computed(() => opts.slides().filter(Boolean) as SlideBlueprint[])
@@ -89,6 +115,9 @@ export function useTypstThumbnails(opts: {
   /** 子集位置 → 当前显示的图的键 / 在途请求的键。 */
   let shownKeys: Record<number, string> = {}
   let pendingKeys: Record<number, string> = {}
+  /** 子集位置 → 已显示的图来自哪一次请求 / 最后一次为它发出的请求；`progressive` 用它判新旧。 */
+  let shownSequence: Record<number, number> = {}
+  let requestedSequence: Record<number, number> = {}
   /** 最近一次 `refresh` 时，`wanted` 里那几页在子集里的位置。响应到达时按它淘汰。 */
   let latestWanted = new Set<number>()
   /** 子集位置 → 最后一次被 `wanted` 点名的次序，`maxCached` 淘汰用它排序。 */
@@ -100,6 +129,12 @@ export function useTypstThumbnails(opts: {
   let timer: ReturnType<typeof setTimeout> | null = null
   let disposed = false
   let warned = false
+  /** 请求序号：每次真的调用命令就 +1，`progressive` 用它判断响应新旧。 */
+  let sequence = 0
+  /** `serial` 用：有请求在途时，期间发生的变化合并成一次尾部请求。 */
+  let inFlight = false
+  let dirty = false
+  let lastResetKey: unknown
 
   function widthBucket(): number {
     return Math.max(WIDTH_BUCKET, Math.ceil(Math.max(opts.widthPx(), 1) / WIDTH_BUCKET) * WIDTH_BUCKET)
@@ -124,8 +159,6 @@ export function useTypstThumbnails(opts: {
   function evict(wantedPositions: Set<number>) {
     const limit = opts.maxCached
     if (!limit || Object.keys(thumbs.value).length <= limit) return
-    // `thumbs` / `lastUsed` 以数组下标为键，`shownKeys` / `pendingKeys` / `wantedPositions`
-    // 以子集位置为键（生成中有空位时两者不同），这里统一换算。
     const positionOf = new Map(latestIndices.map((index, position) => [index, position]))
     const evictable = Object.keys(thumbs.value)
       .map(Number)
@@ -139,20 +172,38 @@ export function useTypstThumbnails(opts: {
       if (Object.keys(next).length <= limit) break
       delete next[index]
       delete lastUsed[index]
+      delete overflow.value[index]
       const position = positionOf.get(index)
       if (position !== undefined) delete shownKeys[position]
     }
     thumbs.value = next
   }
 
+  /** 清空全部图和键。`resetKey` 变化与整体关闭开关都走这里，调用方随即回退到幻灯片组件。 */
+  function resetAll() {
+    thumbs.value = {}
+    overflow.value = {}
+    shownKeys = {}
+    shownSequence = {}
+    lastUsed = {}
+  }
+
   function refresh() {
+    if (disposed) return
     if (!thumbnailsEnabledByPreference()) {
-      thumbs.value = {}
-      shownKeys = {}
-      lastUsed = {}
+      resetAll()
+      pending.value = false
       return
     }
-    if (!(opts.enabled?.() ?? true)) return
+    if (!(opts.enabled?.() ?? true)) {
+      pending.value = false
+      return
+    }
+    // 一次请求在途：`serial` 把这段时间里的变化压成尾部的一次请求，否则直接照常发。
+    if (inFlight) {
+      if (opts.serial) dirty = true
+      return
+    }
 
     const all = opts.slides()
     const deck = presentSlides.value
@@ -167,17 +218,25 @@ export function useTypstThumbnails(opts: {
     const wantedPositions = latestIndices.flatMap((index, position) => (wanted.includes(index) ? [position] : []))
     latestWanted = new Set(wantedPositions)
 
-    const only = wantedPositions.flatMap(position =>
-      shownKeys[position] !== latestKeys[position] && pendingKeys[position] !== latestKeys[position] ? [position] : [],
-    )
+    const only = wantedPositions.flatMap(position => {
+      // 已经有一个在途请求带的就是这一页的当前键，等它回来即可。
+      if (pendingKeys[position] !== undefined) return []
+      // `progressive` 下显示的可能是过期但更新的图，此时键不等；两种模式都靠这一条重发。
+      return shownKeys[position] === latestKeys[position] ? [] : [position]
+    })
     if (!only.length) {
       evict(latestWanted)
+      pending.value = false
       return
     }
     const requestKeys = [...latestKeys]
-    for (const position of only) pendingKeys[position] = requestKeys[position]
+    const requestSequence = ++sequence
+    for (const position of only) {
+      pendingKeys[position] = requestKeys[position]
+    }
     evict(latestWanted)
-    void render(deck, theme, width, only, requestKeys)
+    pending.value = true
+    void render(deck, theme, width, only, requestKeys, requestSequence)
   }
 
   /**
@@ -190,13 +249,19 @@ export function useTypstThumbnails(opts: {
     width: number,
     only: number[],
     requestKeys: string[],
+    requestSequence: number,
   ) {
+    inFlight = true
     let chartSvgs: Array<{ index: number, svg: string }> | null = null
     try {
       chartSvgs = await buildChartSvgs(deck, { projectId: opts.projectId(), themeId: theme })
     } catch (e) {
       // 图表渲染失败不该拖垮整页缩略图：图表页会退回占位卡片。
       console.warn('[thumbnails] 图表 SVG 渲染失败：', e)
+    }
+    if (disposed) {
+      inFlight = false
+      return
     }
     try {
       const batch = await invoke<ThumbnailBatch>('render_slide_thumbnails', {
@@ -207,26 +272,40 @@ export function useTypstThumbnails(opts: {
         widthPx: width,
         only,
       })
-      if (disposed) return
+      if (disposed) {
+        inFlight = false
+        return
+      }
       const next = { ...thumbs.value }
       for (const page of batch.pages) {
         const key = requestKeys[page.index]
-        if (pendingKeys[page.index] === key) delete pendingKeys[page.index]
-        // 这一页在请求期间又变了（内容、页序、主题或尺寸）：这张图已过期，等下一轮的新图。
-        if (latestKeys[page.index] !== key) continue
-        const index = latestIndices[page.index]
+        const position = page.index
+        const index = latestIndices[position]
+        if (index !== undefined) {
+          // 裁切是这一页自己的属性：即使图过期，也要让调用方知道它被裁了。
+          const nextOverflow = { ...overflow.value }
+          nextOverflow[index] = page.overflow
+          overflow.value = nextOverflow
+        }
+        // 只有「键仍等于这一页当前键」的图才作数；`progressive` 放宽成「比已显示的图新」，
+        // 后者落地时把键记成**它自己的**序号，于是最新内容仍会被下一轮请求。
+        const current = latestKeys[position] === key
+        const newer = opts.progressive === true && requestSequence > (shownSequence[position] ?? 0)
+        if (!current && !newer) continue
         if (index === undefined) continue
         next[index] = { url: page.data_url, placeholder: page.placeholder }
-        shownKeys[page.index] = key
+        shownSequence[position] = requestSequence
+        // 过期但更新的图：键记成触发它的那次请求的键，这样最新内容还会被再次请求。
+        shownKeys[position] = current ? key : requestKeys[position]
       }
       thumbs.value = next
       failed.value = false
       // 这一批请求期间可能翻过页：新的 `wanted` 之外的图要按上限淘汰。
       evict(latestWanted)
     } catch (e) {
-      if (disposed) return
-      for (const position of only) {
-        if (pendingKeys[position] === requestKeys[position]) delete pendingKeys[position]
+      if (disposed) {
+        inFlight = false
+        return
       }
       failed.value = true
       if (!warned) {
@@ -234,14 +313,39 @@ export function useTypstThumbnails(opts: {
         console.warn('[thumbnails] Typst 缩略图渲染失败，回退到幻灯片组件：', e)
       }
     }
+    // 成功或失败都要清掉在途标记：失败的页会留到下一次内容变化时重新请求。
+    inFlight = false
+    for (const position of only) {
+      if (pendingKeys[position] === requestKeys[position]) delete pendingKeys[position]
+    }
+    // `serial`：期间变化过就立刻用最新状态再请求一次；`dirty` 只在这里清掉，
+    // 所以这条链一直走到「返回后再没有新变化」为止，最后一次请求带的就是最新内容。
+    if (!disposed && dirty) {
+      dirty = false
+      refresh()
+      return
+    }
+    if (!disposed) {
+      // 非 serial 的调用方没有在途合并，但也要把「还在防抖窗口里等着发」反映到 `pending` 上。
+      // （`refresh` 里还有别的出口会把它置回 false。）
+      pending.value = timer !== null
+    }
   }
 
   function schedule() {
     if (timer) clearTimeout(timer)
+    if (opts.serial && inFlight) {
+      // 在途期间不需要再排一次定时器：响应回来后 `refresh` 里会读到 `dirty`。
+      dirty = true
+      pending.value = true
+      return
+    }
+    const delay = opts.debounceMs ?? DEBOUNCE_MS
+    pending.value = true
     timer = setTimeout(() => {
       timer = null
       refresh()
-    }, DEBOUNCE_MS)
+    }, delay)
   }
 
   // 牌组内容、页序、宽度档位、启用状态、字体变化都会改变键或请求条件；键的比较决定重渲哪些页。
@@ -252,11 +356,22 @@ export function useTypstThumbnails(opts: {
   watch(() => appSettings.settings.fonts, schedule, { deep: true })
   // `wanted` 只决定请求哪几页（键里没有它），翻页时它会变，所以要单独盯着。
   watch(() => (opts.wanted ? opts.wanted().join(',') : ''), schedule)
+  // 换了目标：上一页的在途响应全部作废，已显示的图和键立刻清空。
+  watch(() => opts.resetKey?.(), () => {
+    if (timer) clearTimeout(timer)
+    timer = null
+    if (opts.resetKey && opts.resetKey() !== lastResetKey) {
+      lastResetKey = opts.resetKey()
+      resetAll()
+    }
+    schedule()
+  })
 
   // 主题切换会改 --chart-* / 主题 token，键里带主题 id，触发一次刷新即可。
   const themeObserver = new MutationObserver(schedule)
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
 
+  if (opts.resetKey) lastResetKey = opts.resetKey()
   schedule()
 
   onBeforeUnmount(() => {
@@ -266,5 +381,5 @@ export function useTypstThumbnails(opts: {
     themeObserver.disconnect()
   })
 
-  return { thumbs, failed, refresh }
+  return { thumbs, failed, pending, overflow, refresh }
 }
