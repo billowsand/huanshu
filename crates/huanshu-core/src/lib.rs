@@ -13,6 +13,7 @@ pub mod config;
 pub mod crypto;
 pub mod db;
 pub mod embedded_icons;
+pub mod events;
 pub mod fonts;
 pub mod generator;
 pub mod icon;
@@ -20,5 +21,9 @@ pub mod image_size;
 pub mod input;
 pub mod lmstudio;
 pub mod network;
+pub mod services;
+pub mod state;
 pub mod types;
 pub mod validate;
+
+pub use state::AppState;

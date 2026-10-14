@@ -1,5 +1,5 @@
 #[allow(dead_code)]
-use crate::types::DeckSpec;
+use huanshu_core::types::DeckSpec;
 
 #[allow(dead_code)]
 pub fn render_deck(deck: &DeckSpec) -> String {

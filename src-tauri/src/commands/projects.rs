@@ -1,136 +1,84 @@
-use crate::db::{self, Project, ProjectSummary};
-use crate::types::{AspectRatio, SlideBlueprint};
-use crate::AppState;
-use std::fs;
-use std::path::PathBuf;
-use std::sync::Mutex;
+//! 项目相关的 Tauri 命令：只取参数、锁状态、转错误。实现见 `huanshu_core::services::projects`。
+
+use std::sync::{Arc, Mutex};
+
 use tauri::State;
 
+use huanshu_core::db::{Project, ProjectSummary};
+use huanshu_core::types::AspectRatio;
+use huanshu_core::AppState;
+
+use huanshu_core::services::projects as service;
+
+/// Tauri 侧持有的状态句柄：core 的 `AppState` 外面套一层可跨线程共享的锁。
+type Shared = Arc<Mutex<AppState>>;
+
 #[tauri::command]
-pub fn list_projects(state: State<'_, Mutex<AppState>>) -> Result<Vec<ProjectSummary>, String> {
-    let st = state.lock().unwrap();
-    let db = st.db.lock().unwrap();
-    db::list_projects(&*db).map_err(|e| e.to_string())
+pub fn list_projects(state: State<'_, Shared>) -> Result<Vec<ProjectSummary>, String> {
+    service::list_projects(&state)
 }
 
 #[tauri::command]
-pub fn get_project(state: State<'_, Mutex<AppState>>, id: i64) -> Result<Project, String> {
-    let st = state.lock().unwrap();
-    let db = st.db.lock().unwrap();
-    db::get_project(&*db, id).map_err(|e| e.to_string())
+pub fn get_project(state: State<'_, Shared>, id: i64) -> Result<Project, String> {
+    service::get_project(&state, id)
 }
 
 #[tauri::command]
 pub fn create_project(
-    state: State<'_, Mutex<AppState>>,
+    state: State<'_, Shared>,
     name: String,
     md_content: String,
 ) -> Result<i64, String> {
-    let st = state.lock().unwrap();
-    let db = st.db.lock().unwrap();
-    db::create_project(&*db, &name, &md_content).map_err(|e| e.to_string())
+    service::create_project(&state, name, md_content)
 }
 
 #[tauri::command]
 pub fn update_project_content(
-    state: State<'_, Mutex<AppState>>,
+    state: State<'_, Shared>,
     id: i64,
     name: String,
     md_content: String,
 ) -> Result<(), String> {
-    let st = state.lock().unwrap();
-    let db = st.db.lock().unwrap();
-    db::update_project_content(&*db, id, &name, &md_content).map_err(|e| e.to_string())
+    service::update_project_content(&state, id, name, md_content)
 }
 
 #[tauri::command]
 pub fn update_project_blueprints(
-    state: State<'_, Mutex<AppState>>,
+    state: State<'_, Shared>,
     id: i64,
     blueprints_json: String,
 ) -> Result<(), String> {
-    let st = state.lock().unwrap();
-    let db = st.db.lock().unwrap();
-    db::update_project_blueprints(&*db, id, &blueprints_json).map_err(|e| e.to_string())
+    service::update_project_blueprints(&state, id, blueprints_json)
 }
 
 #[tauri::command]
-pub fn delete_project(state: State<'_, Mutex<AppState>>, id: i64) -> Result<(), String> {
-    let (media_dir, storage_paths) = {
-        let st = state.lock().unwrap();
-        let db = st.db.lock().unwrap();
-        let media_dir = st.app_settings.media_dir.clone();
-        let assets = db::delete_media_assets_for_project(&*db, id).map_err(|e| e.to_string())?;
-        (
-            media_dir,
-            assets
-                .into_iter()
-                .map(|a| a.storage_path)
-                .collect::<Vec<_>>(),
-        )
-    };
-
-    for path in &storage_paths {
-        let full_path = PathBuf::from(&media_dir).join(path);
-        let _ = fs::remove_file(full_path);
-    }
-
-    {
-        let st = state.lock().unwrap();
-        let db = st.db.lock().unwrap();
-        db::delete_project(&*db, id).map_err(|e| e.to_string())?;
-    }
-
-    let project_media_dir = PathBuf::from(&media_dir)
-        .join("projects")
-        .join(id.to_string());
-    let _ = fs::remove_dir_all(project_media_dir);
-
-    Ok(())
+pub fn delete_project(state: State<'_, Shared>, id: i64) -> Result<(), String> {
+    service::delete_project(&state, id)
 }
 
-/// Load a project's blueprints into AppState so the viewer can access them.
-/// Returns the project so the frontend can display it.
 #[tauri::command]
-pub fn open_project(state: State<'_, Mutex<AppState>>, id: i64) -> Result<Project, String> {
-    let mut st = state.lock().unwrap();
-    let project = {
-        let db = st.db.lock().unwrap();
-        db::get_project(&*db, id).map_err(|e| e.to_string())?
-    };
-    let blueprints: Vec<SlideBlueprint> =
-        serde_json::from_str(&project.blueprints_json).unwrap_or_default();
-    st.blueprints = blueprints;
-    st.active_project_id = Some(id);
-    Ok(project)
+pub fn open_project(state: State<'_, Shared>, id: i64) -> Result<Project, String> {
+    service::open_project(&state, id)
 }
 
-/// Set the active project ID (called after creating a new project before generation).
 #[tauri::command]
-pub fn set_active_project(state: State<'_, Mutex<AppState>>, id: i64) -> Result<(), String> {
-    let mut st = state.lock().unwrap();
-    st.active_project_id = Some(id);
-    Ok(())
+pub fn set_active_project(state: State<'_, Shared>, id: i64) -> Result<(), String> {
+    service::set_active_project(&state, id)
 }
 
 #[tauri::command]
 pub fn update_project_aspect_ratio(
-    state: State<'_, Mutex<AppState>>,
+    state: State<'_, Shared>,
     id: i64,
     aspect_ratio: AspectRatio,
 ) -> Result<(), String> {
-    let st = state.lock().unwrap();
-    let db = st.db.lock().unwrap();
-    db::update_project_aspect_ratio(&*db, id, aspect_ratio).map_err(|e| e.to_string())
+    service::update_project_aspect_ratio(&state, id, aspect_ratio)
 }
 
 #[tauri::command]
 pub fn get_project_aspect_ratio(
-    state: State<'_, Mutex<AppState>>,
+    state: State<'_, Shared>,
     id: i64,
 ) -> Result<Option<AspectRatio>, String> {
-    let st = state.lock().unwrap();
-    let db = st.db.lock().unwrap();
-    let project = db::get_project(&*db, id).map_err(|e| e.to_string())?;
-    Ok(project.aspect_ratio)
+    service::get_project_aspect_ratio(&state, id)
 }

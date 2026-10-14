@@ -1,56 +1,32 @@
-use crate::config::{LlmSettings, ModelServiceSettings};
-use crate::lmstudio::LmStudioClient;
-use crate::AppState;
-use std::sync::Mutex;
+//! 模型服务设置的 Tauri 命令。实现见 `huanshu_core::services::settings`。
+
+use std::sync::{Arc, Mutex};
+
 use tauri::State;
 
+use huanshu_core::config::{LlmSettings, ModelServiceSettings};
+use huanshu_core::AppState;
+
+use huanshu_core::services::settings as service;
+
+/// Tauri 侧持有的状态句柄：core 的 `AppState` 外面套一层可跨线程共享的锁。
+type Shared = Arc<Mutex<AppState>>;
+
 #[tauri::command]
-pub async fn get_settings(state: State<'_, Mutex<AppState>>) -> Result<LlmSettings, String> {
-    let state = state.lock().unwrap();
-    Ok(state.settings.clone())
+pub async fn get_settings(state: State<'_, Shared>) -> Result<LlmSettings, String> {
+    service::get_settings(&state)
 }
 
 #[tauri::command]
-pub async fn save_settings(
-    settings: LlmSettings,
-    state: State<'_, Mutex<AppState>>,
-) -> Result<(), String> {
-    for (name, service) in [
-        ("大语言模型", &settings.llm),
-        ("向量模型", &settings.embedding),
-        ("多模态模型", &settings.multimodal),
-    ] {
-        service
-            .proxy
-            .validate()
-            .map_err(|e| format!("{name}: {e}"))?;
-    }
-    let mut state = state.lock().unwrap();
-    let previous = std::mem::replace(&mut state.settings, settings);
-    if let Err(error) = state.persist_settings() {
-        state.settings = previous;
-        return Err(error.to_string());
-    }
-    Ok(())
+pub async fn save_settings(settings: LlmSettings, state: State<'_, Shared>) -> Result<(), String> {
+    service::save_settings(&state, settings)
 }
 
 #[tauri::command]
 pub async fn list_models(
     target: Option<String>,
     service: Option<ModelServiceSettings>,
-    state: State<'_, Mutex<AppState>>,
+    state: State<'_, Shared>,
 ) -> Result<Vec<String>, String> {
-    let service = if let Some(service) = service {
-        service
-    } else {
-        let state = state.lock().unwrap();
-        match target.as_deref().unwrap_or("llm") {
-            "llm" => state.settings.llm.clone(),
-            "embedding" => state.settings.embedding.clone(),
-            "multimodal" => state.settings.multimodal.clone(),
-            other => return Err(format!("unknown model target: {other}")),
-        }
-    };
-    let client = LmStudioClient::from_service(&service).map_err(|e| e.to_string())?;
-    client.list_models().await.map_err(|e| e.to_string())
+    huanshu_core::services::settings::list_models(&state, target, service).await
 }

@@ -3,244 +3,11 @@ mod fonts;
 mod render;
 mod text;
 
-// 业务逻辑都在 huanshu-core；这里 re-export 一下，让命令层继续写 `crate::db::…` 这样的路径。
-pub use huanshu_core::{assets, config, crypto, db, embedded_icons, generator, icon};
-pub use huanshu_core::{image_size, input, lmstudio, network, types, validate};
-
-use config::LlmSettings;
-use rusqlite::Connection;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use types::{AppGlobalSettings, SlideBlueprint};
-
-fn default_data_dir() -> PathBuf {
-    dirs::data_local_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("auto-slidev-studio")
-}
-
-fn bootstrap_path() -> PathBuf {
-    dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("auto-slidev-studio")
-        .join("bootstrap.json")
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct BootstrapData {
-    data_dir: String,
-    media_dir: String,
-    llm_configured: bool,
-    embeddings_ready: bool,
-    #[serde(default)]
-    initialized_embedding_model: String,
-    #[serde(default)]
-    fonts: types::FontSettings,
-}
-
-fn load_bootstrap_data_dir() -> PathBuf {
-    let boot_path = bootstrap_path();
-    if boot_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&boot_path) {
-            if let Ok(boot) = serde_json::from_str::<serde_json::Value>(&content) {
-                if let Some(data_dir) = boot.get("data_dir").and_then(|v| v.as_str()) {
-                    return PathBuf::from(data_dir);
-                }
-            }
-        }
-    }
-    default_data_dir()
-}
-
-fn load_bootstrap_settings() -> Option<AppGlobalSettings> {
-    let boot_path = bootstrap_path();
-    if boot_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&boot_path) {
-            if let Ok(boot) = serde_json::from_str::<BootstrapData>(&content) {
-                return Some(AppGlobalSettings {
-                    data_dir: boot.data_dir,
-                    media_dir: boot.media_dir,
-                    llm_configured: boot.llm_configured,
-                    embeddings_ready: boot.embeddings_ready,
-                    initialized_embedding_model: boot.initialized_embedding_model,
-                    fonts: boot.fonts,
-                });
-            }
-        }
-    }
-    None
-}
-
-fn save_bootstrap_settings(settings: &AppGlobalSettings) -> anyhow::Result<()> {
-    let boot_path = bootstrap_path();
-    if let Some(parent) = boot_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let boot = BootstrapData {
-        data_dir: settings.data_dir.clone(),
-        media_dir: settings.media_dir.clone(),
-        llm_configured: settings.llm_configured,
-        embeddings_ready: settings.embeddings_ready,
-        initialized_embedding_model: settings.initialized_embedding_model.clone(),
-        fonts: settings.fonts.clone(),
-    };
-    std::fs::write(&boot_path, serde_json::to_string_pretty(&boot)?)?;
-    Ok(())
-}
-
-/// Global application state shared across Tauri commands.
-pub struct AppState {
-    pub settings: LlmSettings,
-    pub app_settings: AppGlobalSettings,
-    pub blueprints: Vec<SlideBlueprint>,
-    pub generation_running: bool,
-    pub last_error: Option<String>,
-    pub active_project_id: Option<i64>,
-    pub project_dir: PathBuf,
-    pub db: Arc<Mutex<Connection>>,
-    settings_path: PathBuf,
-}
-
-impl AppState {
-    fn sync_storage_root(&mut self) -> anyhow::Result<()> {
-        let data_dir = PathBuf::from(&self.app_settings.data_dir);
-        std::fs::create_dir_all(&data_dir)?;
-
-        let settings_path = data_dir.join("settings.json");
-        let settings_json = serde_json::to_string_pretty(&self.settings)?;
-        std::fs::write(&settings_path, settings_json)?;
-
-        let conn = db::open(&data_dir)?;
-        db::set_app_setting(&conn, "data_dir", &self.app_settings.data_dir)?;
-        db::set_app_setting(&conn, "media_dir", &self.app_settings.media_dir)?;
-        db::set_app_setting(
-            &conn,
-            "llm_configured",
-            if self.app_settings.llm_configured {
-                "true"
-            } else {
-                "false"
-            },
-        )?;
-        db::set_app_setting(
-            &conn,
-            "embeddings_ready",
-            if self.app_settings.embeddings_ready {
-                "true"
-            } else {
-                "false"
-            },
-        )?;
-        db::set_app_setting(
-            &conn,
-            "initialized_embedding_model",
-            &self.app_settings.initialized_embedding_model,
-        )?;
-        db::set_app_setting(
-            &conn,
-            "fonts",
-            &serde_json::to_string(&self.app_settings.fonts)?,
-        )?;
-
-        self.db = Arc::new(Mutex::new(conn));
-        self.settings_path = settings_path;
-        save_bootstrap_settings(&self.app_settings)?;
-        Ok(())
-    }
-
-    pub fn load() -> Self {
-        let bootstrap_settings = load_bootstrap_settings();
-        let data_dir = bootstrap_settings
-            .as_ref()
-            .map(|s| PathBuf::from(&s.data_dir))
-            .unwrap_or_else(load_bootstrap_data_dir);
-        std::fs::create_dir_all(&data_dir).ok();
-
-        let settings_path = data_dir.join("settings.json");
-        let settings = std::fs::read_to_string(&settings_path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
-
-        let db = Arc::new(Mutex::new(
-            db::open(&data_dir).expect("failed to open SQLite database"),
-        ));
-
-        let app_settings = bootstrap_settings.unwrap_or_else(|| {
-            let conn = db.lock().unwrap();
-            let data_dir_str = db::get_app_setting(&*conn, "data_dir")
-                .ok()
-                .flatten()
-                .unwrap_or_else(|| data_dir.to_string_lossy().to_string());
-            let media_dir = db::get_app_setting(&*conn, "media_dir")
-                .ok()
-                .flatten()
-                .unwrap_or_else(|| data_dir.join("media").to_string_lossy().to_string());
-            let llm_configured = db::get_app_setting(&*conn, "llm_configured")
-                .ok()
-                .flatten()
-                .map(|v| v == "true")
-                .unwrap_or(false);
-            let embeddings_ready = db::get_app_setting(&*conn, "embeddings_ready")
-                .ok()
-                .flatten()
-                .map(|v| v == "true")
-                .unwrap_or(false);
-            let initialized_embedding_model =
-                db::get_app_setting(&*conn, "initialized_embedding_model")
-                    .ok()
-                    .flatten()
-                    .unwrap_or_default();
-            AppGlobalSettings {
-                data_dir: data_dir_str,
-                media_dir,
-                llm_configured,
-                embeddings_ready,
-                initialized_embedding_model,
-                fonts: db::get_app_setting(&*conn, "fonts")
-                    .ok()
-                    .flatten()
-                    .and_then(|value| serde_json::from_str(&value).ok())
-                    .unwrap_or_default(),
-            }
-        });
-
-        let project_dir = {
-            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            if cwd.file_name().and_then(|n| n.to_str()) == Some("src-tauri") {
-                cwd.parent().map(|p| p.to_path_buf()).unwrap_or(cwd)
-            } else {
-                cwd
-            }
-        };
-
-        Self {
-            settings,
-            app_settings,
-            blueprints: Vec::new(),
-            generation_running: false,
-            last_error: None,
-            active_project_id: None,
-            project_dir,
-            db,
-            settings_path,
-        }
-    }
-
-    pub fn persist_settings(&self) -> anyhow::Result<()> {
-        let json = serde_json::to_string_pretty(&self.settings)?;
-        std::fs::write(&self.settings_path, json)?;
-        Ok(())
-    }
-
-    pub fn persist_app_settings(&mut self) -> anyhow::Result<()> {
-        self.sync_storage_root()
-    }
-}
+use huanshu_core::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let state = std::sync::Mutex::new(AppState::load());
+    let state = std::sync::Arc::new(std::sync::Mutex::new(AppState::load()));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -251,7 +18,7 @@ pub fn run() {
             // Scanning system fonts takes ~0.5 s; warm the shared renderer in the background
             // so the first thumbnail or export does not pay for it.
             std::thread::spawn(|| {
-                commands::pdf::renderer();
+                huanshu_core::services::export::renderer();
             });
             Ok(())
         })
@@ -287,10 +54,10 @@ pub fn run() {
             commands::storage::save_app_settings,
             commands::storage::is_first_run,
             commands::storage::complete_first_run,
-            commands::storage::import_media_asset,
-            commands::storage::delete_media_asset,
-            commands::storage::get_project_media,
-            commands::storage::update_media_caption,
+            commands::media::import_media_asset,
+            commands::media::delete_media_asset,
+            commands::media::get_project_media,
+            commands::media::update_media_caption,
             commands::storage::export_project,
             commands::pdf::export_pdf,
             commands::pdf::reveal_exported_file,
