@@ -25,6 +25,7 @@ $Shots = @(
     @("wizard", "wizard"),
     @("settings-appearance", "settings"),
     @("settings-models", "settings:models"),
+    @("settings-generation", "settings:generation"),
     @("settings-storage", "settings:storage"),
     @("settings-about", "settings:about"),
     @("new-step1", "new"),
