@@ -55,6 +55,19 @@
     badge-border: rgb("#a6b592"),
     badge-ink: rgb("#49682c"),
   ),
+  chart: (
+    palette: (
+      rgb("#9d4a1c"),
+      rgb("#49682c"),
+      rgb("#36627b"),
+      rgb("#a6761d"),
+      rgb("#6e5a8a"),
+      rgb("#a64239"),
+    ),
+    grid: rgb("#e3e3d3"),
+    axis: rgb("#c9cebe"),
+    success: rgb("#49682c"),
+  ),
   // `.slide-shell` decorations: the 24px grid doubles as the "rule" token; no
   // notebook margin in this theme (keys kept for parity with light-notes).
   rule: rgb(101, 107, 92, 20), // `--terminal-grid` rgba(101,107,92,0.08)

@@ -56,6 +56,22 @@
     badge-border: rgb("#a9c7b4"),
     badge-ink: rgb("#2e6e4f"),
   ),
+  // Chart tokens: editorial.css has no chart JSON fixture (the SVG fixtures were
+  // generated for light-notes only), so these are copied from the theme's
+  // `--chart-grid` / `--chart-axis` / `--chart-palette-*` and `--success`.
+  chart: (
+    palette: (
+      rgb("#1d4ed8"),
+      rgb("#2e6e4f"),
+      rgb("#9a6212"),
+      rgb("#a8322a"),
+      rgb("#5b6f86"),
+      rgb("#7a5c99"),
+    ),
+    grid: rgb("#e4ded2"),
+    axis: rgb("#cbc5b8"),
+    success: rgb("#2e6e4f"),
+  ),
   // No ruled paper or notebook margin (keys kept for parity with light-notes).
   rule: rgb("#cbc5b8"),
   margin-fill: rgb("#f3efe6"),

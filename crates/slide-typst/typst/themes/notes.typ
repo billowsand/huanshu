@@ -44,6 +44,22 @@
     badge-border: rgb("#d6c0a2"),
     badge-ink: rgb("#746254"),
   ),
+  // Chart tokens: the `--chart-*` variables of notes.css plus `--success`, read
+  // off the Vue reference page. `palette` is exactly six colours; the chart
+  // drawing (lib/chart.typ) cycles them for multi-series and donut sectors.
+  chart: (
+    palette: (
+      rgb("#746254"),
+      rgb("#54633d"),
+      rgb("#826039"),
+      rgb("#4e6570"),
+      rgb("#8a5a44"),
+      rgb("#9c4a3c"),
+    ),
+    grid: rgb("#e8e0cf"),
+    axis: rgb("#c8bbaa"),
+    success: rgb("#54633d"),
+  ),
   // `.slide-shell` stationery: ruled lines, notebook margin, sheet edge.
   rule: rgb(170, 146, 125, 41),
   margin-fill: rgb("#eee8dc99"),

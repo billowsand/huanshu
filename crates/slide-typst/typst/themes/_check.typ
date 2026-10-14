@@ -25,10 +25,24 @@
   assert(type(m.background) == function, message: m.theme.name + " 缺少 background(w, h)")
 }
 
-#for sub in ("lead", "radius", "tracking", "deco", "tones") {
+#for sub in ("lead", "radius", "tracking", "deco", "tones", "chart") {
   let sub-keys = keyset(notes.theme.at(sub))
   for m in modules {
     assert.eq(keyset(m.theme.at(sub)), sub-keys, message: m.theme.name + "." + sub + " 的键集合不一致")
+  }
+}
+
+// The chart palette is indexed by series / sector, so every theme must define
+// exactly six colours: `palette(i)` in lib/chart.typ wraps around, and a short
+// list would silently repeat colours inside one chart.
+#for m in modules {
+  assert.eq(
+    m.theme.chart.palette.len(),
+    6,
+    message: m.theme.name + ".chart.palette 必须恰好 6 色，实际 " + str(m.theme.chart.palette.len()),
+  )
+  for c in m.theme.chart.palette {
+    assert(type(c) == color, message: m.theme.name + ".chart.palette 里有非颜色值")
   }
 }
 

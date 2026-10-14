@@ -63,6 +63,19 @@
     badge-border: rgb(16, 185, 129, 61),
     badge-ink: rgb("#34d399"),
   ),
+  chart: (
+    palette: (
+      rgb("#0ea5e9"),
+      rgb("#a78bfa"),
+      rgb("#34d399"),
+      rgb("#fb7185"),
+      rgb("#fbbf24"),
+      rgb("#22d3ee"),
+    ),
+    grid: rgb("#0f2233"),
+    axis: rgb("#1c3a4f"),
+    success: rgb("#10b981"),
+  ),
   // Unused on this theme (deco.ruled: false); kept for parity with light-notes.
   rule: rgb(14, 165, 233, 13),
   margin-fill: glass,

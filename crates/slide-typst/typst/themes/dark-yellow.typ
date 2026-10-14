@@ -70,6 +70,19 @@
     badge-border: rgb(16, 185, 129, 64),
     badge-ink: rgb("#34d399"),
   ),
+  chart: (
+    palette: (
+      rgb("#f59e0b"),
+      rgb("#818cf8"),
+      rgb("#10b981"),
+      rgb("#f43f5e"),
+      rgb("#38bdf8"),
+      rgb("#e879f9"),
+    ),
+    grid: rgb("#1e1e28"),
+    axis: rgb("#2e2e3c"),
+    success: rgb("#10b981"),
+  ),
   // Unused on this theme (deco.ruled: false); kept for parity with light-notes.
   rule: rgb(255, 255, 255, 13),
   margin-fill: glass,
