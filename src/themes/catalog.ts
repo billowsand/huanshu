@@ -1,5 +1,8 @@
-// Single source of the app themes: startup validation (main.ts), the quick
-// switcher (ThemeToggle) and the settings page all read this list.
+// App themes: startup validation (main.ts), the quick switcher (ThemeToggle) and
+// the settings page all read this list.
+//
+// The same list lives in `crates/huanshu-core/src/themes.rs` for the native UI.
+// Two copies while both UIs ship: **change one, change the other**.
 export interface AppTheme {
   id: string
   name: string

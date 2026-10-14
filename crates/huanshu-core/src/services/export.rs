@@ -411,6 +411,48 @@ mod tests {
         assert!(batch.pages[0].placeholder);
     }
 
+    /// 同一页、同一宽度，像素与 PNG 解码后必须逐点相同：两条路只差一个编码器，
+    /// 界面上看到的两者不能有任何差别。
+    #[test]
+    fn pixels_match_the_png_decoded_byte_for_byte() {
+        let slide = serde_json::json!({
+            "kind": "feature_grid",
+            "title": "像素一致性",
+            "cards": [{ "title": "卡片", "body": "正文", "icon": "i-carbon:square", "tone": "blue" }],
+        });
+        let options = ExportOptions::default();
+        let width = 320;
+
+        let png = renderer()
+            .render_png(std::slice::from_ref(&slide), &options, width, Some(&[0]))
+            .unwrap();
+        let pixels = renderer()
+            .render_pixels(std::slice::from_ref(&slide), &options, width, Some(&[0]))
+            .unwrap();
+        let page = pixels.pages.first().expect("one page");
+
+        let decoded =
+            image::load_from_memory_with_format(&png.pages[0].png, image::ImageFormat::Png)
+                .expect("the PNG decodes")
+                .to_rgba8();
+        assert_eq!(
+            (page.width, page.height),
+            (decoded.width(), decoded.height()),
+            "the two paths must agree on the page size"
+        );
+        assert_eq!(decoded.as_raw().len(), page.pixels.len());
+        let mismatches = decoded
+            .as_raw()
+            .iter()
+            .zip(&page.pixels)
+            .filter(|(left, right)| **left != **right)
+            .count();
+        assert_eq!(
+            mismatches, 0,
+            "{mismatches} bytes differ between pixels and PNG"
+        );
+    }
+
     /// A page whose content does not fit even at `fit-min` is clipped and must say so, because
     /// the editor warns the user about it; a page that only fits after scaling must not.
     #[test]
@@ -453,4 +495,89 @@ mod tests {
         assert_eq!(batch.pages[0].index, 1);
         assert!(!batch.pages[0].overflow);
     }
+}
+
+/// 一页光栅化后的像素。`pixels` 是自上而下、每行 `width * 4` 字节的 **RGBA8**（非预乘）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PixelPage {
+    /// 请求里 `slides` 的下标（子集位置）。
+    pub index: usize,
+    pub width: u32,
+    pub height: u32,
+    pub pixels: Vec<u8>,
+}
+
+/// 一批像素，附带这一次编译的诊断。
+#[derive(Debug, Clone, Default)]
+pub struct PixelBatch {
+    pub pages: Vec<PixelPage>,
+    /// 内容被裁切的页（子集位置）。
+    pub overflow: Vec<usize>,
+    /// 显示成占位图的图片引用。
+    pub missing_assets: Vec<slide_typst::MissingAsset>,
+    pub theme_fallback: Option<String>,
+    /// 这一批的实际光栅化宽度（档位，不是请求值）。
+    pub width: u32,
+}
+
+/// 与 [`render_slide_thumbnails`] 走同一个 [`prepare_export`]，因此主题、比例、字体角色与
+/// 素材解析完全一致——只是把 PNG 编码换成直接交像素（GPUI 要的就是这个，少一次编码、
+/// 少一次解码）。
+///
+/// `index` 同样是**子集位置**：空位不会发出去。
+pub fn render_slide_pixels(
+    state: &SharedState,
+    project_id: Option<i64>,
+    slides: Vec<SlideBlueprint>,
+    theme: Option<String>,
+    width_px: u32,
+    only: Option<Vec<usize>>,
+) -> Result<PixelBatch> {
+    let (slides, options, theme_fallback) = prepare_export(state, project_id, Some(slides), theme)?;
+    let width = width_px.max(1);
+    let rendered = renderer()
+        .render_pixels(&slides, &options, width, only.as_deref())
+        .map_err(|e| e.to_string())?;
+    Ok(PixelBatch {
+        pages: rendered
+            .pages
+            .into_iter()
+            .map(|page| PixelPage {
+                index: page.index,
+                width: page.width,
+                height: page.height,
+                pixels: page.pixels,
+            })
+            .collect(),
+        overflow: rendered
+            .overflows
+            .iter()
+            .filter_map(|overflow| overflow.slide)
+            .collect(),
+        missing_assets: rendered.missing_assets,
+        theme_fallback,
+        width,
+    })
+}
+
+/// 在系统文件管理器里选中导出的文件。Tauri 的 `reveal_exported_file` 命令转调这里。
+pub fn reveal_in_file_manager(path: &Path) -> Result<()> {
+    if !path.is_file() {
+        return Err("文件不存在".to_string());
+    }
+    #[cfg(target_os = "windows")]
+    let result = std::process::Command::new("explorer")
+        .arg("/select,")
+        .arg(path)
+        .spawn();
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open")
+        .arg("-R")
+        .arg(path)
+        .spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let result = std::process::Command::new("xdg-open")
+        .arg(path.parent().unwrap_or(Path::new(".")))
+        .spawn();
+    result.map(|_| ()).map_err(|e| e.to_string())
 }

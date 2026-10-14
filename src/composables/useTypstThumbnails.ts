@@ -1,3 +1,5 @@
+// 调度规则在 `crates/huanshu-core/src/preview.rs` 里有同一份 Rust 实现（原生界面用）。
+// 两套并存到 Tauri 界面下线为止：**改一边必须改另一边**，两侧的单测逐条对着同一条规则。
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useAppSettingsStore } from '../stores/appSettings'

@@ -23,8 +23,10 @@ pub mod image_size;
 pub mod input;
 pub mod lmstudio;
 pub mod network;
+pub mod preview;
 pub mod services;
 pub mod state;
+pub mod themes;
 pub mod types;
 pub mod validate;
 

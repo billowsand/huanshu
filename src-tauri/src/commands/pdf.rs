@@ -2,7 +2,7 @@
 //!
 //! 渲染是同步的重活，命令层把它放到阻塞线程池上跑，避免卡住 Tauri 的异步运行时。
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use tauri::State;
 
@@ -29,27 +29,10 @@ pub async fn export_pdf(
     .map_err(|e| format!("导出任务异常结束：{e}"))?
 }
 
-/// Selects the exported file in the system file manager. This one really is a shell-out,
-/// so it stays in the command layer instead of the service.
+/// Selects the exported file in the system file manager. The shell-out lives in
+/// `huanshu_core::services::export::reveal_in_file_manager` so the native UI does the
+/// same thing without duplicating it.
 #[tauri::command]
 pub fn reveal_exported_file(path: String) -> Result<(), String> {
-    let path = PathBuf::from(path);
-    if !path.is_file() {
-        return Err("文件不存在".to_string());
-    }
-    #[cfg(target_os = "windows")]
-    let result = std::process::Command::new("explorer")
-        .arg("/select,")
-        .arg(&path)
-        .spawn();
-    #[cfg(target_os = "macos")]
-    let result = std::process::Command::new("open")
-        .arg("-R")
-        .arg(&path)
-        .spawn();
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let result = std::process::Command::new("xdg-open")
-        .arg(path.parent().unwrap_or(std::path::Path::new(".")))
-        .spawn();
-    result.map(|_| ()).map_err(|e| e.to_string())
+    service::reveal_in_file_manager(Path::new(&path))
 }

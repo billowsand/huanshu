@@ -12,6 +12,10 @@ repository = "https://github.com/billowsand/huanshu"
 name = "huanshu_core"
 path = "src/lib.rs"
 
+[dev-dependencies]
+# 只在单测里用来把 PNG 解码，与 `render_pixels` 的原始像素逐点比对。
+image = "0.25"
+
 [build-dependencies]
 # 无：build.rs 只用 std，把 carbon 图标拷进 OUT_DIR
 
