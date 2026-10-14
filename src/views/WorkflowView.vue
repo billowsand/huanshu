@@ -518,6 +518,7 @@ onMounted(() => {
         v-else-if="currentStep === 3"
         v-model:active-slide="activeSlide"
         :slide-count="gen.slideCount"
+        :project-id="projectId"
         :blueprints="(gen.blueprints as unknown as SlideBlueprint[])"
         :media-items="mediaLib.mediaItems.value"
         :media-map="mediaLib.mediaMap.value"
@@ -2006,6 +2007,42 @@ onMounted(() => {
   overflow: hidden;
   background: #fff;
   flex-shrink: 0;
+}
+
+/* 编辑器预览的 Typst 位图：CSS 尺寸就是舞台尺寸，位图本身按舞台比例渲染，直接铺满。 */
+.edit-preview-img {
+  display: block;
+  object-fit: fill;
+}
+
+/* 舞台还没拿到位图（首次渲染、刚换页）：先留一块与幻灯片同色的底，不要闪出幻灯片组件。 */
+.edit-preview-stage--typst {
+  box-shadow: none;
+}
+
+.edit-preview-loading {
+  width: 100%;
+  height: 100%;
+  background: #fff;
+}
+
+/* 「渲染中」标记：`pending` 持续 150ms 以上才出现，不抢眼、不闪。（Step3Editor 的 scoped
+   样式里没有这些类，这一块是全局的。） */
+.edit-rendering {
+  font-size: 0.65rem;
+  color: var(--studio-text-dim, #888);
+  margin-left: 0.5rem;
+}
+
+/* 溢出提示：内容缩到最小字号仍放不下时提示，位置在预览舞台下方。 */
+.edit-preview-clip {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.35rem 1rem 0.6rem;
+  font-size: 0.7rem;
+  color: #b45309;
 }
 
 .edit-preview-canvas {

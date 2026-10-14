@@ -355,10 +355,44 @@ watch(detailStageRef, (el) => {
   }
 })
 
+// 右侧详情大图同样改成 Typst 位图：牌组与看板相同（`slideItems` 的蓝图，含生成中的空位），
+// 只请求选中这一页，缓存上限 4 张。
+const detailThumbnails = useTypstThumbnails({
+  slides: () => slideItems.value.map(item => item.blueprint ?? null),
+  projectId: () => props.projectId ?? null,
+  widthPx: () => Math.ceil(detailCanvasSize().width * (window.devicePixelRatio || 1)),
+  wanted: () => (props.selectedSlideIndex === null ? [] : [props.selectedSlideIndex]),
+  maxCached: 4,
+})
+
+/** 详情位图的 CSS 尺寸：与 `sdp-preview-canvas` 一样是舞台缩放后的尺寸。 */
+function detailCanvasSize() {
+  return {
+    width: detailStageWidth.value || slideDims.value.w,
+    height: (detailStageWidth.value || slideDims.value.w) * (slideDims.value.h / slideDims.value.w),
+  }
+}
+
+/** 选中页的 Typst 位图；占位页（模板还没有 Typst 版式）与失败时返回 null。 */
+function detailThumbnail() {
+  const index = props.selectedSlideIndex
+  if (index === null || detailThumbnails.failed.value)
+    return null
+  const thumb = detailThumbnails.thumbs.value[index]
+  return thumb && !thumb.placeholder ? thumb : null
+}
+
+/** 位图还在路上：显示空白底，不要闪出幻灯片组件。 */
+function detailThumbnailPending() {
+  const index = props.selectedSlideIndex
+  if (index === null || detailThumbnails.failed.value)
+    return false
+  return !detailThumbnails.thumbs.value[index]
+}
+
 onMounted(() => {
   window.addEventListener('keydown', handleStepKeydown)
 })
-
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleStepKeydown)
   if (detailResizeObserver) {
@@ -539,7 +573,17 @@ onBeforeUnmount(() => {
               :style="{ aspectRatio: `${slideDims.w} / ${slideDims.h}` }"
             >
               <div class="sdp-preview-canvas" :style="{ width: slideDims.w + 'px', height: slideDims.h + 'px', transform: `scale(${detailPreviewScale})` }">
-                <SlideRenderer :slide="selectedSlide.blueprint" :slide-index="selectedSlide.index" :media-map="props.mediaMap" />
+                <!-- Typst 位图按缩放后的实际尺寸显示，不放进 `transform: scale()` 里（会发糊）。 -->
+                <img
+                  v-if="detailThumbnail()"
+                  class="sdp-preview-img"
+                  :src="(detailThumbnail() as any).url"
+                  :style="{ width: detailCanvasSize().width + 'px', height: detailCanvasSize().height + 'px' }"
+                  draggable="false"
+                  alt=""
+                >
+                <div v-else-if="detailThumbnailPending()" class="sdp-preview-loading" />
+                <SlideRenderer v-else :slide="selectedSlide.blueprint" :slide-index="selectedSlide.index" :media-map="props.mediaMap" />
               </div>
             </div>
             <div v-else class="sdp-preview-empty">
@@ -1065,6 +1109,19 @@ onBeforeUnmount(() => {
   height: 720px;
   transform: scale(0.315);
   transform-origin: top left;
+}
+
+/* 详情大图的 Typst 位图：CSS 尺寸就是舞台缩放后的尺寸，直接铺满它。 */
+.sdp-preview-img {
+  display: block;
+  object-fit: fill;
+}
+
+/* 位图还在路上：先给一块空白，不要闪出幻灯片组件。 */
+.sdp-preview-loading {
+  width: 100%;
+  height: 100%;
+  background: #fff;
 }
 
 .sdp-note {

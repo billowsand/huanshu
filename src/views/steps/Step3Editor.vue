@@ -4,8 +4,12 @@ import { invoke } from '@tauri-apps/api/core'
 import SlideRenderer from '../../components/SlideRenderer.vue'
 import { chartProblems } from '../../components/chartOptions'
 import { ALL_KINDS, KIND_FIELDS, KIND_META } from '../../composables/useSlideEditor'
+import { useTypstThumbnails } from '../../composables/useTypstThumbnails'
 import type { SlideBlueprint, SlideKind } from '../../components/types'
 import type { MediaItem } from '../../composables/useMediaLibrary'
+
+/** 编辑器预览的 Typst 位图开关（`'0'` 关闭，回退到 `SlideRenderer`，用于 A/B 对比）。 */
+const TYPST_EDITOR_PREVIEW_KEY = 'huanshu.typstEditorPreview'
 
 type FieldType = 'text' | 'textarea' | 'select' | 'boolean'
 
@@ -429,6 +433,7 @@ const OBJECT_SECTIONS: Partial<Record<SlideKind, ObjectSectionDef[]>> = {
 const props = defineProps<{
   activeSlide: number
   slideCount: number
+  projectId: number | null
   blueprints: SlideBlueprint[]
   mediaItems: MediaItem[]
   mediaMap: Record<string, string>
@@ -768,6 +773,76 @@ function setActiveSlide(index: number) {
   emit('update:activeSlide', index)
 }
 
+// ── Typst 预览位图 ────────────────────────────────────────────────────────────
+// 编辑器的预览改成 Typst 光栅化的 PNG（与缩略图、演示主画面同一条链路）。
+// **只发当前这一页**：版式只依赖本页数据，单页编译最快（`chart:<index>` 与溢出标记的下标
+// 都是 0，取图时换算回 `activeSlide`）。打字时每敲一个字内容就变，缓存帮不上忙，所以用
+// `serial`（同一时刻只有一个请求在途）把连续输入合并成一次尾部请求，再用 `progressive`
+// 让每个响应只要比画面新就先落下：预览最多落后一个请求的时间，停手后一定落在最新内容上。
+
+function editorPreviewEnabled(): boolean {
+  try {
+    return localStorage.getItem(TYPST_EDITOR_PREVIEW_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+const typstPreview = useTypstThumbnails({
+  slides: () => (props.editorPreviewSlide ? [props.editorPreviewSlide] : []),
+  projectId: () => props.projectId ?? null,
+  widthPx: () => Math.ceil(Math.max(props.editorStageW, 1) * (window.devicePixelRatio || 1)),
+  enabled: editorPreviewEnabled,
+  // 换页就是换目标：上一页的在途响应作废，图和键清空，调用方立刻回退到幻灯片组件。
+  resetKey: () => props.activeSlide,
+  serial: true,
+  progressive: true,
+  debounceMs: 120,
+})
+
+/** 这一页的 Typst 位图；占位页（模板还没有 Typst 版式）与失败时返回 null。 */
+const typstPreviewImage = computed(() => {
+  if (!editorPreviewEnabled() || typstPreview.failed.value)
+    return null
+  // 只发这一页，所以它在数组里的下标恒为 0（`activeSlide` 是牌组页序，不是这里的键）。
+  const thumb = typstPreview.thumbs.value[0]
+  return thumb && !thumb.placeholder ? thumb : null
+})
+
+/** 位图还在路上（防抖或请求在途）：显示与舞台同色的底，不要闪出上一页的画面。 */
+const typstPreviewLoading = computed(() => {
+  if (!editorPreviewEnabled() || !props.editorPreviewSlide)
+    return false
+  return !typstPreview.failed.value && !typstPreviewImage.value
+})
+
+/** 「渲染中」标记：`pending` 持续不足 150ms 就不显示，避免打字时闪个不停。 */
+const renderBusy = ref(false)
+let renderBusyTimer: ReturnType<typeof setTimeout> | null = null
+watch(() => typstPreview.pending.value, (pending) => {
+  if (renderBusyTimer) {
+    clearTimeout(renderBusyTimer)
+    renderBusyTimer = null
+  }
+  if (!pending) {
+    renderBusy.value = false
+    return
+  }
+  renderBusyTimer = setTimeout(() => {
+    renderBusyTimer = null
+    renderBusy.value = true
+  }, 150)
+})
+
+/** 内容缩到最小字号仍放不下、超出的部分被裁切。 */
+const typstPreviewClipped = computed(() =>
+  Boolean(typstPreview.overflow.value[0]),
+)
+
+function typstPreviewSize() {
+  return { width: `${props.editorStageW}px`, height: `${props.editorStageH}px` }
+}
+
 function shouldIgnoreEditorKeydown(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement))
     return false
@@ -809,6 +884,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleEditorArrowKeydown)
+  if (renderBusyTimer) {
+    clearTimeout(renderBusyTimer)
+    renderBusyTimer = null
+  }
 })
 </script>
 
@@ -859,6 +938,7 @@ onBeforeUnmount(() => {
           <span class="i-carbon:view" />
           实时预览
           <span v-if="hasUnsavedChanges" class="edit-unsaved">● 未保存</span>
+          <span v-if="renderBusy" class="edit-rendering" role="status">渲染中…</span>
           <div class="edit-preview-nav ml-auto">
             <button class="btn btn-ghost edit-icon-btn" :disabled="activeSlide === 0" @click="$emit('update:activeSlide', activeSlide - 1)">
               <span class="i-carbon:arrow-left" />
@@ -884,9 +964,24 @@ onBeforeUnmount(() => {
           <div
             v-if="editorPreviewSlide"
             class="edit-preview-stage"
+            :class="{ 'edit-preview-stage--typst': typstPreviewImage }"
             :style="{ width: editorStageW + 'px', height: editorStageH + 'px' }"
           >
+            <!--
+              Typst 位图直接按舞台尺寸显示（不能放进带 `transform: scale()` 的
+              `.edit-preview-canvas`，缩放过的位图会发糊）。
+            -->
+            <img
+              v-if="typstPreviewImage"
+              class="edit-preview-img"
+              :src="typstPreviewImage.url"
+              :style="typstPreviewSize()"
+              draggable="false"
+              alt=""
+            >
+            <div v-else-if="typstPreviewLoading" class="edit-preview-loading" />
             <div
+              v-else
               class="edit-preview-canvas"
               :style="{ transform: `scale(${previewScale})`, transformOrigin: 'top left', width: currentSlideDims.w + 'px', height: currentSlideDims.h + 'px' }"
             >
@@ -894,6 +989,10 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </div>
+        <p v-if="typstPreviewClipped" class="edit-preview-clip" role="status">
+          <span class="i-carbon:warning-alt" />
+          内容过多，已缩到最小字号仍放不下，超出部分被裁切
+        </p>
       </div>
 
       <div class="edit-json-col">

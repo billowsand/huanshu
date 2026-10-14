@@ -134,6 +134,8 @@ export function useTypstThumbnails(opts: {
   /** `serial` 用：有请求在途时，期间发生的变化合并成一次尾部请求。 */
   let inFlight = false
   let dirty = false
+  /** 换过目标（esetAll）：在途响应已作废，下一次 efresh 必须真的发请求。 */
+  let resetPending = false
   let lastResetKey: unknown
 
   function widthBucket(): number {
@@ -181,6 +183,7 @@ export function useTypstThumbnails(opts: {
 
   /** 清空全部图和键。`resetKey` 变化与整体关闭开关都走这里，调用方随即回退到幻灯片组件。 */
   function resetAll() {
+    resetPending = true
     thumbs.value = {}
     overflow.value = {}
     shownKeys = {}
@@ -204,6 +207,12 @@ export function useTypstThumbnails(opts: {
       if (opts.serial) dirty = true
       return
     }
+    // `resetAll`（换页）把上一页的在途响应作废了，所以不能因为 `pendingKeys` 里还留着那个位置
+    // 就跳过这一页——那个响应回来时已经过期，也不会触发尾部请求，画面会一直空着。
+    // 记下这一次要忽略在途键，并把 `dirty` 立起来，保证这一次请求结束后一定会重来。
+    const ignoringPending = resetPending
+    resetPending = false
+    dirty = true
 
     const all = opts.slides()
     const deck = presentSlides.value
@@ -219,12 +228,13 @@ export function useTypstThumbnails(opts: {
     latestWanted = new Set(wantedPositions)
 
     const only = wantedPositions.flatMap(position => {
-      // 已经有一个在途请求带的就是这一页的当前键，等它回来即可。
-      if (pendingKeys[position] !== undefined) return []
+      // 在途请求带的就是这一页的当前键，等它回来即可；换过目标时那个请求已经作废，不算数。
+      if (!ignoringPending && pendingKeys[position] !== undefined) return []
       // `progressive` 下显示的可能是过期但更新的图，此时键不等；两种模式都靠这一条重发。
       return shownKeys[position] === latestKeys[position] ? [] : [position]
     })
     if (!only.length) {
+      dirty = false
       evict(latestWanted)
       pending.value = false
       return
