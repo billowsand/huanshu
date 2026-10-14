@@ -3,7 +3,7 @@
 //! | 原版                          | 这里                     | 状态（详见 `docs/native/parity.md`） |
 //! |-------------------------------|--------------------------|---------------------------------------|
 //! | `HomeView.vue`                | [`home`]                 | 样板：完整实现（加密导入导出待做）    |
-//! | `SettingsView.vue`            | [`settings`]             | 骨架：导航 + 主题区可用，其余待做     |
+//! | `SettingsView.vue`            | [`settings`]             | 完整实现（字体 / 模型服务 / 生成 / 存储 / 保存条） |
 //! | `FirstRunWizard.vue`          | [`wizard`]               | 骨架：步骤条与翻页，表单待做          |
 //! | `WorkflowView.vue`            | [`workflow`]             | 骨架：侧栏与三步切换可用              |
 //! | `steps/Step1Prepare.vue`      | [`workflow::step1`]      | 骨架：分区占位                        |

@@ -15,7 +15,7 @@
 | 六个主题、外壳配色 | `style.css` `--studio-*` | ✅ | `theme/tokens.rs`（从运行中的旧应用读出的计算值） |
 | GPUI Kit 组件跟随主题（按钮、输入框、对话框） | — | ✅ | `theme::apply` 映射 `colors` 并重派生 `tokens` |
 | 主题切换并保存 | `ThemeToggle.vue` | ✅ | `widgets::theme_dots` → `ShellHandle::set_theme`（`app_settings.app_theme`） |
-| 界面字体（`--font-interface`） | `typography.ts` | 🟡 | 启动时读取并应用；设置页改字体后未实时生效 |
+| 界面字体（`--font-interface`） | `typography.ts` | ✅ | `theme::apply`；设置页改「界面」字体即时生效（`pages/settings/appearance.rs`） |
 | 首次启动进向导 | `App.vue` `is_first_run` | ✅ | `Shell::new` |
 | Carbon 图标 | UnoCSS `i-carbon:*` | ✅ | `icons::carbon`，同一套图标 |
 | 品牌图标 | `BrandMark.vue` | ✅ | `assets/brand-mark.svg` |
@@ -46,19 +46,19 @@
 | 左侧五个分区、返回工作台、版本号 | ✅ | |
 | 分区标题与说明 | ✅ | |
 | 界面主题卡片：点击预览、保存后生效、撤销 | ✅ | `shell/settings-appearance-0.png` |
-| 字体：七个角色、可搜索系统字体下拉、统一所有字体、恢复默认 | ⬜ | `SystemFontPicker.vue`、`huanshu_core::fonts::enumerate_system_fonts` |
-| 字体：演示预览 / 界面预览 | ⬜ | |
-| 模型服务：三类服务卡片与状态 | ⬜ | `serviceState` |
-| 模型服务：地址、Key、模型下拉 / 手动输入 | ⬜ | `services::settings::{get_settings, save_settings, list_models}` |
-| 模型服务：SOCKS5 代理 | ⬜ | |
-| 模型服务：测试连接（耗时、错误） | ⬜ | `list_models`（async → `tasks::run_async`） |
-| 生成设置：修复轮数、并发数 | ⬜ | `LlmSettings` |
+| 字体：七个角色、可搜索系统字体下拉、统一所有字体、恢复默认 | ✅ | `pages/settings/appearance.rs`（FontPicker 弹层照 `SystemFontPicker.vue`；`fonts::enumerate_system_fonts` 走 `run_bg`）；单测 `set_font_under_unified_fills_every_role` 等 |
+| 字体：演示预览 / 界面预览 | ✅ | `appearance.rs::font_preview_card`；界面字体随改随 `theme::apply` |
+| 模型服务：三类服务卡片与状态 | ✅ | `service_form.rs::service_state`（签名比对照原版）；单测 `testing_wins_over_everything` 等 |
+| 模型服务：地址、Key、模型下拉 / 手动输入 | ✅ | `service_form.rs::ServiceForm`（GPUI Kit Select；`services::settings::{get_settings, save_settings}`） |
+| 模型服务：SOCKS5 代理 | ✅ | `ServiceForm` 代理开关 + 地址 / 用户名 / 密码（保存时 core `Socks5Settings::validate` 把关） |
+| 模型服务：测试连接（耗时、错误） | ✅ | `list_models`（async → `tasks::run_async`，发起时签名比对，迟到结果作废） |
+| 生成设置：修复轮数、并发数 | ✅ | `generation.rs`（0–10 / 1–8，保存前校验文案照原版）；单测 `generation_ranges_match_the_original_rules` |
 | 存储：数据目录、媒体目录展示 | ✅ | |
-| 存储：图标向量缓存初始化 | ⬜ | `services::generation::ensure_icon_embeddings` |
+| 存储：图标向量缓存初始化 | ✅ | `storage.rs::init_embeddings` → `services::generation::ensure_icon_embeddings`（async）；状态逻辑照原版 `embeddingReady` |
 | 关于与帮助 | ✅ | |
-| 底部保存条：状态、撤销、保存 | 🟡 | 只覆盖主题；字体与模型接上后统一 |
-| 离开时「有未保存的更改」确认（保存并离开 / 放弃 / 继续编辑） | ⬜ | `answerLeave`；现在离开等于放弃 |
-| `Ctrl+S` 保存 | ⬜ | `onKeydown` |
+| 底部保存条：状态、撤销、保存 | ✅ | 统一草稿（主题 + 字体 + 模型 + 生成参数）；保存后界面字体立即生效；单测 `config_dirty_tracks_any_component_change` |
+| 离开时「有未保存的更改」确认（保存并离开 / 放弃 / 继续编辑） | ✅ | `mod.rs::leave`（Dialog 三按钮，文案逐字；放弃 = 恢复上次保存的主题与字体） |
+| `Ctrl+S` 保存 | ✅ | `track_focus` + `on_key_down`（页面根，`mod.rs`） |
 
 ## 首次向导 `FirstRunWizard.vue` → `pages/wizard.rs`
 
