@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use gpui_kit::RenderImage;
 use huanshu_core::preview::{PreviewResult, RenderedSlide};
-use huanshu_core::services::{export, projects, settings};
+use huanshu_core::services::{export, settings};
 use huanshu_core::themes::{self, AppTheme};
 
 use crate::images::to_render_image;
@@ -28,16 +28,6 @@ pub fn load() -> (AppShared, AppTheme, String) {
         eprintln!("[native] 未知主题 {requested}，回落到 {}", theme.id);
     }
     (shared, *theme, data_dir)
-}
-
-/// 读一份项目的牌组。**按原始 JSON 返回**：数据库里存的就是 JSON，而只读界面没有理由
-/// 替用户「修正」一份 Typst 能渲染、但 Rust 结构体装不下的牌组（例如 `items` 里混进对象）。
-pub fn load_deck(shared: &AppShared, project_id: i64) -> Result<Vec<serde_json::Value>, String> {
-    let project = projects::get_project(shared, project_id)?;
-    if project.blueprints_json.trim().is_empty() {
-        return Ok(Vec::new());
-    }
-    serde_json::from_str(&project.blueprints_json).map_err(|err| format!("读取幻灯片失败：{err}"))
 }
 
 /// 一批渲染好的页。
@@ -91,7 +81,8 @@ pub fn export_pdf(
     )
 }
 
-/// 工作集内存（MiB），`--flip-soak` 用来证明内存收敛。
+/// 工作集内存（MiB）。内存测量脚本用（看板/演示翻页的长跑），平时没有调用方。
+#[allow(dead_code)]
 pub fn working_set_mib() -> f64 {
     #[cfg(windows)]
     {

@@ -3,7 +3,7 @@ name = "huanshu-native"
 version = "0.4.0"
 edition = "2021"
 rust-version = "1.77"
-description = "幻述原生界面：项目列表、看板、演示与 PDF 导出（只读）"
+description = "幻述原生界面（GPUI Kit），逐页复刻 Tauri + Vue 版"
 license = "MIT"
 authors = ["幻述 Authors"]
 repository = "https://github.com/billowsand/huanshu"
@@ -16,15 +16,21 @@ path = "src/main.rs"
 [dependencies]
 # GPUI Kit 0.7.3 是 zed@93d7456 的快照，不是官方 GPUI：一律通过 `gpui-kit` 使用，
 # 不直接依赖 `gpui`（直接依赖会拿到两套互不兼容的 App/Context 类型）。
-gpui-kit = "=0.7.3"
-# 原生保存对话框；只有「导出 PDF」用得到。
+# `tree-sitter-markdown`：第一步 Markdown 编辑器的语法高亮。
+gpui-kit = { version = "=0.7.3", features = ["tree-sitter-markdown"] }
+# 原生文件对话框（导入导出、上传文稿、选目录）。
 rfd = "0.15"
 # 业务逻辑全在这里：数据只经 `huanshu_core::services` 读写，不碰 rusqlite。
 huanshu-core = { path = "../../crates/huanshu-core" }
-# 只为类型（`SUPPORTED_THEMES` 之类）；渲染一律走 core 的服务。
+# 只为类型与 Carbon 图标（`render_icon_svg`）；渲染一律走 core 的服务。
 slide-typst = { path = "../../crates/slide-typst" }
 # 把 `render_pixels` 的 RGBA 换成 GPUI 要的 BGRA。
 image = "0.25"
 serde_json = "1"
 # 首页的更新时间按本地时区显示。
 chrono = "0.4"
+# core 的 async 服务（生成流水线、模型列表）要求 tokio 运行时，见 `tasks.rs`。
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
+# 生成事件通道（`tasks::listen_events`）。
+futures = "0.3"
+anyhow = "1.0"

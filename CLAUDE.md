@@ -32,20 +32,26 @@ bootstrap 所在目录为目标。Tauri 版用 `.claude/launch.json` 的 `tauri-
 
 ## 原生界面（`apps/huanshu-native`，GPUI Kit）
 
-只读查看器：项目列表 → 看板（缩略图 + 大图）→ 演示 → 导出 PDF。在根 workspace 里但**不在 `default-members`**：
-`bunx tauri dev`、裸 `cargo build` 不编 GPUI，`cargo test --workspace` 与 `-p huanshu-native` 会编。
-命令行开关见它的 README（`--open/--page/--present/--theme/--export-pdf/--quit-after/--flip-soak`），截图用 `tools/shots.ps1`。
+逐页复刻 Tauri + Vue 版，**目标是完整替代原版**：可以按 GPUI 的特点调整细节，关键功能一项都不能丢。
+框架与写页面的规矩见 `apps/huanshu-native/README.md`；功能清单与进度是 `docs/native/parity.md`（做完一项改一项）；
+原版截图 `docs/native/reference/`，原生截图 `docs/native/shell/`（`tools/shots.ps1`，同一份沙箱数据、同一主题）。
+在根 workspace 里但**不在 `default-members`**：`bunx tauri dev`、裸 `cargo build` 不编 GPUI，`cargo test --workspace` 与 `-p huanshu-native` 会编。
 
-- 数据只经 `huanshu_core::services`，位图经 `services::export::render_slide_pixels`（与缩略图、PDF 共用 `prepare_export_values`），
-  调度用 `huanshu_core::preview::PreviewCache`。牌组按**原始 JSON** 处理（Typst 比 `SlideBlueprint` 宽松，强类型往返会挡掉能渲染的牌组）。
-- **每张不再显示的 `RenderImage` 都要 `cx.drop_image`**：`PreviewCache` 的 `complete` 返回值与 `take_released()`、`reset()` 交还的图都要释放，
-  GPUI 不会回收图集。
+- 外壳 `shell.rs`（标题栏 + 当前页 + 演示覆盖层），页面经 `ShellHandle` 换页、换主题、开演示；路由 `router.rs` 对应原版五条路由。
+- 配色只用 `cx.studio().colors`：`theme/tokens.rs` 是从运行中的旧应用读出的 `--studio-*` 计算值（改 CSS 时同步）。
+  `theme::apply` 同时写 GPUI Kit 的 `Theme.colors` 并重派生 `Theme.tokens`（组件读 tokens，不重派生主按钮就是白底）。
+- 图标用原版同一套 Carbon（`icons::carbon("i-carbon:xxx")`，SVG 由 `slide_typst::render_icon_svg` 现生成）。
+- 数据只经 `huanshu_core::services`；同步重活 `tasks::run_bg`，core 的 async 服务 `tasks::run_async`（进程内一个 tokio 运行时），
+  生成事件 `tasks::listen_events`（`CoreEvent` 通道，替代 Tauri 的 `listen('gen:*')`）。
+- 幻灯片位图只用 `slides::SlideImages`（包 `huanshu_core::preview::PreviewCache`），页面离开调 `release`。
+  **每张不再显示的 `RenderImage` 都要 `drop_image`**，GPUI 不会回收图集。
 - `PreviewCache::set_deck` / `set_wanted` 只在内容真变了时才重新打开失败闸：界面每帧都会调用它们，无条件打开会让编译不过的牌组每帧重试。
-- **按键观察者是全应用的**（`observe_keystrokes` 会收到所有窗口的按键）：每个观察者先比对 `window.window_handle()` 与自己的窗口。
-  演示窗口 Esc 用 `window.remove_window()`，不要 `cx.quit()`。
-- 主题由标题栏（`Root::set_theme`）统一切换：保存设置、外壳明暗、看板渲染主题一起变；存在 `app_settings` 的 `app_theme` 键，
-  与 Tauri 版（WebView localStorage）暂不同步。
-- 量内存要量**本进程**：PowerShell 里的 `$PID` 是 PowerShell 自己。实测（release，5 分钟每 100ms 翻一页）工作集稳定在 385–412 MiB。
+- 页面快捷键用 `track_focus` + `on_key_down`；**不要用 `observe_keystrokes`**（全应用的，会收到其他窗口和其他页面的按键）。
+- 演示是盖在当前页上的覆盖层（与原版一致），打开即全屏，Esc 先关全览再退出并退出全屏。
+- 主题存在 `app_settings` 的 `app_theme` 键，与 Tauri 版（WebView localStorage）暂不同步。
+- 量内存要量**本进程**：PowerShell 里的 `$PID` 是 PowerShell 自己。只读查看器阶段实测（release，5 分钟每 100ms 翻一页）工作集稳定在 385–412 MiB。
+- **原版首次向导在沙箱里会指回真实目录**：`FirstRunWizard.vue` 用前端的 `localDataDir()` 拼默认目录，不认 `HUANSHU_HOME`。
+  在 `tauri-dev-sandbox` 里不要点向导的「进入 Studio」（用 `complete_first_run` 命令跳过）；原生版的向导取 core 的目录，没有这个问题。
 
 # Auto-Slidev 模板扩展说明
 

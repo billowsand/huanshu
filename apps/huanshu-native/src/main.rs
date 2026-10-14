@@ -1,15 +1,21 @@
-//! 幻述原生界面（只读查看器）：项目列表 → 看板 → 演示 → 导出 PDF。
+//! 幻述原生界面（GPUI Kit）：逐页复刻 Tauri + Vue 版。
 //!
-//! 业务逻辑全在 `huanshu_core`；本工程只做界面与「把 Typst 的像素画出来」这一件事。
-//! 命令行开关见 `README.md` 与 `cli.rs`。
+//! 结构见 `README.md`「框架」一节与 `docs/native/parity.md`（逐项功能对照）。
+//! 业务逻辑全在 `huanshu_core`；本工程只做界面。
 
 mod app;
-mod board;
 mod cli;
 mod export;
+mod icons;
 mod images;
+mod pages;
 mod present;
+mod router;
 mod shell;
+mod slides;
+mod tasks;
+mod theme;
+mod widgets;
 
 use gpui_kit::prelude::*;
 use gpui_kit::{px, size, App, Bounds, WindowBounds};
@@ -27,28 +33,40 @@ fn main() {
     }
 
     gpui_kit::application()
-        .with_assets(gpui_kit::assets::Assets)
+        .with_assets(icons::NativeAssets)
         .run(move |cx: &mut App| {
             gpui_kit::init(cx);
-            let (shared, current, data_dir) = app::load();
-            let theme = shell::ThemeRef::from(current);
-            if let Some(requested) = cli.theme.as_deref() {
-                match huanshu_core::services::settings::set_app_theme(&shared, requested) {
-                    Ok(()) => eprintln!("[native] 主题设为 {requested}"),
-                    Err(error) => eprintln!("[native] --theme {requested}: {error}"),
+            let (shared, current, _data_dir) = app::load();
+            let theme_id = match cli.theme.as_deref() {
+                Some(requested) => {
+                    match huanshu_core::services::settings::set_app_theme(&shared, requested) {
+                        Ok(()) => requested.to_string(),
+                        Err(error) => {
+                            eprintln!("[native] --theme {requested}: {error}");
+                            current.id.to_string()
+                        }
+                    }
                 }
-            }
-            let boot = shell::Boot {
-                open: cli.open,
-                page: cli.page,
-                present: cli.present,
+                None => current.id.to_string(),
             };
+            let font = shell::interface_font(&shared);
+            theme::apply(&theme_id, font.as_deref(), None, cx);
 
             // 预热渲染器：扫描系统字体约 0.5 秒，不该由第一张图来付。
             cx.background_spawn(async move {
                 huanshu_core::services::export::renderer();
             })
             .detach();
+
+            if let Some(seconds) = cli.quit_after {
+                cx.spawn(async move |cx| {
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_secs(seconds))
+                        .await;
+                    cx.update(|cx| cx.quit());
+                })
+                .detach();
+            }
 
             let mut options = gpui_kit::component::TitleBar::window_options();
             options.window_min_size = Some(size(px(1080.), px(680.)));
@@ -57,19 +75,9 @@ fn main() {
                 size(px(1440.), px(900.)),
                 cx,
             )));
+            let route = cli.route.clone();
             gpui_kit::open_window(options, cx, move |window, cx| {
-                cx.new(move |cx| {
-                    shell::Root::new(
-                        shared,
-                        theme,
-                        data_dir,
-                        Some(boot),
-                        cli.quit_after,
-                        cli.flip_soak,
-                        window,
-                        cx,
-                    )
-                })
+                cx.new(move |cx| shell::Shell::new(shared, route, window, cx))
             })
             .expect("open the native window");
         });

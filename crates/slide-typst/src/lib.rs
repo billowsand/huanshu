@@ -16,6 +16,9 @@ mod icons;
 mod math;
 
 pub use assets::{AssetData, Assets, MissingAsset};
+/// The Carbon SVG builder the templates use, for hosts that draw the same icons in their UI
+/// (the native shell renders the editor's Carbon icon names with it).
+pub use icons::render_svg as render_icon_svg;
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
