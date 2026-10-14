@@ -17,19 +17,67 @@ use crate::types::{AppGlobalSettings, SlideBlueprint};
 /// [`AppState`]，服务函数只认 `&SharedState`。
 pub type SharedState = std::sync::Mutex<AppState>;
 
+/// 本机的存储位置。
+///
+/// 设了 `HUANSHU_HOME` 时全部落在它下面（隔离沙箱：真机验证、演示数据、与真实项目
+/// 互不干扰）；没设时与从前逐字相同——`<LOCALAPPDATA>/auto-slidev-studio` 放数据、
+/// `<APPDATA>/auto-slidev-studio/bootstrap.json` 记数据目录。素材目录仍跟随数据目录。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoragePaths {
+    /// SQLite、settings.json 与默认素材目录的根。
+    pub data_dir: PathBuf,
+    /// 开机前就要知道数据目录的那几个字段。
+    pub bootstrap: PathBuf,
+}
+
+/// 算出存储位置。`home` 是 `HUANSHU_HOME` 的值；`None` 或空串按「未设置」处理。
+///
+/// 纯函数：单测直接传 `Some(path)`，不去改进程环境变量（并发测试会互相干扰）。
+pub fn storage_paths(home: Option<&std::path::Path>) -> StoragePaths {
+    // An empty `HUANSHU_HOME` is a mistake, not a request to store data in the cwd.
+    match home.filter(|home| !home.as_os_str().is_empty()) {
+        Some(home) => StoragePaths {
+            data_dir: home.join("data"),
+            bootstrap: home.join("bootstrap.json"),
+        },
+        None => StoragePaths {
+            data_dir: system_data_dir(),
+            bootstrap: system_bootstrap_path(),
+        },
+    }
+}
+
+/// `HUANSHU_HOME` 的值；未设置或为空串时是 `None`。
+pub fn sandbox_home() -> Option<PathBuf> {
+    match std::env::var_os("HUANSHU_HOME") {
+        Some(value) if !value.is_empty() => Some(PathBuf::from(value)),
+        _ => None,
+    }
+}
+
 /// 本机数据目录的默认值：`<LOCALAPPDATA>/auto-slidev-studio`。
-pub fn default_data_dir() -> PathBuf {
+fn system_data_dir() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("auto-slidev-studio")
 }
 
-/// 指向数据目录等「开机前就要知道」的少量字段的文件。
-pub fn bootstrap_path() -> PathBuf {
+/// bootstrap 文件的默认位置：`<APPDATA>/auto-slidev-studio/bootstrap.json`。
+fn system_bootstrap_path() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("auto-slidev-studio")
         .join("bootstrap.json")
+}
+
+/// 本机数据目录：设了 `HUANSHU_HOME` 就在沙箱里，否则用系统目录。
+pub fn default_data_dir() -> PathBuf {
+    storage_paths(sandbox_home().as_deref()).data_dir
+}
+
+/// bootstrap 文件：设了 `HUANSHU_HOME` 就在沙箱里，否则用系统目录。
+pub fn bootstrap_path() -> PathBuf {
+    storage_paths(sandbox_home().as_deref()).bootstrap
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -243,5 +291,50 @@ impl AppState {
 
     pub fn persist_app_settings(&mut self) -> Result<()> {
         self.sync_storage_root()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    /// 沙箱把两处路径都收进 `HUANSHU_HOME` 下，真机验证因此不会碰到用户的真实项目。
+    #[test]
+    fn a_sandbox_home_redirects_both_paths_under_itself() {
+        let paths = storage_paths(Some(Path::new("E:/huanshu/target/sandbox-home")));
+        assert_eq!(
+            paths.data_dir,
+            PathBuf::from("E:/huanshu/target/sandbox-home/data")
+        );
+        assert_eq!(
+            paths.bootstrap,
+            PathBuf::from("E:/huanshu/target/sandbox-home/bootstrap.json")
+        );
+    }
+
+    /// 没设 `HUANSHU_HOME` 时行为必须与从前逐字相同，否则会悄悄改掉用户的数据位置。
+    #[test]
+    fn without_a_sandbox_the_system_directories_are_used() {
+        let paths = storage_paths(None);
+        assert!(paths.data_dir.ends_with("auto-slidev-studio"), "{paths:?}");
+        assert_eq!(
+            paths.bootstrap.file_name().unwrap().to_str().unwrap(),
+            "bootstrap.json"
+        );
+        // 沙箱的 data/ 目录名不能漏进系统路径。
+        assert_ne!(
+            paths.data_dir.file_name().unwrap().to_str().unwrap(),
+            "data"
+        );
+    }
+
+    #[test]
+    fn an_empty_home_falls_back_to_the_system_directories() {
+        assert_eq!(
+            storage_paths(Some(Path::new(""))),
+            storage_paths(None),
+            "an empty HUANSHU_HOME is treated as unset"
+        );
     }
 }
