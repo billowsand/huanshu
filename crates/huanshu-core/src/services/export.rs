@@ -91,21 +91,22 @@ fn resolve_theme(theme: Option<String>) -> (String, Option<String>) {
 pub fn export_pdf(
     state: &SharedState,
     project_id: Option<i64>,
-    slides: Option<Vec<SlideBlueprint>>,
+    slides: Option<Vec<serde_json::Value>>,
     path: String,
     theme: Option<String>,
 ) -> Result<PdfExportReport> {
-    let (slides, options, theme_fallback) = prepare_export(state, project_id, slides, theme)?;
+    let (slides, options, theme_fallback) =
+        prepare_export_values(state, project_id, slides, theme)?;
     render_to_file(&slides, &options, Path::new(&path), theme_fallback)
 }
 
 /// Resolves the deck, theme, fonts, aspect ratio and images of an export. Also reused by
 /// [`render_thumbnails`], so a thumbnail and the exported page can never resolve a theme,
 /// aspect ratio or image reference differently.
-pub fn prepare_export(
+pub fn prepare_export_values(
     state: &SharedState,
     project_id: Option<i64>,
-    slides: Option<Vec<SlideBlueprint>>,
+    slides: Option<Vec<serde_json::Value>>,
     theme: Option<String>,
 ) -> Result<(Vec<serde_json::Value>, ExportOptions, Option<String>)> {
     let (slides, project, media_assets, media_dir, project_dir, fonts) = {
@@ -140,10 +141,17 @@ pub fn prepare_export(
         return Err("没有可导出的幻灯片".to_string());
     }
 
+    // 页面比例从 JSON 的同一个键读（强类型那版读 `SlideBlueprint.aspect_ratio`）。
+    let slide_ratio = slides.first().and_then(|slide| {
+        slide
+            .get("aspect_ratio")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|value| serde_json::from_value::<AspectRatio>(value.into()).ok())
+    });
     let aspect = project
         .as_ref()
         .and_then(|p| p.aspect_ratio)
-        .or_else(|| slides.first().and_then(|s| s.aspect_ratio))
+        .or(slide_ratio)
         .unwrap_or(AspectRatio::Ratio16x9);
     let (theme, theme_fallback) = resolve_theme(theme);
     let options = ExportOptions {
@@ -156,12 +164,27 @@ pub fn prepare_export(
         title: project.as_ref().map(|p| p.name.clone()),
         assets: export_assets(&project_dir, &media_dir, &media_assets),
     };
-    let slides: Vec<serde_json::Value> = slides
-        .iter()
-        .map(serde_json::to_value)
-        .collect::<Result<_, _>>()
-        .map_err(|e| e.to_string())?;
     Ok((slides, options, theme_fallback))
+}
+
+/// Typed entry point for the Tauri command layer; the deck itself is handled as JSON.
+pub fn prepare_export(
+    state: &SharedState,
+    project_id: Option<i64>,
+    slides: Option<Vec<SlideBlueprint>>,
+    theme: Option<String>,
+) -> Result<(Vec<serde_json::Value>, ExportOptions, Option<String>)> {
+    let slides = match slides {
+        Some(slides) => Some(
+            slides
+                .iter()
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<serde_json::Value>, _>>()
+                .map_err(|e| e.to_string())?,
+        ),
+        None => None,
+    };
+    prepare_export_values(state, project_id, slides, theme)
 }
 
 fn render_to_file(
@@ -520,20 +543,25 @@ pub struct PixelBatch {
     pub width: u32,
 }
 
-/// 与 [`render_slide_thumbnails`] 走同一个 [`prepare_export`]，因此主题、比例、字体角色与
-/// 素材解析完全一致——只是把 PNG 编码换成直接交像素（GPUI 要的就是这个，少一次编码、
-/// 少一次解码）。
+/// 与 [`render_slide_thumbnails`] 走同一个 [`prepare_export_values`]，因此主题、比例、
+/// 字体角色与素材解析完全一致——只是把 PNG 编码换成直接交像素（GPUI 要的就是这个，
+/// 少一次编码、少一次解码）。
+///
+/// 牌组按**原始 JSON** 传入而不是 `SlideBlueprint`：数据库里存的就是 JSON，而 Typst 版式
+/// 对字段比 Rust 结构体宽松（例如 `cards[].items` 可以混进对象）。强类型往返会把这样的牌组
+/// 挡在门外，只读界面没有理由替用户「修正」它。
 ///
 /// `index` 同样是**子集位置**：空位不会发出去。
 pub fn render_slide_pixels(
     state: &SharedState,
     project_id: Option<i64>,
-    slides: Vec<SlideBlueprint>,
+    slides: Vec<serde_json::Value>,
     theme: Option<String>,
     width_px: u32,
     only: Option<Vec<usize>>,
 ) -> Result<PixelBatch> {
-    let (slides, options, theme_fallback) = prepare_export(state, project_id, Some(slides), theme)?;
+    let (slides, options, theme_fallback) =
+        prepare_export_values(state, project_id, Some(slides), theme)?;
     let width = width_px.max(1);
     let rendered = renderer()
         .render_pixels(&slides, &options, width, only.as_deref())

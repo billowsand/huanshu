@@ -592,3 +592,24 @@ fn the_key_covers_theme_fonts_width_and_position() {
         );
     }
 }
+
+/// `reset` 只清缓存，不清牌组：清掉牌组会让这一次的请求永远为空，画面停在加载框。
+#[test]
+fn a_reset_keeps_the_deck_so_the_page_is_requested_again() {
+    let mut cache = cache();
+    cache.set_deck(&deck(2), style(560.0));
+    settle(&mut cache);
+    assert_eq!(cache.cached(), 2);
+
+    let released = cache.reset();
+    assert_eq!(released.len(), 2, "the cached bitmaps are handed back");
+    assert_eq!(cache.cached(), 0);
+    assert!(cache.image(0).is_none());
+
+    // 不再 `set_deck`，直接就该重新请求。
+    let request = cache
+        .next_request()
+        .expect("the deck survives the reset, so there is work to do");
+    assert_eq!(request.slides.len(), 2);
+    assert_eq!(request.only, vec![0, 1]);
+}

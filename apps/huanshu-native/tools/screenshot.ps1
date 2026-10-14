@@ -42,6 +42,7 @@ public class Win32Shots {
     [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, uint flags);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr hWnd, StringBuilder text, int count);
@@ -100,14 +101,17 @@ foreach ($handle in $handles) {
             [void][Win32Shots]::ShowWindow($handle, 9)
             Start-Sleep -Milliseconds 600
         }
-        [void][Win32Shots]::SetForegroundWindow($handle)
-        Start-Sleep -Milliseconds 400
+        # PrintWindow renders the window itself, so a window that is covered by another
+        # one is captured correctly (SetForegroundWindow often loses the foreground lock).
         [void][Win32Shots]::GetWindowRect($handle, [ref]$rect)
         $width = $rect.Right - $rect.Left
         $height = $rect.Bottom - $rect.Top
         $source = New-Object System.Drawing.Bitmap $width, $height
         $graphics = [System.Drawing.Graphics]::FromImage($source)
-        $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $source.Size)
+        $hdc = $graphics.GetHdc()
+        # 2 = PW_RENDERFULLCONTENT (needed for composited / GPU-drawn windows)
+        [void][Win32Shots]::PrintWindow($handle, $hdc, 2)
+        $graphics.ReleaseHdc($hdc)
         $graphics.Dispose()
         $target = $source
         if ($Scale -ne 1.0) {

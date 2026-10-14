@@ -268,7 +268,7 @@ fn load_projects(shared: &AppShared) -> Vec<ProjectRow> {
             slides: project.slide_count,
             ratio: project
                 .aspect_ratio
-                .map(|ratio| format!("{ratio:?}"))
+                .map(|ratio| ratio.label().split(' ').next().unwrap_or("").to_string())
                 .unwrap_or_else(|| "—".to_string()),
             updated: format_time(project.updated_at),
         })
@@ -298,42 +298,48 @@ impl Render for Root {
             None => self.home(cx).into_any_element(),
         };
 
-        gpui_kit::component::TitleBar::new()
+        // 整个应用是一列：标题栏在上面，页面在下面——窗口尺寸由此决定。
+        div()
+            .flex()
+            .flex_col()
+            .size_full()
             .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .gap_3()
-                    .child(div().text_sm().child(SharedString::from(if on_board {
-                        "幻述 · 看板"
-                    } else {
-                        "幻述 · 原生界面"
-                    })))
-                    // The data directory is on screen on purpose: an isolated sandbox must be
-                    // obvious at a glance.
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(SharedString::from(self.data_dir.clone())),
-                    )
-                    .child(div().flex_1())
-                    .child(
-                        Button::new("theme")
-                            .label(format!("主题：{}", self.theme.name))
-                            // Cycle through the catalogue; a real dropdown comes later.
-                            .on_click(cx.listener(move |root, _event, window, cx| {
-                                root.set_theme(next_theme, window, cx)
-                            })),
-                    )
-                    .child(
-                        Button::new("home")
-                            .label("项目")
-                            .on_click(cx.listener(|root, _event, _window, cx| root.goto_home(cx))),
-                    ),
+                gpui_kit::component::TitleBar::new().child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_3()
+                        .child(div().text_sm().child(SharedString::from(if on_board {
+                            "幻述 · 看板"
+                        } else {
+                            "幻述 · 原生界面"
+                        })))
+                        // The data directory is on screen on purpose: an isolated sandbox must be
+                        // obvious at a glance.
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(SharedString::from(self.data_dir.clone())),
+                        )
+                        .child(div().flex_1())
+                        .child(
+                            Button::new("theme")
+                                .label(format!("主题：{}", self.theme.name))
+                                // Cycle through the catalogue; a real dropdown comes later.
+                                .on_click(cx.listener(move |root, _event, window, cx| {
+                                    root.set_theme(next_theme, window, cx)
+                                })),
+                        )
+                        .child(
+                            Button::new("home").label("项目").on_click(
+                                cx.listener(|root, _event, _window, cx| root.goto_home(cx)),
+                            ),
+                        ),
+                ),
             )
-            .child(div().flex_1().child(content))
+            .child(div().flex_1().min_h_0().child(content))
     }
 }
 
@@ -350,7 +356,8 @@ impl Root {
         div()
             .flex()
             .flex_col()
-            .size_full()
+            // 滚动容器里没有确定高度，不能用 `size_full`（会把内容压成 0 高）。
+            .w_full()
             .p_4()
             .gap_2()
             .when(empty, |element| {
@@ -376,7 +383,12 @@ impl Root {
                     .border_1()
                     .border_color(cx.theme().border)
                     .cursor_pointer()
-                    .child(div().flex_1().text_lg().child(SharedString::from(row.name)))
+                    .child(
+                        div()
+                            .w_full()
+                            .text_lg()
+                            .child(SharedString::from(row.name)),
+                    )
                     .child(
                         div()
                             .flex()

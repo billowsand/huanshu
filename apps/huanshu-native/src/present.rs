@@ -16,7 +16,6 @@ use gpui_kit::{
     RenderImage, SharedString, Subscription, Window, WindowBounds, WindowOptions,
 };
 use huanshu_core::preview::{PreviewCache, PreviewOptions, PreviewStyle};
-use huanshu_core::types::SlideBlueprint;
 
 use crate::app::{self, AppShared};
 use crate::images::drop_all;
@@ -31,7 +30,7 @@ const PREFETCH_BEHIND: usize = 1;
 pub struct Present {
     project_id: i64,
     shared: AppShared,
-    deck: Vec<SlideBlueprint>,
+    deck: Vec<serde_json::Value>,
     theme: String,
     index: usize,
     cache: PreviewCache<Arc<RenderImage>>,
@@ -46,7 +45,7 @@ pub struct Present {
 /// `deck` 与 `shared` 都由看板传进来——演示不依赖看板还活着，关闭看板也不影响它。
 pub fn open(
     project_id: i64,
-    deck: Vec<SlideBlueprint>,
+    deck: Vec<serde_json::Value>,
     theme: &str,
     shared: AppShared,
     cx: &mut App,
@@ -73,7 +72,7 @@ impl Present {
     pub fn new(
         project_id: i64,
         shared: AppShared,
-        deck: Vec<SlideBlueprint>,
+        deck: Vec<serde_json::Value>,
         theme: String,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -139,10 +138,7 @@ impl Present {
     }
 
     fn deck_values(&self) -> Vec<Option<serde_json::Value>> {
-        self.deck
-            .iter()
-            .map(|slide| serde_json::to_value(slide).ok())
-            .collect()
+        self.deck.iter().cloned().map(Some).collect()
     }
 
     /// 当前页还没有图时只请求当前页；有了才预取邻页。

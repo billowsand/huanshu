@@ -9,7 +9,6 @@ use gpui_kit::RenderImage;
 use huanshu_core::preview::{PreviewResult, RenderedSlide};
 use huanshu_core::services::{export, projects, settings};
 use huanshu_core::themes::{self, AppTheme};
-use huanshu_core::types::SlideBlueprint;
 
 use crate::images::to_render_image;
 
@@ -31,8 +30,9 @@ pub fn load() -> (AppShared, AppTheme, String) {
     (shared, *theme, data_dir)
 }
 
-/// 读一份项目的牌组。空牌组也让调用方继续（看板上就是空列表）。
-pub fn load_deck(shared: &AppShared, project_id: i64) -> Result<Vec<SlideBlueprint>, String> {
+/// 读一份项目的牌组。**按原始 JSON 返回**：数据库里存的就是 JSON，而只读界面没有理由
+/// 替用户「修正」一份 Typst 能渲染、但 Rust 结构体装不下的牌组（例如 `items` 里混进对象）。
+pub fn load_deck(shared: &AppShared, project_id: i64) -> Result<Vec<serde_json::Value>, String> {
     let project = projects::get_project(shared, project_id)?;
     if project.blueprints_json.trim().is_empty() {
         return Ok(Vec::new());
@@ -47,7 +47,7 @@ pub type Pages = PreviewResult<Arc<RenderImage>>;
 pub fn render_pages(
     shared: AppShared,
     project_id: Option<i64>,
-    slides: Vec<SlideBlueprint>,
+    slides: Vec<serde_json::Value>,
     theme: Option<String>,
     width_px: u32,
     only: Vec<usize>,

@@ -21,7 +21,6 @@ use huanshu_core::editor_schema;
 use huanshu_core::preview::{PreviewCache, PreviewOptions, PreviewStyle};
 use huanshu_core::services::settings;
 use huanshu_core::themes;
-use huanshu_core::types::SlideBlueprint;
 
 use crate::app::{self, AppShared};
 use crate::images::drop_all;
@@ -48,7 +47,7 @@ pub struct BoardArgs {
 pub struct Board {
     args: BoardArgs,
     /// 牌组。空位（没有蓝图）保留为 `None`，位置仍参与页码。
-    deck: Vec<Option<SlideBlueprint>>,
+    deck: Vec<Option<serde_json::Value>>,
     /// 版式中文名，来自 core 的编辑器模式表（不另写一份）。
     kind_labels: Vec<(String, String)>,
     project_name: String,
@@ -90,7 +89,7 @@ impl Board {
                 }
             });
         let slides = app::load_deck(&args.shared, args.project_id).unwrap_or_default();
-        let deck: Vec<Option<SlideBlueprint>> = slides.into_iter().map(Some).collect();
+        let deck: Vec<Option<serde_json::Value>> = slides.into_iter().map(Some).collect();
         let kind_labels = editor_schema::editor_schema()
             .kinds
             .into_iter()
@@ -150,7 +149,7 @@ impl Board {
     }
 
     /// 演示与导出要用的数据。
-    pub fn deck_for_present(&self) -> (i64, Vec<SlideBlueprint>, &'static str, AppShared) {
+    pub fn deck_for_present(&self) -> (i64, Vec<serde_json::Value>, &'static str, AppShared) {
         (
             self.args.project_id,
             self.deck.iter().flatten().cloned().collect(),
@@ -187,7 +186,11 @@ impl Board {
     }
 
     fn kind_label(&self, index: usize) -> String {
-        let Some(kind) = self.deck[index].as_ref().map(|slide| slide.kind.as_str()) else {
+        let Some(kind) = self.deck[index]
+            .as_ref()
+            .and_then(|slide| slide.get("kind"))
+            .and_then(|kind| kind.as_str())
+        else {
             return "—".to_string();
         };
         self.kind_labels
@@ -206,11 +209,7 @@ impl Board {
             fonts: fonts.clone(),
             width_px: width_px as f32,
         };
-        let deck: Vec<Option<serde_json::Value>> = self
-            .deck
-            .iter()
-            .map(|slide| slide.as_ref().and_then(|s| serde_json::to_value(s).ok()))
-            .collect();
+        let deck = self.deck.clone();
         self.thumbs.set_deck(&deck, style(self.thumb_width));
         self.stage.set_deck(&deck, style(self.stage_width));
         cx.notify();
@@ -278,7 +277,7 @@ impl Board {
 
         // The stage first: it is the page in front of the user.
         if let Some(request) = stage_request {
-            let slides: Vec<SlideBlueprint> = self.deck.iter().flatten().cloned().collect();
+            let slides: Vec<serde_json::Value> = self.deck.iter().flatten().cloned().collect();
             let width = request.width_px;
             let only = request.only.clone();
             let shared = shared.clone();
@@ -304,7 +303,7 @@ impl Board {
         }
 
         if let Some(request) = thumb_request {
-            let slides: Vec<SlideBlueprint> = self.deck.iter().flatten().cloned().collect();
+            let slides: Vec<serde_json::Value> = self.deck.iter().flatten().cloned().collect();
             let width = request.width_px;
             let only = request.only.clone();
             let shared = shared.clone();
@@ -356,6 +355,9 @@ impl Board {
                     drop_all(released, Some(window), cx);
                 }
             }
+        }
+        if self.stage.image(self.selected).is_some() {
+            self.pending_since = None;
         }
         cx.notify();
         // Only after the current page has landed do we prefetch its neighbours.
@@ -464,6 +466,8 @@ impl Board {
         div()
             .flex()
             .flex_col()
+            // 侧栏不参与收缩，否则大图会把缩略图挤成一条缝。
+            .flex_none()
             .w(px(thumb_w + 16.0))
             .h_full()
             .border_r_1()
@@ -612,9 +616,12 @@ impl Render for Board {
                     ),
             );
 
+        // 舞台按页面比例定尺寸：显示框与光栅宽度同源，位图正好铺满、不会被裁。
+        let (stage_w, stage_h) = stage_box(window, self.aspect);
         let stage = match stage_image {
             Some(image) => div()
-                .size_full()
+                .w(px(stage_w))
+                .h(px(stage_h))
                 .child(img(image).w_full().h_full().object_fit(ObjectFit::Contain)),
             None => div()
                 .text_sm()

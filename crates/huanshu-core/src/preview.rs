@@ -227,11 +227,12 @@ impl<Img> PreviewCache<Img> {
     }
 
     /// 换目标：清空全部图并作废在途响应，调用方随即显示加载框。返回要交还的图片。
+    ///
+    /// **牌组与 `wanted` 不动**——它们来自调用方，`reset` 只清缓存（与 TypeScript 版的
+    /// `resetAll` 一致）。清掉牌组会让这一次 reset 之后的请求永远为空，画面停在加载框。
     pub fn reset(&mut self) -> Vec<Img> {
         self.generation += 1;
         self.reset_pending = true;
-        self.deck.clear();
-        self.wanted = None;
         self.request_keys.clear();
         self.request_indices.clear();
         self.shown_sequence.clear();
