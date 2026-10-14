@@ -17,6 +17,7 @@ pub mod editor_schema;
 pub mod embedded_icons;
 pub mod events;
 pub mod fonts;
+pub mod generation_progress;
 pub mod generator;
 pub mod icon;
 pub mod image_size;

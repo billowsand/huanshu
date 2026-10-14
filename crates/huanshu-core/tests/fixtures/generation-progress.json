@@ -1,0 +1,5669 @@
+{
+  "version": 1,
+  "tables": {
+    "page_stages": [
+      [
+        "planning",
+        "页面规划"
+      ],
+      [
+        "layout",
+        "布局排版"
+      ],
+      [
+        "content",
+        "内容生成"
+      ],
+      [
+        "normalizing",
+        "规范修复"
+      ],
+      [
+        "validating",
+        "校验修复"
+      ]
+    ],
+    "stage_labels": [
+      [
+        "idle",
+        "等待"
+      ],
+      [
+        "start",
+        "初始化"
+      ],
+      [
+        "init",
+        "验证连接"
+      ],
+      [
+        "page_plan",
+        "规划页面"
+      ],
+      [
+        "generating",
+        "生成中"
+      ],
+      [
+        "assembling",
+        "组装中"
+      ],
+      [
+        "validate",
+        "校验中"
+      ],
+      [
+        "done",
+        "完成"
+      ],
+      [
+        "error",
+        "出错"
+      ]
+    ],
+    "log_stage_labels": [
+      [
+        "start",
+        "开始"
+      ],
+      [
+        "init",
+        "初始化"
+      ],
+      [
+        "clean",
+        "文档清理"
+      ],
+      [
+        "page_plan",
+        "页面规划"
+      ],
+      [
+        "layout_plan",
+        "布局规划"
+      ],
+      [
+        "content",
+        "内容生成"
+      ],
+      [
+        "normalize",
+        "规范修复"
+      ],
+      [
+        "validate",
+        "最终校验"
+      ],
+      [
+        "done",
+        "完成"
+      ],
+      [
+        "error",
+        "错误"
+      ]
+    ],
+    "step2_kind_labels": [
+      [
+        "cover",
+        "封面"
+      ],
+      [
+        "closing",
+        "结束页"
+      ],
+      [
+        "overview",
+        "目录"
+      ],
+      [
+        "section_intro",
+        "章节导览"
+      ],
+      [
+        "feature_grid",
+        "特性格"
+      ],
+      [
+        "spotlight",
+        "聚光灯"
+      ],
+      [
+        "split_layers",
+        "分层"
+      ],
+      [
+        "section_list",
+        "列表"
+      ],
+      [
+        "focus_example",
+        "焦点例"
+      ],
+      [
+        "outcome_grid",
+        "成果格"
+      ],
+      [
+        "center_grid",
+        "中心格"
+      ],
+      [
+        "timeline",
+        "时间轴"
+      ],
+      [
+        "step_flow",
+        "步骤流"
+      ],
+      [
+        "process",
+        "流程"
+      ],
+      [
+        "compare",
+        "对比"
+      ],
+      [
+        "swot",
+        "SWOT"
+      ]
+    ]
+  },
+  "lookup_probes": [
+    {
+      "fn": "stage_label",
+      "input": "idle",
+      "output": "等待"
+    },
+    {
+      "fn": "stage_label",
+      "input": "start",
+      "output": "初始化"
+    },
+    {
+      "fn": "stage_label",
+      "input": "init",
+      "output": "验证连接"
+    },
+    {
+      "fn": "stage_label",
+      "input": "page_plan",
+      "output": "规划页面"
+    },
+    {
+      "fn": "stage_label",
+      "input": "generating",
+      "output": "生成中"
+    },
+    {
+      "fn": "stage_label",
+      "input": "assembling",
+      "output": "组装中"
+    },
+    {
+      "fn": "stage_label",
+      "input": "validate",
+      "output": "校验中"
+    },
+    {
+      "fn": "stage_label",
+      "input": "done",
+      "output": "完成"
+    },
+    {
+      "fn": "stage_label",
+      "input": "error",
+      "output": "出错"
+    },
+    {
+      "fn": "stage_label",
+      "input": "unknown-stage",
+      "output": "unknown-stage"
+    },
+    {
+      "fn": "stage_label",
+      "input": "",
+      "output": ""
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "start",
+      "output": "开始"
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "init",
+      "output": "初始化"
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "clean",
+      "output": "文档清理"
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "page_plan",
+      "output": "页面规划"
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "layout_plan",
+      "output": "布局规划"
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "content",
+      "output": "内容生成"
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "normalize",
+      "output": "规范修复"
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "validate",
+      "output": "最终校验"
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "done",
+      "output": "完成"
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "error",
+      "output": "错误"
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "unknown-log-stage",
+      "output": "unknown-log-stage"
+    },
+    {
+      "fn": "log_stage_label",
+      "input": "",
+      "output": ""
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": null,
+      "output": "待定"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "",
+      "output": "待定"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "cover",
+      "output": "封面"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "closing",
+      "output": "结束页"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "overview",
+      "output": "目录"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "section_intro",
+      "output": "章节导览"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "feature_grid",
+      "output": "特性格"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "spotlight",
+      "output": "聚光灯"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "split_layers",
+      "output": "分层"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "section_list",
+      "output": "列表"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "focus_example",
+      "output": "焦点例"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "outcome_grid",
+      "output": "成果格"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "center_grid",
+      "output": "中心格"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "timeline",
+      "output": "时间轴"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "step_flow",
+      "output": "步骤流"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "process",
+      "output": "流程"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "compare",
+      "output": "对比"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "swot",
+      "output": "SWOT"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "issue_stack",
+      "output": "issue_stack"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "chart_focus",
+      "output": "chart_focus"
+    },
+    {
+      "fn": "step2_kind_label",
+      "input": "unknown-kind",
+      "output": "unknown-kind"
+    }
+  ],
+  "cases": [
+    {
+      "name": "empty-deck",
+      "stage": "idle",
+      "running": false,
+      "blueprints": [],
+      "logs": [],
+      "page_statuses": {},
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [],
+      "step_states": [],
+      "summary": {
+        "total": 0,
+        "done": 0,
+        "error": 0,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 0,
+        "percent": 0,
+        "done_width": "0%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [],
+      "preferred_index": null,
+      "ready_blueprint_count": 0,
+      "important_log_count": 0,
+      "prompt_log_count": 0,
+      "recent_log_ids": [],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "only-page-plans-running",
+      "stage": "generating",
+      "running": true,
+      "blueprints": [],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 3 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        }
+      ],
+      "page_statuses": {},
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 2,
+          "page_plan": {
+            "page_id": "p3",
+            "page_title": "第三页",
+            "section_title": "方案"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 1,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 2,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 3,
+        "done": 0,
+        "error": 0,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 3,
+        "percent": 0,
+        "done_width": "0%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 1,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 2,
+          "tone": "pending",
+          "label": "等待开始"
+        }
+      ],
+      "preferred_index": 2,
+      "ready_blueprint_count": 0,
+      "important_log_count": 1,
+      "prompt_log_count": 0,
+      "recent_log_ids": [
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "layout-plans-no-blueprint",
+      "stage": "generating",
+      "running": true,
+      "blueprints": [],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 3 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": null,
+          "stage": "layout_plan",
+          "kind": "layout_plan",
+          "title": "布局规划完成",
+          "summary": "分配了 3 页版式",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ],
+            "layout_plans": [
+              {
+                "page_id": "p1",
+                "kind": "feature_grid",
+                "title": "特性格页",
+                "reason": "并列要点"
+              },
+              {
+                "page_id": "p2",
+                "kind": "timeline",
+                "title": "时间轴页"
+              },
+              {
+                "page_id": "p3",
+                "kind": "compare",
+                "title": "对比页"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000002
+        }
+      ],
+      "page_statuses": {},
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "page_id": "p1",
+            "kind": "feature_grid",
+            "title": "特性格页",
+            "reason": "并列要点"
+          },
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": {
+            "page_id": "p2",
+            "kind": "timeline",
+            "title": "时间轴页"
+          },
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 2,
+          "page_plan": {
+            "page_id": "p3",
+            "page_title": "第三页",
+            "section_title": "方案"
+          },
+          "layout_plan": {
+            "page_id": "p3",
+            "kind": "compare",
+            "title": "对比页"
+          },
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 1,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 2,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 3,
+        "done": 0,
+        "error": 0,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 3,
+        "percent": 0,
+        "done_width": "0%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 3,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 3,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "active",
+          "label": "内容生成中"
+        },
+        {
+          "index": 1,
+          "tone": "active",
+          "label": "内容生成中"
+        },
+        {
+          "index": 2,
+          "tone": "active",
+          "label": "内容生成中"
+        }
+      ],
+      "preferred_index": 2,
+      "ready_blueprint_count": 0,
+      "important_log_count": 2,
+      "prompt_log_count": 0,
+      "recent_log_ids": [
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "some-pages-waiting",
+      "stage": "generating",
+      "running": true,
+      "blueprints": [],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 3 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": null,
+          "stage": "layout_plan",
+          "kind": "layout_plan",
+          "title": "布局规划完成",
+          "summary": "分配了 2 页版式",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ],
+            "layout_plans": [
+              {
+                "page_id": "p1",
+                "kind": "feature_grid",
+                "title": "特性格页",
+                "reason": "并列要点"
+              },
+              {
+                "page_id": "p2",
+                "kind": "timeline",
+                "title": "时间轴页"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000002
+        }
+      ],
+      "page_statuses": {
+        "0": {
+          "stage": "content",
+          "message": "等待内容生成",
+          "previous_stage": null,
+          "waiting": true
+        },
+        "1": {
+          "stage": "content",
+          "message": "正在生成",
+          "previous_stage": null,
+          "waiting": false
+        }
+      },
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "page_id": "p1",
+            "kind": "feature_grid",
+            "title": "特性格页",
+            "reason": "并列要点"
+          },
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": {
+            "page_id": "p2",
+            "kind": "timeline",
+            "title": "时间轴页"
+          },
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 1,
+          "planning": "done",
+          "layout": "done",
+          "content": "active",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 2,
+        "done": 0,
+        "error": 0,
+        "active": 1,
+        "interrupted": 0,
+        "pending": 1,
+        "percent": 0,
+        "done_width": "0%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 0,
+            "active": 1,
+            "percent": 0,
+            "state": "active"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "pending",
+          "label": "等待内容生成"
+        },
+        {
+          "index": 1,
+          "tone": "active",
+          "label": "内容生成中"
+        }
+      ],
+      "preferred_index": 1,
+      "ready_blueprint_count": 0,
+      "important_log_count": 2,
+      "prompt_log_count": 0,
+      "recent_log_ids": [
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "error-previous-stage-variants",
+      "stage": "generating",
+      "running": true,
+      "blueprints": [],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 3 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": null,
+          "stage": "layout_plan",
+          "kind": "layout_plan",
+          "title": "布局规划完成",
+          "summary": "分配了 3 页版式",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ],
+            "layout_plans": [
+              {
+                "page_id": "p1",
+                "kind": "feature_grid",
+                "title": "特性格页",
+                "reason": "并列要点"
+              },
+              {
+                "page_id": "p2",
+                "kind": "timeline",
+                "title": "时间轴页"
+              },
+              {
+                "page_id": "p3",
+                "kind": "compare",
+                "title": "对比页"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000002
+        }
+      ],
+      "page_statuses": {
+        "0": {
+          "stage": "error",
+          "message": "内容生成失败",
+          "previous_stage": "content",
+          "waiting": false
+        },
+        "1": {
+          "stage": "error",
+          "message": "布局失败",
+          "previous_stage": "layout",
+          "waiting": false
+        },
+        "2": {
+          "stage": "error",
+          "message": "",
+          "previous_stage": "planning",
+          "waiting": false
+        },
+        "3": {
+          "stage": "error",
+          "message": "阶段为空",
+          "previous_stage": "",
+          "waiting": false
+        },
+        "4": {
+          "stage": "error",
+          "message": "没有 previousStage",
+          "previous_stage": null,
+          "waiting": false
+        }
+      },
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "page_id": "p1",
+            "kind": "feature_grid",
+            "title": "特性格页",
+            "reason": "并列要点"
+          },
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": {
+            "page_id": "p2",
+            "kind": "timeline",
+            "title": "时间轴页"
+          },
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 2,
+          "page_plan": {
+            "page_id": "p3",
+            "page_title": "第三页",
+            "section_title": "方案"
+          },
+          "layout_plan": {
+            "page_id": "p3",
+            "kind": "compare",
+            "title": "对比页"
+          },
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 3,
+          "page_plan": null,
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 4,
+          "page_plan": null,
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 1,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 2,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 3,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 4,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 5,
+        "done": 0,
+        "error": 5,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 0,
+        "percent": 0,
+        "done_width": "0%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 3,
+            "active": 0,
+            "percent": 60,
+            "state": "pending"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 3,
+            "active": 0,
+            "percent": 60,
+            "state": "pending"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "error",
+          "label": "生成失败"
+        },
+        {
+          "index": 1,
+          "tone": "error",
+          "label": "生成失败"
+        },
+        {
+          "index": 2,
+          "tone": "error",
+          "label": "生成失败"
+        },
+        {
+          "index": 3,
+          "tone": "error",
+          "label": "生成失败"
+        },
+        {
+          "index": 4,
+          "tone": "error",
+          "label": "生成失败"
+        }
+      ],
+      "preferred_index": 2,
+      "ready_blueprint_count": 0,
+      "important_log_count": 2,
+      "prompt_log_count": 0,
+      "recent_log_ids": [
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "interrupted-running-false",
+      "stage": "generating",
+      "running": false,
+      "blueprints": [],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 3 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": null,
+          "stage": "layout_plan",
+          "kind": "layout_plan",
+          "title": "布局规划完成",
+          "summary": "分配了 2 页版式",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ],
+            "layout_plans": [
+              {
+                "page_id": "p1",
+                "kind": "feature_grid",
+                "title": "特性格页",
+                "reason": "并列要点"
+              },
+              {
+                "page_id": "p2",
+                "kind": "timeline",
+                "title": "时间轴页"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000002
+        }
+      ],
+      "page_statuses": {
+        "0": {
+          "stage": "content",
+          "message": "正在生成",
+          "previous_stage": null,
+          "waiting": false
+        },
+        "1": {
+          "stage": "validating",
+          "message": "校验中",
+          "previous_stage": null,
+          "waiting": false
+        }
+      },
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "page_id": "p1",
+            "kind": "feature_grid",
+            "title": "特性格页",
+            "reason": "并列要点"
+          },
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": {
+            "page_id": "p2",
+            "kind": "timeline",
+            "title": "时间轴页"
+          },
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 1,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 2,
+        "done": 0,
+        "error": 0,
+        "active": 0,
+        "interrupted": 2,
+        "pending": 0,
+        "percent": 0,
+        "done_width": "0%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "pending",
+          "label": "已中断"
+        },
+        {
+          "index": 1,
+          "tone": "pending",
+          "label": "已中断"
+        }
+      ],
+      "preferred_index": 1,
+      "ready_blueprint_count": 0,
+      "important_log_count": 2,
+      "prompt_log_count": 0,
+      "recent_log_ids": [
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "active-running-true",
+      "stage": "generating",
+      "running": true,
+      "blueprints": [],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 3 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": null,
+          "stage": "layout_plan",
+          "kind": "layout_plan",
+          "title": "布局规划完成",
+          "summary": "分配了 2 页版式",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ],
+            "layout_plans": [
+              {
+                "page_id": "p1",
+                "kind": "feature_grid",
+                "title": "特性格页",
+                "reason": "并列要点"
+              },
+              {
+                "page_id": "p2",
+                "kind": "timeline",
+                "title": "时间轴页"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000002
+        }
+      ],
+      "page_statuses": {
+        "0": {
+          "stage": "content",
+          "message": "正在生成",
+          "previous_stage": null,
+          "waiting": false
+        },
+        "1": {
+          "stage": "validating",
+          "message": "校验中",
+          "previous_stage": null,
+          "waiting": false
+        }
+      },
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "page_id": "p1",
+            "kind": "feature_grid",
+            "title": "特性格页",
+            "reason": "并列要点"
+          },
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": {
+            "page_id": "p2",
+            "kind": "timeline",
+            "title": "时间轴页"
+          },
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "active",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 1,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "active"
+        }
+      ],
+      "summary": {
+        "total": 2,
+        "done": 0,
+        "error": 0,
+        "active": 2,
+        "interrupted": 0,
+        "pending": 0,
+        "percent": 0,
+        "done_width": "0%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 1,
+            "active": 1,
+            "percent": 50,
+            "state": "active"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 0,
+            "active": 1,
+            "percent": 0,
+            "state": "active"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "active",
+          "label": "内容生成中"
+        },
+        {
+          "index": 1,
+          "tone": "active",
+          "label": "校验修复中"
+        }
+      ],
+      "preferred_index": 1,
+      "ready_blueprint_count": 0,
+      "important_log_count": 2,
+      "prompt_log_count": 0,
+      "recent_log_ids": [
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "consecutive-errors-keep-first-stage",
+      "stage": "generating",
+      "running": true,
+      "blueprints": [],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 3 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": null,
+          "stage": "layout_plan",
+          "kind": "layout_plan",
+          "title": "布局规划完成",
+          "summary": "分配了 2 页版式",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ],
+            "layout_plans": [
+              {
+                "page_id": "p1",
+                "kind": "feature_grid",
+                "title": "特性格页",
+                "reason": "并列要点"
+              },
+              {
+                "page_id": "p2",
+                "kind": "timeline",
+                "title": "时间轴页"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000002
+        }
+      ],
+      "page_statuses": {},
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [
+        {
+          "slide_index": 0,
+          "stage": "planning",
+          "message": "规划完成",
+          "waiting": false
+        },
+        {
+          "slide_index": 0,
+          "stage": "error",
+          "message": "第一次失败",
+          "waiting": false
+        },
+        {
+          "slide_index": 0,
+          "stage": "error",
+          "message": "第二次失败",
+          "waiting": false
+        },
+        {
+          "slide_index": 1,
+          "stage": "planning",
+          "message": "规划完成",
+          "waiting": false
+        },
+        {
+          "slide_index": 1,
+          "stage": "error",
+          "message": "失败",
+          "waiting": false
+        },
+        {
+          "slide_index": 1,
+          "stage": "content",
+          "message": "重新排队",
+          "waiting": true
+        },
+        {
+          "slide_index": 1,
+          "stage": "error",
+          "message": "又失败",
+          "waiting": false
+        },
+        {
+          "slide_index": 2,
+          "stage": "error",
+          "message": "首次就失败",
+          "waiting": false
+        }
+      ],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "page_id": "p1",
+            "kind": "feature_grid",
+            "title": "特性格页",
+            "reason": "并列要点"
+          },
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": {
+            "page_id": "p2",
+            "kind": "timeline",
+            "title": "时间轴页"
+          },
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 1,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 2,
+        "done": 0,
+        "error": 0,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 2,
+        "percent": 0,
+        "done_width": "0%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "active",
+          "label": "内容生成中"
+        },
+        {
+          "index": 1,
+          "tone": "active",
+          "label": "内容生成中"
+        }
+      ],
+      "preferred_index": 1,
+      "ready_blueprint_count": 0,
+      "important_log_count": 2,
+      "prompt_log_count": 0,
+      "recent_log_ids": [
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": [
+        {
+          "0": {
+            "stage": "planning",
+            "message": "规划完成",
+            "previous_stage": null,
+            "waiting": false
+          }
+        },
+        {
+          "0": {
+            "stage": "error",
+            "message": "第一次失败",
+            "previous_stage": "planning",
+            "waiting": false
+          }
+        },
+        {
+          "0": {
+            "stage": "error",
+            "message": "第二次失败",
+            "previous_stage": "planning",
+            "waiting": false
+          }
+        },
+        {
+          "0": {
+            "stage": "error",
+            "message": "第二次失败",
+            "previous_stage": "planning",
+            "waiting": false
+          },
+          "1": {
+            "stage": "planning",
+            "message": "规划完成",
+            "previous_stage": null,
+            "waiting": false
+          }
+        },
+        {
+          "0": {
+            "stage": "error",
+            "message": "第二次失败",
+            "previous_stage": "planning",
+            "waiting": false
+          },
+          "1": {
+            "stage": "error",
+            "message": "失败",
+            "previous_stage": "planning",
+            "waiting": false
+          }
+        },
+        {
+          "0": {
+            "stage": "error",
+            "message": "第二次失败",
+            "previous_stage": "planning",
+            "waiting": false
+          },
+          "1": {
+            "stage": "content",
+            "message": "重新排队",
+            "previous_stage": null,
+            "waiting": true
+          }
+        },
+        {
+          "0": {
+            "stage": "error",
+            "message": "第二次失败",
+            "previous_stage": "planning",
+            "waiting": false
+          },
+          "1": {
+            "stage": "error",
+            "message": "又失败",
+            "previous_stage": "content",
+            "waiting": false
+          }
+        },
+        {
+          "0": {
+            "stage": "error",
+            "message": "第二次失败",
+            "previous_stage": "planning",
+            "waiting": false
+          },
+          "1": {
+            "stage": "error",
+            "message": "又失败",
+            "previous_stage": "content",
+            "waiting": false
+          },
+          "2": {
+            "stage": "error",
+            "message": "首次就失败",
+            "previous_stage": null,
+            "waiting": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "overall-error-stage",
+      "stage": "error",
+      "running": false,
+      "blueprints": [
+        {
+          "kind": "cover",
+          "title": "封面标题",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "overview",
+          "title": "目录",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "feature_grid",
+          "title": "第一页蓝图",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "closing",
+          "title": "谢谢观看",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        }
+      ],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 2 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": null,
+          "stage": "layout_plan",
+          "kind": "layout_plan",
+          "title": "布局规划完成",
+          "summary": "分配了 2 页版式",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ],
+            "layout_plans": [
+              {
+                "page_id": "p1",
+                "kind": "feature_grid",
+                "title": "特性格页",
+                "reason": "并列要点"
+              },
+              {
+                "page_id": "p2",
+                "kind": "timeline",
+                "title": "时间轴页"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000002
+        },
+        {
+          "id": 3,
+          "run_id": 7,
+          "seq": 3,
+          "slide_index": 0,
+          "stage": "content",
+          "kind": "slide",
+          "title": "幻灯片 1/3",
+          "summary": "内容生成完成",
+          "detail": {
+            "page_plan": {
+              "page_id": "p1",
+              "page_title": "第一页",
+              "section_title": "背景",
+              "objective": "说清背景"
+            },
+            "layout_plan": {
+              "kind": "feature_grid"
+            },
+            "system_prompt": "你是一个排版助手",
+            "user_prompt": "请生成第 1 页",
+            "raw_output": "{\"title\":\"...\"}",
+            "parsed_output": {
+              "title": "解析结果"
+            }
+          },
+          "important": true,
+          "created_at": 1760000003
+        },
+        {
+          "id": 4,
+          "run_id": 7,
+          "seq": 4,
+          "slide_index": 1,
+          "stage": "content",
+          "kind": "slide",
+          "title": "幻灯片 2/3",
+          "summary": "内容生成完成",
+          "detail": {
+            "page_plan": {
+              "page_id": "p2",
+              "page_title": "第二页",
+              "section_title": "现状"
+            },
+            "layout_plan": {
+              "kind": "timeline"
+            },
+            "system_prompt": "你是一个排版助手",
+            "user_prompt": "请生成第 2 页",
+            "raw_output": "{\"title\":\"...\"}",
+            "parsed_output": {
+              "title": "解析结果"
+            },
+            "blueprint": {
+              "kind": "timeline",
+              "title": "第二页蓝图"
+            }
+          },
+          "important": true,
+          "created_at": 1760000004
+        }
+      ],
+      "page_statuses": {
+        "0": {
+          "stage": "error",
+          "message": "未通过最终校验",
+          "previous_stage": "content",
+          "waiting": false
+        }
+      },
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "page_id": "p1",
+            "kind": "feature_grid",
+            "title": "特性格页",
+            "reason": "并列要点"
+          },
+          "blueprint": {
+            "kind": "feature_grid",
+            "title": "第一页蓝图",
+            "subtitle": null,
+            "note": null,
+            "aspect_ratio": "ratio_16x9"
+          },
+          "content_log": {
+            "id": 3,
+            "run_id": 7,
+            "seq": 3,
+            "slide_index": 0,
+            "stage": "content",
+            "kind": "slide",
+            "title": "幻灯片 1/3",
+            "summary": "内容生成完成",
+            "detail": {
+              "page_plan": {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              "layout_plan": {
+                "kind": "feature_grid"
+              },
+              "system_prompt": "你是一个排版助手",
+              "user_prompt": "请生成第 1 页",
+              "raw_output": "{\"title\":\"...\"}",
+              "parsed_output": {
+                "title": "解析结果"
+              }
+            },
+            "important": true,
+            "created_at": 1760000003
+          }
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": {
+            "page_id": "p2",
+            "kind": "timeline",
+            "title": "时间轴页"
+          },
+          "blueprint": {
+            "kind": "timeline",
+            "title": "第二页蓝图"
+          },
+          "content_log": {
+            "id": 4,
+            "run_id": 7,
+            "seq": 4,
+            "slide_index": 1,
+            "stage": "content",
+            "kind": "slide",
+            "title": "幻灯片 2/3",
+            "summary": "内容生成完成",
+            "detail": {
+              "page_plan": {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              "layout_plan": {
+                "kind": "timeline"
+              },
+              "system_prompt": "你是一个排版助手",
+              "user_prompt": "请生成第 2 页",
+              "raw_output": "{\"title\":\"...\"}",
+              "parsed_output": {
+                "title": "解析结果"
+              },
+              "blueprint": {
+                "kind": "timeline",
+                "title": "第二页蓝图"
+              }
+            },
+            "important": true,
+            "created_at": 1760000004
+          }
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 1,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "done"
+        }
+      ],
+      "summary": {
+        "total": 2,
+        "done": 1,
+        "error": 1,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 0,
+        "percent": 50,
+        "done_width": "50%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "error",
+          "label": "生成失败"
+        },
+        {
+          "index": 1,
+          "tone": "done",
+          "label": "已完成"
+        }
+      ],
+      "preferred_index": 1,
+      "ready_blueprint_count": 4,
+      "important_log_count": 4,
+      "prompt_log_count": 2,
+      "recent_log_ids": [
+        4,
+        3,
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "deck-with-cover-done",
+      "stage": "done",
+      "running": false,
+      "blueprints": [
+        {
+          "kind": "cover",
+          "title": "封面标题",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "overview",
+          "title": "目录",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "feature_grid",
+          "title": "第一页蓝图",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "timeline",
+          "title": "第二页蓝图",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "closing",
+          "title": "谢谢观看",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        }
+      ],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 2 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": null,
+          "stage": "layout_plan",
+          "kind": "layout_plan",
+          "title": "布局规划完成",
+          "summary": "分配了 2 页版式",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ],
+            "layout_plans": [
+              {
+                "page_id": "p1",
+                "kind": "feature_grid",
+                "title": "特性格页",
+                "reason": "并列要点"
+              },
+              {
+                "page_id": "p2",
+                "kind": "timeline",
+                "title": "时间轴页"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000002
+        },
+        {
+          "id": 3,
+          "run_id": 7,
+          "seq": 3,
+          "slide_index": 0,
+          "stage": "content",
+          "kind": "slide",
+          "title": "幻灯片 1/3",
+          "summary": "内容生成完成",
+          "detail": {
+            "page_plan": {
+              "page_id": "p1",
+              "page_title": "第一页",
+              "section_title": "背景",
+              "objective": "说清背景"
+            },
+            "layout_plan": {
+              "kind": "feature_grid"
+            },
+            "system_prompt": "你是一个排版助手",
+            "user_prompt": "请生成第 1 页",
+            "raw_output": "{\"title\":\"...\"}",
+            "parsed_output": {
+              "title": "解析结果"
+            }
+          },
+          "important": true,
+          "created_at": 1760000003
+        },
+        {
+          "id": 4,
+          "run_id": 7,
+          "seq": 4,
+          "slide_index": 1,
+          "stage": "content",
+          "kind": "slide",
+          "title": "幻灯片 2/3",
+          "summary": "内容生成完成",
+          "detail": {
+            "page_plan": {
+              "page_id": "p2",
+              "page_title": "第二页",
+              "section_title": "现状"
+            },
+            "layout_plan": {
+              "kind": "timeline"
+            },
+            "system_prompt": "你是一个排版助手",
+            "user_prompt": "请生成第 2 页",
+            "raw_output": "{\"title\":\"...\"}",
+            "parsed_output": {
+              "title": "解析结果"
+            },
+            "blueprint": {
+              "kind": "timeline",
+              "title": "第二页蓝图"
+            }
+          },
+          "important": true,
+          "created_at": 1760000004
+        }
+      ],
+      "page_statuses": {
+        "0": {
+          "stage": "done",
+          "message": null,
+          "previous_stage": null,
+          "waiting": false
+        },
+        "1": {
+          "stage": "done",
+          "message": null,
+          "previous_stage": null,
+          "waiting": false
+        }
+      },
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "page_id": "p1",
+            "kind": "feature_grid",
+            "title": "特性格页",
+            "reason": "并列要点"
+          },
+          "blueprint": {
+            "kind": "feature_grid",
+            "title": "第一页蓝图",
+            "subtitle": null,
+            "note": null,
+            "aspect_ratio": "ratio_16x9"
+          },
+          "content_log": {
+            "id": 3,
+            "run_id": 7,
+            "seq": 3,
+            "slide_index": 0,
+            "stage": "content",
+            "kind": "slide",
+            "title": "幻灯片 1/3",
+            "summary": "内容生成完成",
+            "detail": {
+              "page_plan": {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              "layout_plan": {
+                "kind": "feature_grid"
+              },
+              "system_prompt": "你是一个排版助手",
+              "user_prompt": "请生成第 1 页",
+              "raw_output": "{\"title\":\"...\"}",
+              "parsed_output": {
+                "title": "解析结果"
+              }
+            },
+            "important": true,
+            "created_at": 1760000003
+          }
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": {
+            "page_id": "p2",
+            "kind": "timeline",
+            "title": "时间轴页"
+          },
+          "blueprint": {
+            "kind": "timeline",
+            "title": "第二页蓝图",
+            "subtitle": null,
+            "note": null,
+            "aspect_ratio": "ratio_16x9"
+          },
+          "content_log": {
+            "id": 4,
+            "run_id": 7,
+            "seq": 4,
+            "slide_index": 1,
+            "stage": "content",
+            "kind": "slide",
+            "title": "幻灯片 2/3",
+            "summary": "内容生成完成",
+            "detail": {
+              "page_plan": {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              "layout_plan": {
+                "kind": "timeline"
+              },
+              "system_prompt": "你是一个排版助手",
+              "user_prompt": "请生成第 2 页",
+              "raw_output": "{\"title\":\"...\"}",
+              "parsed_output": {
+                "title": "解析结果"
+              },
+              "blueprint": {
+                "kind": "timeline",
+                "title": "第二页蓝图"
+              }
+            },
+            "important": true,
+            "created_at": 1760000004
+          }
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "done"
+        },
+        {
+          "index": 1,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "done"
+        }
+      ],
+      "summary": {
+        "total": 2,
+        "done": 2,
+        "error": 0,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 0,
+        "percent": 100,
+        "done_width": "100%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "done",
+          "label": "已完成"
+        },
+        {
+          "index": 1,
+          "tone": "done",
+          "label": "已完成"
+        }
+      ],
+      "preferred_index": 1,
+      "ready_blueprint_count": 5,
+      "important_log_count": 4,
+      "prompt_log_count": 2,
+      "recent_log_ids": [
+        4,
+        3,
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "no-cover-partial-deck",
+      "stage": "generating",
+      "running": true,
+      "blueprints": [
+        {
+          "kind": "feature_grid",
+          "title": "第一页蓝图",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        null,
+        {
+          "kind": "compare",
+          "title": "第三页蓝图",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        }
+      ],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": 0,
+          "stage": "content",
+          "kind": "slide",
+          "title": "幻灯片 1/3",
+          "summary": "内容生成完成",
+          "detail": {
+            "page_plan": {
+              "page_id": "p1",
+              "page_title": "第一页",
+              "section_title": "背景",
+              "objective": "说清背景"
+            },
+            "layout_plan": {
+              "kind": "feature_grid"
+            },
+            "system_prompt": "你是一个排版助手",
+            "user_prompt": "请生成第 1 页",
+            "raw_output": "{\"title\":\"...\"}",
+            "parsed_output": {
+              "title": "解析结果"
+            }
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": 2,
+          "stage": "content",
+          "kind": "slide",
+          "title": "幻灯片 3/3",
+          "summary": "内容生成完成",
+          "detail": {
+            "page_plan": {
+              "page_id": "p3",
+              "page_title": "第三页",
+              "section_title": "方案"
+            },
+            "layout_plan": {
+              "kind": "compare"
+            },
+            "system_prompt": "你是一个排版助手",
+            "user_prompt": "请生成第 3 页",
+            "raw_output": "{\"title\":\"...\"}",
+            "parsed_output": {
+              "title": "解析结果"
+            }
+          },
+          "important": true,
+          "created_at": 1760000002
+        }
+      ],
+      "page_statuses": {
+        "3": {
+          "stage": "planning",
+          "message": "规划中",
+          "previous_stage": null,
+          "waiting": false
+        }
+      },
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "kind": "feature_grid"
+          },
+          "blueprint": {
+            "kind": "feature_grid",
+            "title": "第一页蓝图",
+            "subtitle": null,
+            "note": null,
+            "aspect_ratio": "ratio_16x9"
+          },
+          "content_log": {
+            "id": 1,
+            "run_id": 7,
+            "seq": 1,
+            "slide_index": 0,
+            "stage": "content",
+            "kind": "slide",
+            "title": "幻灯片 1/3",
+            "summary": "内容生成完成",
+            "detail": {
+              "page_plan": {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              "layout_plan": {
+                "kind": "feature_grid"
+              },
+              "system_prompt": "你是一个排版助手",
+              "user_prompt": "请生成第 1 页",
+              "raw_output": "{\"title\":\"...\"}",
+              "parsed_output": {
+                "title": "解析结果"
+              }
+            },
+            "important": true,
+            "created_at": 1760000001
+          }
+        },
+        {
+          "index": 1,
+          "page_plan": null,
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 2,
+          "page_plan": {
+            "page_id": "p3",
+            "page_title": "第三页",
+            "section_title": "方案"
+          },
+          "layout_plan": {
+            "kind": "compare"
+          },
+          "blueprint": {
+            "kind": "compare",
+            "title": "第三页蓝图",
+            "subtitle": null,
+            "note": null,
+            "aspect_ratio": "ratio_16x9"
+          },
+          "content_log": {
+            "id": 2,
+            "run_id": 7,
+            "seq": 2,
+            "slide_index": 2,
+            "stage": "content",
+            "kind": "slide",
+            "title": "幻灯片 3/3",
+            "summary": "内容生成完成",
+            "detail": {
+              "page_plan": {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              },
+              "layout_plan": {
+                "kind": "compare"
+              },
+              "system_prompt": "你是一个排版助手",
+              "user_prompt": "请生成第 3 页",
+              "raw_output": "{\"title\":\"...\"}",
+              "parsed_output": {
+                "title": "解析结果"
+              }
+            },
+            "important": true,
+            "created_at": 1760000002
+          }
+        },
+        {
+          "index": 3,
+          "page_plan": null,
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "done"
+        },
+        {
+          "index": 1,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 2,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "done"
+        },
+        {
+          "index": 3,
+          "planning": "active",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 4,
+        "done": 2,
+        "error": 0,
+        "active": 1,
+        "interrupted": 0,
+        "pending": 1,
+        "percent": 50,
+        "done_width": "50%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 2,
+            "active": 1,
+            "percent": 50,
+            "state": "active"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 2,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 2,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 2,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 2,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "done",
+          "label": "已完成"
+        },
+        {
+          "index": 1,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 2,
+          "tone": "done",
+          "label": "已完成"
+        },
+        {
+          "index": 3,
+          "tone": "active",
+          "label": "页面规划中"
+        }
+      ],
+      "preferred_index": 2,
+      "ready_blueprint_count": 2,
+      "important_log_count": 2,
+      "prompt_log_count": 2,
+      "recent_log_ids": [
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "content-log-fallbacks",
+      "stage": "generating",
+      "running": true,
+      "blueprints": [],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": 0,
+          "stage": "content",
+          "kind": "slide",
+          "title": "幻灯片 1/3",
+          "summary": "内容生成完成",
+          "detail": {
+            "page_plan": {
+              "page_id": "p1",
+              "page_title": "第一页",
+              "section_title": "背景",
+              "objective": "说清背景"
+            },
+            "layout_plan": {
+              "kind": "feature_grid"
+            },
+            "system_prompt": "你是一个排版助手",
+            "user_prompt": "请生成第 1 页",
+            "raw_output": "{\"title\":\"...\"}",
+            "parsed_output": {
+              "title": "解析结果"
+            },
+            "blueprint": {
+              "kind": "feature_grid",
+              "title": "来自日志的蓝图"
+            }
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": 1,
+          "stage": "content",
+          "kind": "slide",
+          "title": "幻灯片 2/2",
+          "summary": "只有规划",
+          "detail": {
+            "page_plan": {
+              "page_id": "p2",
+              "page_title": "第二页",
+              "section_title": "现状"
+            }
+          },
+          "important": false,
+          "created_at": 1760000002
+        }
+      ],
+      "page_statuses": {},
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "kind": "feature_grid"
+          },
+          "blueprint": {
+            "kind": "feature_grid",
+            "title": "来自日志的蓝图"
+          },
+          "content_log": {
+            "id": 1,
+            "run_id": 7,
+            "seq": 1,
+            "slide_index": 0,
+            "stage": "content",
+            "kind": "slide",
+            "title": "幻灯片 1/3",
+            "summary": "内容生成完成",
+            "detail": {
+              "page_plan": {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              "layout_plan": {
+                "kind": "feature_grid"
+              },
+              "system_prompt": "你是一个排版助手",
+              "user_prompt": "请生成第 1 页",
+              "raw_output": "{\"title\":\"...\"}",
+              "parsed_output": {
+                "title": "解析结果"
+              },
+              "blueprint": {
+                "kind": "feature_grid",
+                "title": "来自日志的蓝图"
+              }
+            },
+            "important": true,
+            "created_at": 1760000001
+          }
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": {
+            "id": 2,
+            "run_id": 7,
+            "seq": 2,
+            "slide_index": 1,
+            "stage": "content",
+            "kind": "slide",
+            "title": "幻灯片 2/2",
+            "summary": "只有规划",
+            "detail": {
+              "page_plan": {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            },
+            "important": false,
+            "created_at": 1760000002
+          }
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "done"
+        },
+        {
+          "index": 1,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 2,
+        "done": 1,
+        "error": 0,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 1,
+        "percent": 50,
+        "done_width": "50%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "done",
+          "label": "已完成"
+        },
+        {
+          "index": 1,
+          "tone": "pending",
+          "label": "等待开始"
+        }
+      ],
+      "preferred_index": 1,
+      "ready_blueprint_count": 0,
+      "important_log_count": 1,
+      "prompt_log_count": 2,
+      "recent_log_ids": [
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "retrying-page-while-running",
+      "stage": "generating",
+      "running": true,
+      "blueprints": [],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 2 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": null,
+          "stage": "layout_plan",
+          "kind": "layout_plan",
+          "title": "布局规划完成",
+          "summary": "分配了 2 页版式",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ],
+            "layout_plans": [
+              {
+                "page_id": "p1",
+                "kind": "feature_grid",
+                "title": "特性格页",
+                "reason": "并列要点"
+              },
+              {
+                "page_id": "p2",
+                "kind": "timeline",
+                "title": "时间轴页"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000002
+        }
+      ],
+      "page_statuses": {
+        "0": {
+          "stage": "error",
+          "message": "该页失败",
+          "previous_stage": "content",
+          "waiting": false
+        },
+        "1": {
+          "stage": "error",
+          "message": "该页也失败",
+          "previous_stage": "content",
+          "waiting": false
+        }
+      },
+      "retrying_pages": [
+        0,
+        1
+      ],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "page_id": "p1",
+            "kind": "feature_grid",
+            "title": "特性格页",
+            "reason": "并列要点"
+          },
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": {
+            "page_id": "p2",
+            "kind": "timeline",
+            "title": "时间轴页"
+          },
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 1,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 2,
+        "done": 0,
+        "error": 2,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 0,
+        "percent": 0,
+        "done_width": "0%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "active",
+          "label": "等待重试"
+        },
+        {
+          "index": 1,
+          "tone": "active",
+          "label": "等待重试"
+        }
+      ],
+      "preferred_index": 1,
+      "ready_blueprint_count": 0,
+      "important_log_count": 2,
+      "prompt_log_count": 0,
+      "recent_log_ids": [
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "retrying-page-idle",
+      "stage": "done",
+      "running": false,
+      "blueprints": [
+        {
+          "kind": "cover",
+          "title": "封面标题",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "overview",
+          "title": "目录",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "feature_grid",
+          "title": "第一页蓝图",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "timeline",
+          "title": "第二页蓝图",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "closing",
+          "title": "谢谢观看",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        }
+      ],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 2 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": null,
+          "stage": "layout_plan",
+          "kind": "layout_plan",
+          "title": "布局规划完成",
+          "summary": "分配了 2 页版式",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              }
+            ],
+            "layout_plans": [
+              {
+                "page_id": "p1",
+                "kind": "feature_grid",
+                "title": "特性格页",
+                "reason": "并列要点"
+              },
+              {
+                "page_id": "p2",
+                "kind": "timeline",
+                "title": "时间轴页"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000002
+        },
+        {
+          "id": 3,
+          "run_id": 7,
+          "seq": 3,
+          "slide_index": 0,
+          "stage": "content",
+          "kind": "slide",
+          "title": "幻灯片 1/3",
+          "summary": "内容生成完成",
+          "detail": {
+            "page_plan": {
+              "page_id": "p1",
+              "page_title": "第一页",
+              "section_title": "背景",
+              "objective": "说清背景"
+            },
+            "layout_plan": {
+              "kind": "feature_grid"
+            },
+            "system_prompt": "你是一个排版助手",
+            "user_prompt": "请生成第 1 页",
+            "raw_output": "{\"title\":\"...\"}",
+            "parsed_output": {
+              "title": "解析结果"
+            }
+          },
+          "important": true,
+          "created_at": 1760000003
+        },
+        {
+          "id": 4,
+          "run_id": 7,
+          "seq": 4,
+          "slide_index": 1,
+          "stage": "content",
+          "kind": "slide",
+          "title": "幻灯片 2/3",
+          "summary": "内容生成完成",
+          "detail": {
+            "page_plan": {
+              "page_id": "p2",
+              "page_title": "第二页",
+              "section_title": "现状"
+            },
+            "layout_plan": {
+              "kind": "timeline"
+            },
+            "system_prompt": "你是一个排版助手",
+            "user_prompt": "请生成第 2 页",
+            "raw_output": "{\"title\":\"...\"}",
+            "parsed_output": {
+              "title": "解析结果"
+            }
+          },
+          "important": true,
+          "created_at": 1760000004
+        }
+      ],
+      "page_statuses": {
+        "0": {
+          "stage": "done",
+          "message": null,
+          "previous_stage": null,
+          "waiting": false
+        },
+        "1": {
+          "stage": "error",
+          "message": "该页失败",
+          "previous_stage": "content",
+          "waiting": false
+        }
+      },
+      "retrying_pages": [
+        1
+      ],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "page_id": "p1",
+            "kind": "feature_grid",
+            "title": "特性格页",
+            "reason": "并列要点"
+          },
+          "blueprint": {
+            "kind": "feature_grid",
+            "title": "第一页蓝图",
+            "subtitle": null,
+            "note": null,
+            "aspect_ratio": "ratio_16x9"
+          },
+          "content_log": {
+            "id": 3,
+            "run_id": 7,
+            "seq": 3,
+            "slide_index": 0,
+            "stage": "content",
+            "kind": "slide",
+            "title": "幻灯片 1/3",
+            "summary": "内容生成完成",
+            "detail": {
+              "page_plan": {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              "layout_plan": {
+                "kind": "feature_grid"
+              },
+              "system_prompt": "你是一个排版助手",
+              "user_prompt": "请生成第 1 页",
+              "raw_output": "{\"title\":\"...\"}",
+              "parsed_output": {
+                "title": "解析结果"
+              }
+            },
+            "important": true,
+            "created_at": 1760000003
+          }
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": {
+            "page_id": "p2",
+            "kind": "timeline",
+            "title": "时间轴页"
+          },
+          "blueprint": {
+            "kind": "timeline",
+            "title": "第二页蓝图",
+            "subtitle": null,
+            "note": null,
+            "aspect_ratio": "ratio_16x9"
+          },
+          "content_log": {
+            "id": 4,
+            "run_id": 7,
+            "seq": 4,
+            "slide_index": 1,
+            "stage": "content",
+            "kind": "slide",
+            "title": "幻灯片 2/3",
+            "summary": "内容生成完成",
+            "detail": {
+              "page_plan": {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              "layout_plan": {
+                "kind": "timeline"
+              },
+              "system_prompt": "你是一个排版助手",
+              "user_prompt": "请生成第 2 页",
+              "raw_output": "{\"title\":\"...\"}",
+              "parsed_output": {
+                "title": "解析结果"
+              }
+            },
+            "important": true,
+            "created_at": 1760000004
+          }
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "done"
+        },
+        {
+          "index": 1,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 2,
+        "done": 1,
+        "error": 1,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 0,
+        "percent": 50,
+        "done_width": "50%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 2,
+            "active": 0,
+            "percent": 100,
+            "state": "done"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 1,
+            "active": 0,
+            "percent": 50,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "done",
+          "label": "已完成"
+        },
+        {
+          "index": 1,
+          "tone": "active",
+          "label": "重试中"
+        }
+      ],
+      "preferred_index": 1,
+      "ready_blueprint_count": 5,
+      "important_log_count": 4,
+      "prompt_log_count": 2,
+      "recent_log_ids": [
+        4,
+        3,
+        2,
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "percent-halves",
+      "stage": "generating",
+      "running": false,
+      "blueprints": [
+        {
+          "kind": "cover",
+          "title": "封面标题",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "overview",
+          "title": "目录",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "feature_grid",
+          "title": "第一页蓝图",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          "kind": "closing",
+          "title": "谢谢观看",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        }
+      ],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 8 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        }
+      ],
+      "page_statuses": {},
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": null,
+          "blueprint": {
+            "kind": "feature_grid",
+            "title": "第一页蓝图",
+            "subtitle": null,
+            "note": null,
+            "aspect_ratio": "ratio_16x9"
+          },
+          "content_log": null
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 2,
+          "page_plan": {
+            "page_id": "p3",
+            "page_title": "第三页",
+            "section_title": "方案"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 3,
+          "page_plan": null,
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 4,
+          "page_plan": null,
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 5,
+          "page_plan": null,
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 6,
+          "page_plan": null,
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 7,
+          "page_plan": null,
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "done"
+        },
+        {
+          "index": 1,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 2,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 3,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 4,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 5,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 6,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 7,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 8,
+        "done": 1,
+        "error": 0,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 7,
+        "percent": 13,
+        "done_width": "12.5%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 1,
+            "active": 0,
+            "percent": 13,
+            "state": "pending"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 1,
+            "active": 0,
+            "percent": 13,
+            "state": "pending"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 1,
+            "active": 0,
+            "percent": 13,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 1,
+            "active": 0,
+            "percent": 13,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 1,
+            "active": 0,
+            "percent": 13,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "done",
+          "label": "已完成"
+        },
+        {
+          "index": 1,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 2,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 3,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 4,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 5,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 6,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 7,
+          "tone": "pending",
+          "label": "等待开始"
+        }
+      ],
+      "preferred_index": 2,
+      "ready_blueprint_count": 4,
+      "important_log_count": 1,
+      "prompt_log_count": 0,
+      "recent_log_ids": [
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "percent-thirds",
+      "stage": "generating",
+      "running": false,
+      "blueprints": [
+        {
+          "kind": "cover",
+          "title": "封面标题",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "overview",
+          "title": "目录",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "feature_grid",
+          "title": "第一页蓝图",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        {
+          "kind": "timeline",
+          "title": "第二页蓝图",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        },
+        null,
+        {
+          "kind": "closing",
+          "title": "谢谢观看",
+          "subtitle": null,
+          "note": null,
+          "aspect_ratio": "ratio_16x9"
+        }
+      ],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 3 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000001
+        }
+      ],
+      "page_statuses": {},
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": null,
+          "blueprint": {
+            "kind": "feature_grid",
+            "title": "第一页蓝图",
+            "subtitle": null,
+            "note": null,
+            "aspect_ratio": "ratio_16x9"
+          },
+          "content_log": null
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": null,
+          "blueprint": {
+            "kind": "timeline",
+            "title": "第二页蓝图",
+            "subtitle": null,
+            "note": null,
+            "aspect_ratio": "ratio_16x9"
+          },
+          "content_log": null
+        },
+        {
+          "index": 2,
+          "page_plan": {
+            "page_id": "p3",
+            "page_title": "第三页",
+            "section_title": "方案"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "done"
+        },
+        {
+          "index": 1,
+          "planning": "done",
+          "layout": "done",
+          "content": "done",
+          "normalizing": "done",
+          "validating": "done"
+        },
+        {
+          "index": 2,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 3,
+        "done": 2,
+        "error": 0,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 1,
+        "percent": 67,
+        "done_width": "66.66666666666666%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 2,
+            "active": 0,
+            "percent": 67,
+            "state": "pending"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 2,
+            "active": 0,
+            "percent": 67,
+            "state": "pending"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 2,
+            "active": 0,
+            "percent": 67,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 2,
+            "active": 0,
+            "percent": 67,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 2,
+            "active": 0,
+            "percent": 67,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "done",
+          "label": "已完成"
+        },
+        {
+          "index": 1,
+          "tone": "done",
+          "label": "已完成"
+        },
+        {
+          "index": 2,
+          "tone": "pending",
+          "label": "等待开始"
+        }
+      ],
+      "preferred_index": 2,
+      "ready_blueprint_count": 5,
+      "important_log_count": 1,
+      "prompt_log_count": 0,
+      "recent_log_ids": [
+        1
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    },
+    {
+      "name": "statuses-from-logs",
+      "stage": "error",
+      "running": false,
+      "blueprints": [],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": null,
+          "stage": "start",
+          "kind": "input",
+          "title": "开始",
+          "summary": "开始生成",
+          "detail": null,
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": null,
+          "stage": "page_plan",
+          "kind": "plan",
+          "title": "页面规划完成",
+          "summary": "规划了 3 页",
+          "detail": {
+            "page_plans": [
+              {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              {
+                "page_id": "p2",
+                "page_title": "第二页",
+                "section_title": "现状"
+              },
+              {
+                "page_id": "p3",
+                "page_title": "第三页",
+                "section_title": "方案"
+              }
+            ]
+          },
+          "important": true,
+          "created_at": 1760000002
+        },
+        {
+          "id": 3,
+          "run_id": 7,
+          "seq": 3,
+          "slide_index": 0,
+          "stage": "content",
+          "kind": "slide",
+          "title": "幻灯片 1/3",
+          "summary": "内容生成完成",
+          "detail": {
+            "page_plan": {
+              "page_id": "p1",
+              "page_title": "第一页",
+              "section_title": "背景",
+              "objective": "说清背景"
+            },
+            "layout_plan": {
+              "kind": "feature_grid"
+            },
+            "system_prompt": "你是一个排版助手",
+            "user_prompt": "请生成第 1 页",
+            "raw_output": "{\"title\":\"...\"}",
+            "parsed_output": {
+              "title": "解析结果"
+            }
+          },
+          "important": true,
+          "created_at": 1760000003
+        },
+        {
+          "id": 4,
+          "run_id": 7,
+          "seq": 4,
+          "slide_index": 1,
+          "stage": "content",
+          "kind": "page_error",
+          "title": "页面生成失败",
+          "summary": "模型输出无法解析",
+          "detail": {
+            "page_plan": {
+              "page_id": "p2",
+              "page_title": "第二页",
+              "section_title": "现状"
+            },
+            "error": "解析失败"
+          },
+          "important": true,
+          "created_at": 1760000004
+        },
+        {
+          "id": 5,
+          "run_id": 7,
+          "seq": 5,
+          "slide_index": 1,
+          "stage": "content",
+          "kind": "retry",
+          "title": "页面重试",
+          "summary": "该页重试完成",
+          "detail": {
+            "retry_succeeded": true,
+            "deck_ready": true
+          },
+          "important": true,
+          "created_at": 1760000005
+        },
+        {
+          "id": 6,
+          "run_id": 7,
+          "seq": 6,
+          "slide_index": 2,
+          "stage": "content",
+          "kind": "retry",
+          "title": "页面重试",
+          "summary": "重试仍然失败",
+          "detail": {
+            "retry_succeeded": false,
+            "deck_ready": false
+          },
+          "important": true,
+          "created_at": 1760000006
+        },
+        {
+          "id": 7,
+          "run_id": 7,
+          "seq": 7,
+          "slide_index": 3,
+          "stage": "content",
+          "kind": "retry",
+          "title": "页面重试（detail 为空）",
+          "summary": "没有 detail",
+          "detail": null,
+          "important": false,
+          "created_at": 1760000007
+        },
+        {
+          "id": 8,
+          "run_id": 7,
+          "seq": 8,
+          "slide_index": 4,
+          "stage": "content",
+          "kind": "page_error",
+          "title": "页面生成失败",
+          "summary": "之后被成功的 retry 恢复",
+          "detail": {
+            "error": "x"
+          },
+          "important": true,
+          "created_at": 1760000008
+        },
+        {
+          "id": 9,
+          "run_id": 7,
+          "seq": 9,
+          "slide_index": 4,
+          "stage": "content",
+          "kind": "retry",
+          "title": "页面重试",
+          "summary": "重试成功",
+          "detail": {
+            "retry_succeeded": true
+          },
+          "important": true,
+          "created_at": 1760000009
+        },
+        {
+          "id": 10,
+          "run_id": 7,
+          "seq": 10,
+          "slide_index": null,
+          "stage": "validate",
+          "kind": "validate",
+          "title": "最终校验",
+          "summary": "仍然有失败页",
+          "detail": null,
+          "important": true,
+          "created_at": 1760000010
+        }
+      ],
+      "page_statuses": {},
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": {
+            "kind": "feature_grid"
+          },
+          "blueprint": null,
+          "content_log": {
+            "id": 3,
+            "run_id": 7,
+            "seq": 3,
+            "slide_index": 0,
+            "stage": "content",
+            "kind": "slide",
+            "title": "幻灯片 1/3",
+            "summary": "内容生成完成",
+            "detail": {
+              "page_plan": {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              },
+              "layout_plan": {
+                "kind": "feature_grid"
+              },
+              "system_prompt": "你是一个排版助手",
+              "user_prompt": "请生成第 1 页",
+              "raw_output": "{\"title\":\"...\"}",
+              "parsed_output": {
+                "title": "解析结果"
+              }
+            },
+            "important": true,
+            "created_at": 1760000003
+          }
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p2",
+            "page_title": "第二页",
+            "section_title": "现状"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        },
+        {
+          "index": 2,
+          "page_plan": {
+            "page_id": "p3",
+            "page_title": "第三页",
+            "section_title": "方案"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": null
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "done",
+          "layout": "done",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 1,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 2,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 3,
+        "done": 0,
+        "error": 0,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 3,
+        "percent": 0,
+        "done_width": "0%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 1,
+            "active": 0,
+            "percent": 33,
+            "state": "pending"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 1,
+            "active": 0,
+            "percent": 33,
+            "state": "pending"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "error",
+          "label": "生成中断"
+        },
+        {
+          "index": 1,
+          "tone": "error",
+          "label": "生成中断"
+        },
+        {
+          "index": 2,
+          "tone": "error",
+          "label": "生成中断"
+        }
+      ],
+      "preferred_index": 2,
+      "ready_blueprint_count": 0,
+      "important_log_count": 9,
+      "prompt_log_count": 2,
+      "recent_log_ids": [
+        10,
+        9,
+        8,
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1
+      ],
+      "statuses_from_logs": {
+        "1": {
+          "stage": "done",
+          "message": "重试完成",
+          "previous_stage": null,
+          "waiting": false
+        },
+        "2": {
+          "stage": "error",
+          "message": "重试仍然失败",
+          "previous_stage": "content",
+          "waiting": false
+        },
+        "3": {
+          "stage": "error",
+          "message": "没有 detail",
+          "previous_stage": "content",
+          "waiting": false
+        },
+        "4": {
+          "stage": "done",
+          "message": "重试完成",
+          "previous_stage": null,
+          "waiting": false
+        }
+      },
+      "status_events_results": []
+    },
+    {
+      "name": "many-logs-recent-ten",
+      "stage": "generating",
+      "running": true,
+      "blueprints": [],
+      "logs": [
+        {
+          "id": 1,
+          "run_id": 7,
+          "seq": 1,
+          "slide_index": 0,
+          "stage": "content",
+          "kind": "slide",
+          "title": "第 1 条",
+          "summary": "摘要 1",
+          "detail": {
+            "page_plan": {
+              "page_id": "p1",
+              "page_title": "第一页",
+              "section_title": "背景",
+              "objective": "说清背景"
+            }
+          },
+          "important": true,
+          "created_at": 1760000001
+        },
+        {
+          "id": 2,
+          "run_id": 7,
+          "seq": 2,
+          "slide_index": 1,
+          "stage": "content",
+          "kind": "slide",
+          "title": "第 2 条",
+          "summary": "摘要 2",
+          "detail": {
+            "page_plan": {
+              "page_id": "p1",
+              "page_title": "第一页",
+              "section_title": "背景",
+              "objective": "说清背景"
+            }
+          },
+          "important": false,
+          "created_at": 1760000002
+        },
+        {
+          "id": 3,
+          "run_id": 7,
+          "seq": 3,
+          "slide_index": 2,
+          "stage": "content",
+          "kind": "slide",
+          "title": "第 3 条",
+          "summary": "摘要 3",
+          "detail": {
+            "page_plan": {
+              "page_id": "p1",
+              "page_title": "第一页",
+              "section_title": "背景",
+              "objective": "说清背景"
+            }
+          },
+          "important": false,
+          "created_at": 1760000003
+        },
+        {
+          "id": 4,
+          "run_id": 7,
+          "seq": 4,
+          "slide_index": 3,
+          "stage": "content",
+          "kind": "slide",
+          "title": "第 4 条",
+          "summary": "摘要 4",
+          "detail": {
+            "page_plan": {
+              "page_id": "p1",
+              "page_title": "第一页",
+              "section_title": "背景",
+              "objective": "说清背景"
+            }
+          },
+          "important": true,
+          "created_at": 1760000004
+        },
+        {
+          "id": 5,
+          "run_id": 7,
+          "seq": 5,
+          "slide_index": 4,
+          "stage": "content",
+          "kind": "slide",
+          "title": "第 5 条",
+          "summary": "摘要 5",
+          "detail": {
+            "page_plan": {
+              "page_id": "p1",
+              "page_title": "第一页",
+              "section_title": "背景",
+              "objective": "说清背景"
+            }
+          },
+          "important": false,
+          "created_at": 1760000005
+        },
+        {
+          "id": 6,
+          "run_id": 7,
+          "seq": 6,
+          "slide_index": null,
+          "stage": "validate",
+          "kind": "repair",
+          "title": "第 6 条",
+          "summary": "摘要 6",
+          "detail": {
+            "note": "#6"
+          },
+          "important": false,
+          "created_at": 1760000006
+        },
+        {
+          "id": 7,
+          "run_id": 7,
+          "seq": 7,
+          "slide_index": null,
+          "stage": "validate",
+          "kind": "prompt_io",
+          "title": "第 7 条",
+          "summary": "摘要 7",
+          "detail": {
+            "note": "#7"
+          },
+          "important": true,
+          "created_at": 1760000007
+        },
+        {
+          "id": 8,
+          "run_id": 7,
+          "seq": 8,
+          "slide_index": null,
+          "stage": "validate",
+          "kind": "repair",
+          "title": "第 8 条",
+          "summary": "摘要 8",
+          "detail": {
+            "note": "#8"
+          },
+          "important": false,
+          "created_at": 1760000008
+        },
+        {
+          "id": 9,
+          "run_id": 7,
+          "seq": 9,
+          "slide_index": null,
+          "stage": "validate",
+          "kind": "prompt_io",
+          "title": "第 9 条",
+          "summary": "摘要 9",
+          "detail": {
+            "note": "#9"
+          },
+          "important": false,
+          "created_at": 1760000009
+        },
+        {
+          "id": 10,
+          "run_id": 7,
+          "seq": 10,
+          "slide_index": null,
+          "stage": "validate",
+          "kind": "repair",
+          "title": "第 10 条",
+          "summary": "摘要 10",
+          "detail": {
+            "note": "#10"
+          },
+          "important": true,
+          "created_at": 1760000010
+        },
+        {
+          "id": 11,
+          "run_id": 7,
+          "seq": 11,
+          "slide_index": null,
+          "stage": "validate",
+          "kind": "prompt_io",
+          "title": "第 11 条",
+          "summary": "摘要 11",
+          "detail": {
+            "note": "#11"
+          },
+          "important": false,
+          "created_at": 1760000011
+        },
+        {
+          "id": 12,
+          "run_id": 7,
+          "seq": 12,
+          "slide_index": null,
+          "stage": "validate",
+          "kind": "repair",
+          "title": "第 12 条",
+          "summary": "摘要 12",
+          "detail": {
+            "note": "#12"
+          },
+          "important": false,
+          "created_at": 1760000012
+        },
+        {
+          "id": 13,
+          "run_id": 7,
+          "seq": 13,
+          "slide_index": null,
+          "stage": "validate",
+          "kind": "prompt_io",
+          "title": "第 13 条",
+          "summary": "摘要 13",
+          "detail": {
+            "note": "#13"
+          },
+          "important": true,
+          "created_at": 1760000013
+        },
+        {
+          "id": 14,
+          "run_id": 7,
+          "seq": 14,
+          "slide_index": null,
+          "stage": "validate",
+          "kind": "repair",
+          "title": "第 14 条",
+          "summary": "摘要 14",
+          "detail": {
+            "note": "#14"
+          },
+          "important": false,
+          "created_at": 1760000014
+        }
+      ],
+      "page_statuses": {},
+      "retrying_pages": [],
+      "status_event_start": {},
+      "status_events": [],
+      "slide_items": [
+        {
+          "index": 0,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": {
+            "id": 1,
+            "run_id": 7,
+            "seq": 1,
+            "slide_index": 0,
+            "stage": "content",
+            "kind": "slide",
+            "title": "第 1 条",
+            "summary": "摘要 1",
+            "detail": {
+              "page_plan": {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              }
+            },
+            "important": true,
+            "created_at": 1760000001
+          }
+        },
+        {
+          "index": 1,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": {
+            "id": 2,
+            "run_id": 7,
+            "seq": 2,
+            "slide_index": 1,
+            "stage": "content",
+            "kind": "slide",
+            "title": "第 2 条",
+            "summary": "摘要 2",
+            "detail": {
+              "page_plan": {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              }
+            },
+            "important": false,
+            "created_at": 1760000002
+          }
+        },
+        {
+          "index": 2,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": {
+            "id": 3,
+            "run_id": 7,
+            "seq": 3,
+            "slide_index": 2,
+            "stage": "content",
+            "kind": "slide",
+            "title": "第 3 条",
+            "summary": "摘要 3",
+            "detail": {
+              "page_plan": {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              }
+            },
+            "important": false,
+            "created_at": 1760000003
+          }
+        },
+        {
+          "index": 3,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": {
+            "id": 4,
+            "run_id": 7,
+            "seq": 4,
+            "slide_index": 3,
+            "stage": "content",
+            "kind": "slide",
+            "title": "第 4 条",
+            "summary": "摘要 4",
+            "detail": {
+              "page_plan": {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              }
+            },
+            "important": true,
+            "created_at": 1760000004
+          }
+        },
+        {
+          "index": 4,
+          "page_plan": {
+            "page_id": "p1",
+            "page_title": "第一页",
+            "section_title": "背景",
+            "objective": "说清背景"
+          },
+          "layout_plan": null,
+          "blueprint": null,
+          "content_log": {
+            "id": 5,
+            "run_id": 7,
+            "seq": 5,
+            "slide_index": 4,
+            "stage": "content",
+            "kind": "slide",
+            "title": "第 5 条",
+            "summary": "摘要 5",
+            "detail": {
+              "page_plan": {
+                "page_id": "p1",
+                "page_title": "第一页",
+                "section_title": "背景",
+                "objective": "说清背景"
+              }
+            },
+            "important": false,
+            "created_at": 1760000005
+          }
+        }
+      ],
+      "step_states": [
+        {
+          "index": 0,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 1,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 2,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 3,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        },
+        {
+          "index": 4,
+          "planning": "pending",
+          "layout": "pending",
+          "content": "pending",
+          "normalizing": "pending",
+          "validating": "pending"
+        }
+      ],
+      "summary": {
+        "total": 5,
+        "done": 0,
+        "error": 0,
+        "active": 0,
+        "interrupted": 0,
+        "pending": 5,
+        "percent": 0,
+        "done_width": "0%",
+        "stage_cards": [
+          {
+            "key": "planning",
+            "label": "页面规划",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "layout",
+            "label": "布局排版",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "content",
+            "label": "内容生成",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "normalizing",
+            "label": "规范修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          },
+          {
+            "key": "validating",
+            "label": "校验修复",
+            "completed": 0,
+            "active": 0,
+            "percent": 0,
+            "state": "pending"
+          }
+        ]
+      },
+      "slide_status": [
+        {
+          "index": 0,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 1,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 2,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 3,
+          "tone": "pending",
+          "label": "等待开始"
+        },
+        {
+          "index": 4,
+          "tone": "pending",
+          "label": "等待开始"
+        }
+      ],
+      "preferred_index": 4,
+      "ready_blueprint_count": 0,
+      "important_log_count": 5,
+      "prompt_log_count": 14,
+      "recent_log_ids": [
+        14,
+        13,
+        12,
+        11,
+        10,
+        9,
+        8,
+        7,
+        6,
+        5
+      ],
+      "statuses_from_logs": {},
+      "status_events_results": []
+    }
+  ]
+}

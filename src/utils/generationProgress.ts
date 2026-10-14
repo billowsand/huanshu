@@ -1,3 +1,4 @@
+// 规则已移植到 huanshu_core::generation_progress（crates/huanshu-core/src/generation_progress.rs），改一边必须改另一边；一致性由 crates/huanshu-core/tests/generation_progress.rs 快照守住。
 export const PAGE_STAGES = [
   { key: 'planning', label: '页面规划' },
   { key: 'layout', label: '布局排版' },

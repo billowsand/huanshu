@@ -470,15 +470,15 @@ pub async fn repair_slide(
 // ---------------------------------------------------------------------------
 
 /// Outcome of a single-page retry.
-#[derive(serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct RetryPageResult {
-    slide: SlideBlueprint,
+    pub slide: SlideBlueprint,
     /// Whether the whole deck now passes validation (the run is then marked done).
-    deck_ready: bool,
+    pub deck_ready: bool,
     /// What still blocks the deck when it is not ready; empty otherwise.
-    remaining: String,
+    pub remaining: String,
     /// Content pages that still fail validation.
-    invalid_pages: Vec<usize>,
+    pub invalid_pages: Vec<usize>,
 }
 
 /// Retry a content page using its original source and assigned layout.
@@ -671,10 +671,10 @@ pub async fn retry_generation_page(
     result.map_err(|e| format!("{e:#}"))
 }
 
-#[derive(serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct RetryLayoutOptions {
-    current_kind: crate::types::SlideKind,
-    kinds: Vec<crate::types::SlideKind>,
+    pub current_kind: crate::types::SlideKind,
+    pub kinds: Vec<crate::types::SlideKind>,
 }
 
 /// Use the same layout eligibility table as automatic generation.
