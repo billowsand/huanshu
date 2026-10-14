@@ -34,7 +34,7 @@
   --terminal-inner-shadow: inset 0 1px 0 var(--terminal-edge-light),
     0 1px 2px rgba(0, 0, 0, 0.22);
 
-  /* chart tokens（ECharts 主题，hexA() 依赖 #hex 格式） */
+  /* chart tokens（Typst 主题 chart 字典的对照来源） */
   --chart-grid:  #232620;
   --chart-axis:  #393d33;
   --chart-palette-0: #ed9b62;
@@ -80,7 +80,7 @@
   --terminal-inner-shadow: inset 0 1px 0 var(--terminal-edge-light),
     0 1px 2px rgba(37, 41, 31, 0.06);
 
-  /* chart tokens（ECharts 主题，hexA() 依赖 #hex 格式） */
+  /* chart tokens（Typst 主题 chart 字典的对照来源） */
   --chart-grid:  #e3e3d3;
   --chart-axis:  #c9cebe;
   --chart-palette-0: #9d4a1c;
@@ -152,179 +152,13 @@
   --studio-error: var(--terminal-danger);
   --studio-error-bg: var(--terminal-danger-bg);
   --studio-error-border: var(--terminal-danger-border);
-  --slidev-code-background: var(--terminal-raised) !important;
-}
-
-/* Shared shell covers editor previews, thumbnails, overview and presentation. */
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .slide-shell {
-  background: var(--bg);
-  background-image: linear-gradient(var(--terminal-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--terminal-grid) 1px, transparent 1px);
-  background-size: 24px 24px;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .slide-shell__ambient {
-  display: none;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .slide-shell__frame {
-  border-radius: 2px;
-  background: transparent;
-  box-shadow: none;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .glass-card {
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-radius: 2px;
-  box-shadow: var(--terminal-card-shadow);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-/* Override scoped component geometry and intentional inline glow styles only. */
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.slide-shell, .slidev-slide) :is(
-  [rounded-lg], [rounded-xl], [rounded-2xl], [rounded-full],
-  .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-full,
-  .tag-pill, .tool-badge, .cp-panel, .cp-header, .cp-footer, .cp-item,
-  .cp-mode-badge, .cp-vs-badge, .cp-balance-badge,
-  .sf-hnode, .sf-vnode, .sf-num, .tl-card, .tl-node,
-  .phase-chip, .step-dot, .swot-flag, .swot-flag-icon, .swot-summary,
-  .split-left-step, .issue-card__pill
-) {
-  border-radius: 2px;
-  box-shadow: none !important;
-  text-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-/* Cards sit above the canvas; nested cards retain a quieter, lower elevation.
-   Important is needed for the component's inline node glows and the reset above. */
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.slide-shell, .slidev-slide) :is(
-  .glass-card, .spotlight-media, .sf-hnode, .sf-vnode
-) {
-  box-shadow: var(--terminal-card-shadow) !important;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.slide-shell, .slidev-slide) .glass-card .glass-card {
-  box-shadow: var(--terminal-inner-shadow) !important;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.slide-shell, .slidev-slide) .swot-flag {
-  box-shadow: var(--terminal-inner-shadow) !important;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(
-  .slide-title, .cover-title, .closing-title, .slide-section-title
-) {
-  font-weight: 600;
-  letter-spacing: -0.025em;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(
-  .tag-pill, .tool-badge, .closing-kicker, .closing-mark,
-  .section-intro__meta-label, .section-intro__card-index,
-  .phase-chip, .phase-steps-wrap__title, .split-left-index, .issue-card__eyebrow
-) {
-  /* 字体由 typography.css 的角色分组决定，主题只调字距 */
-  letter-spacing: 0.06em;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.amber-badge, .amber-header) {
-  background: var(--primary-bg);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.slide-title-divider, .divider-amber, .process-summary__line) {
-  height: 1px;
-  background: var(--primary);
-  opacity: 1;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-num {
-  font-size: var(--type-meta);
-  font-weight: 400;
-  color: var(--text-muted);
-  -webkit-text-stroke: 0;
-  letter-spacing: 0.08em;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.cp-divider-line, .cp-simple-divider, .tl-axis-line, .split-left-connector, .sf-track, .sf-connector) {
-  background: var(--glass-border) !important;
-  opacity: 1;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.phase-chip, .step-dot) {
-  background: var(--phase-solid) !important;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .phase-highlight {
-  background: var(--glass) !important;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .phase-head::after,
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-intro__card::after,
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .phase-steps-wrap__glow {
-  display: none;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-intro__lead {
-  background: var(--glass);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-intro__meta {
-  border-color: var(--glass-border);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-intro__note {
-  border-color: var(--success-border);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(
-  .section-intro__meta-label, .section-intro__card-index,
-  .closing-subtitle, .closing-note, .closing-mark
-) {
-  color: var(--text-muted);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .section-intro__card-item {
-  color: var(--text);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .closing-kicker {
-  color: var(--primary);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .sf-num {
-  color: var(--step-contrast);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .spotlight-media {
-  background: var(--glass);
-  border-color: var(--glass-border);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .carousel-indicator {
-  background: var(--text-muted);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .carousel-indicator.is-active {
-  background: var(--primary);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .swot-flag-icon {
-  color: var(--quadrant-contrast);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .swot-flag-icon > div {
-  color: inherit;
 }
 
 /* App chrome shares the same card elevations; retain round theme swatches. */
 :is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(
   .btn, input, textarea, select, .project-card, .card-icon-wrap,
   .heading-mark, .titlebar-brand-chip, .empty-icon-circle, .slide-card-bg,
-  .theme-popover, .modal-box, .badge, .slide-card, .kind-badge
+  .theme-popover, .modal-box, .badge
 ) {
   border-radius: 2px;
   box-shadow: none;
@@ -340,7 +174,7 @@
   transform: none;
 }
 
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.project-card, .slide-card) {
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .project-card {
   box-shadow: var(--terminal-card-shadow);
   transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -354,7 +188,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.project-card, .slide-card) {
+  :is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .project-card {
     transition: none;
   }
 }
@@ -364,20 +198,10 @@
   outline-offset: 2px;
 }
 
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.page-crumb, .heading-eyebrow, .project-count, .card-date, .badge, .kind-badge) {
+:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) :is(.page-crumb, .heading-eyebrow, .project-count, .card-date, .badge) {
   font-family: var(--font-mono);
 }
 
 :is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .card-accent {
   background: var(--studio-primary);
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .slide-card .kind-badge {
-  background: var(--studio-primary-bg) !important;
-  border-color: var(--studio-primary-border) !important;
-  color: var(--studio-primary) !important;
-}
-
-:is([data-theme="dark-terminal"], [data-theme="light-terminal"]) .slide-card:hover {
-  border-color: var(--studio-border-hover);
 }

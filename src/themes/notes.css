@@ -86,7 +86,6 @@
   --studio-error: var(--danger);
   --studio-error-bg: var(--danger-bg);
   --studio-error-border: var(--danger-border);
-  --slidev-code-background: #eee7da !important;
 }
 
 /* Pale wood stays visible between the cream sheets. */
@@ -261,7 +260,7 @@
   box-shadow: var(--notes-button-shadow);
 }
 
-[data-theme="light-notes"] :is(.project-card, .slide-card, .modal-box, .theme-popover, .kp-box) {
+[data-theme="light-notes"] :is(.project-card, .modal-box, .theme-popover, .kp-box) {
   background: var(--notes-paper);
   border-color: var(--notes-edge);
   border-radius: 5px;
@@ -282,109 +281,6 @@
 
 [data-theme="light-notes"] .card-accent {
   background: var(--studio-primary);
-}
-
-/* A sheet of manuscript paper, shared by every thumbnail and live slide.
-   Background layers do not intercept clicks or obscure slide content. */
-[data-theme="light-notes"] .slide-shell {
-  background-color: var(--notes-paper);
-  background-image: linear-gradient(90deg, #eee8dc99 0 45px, var(--notes-margin) 45px 46px, transparent 46px),
-    repeating-linear-gradient(0deg, transparent 0 35px, var(--notes-grid) 35px 36px);
-  box-shadow: inset 0 0 0 1px var(--notes-edge);
-}
-
-[data-theme="light-notes"] .slide-shell__ambient {
-  display: none;
-}
-
-[data-theme="light-notes"] .slide-shell__frame {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-[data-theme="light-notes"] :is(.glass-card, .spotlight-media, .sf-hnode, .sf-vnode) {
-  background: var(--notes-paper);
-  border: 1px solid var(--glass-border);
-  border-radius: 4px;
-  box-shadow: var(--notes-paper-shadow) !important;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-[data-theme="light-notes"] .glass-card .glass-card {
-  box-shadow: 0 1px 2px #60472b12 !important;
-}
-
-[data-theme="light-notes"] :is(.slide-title, .cover-title, .closing-title, .slide-section-title) {
-  color: var(--notes-ink);
-  text-shadow: none;
-}
-
-[data-theme="light-notes"] :is(.slide-shell, .slidev-slide) :is(
-  .tag-pill, .tool-badge, .cp-panel, .cp-header, .cp-footer, .cp-item,
-  .cp-mode-badge, .cp-vs-badge, .cp-balance-badge, .sf-num, .tl-card, .tl-node,
-  .phase-chip, .step-dot, .swot-flag, .swot-flag-icon, .swot-summary,
-  .split-left-step, .issue-card__pill
-) {
-  border-radius: 4px;
-  box-shadow: none !important;
-  text-shadow: none;
-}
-
-[data-theme="light-notes"] :is(.amber-badge, .amber-header, .section-intro__lead, .phase-highlight) {
-  background: var(--primary-bg);
-}
-
-[data-theme="light-notes"] :is(.slide-title-divider, .divider-amber, .process-summary__line) {
-  background: var(--primary);
-  height: 1px;
-  opacity: 0.65;
-}
-
-[data-theme="light-notes"] :is(.phase-head::after, .section-intro__card::after, .phase-steps-wrap__glow) {
-  display: none;
-}
-
-[data-theme="light-notes"] :is(.section-intro__meta, .cp-divider-line, .cp-simple-divider, .tl-axis-line, .split-left-connector, .sf-track, .sf-connector) {
-  border-color: var(--glass-border);
-}
-
-[data-theme="light-notes"] :is(.section-intro__meta-label, .section-intro__card-index, .closing-subtitle, .closing-note, .closing-mark) {
-  color: var(--text-muted);
-}
-
-[data-theme="light-notes"] .section-intro__card-item {
-  color: var(--text);
-}
-
-[data-theme="light-notes"] .closing-kicker {
-  color: var(--primary);
-}
-
-[data-theme="light-notes"] .section-num {
-  color: transparent;
-  -webkit-text-stroke-color: #b6a49270;
-}
-
-[data-theme="light-notes"] .swot-flag-icon,
-[data-theme="light-notes"] .swot-flag-icon > div {
-  color: var(--quadrant-contrast);
-}
-
-[data-theme="light-notes"] .sf-num {
-  color: var(--step-contrast);
-}
-
-[data-theme="light-notes"] :is(.phase-chip, .step-dot) {
-  background: var(--phase-solid) !important;
-}
-
-[data-theme="light-notes"] .slide-card .kind-badge {
-  background: var(--studio-primary-bg) !important;
-  border-color: var(--studio-primary-border) !important;
-  color: var(--studio-primary) !important;
 }
 
 [data-theme="light-notes"] * {

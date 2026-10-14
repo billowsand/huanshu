@@ -7,114 +7,27 @@
 }
 
 /* ============================================================
-   字体角色规划表 —— 幻灯片里每一处文字都必须落到下面 6 类角色之一，
-   角色与用户在「设置 → 外观与字体」选择的字体一一对应
+   字体角色 —— 用户在「设置 → 外观与字体」选择的 6 类字体
    （src/typography.ts 的 fontRoles）：
-     标题          .slide-font-title    → --font-title
-     副标题        .slide-font-subtitle → --font-subtitle
-     正文          .slide-font-body     → --font-body（默认角色）
-     注释与标签    .slide-font-caption  → --font-caption
-     数字与序号    .slide-font-number   → --font-number
-     代码与编辑器  .slide-font-code     → --font-code
-   --font-interface 只服务 Studio 外壳，绝不出现在幻灯片里。
+     标题 → --font-title，副标题 → --font-subtitle，正文 → --font-body，
+     注释与标签 → --font-caption，数字与序号 → --font-number，代码 → --font-code。
+   --font-interface 只服务 Studio 外壳。
 
-   解析分四层，书写顺序即优先级（特异性相同时后写的胜出）：
-     1. 默认：幻灯片内一切文字先算「正文」，所以没被显式归类的元素
-        会落到 --font-body，而不是界面字体。
-     2. 语义类名分组：页面级类名（.slide-title …）与各模板自有类名
-        （.phase-head__title …）。新增模板时先在这里补一行。
-     3. 显式角色钩子 .slide-font-*：模板里逐个打标，用于「没有语义类可挂」
-        的元素，或需要让正文压过某个字号类默认归组的元素。钩子列在分组
-        之后，因此钩子总赢；同一个元素只挂一个 .slide-font-* 钩子。
-     4. code / pre / kbd / samp 永远是代码字体。
-
-   判断依据是「这段话在版式里扮演什么角色」，不是字号大小：
-     标题 = 页面/卡片/象限/阶段的名称；副标题 = 标题下的说明或英文副标题；
-     正文 = 卡片描述、条目、摘要、结论；注释与标签 = 脚注、页尾、眉标、
-     标签 pill、模式徽章、占位提示；数字与序号 = 章节号、步骤号、卡片编号、
-     时间轴日期；代码 = 代码块与等宽技术信息。
+   幻灯片已经全部由 Typst 出图（crates/slide-typst，字体取自应用设置，不经过
+   CSS），所以这里只剩 Studio 里唯一一处需要角色字体的内容：Step1 的 Markdown
+   预览 .md-preview。它整体算「正文」，标题和代码块再单独接管。
    ============================================================ */
 
-/* 1. 默认角色 = 正文 */
-:is(.slide-shell, .slidev-slide, .md-preview) {
+/* 默认角色 = 正文 */
+.md-preview {
   font-family: var(--font-body);
 }
 
-/* 2.0 正文：显式登记常用正文类，让规划表能一眼看出它们是「正文」而不是残留
-   （.slide-meta / .slide-text-meta 只表示字号，承载的是卡片描述、条目与摘要）；
-   本组写在其它分组之前，带注释/标题/数字语义的元素仍会被后面的分组接管 */
-:is(.slide-shell, .slidev-slide) :is(
-  .slide-body, .slide-body-tight, .slide-text-body-strong, .slide-text-body,
-  .slide-meta, .slide-text-meta
-) {
-  font-family: var(--font-body) !important;
-}
-
-/* 2.1 标题：页面标题、封面与结尾标题、卡片/象限/阶段标题、h1–h6 */
-/*    与其它分组一样限定在幻灯片容器内：既让各组特异性一致（书写顺序才真正等于优先级），
-      也避免 Studio 里同名的 .slide-title（SlideCard 页面列表）被换成标题字体 */
-:is(.slide-shell, .slidev-slide, .md-preview) :is(
-  .slide-title, .cover-title, .closing-title, .slide-section-title, .slide-compact-title, .slide-card-title,
-  .section-intro__card-title, .phase-head__title, .swot-flag-text, .issue-card__eyebrow,
-  h1, h2, h3, h4, h5, h6
-) {
+.md-preview :is(h1, h2, h3, h4, h5, h6) {
   font-family: var(--font-title) !important;
 }
 
-/* 2.2 注释与标签：脚注、页尾说明、眉标、标签 pill、模式徽章、辅助信息 */
-:is(.slide-shell, .slidev-slide) :is(
-  .tag-pill, .tool-badge, .slide-caption, .slide-text-note,
-  .closing-note, .closing-kicker, .closing-mark, .section-intro__note,
-  .section-intro__meta-label, .section-intro__meta-value, .phase-steps-wrap__title,
-  .cp-mode-badge, .cp-axis-label, .feature-risk, .issue-card__pill,
-  .slide-footnote, .center-grid-footer, .process-footer, .footnotes
-) {
-  font-family: var(--font-caption) !important;
-}
-
-/* 2.3 副标题：封面副标题、英文副标题、章节说明、卡片副标题 */
-:is(.slide-shell, .slidev-slide) :is(
-  .slide-subtitle, .cover-subtitle, .cover-en-title, .closing-subtitle,
-  .section-intro__subtitle, .phase-head__subtitle, .feature-subtitle
-) {
-  font-family: var(--font-subtitle) !important;
-}
-
-/* 2.4 数字与序号：章节号、步骤号、卡片编号、时间轴日期、阶段编号 */
-:is(.slide-shell, .slidev-slide) :is(
-  .section-num, .step-number, .slide-number, .sf-num, .step-dot, .phase-chip,
-  .spotlight-step-number, .section-intro__card-index, .split-left-step, .split-left-index,
-  .cp-row-index, .tl-date
-) {
-  font-family: var(--font-number) !important;
-}
-
-/* 3. 显式角色钩子（模板逐个打标；写在分组之后，压过第 2 层的判定） */
-:is(.slide-shell, .slidev-slide) :is(.slide-font-title) {
-  font-family: var(--font-title) !important;
-}
-
-:is(.slide-shell, .slidev-slide) :is(.slide-font-subtitle) {
-  font-family: var(--font-subtitle) !important;
-}
-
-:is(.slide-shell, .slidev-slide) :is(.slide-font-caption) {
-  font-family: var(--font-caption) !important;
-}
-
-:is(.slide-shell, .slidev-slide) :is(.slide-font-number) {
-  font-family: var(--font-number) !important;
-}
-
-:is(.slide-shell, .slidev-slide) :is(.slide-font-body) {
-  font-family: var(--font-body) !important;
-}
-
-:is(.slide-shell, .slidev-slide) :is(.slide-font-code) {
-  font-family: var(--font-code) !important;
-}
-
-/* 4. 代码与编辑器字体 */
-:is(.slide-shell, .slidev-slide, .md-preview) :is(code, pre, kbd, samp) {
+/* 代码与编辑器 */
+.md-preview :is(code, pre, kbd, samp) {
   font-family: var(--font-code) !important;
 }

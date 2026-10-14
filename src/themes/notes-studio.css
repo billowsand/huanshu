@@ -1,5 +1,6 @@
 /* Page-specific controls for 便签·稿纸. All changes are opt-in. */
 [data-theme="light-notes"] {
+  --notes-rule: repeating-linear-gradient(0deg, transparent 0 31px, var(--notes-grid) 31px 32px);
   --studio-warning: var(--warning);
   --studio-warning-bg: var(--warning-bg);
   --studio-warning-border: var(--warning-border);
@@ -109,7 +110,6 @@
 [data-theme="light-notes"] :is(.ej-field, .ej-section, .ej-array-card, .ej-nested-card, .ej-icon-box) {
   border-radius: 3px; background: #faf4e8; border-color: var(--notes-edge);
 }
-[data-theme="light-notes"] .ej-section-head { border-bottom: 1px dashed var(--notes-edge); }
 [data-theme="light-notes"] .ej-wrap { border-radius: 2px; background: var(--notes-paper); box-shadow: inset 0 1px 2px #60472b12; }
 [data-theme="light-notes"] .ej-gutter { background: #f1ebdf; border-right: 1px solid var(--notes-margin); }
 [data-theme="light-notes"] :is(.kp-card, .ej-tone-chip, .ej-dir-chip, .ej-icon-chip, .ej-media-strip) { border-radius: 3px; box-shadow: var(--notes-button-shadow); }
@@ -126,7 +126,6 @@
 [data-theme="light-notes"] :is(.service-panel, .model-config-panel) {
   background: #faf4e8; border-radius: 3px; border-color: var(--notes-edge); box-shadow: inset 0 3px 0 var(--notes-edge);
 }
-[data-theme="light-notes"] .model-header { border-bottom: 1px dashed var(--notes-edge); padding-bottom: 0.5rem; }
 [data-theme="light-notes"] .font-preview { background: #faf4e8; }
 [data-theme="light-notes"] .font-trigger { background: linear-gradient(#fbf7ec, #eee8dc); box-shadow: var(--notes-button-shadow); }
 [data-theme="light-notes"] .font-option.active { background: var(--studio-primary-bg); box-shadow: inset 2px 0 0 var(--studio-primary); }
