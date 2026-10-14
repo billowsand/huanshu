@@ -34,9 +34,9 @@
 | 删除确认（文案一致）并删除 | ✅ | `AlertDialog` → `services::projects::delete_project` |
 | 导出对话框：普通 `.keynn` | ✅ | `services::storage::export_project` + 保存对话框 |
 | 导出对话框：PDF 文档 + 结果对话框 | ✅ | `export::show_report`（对应 `PdfExportDialog.vue`） |
-| 导出对话框：加密导出（密码 + 强度提示） | ⬜ | `PasswordDialog.vue`（encrypt 模式）、`export_project(encrypted, password)` |
+| 导出对话框：加密导出（密码 + 强度提示） | ✅ | `password_dialog.rs::PasswordDialog`（encrypt 模式，强度条/确认密码/门槛照原版）、`export_project(encrypted, password)`；单测 `encrypt_gate_agrees_with_core_password_validation` 等 |
 | 导入未加密 `.keynn` | ✅ | `services::storage::import_project` |
-| 导入加密 `.keynn`（输入密码、错误重试） | ⬜ | `PasswordDialog.vue`（decrypt 模式）、`is_encrypted_file` |
+| 导入加密 `.keynn`（输入密码、错误重试） | ✅ | `PasswordDialog`（decrypt 模式）：`is_encrypted_file` 为真弹密码框，密码错误不关闭、`set_external_error` 重试 |
 | 卡片入场动画 | ➖ | 视觉细节，GPUI 下不做 |
 
 ## 设置 `SettingsView.vue` → `pages/settings.rs`

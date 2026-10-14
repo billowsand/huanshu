@@ -2,8 +2,8 @@
 //!
 //! 已实现：操作栏（项目 · 主题浮层 · 导入 · 设置 · 新建演示）、标题区、加载骨架、空状态、
 //! 项目卡片（名称、比例徽章、页数、更新时间、导出、删除）、删除确认、导出对话框
-//! （普通 `.keynn` 与 PDF）、导入未加密的 `.keynn`。
-//! 待实现：加密导出与加密导入（需要密码对话框 `PasswordDialog.vue`），见 `docs/native/parity.md`。
+//! （普通 `.keynn`、加密 `.keynn` 与 PDF）、导入 `.keynn`（加密文件弹密码对话框，
+//! 密码错误不关闭可重试，照原版 `handlePasswordSubmit`）。
 
 use gpui_kit::component::button::ButtonVariant;
 use gpui_kit::component::dialog::{AlertDialog, Dialog, DialogClose, DialogFooter};
@@ -11,13 +11,14 @@ use gpui_kit::component::notification::Notification;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::{Disableable as _, Selectable as _};
 use gpui_kit::prelude::*;
-use gpui_kit::{div, px, Context, Render, SharedString, Window};
+use gpui_kit::{div, px, Context, Entity, Render, SharedString, Window};
 use huanshu_core::db::ProjectSummary;
 use huanshu_core::services::{projects, storage};
 use huanshu_core::types::AspectRatio;
 
 use crate::export;
 use crate::icons::carbon;
+use crate::password_dialog::{PasswordDialog, PasswordMode};
 use crate::router::{Route, SettingsTab};
 use crate::shell::ShellHandle;
 use crate::tasks::run_bg;
@@ -26,6 +27,14 @@ use crate::widgets::{self, Tone2};
 
 /// 内容列的最大宽度（原版 `.home-body` 的 `max-width`）。
 const BODY_MAX_W: f32 = 750.0;
+
+/// 导入读文件的两种走向（原版 `handleImport` 的分支）。
+enum ImportRead {
+    /// 未加密：已直接导入。
+    Imported,
+    /// 加密：等用户在密码对话框里输密码。
+    Encrypted(Vec<u8>),
+}
 
 pub struct HomePage {
     handle: ShellHandle,
@@ -36,6 +45,10 @@ pub struct HomePage {
     /// 正在导出的项目（按钮显示转圈，禁止重复点击）。
     exporting: Option<i64>,
     importing: bool,
+    /// 加密导入：已读入内存、等待密码的 `.keynn` 字节（原版 `pendingImportData`）。
+    pending_import: Option<Vec<u8>>,
+    /// 当前打开的密码对话框（外部错误经它更新，实体也由此保活）。
+    password_dialog: Option<Entity<PasswordDialog>>,
 }
 
 impl HomePage {
@@ -47,6 +60,8 @@ impl HomePage {
             show_theme_picker: false,
             exporting: None,
             importing: false,
+            pending_import: None,
+            password_dialog: None,
         };
         page.reload(window, cx);
         page
@@ -143,8 +158,9 @@ impl HomePage {
                                 .child(div().text_size(px(12.0)).text_color(c.muted).child(desc)),
                         )
                 };
-            let (plain_page, pdf_page) = (page.clone(), page.clone());
-            let (plain_project, pdf_project) = (project.clone(), project.clone());
+            let (plain_page, pdf_page, encrypted_page) = (page.clone(), page.clone(), page.clone());
+            let (plain_project, pdf_project, encrypted_project) =
+                (project.clone(), project.clone(), project.clone());
             dialog
                 .title("导出演示文稿")
                 .child(
@@ -168,7 +184,7 @@ impl HomePage {
                             .on_click(move |_event, window, cx| {
                                 window.close_dialog(cx);
                                 let _ = plain_page.update(cx, |page, cx| {
-                                    page.export_keynn(plain_project.clone(), window, cx)
+                                    page.export_keynn(plain_project.clone(), None, window, cx)
                                 });
                             }),
                         )
@@ -179,14 +195,11 @@ impl HomePage {
                                 "加密导出",
                                 "设置密码后再生成导出文件",
                             )
-                            .on_click(|_event, window, cx| {
+                            .on_click(move |_event, window, cx| {
                                 window.close_dialog(cx);
-                                window.push_notification(
-                                    Notification::warning(
-                                        "加密导出尚未在原生界面实现（见 parity.md）",
-                                    ),
-                                    cx,
-                                );
+                                let _ = encrypted_page.update(cx, |page, cx| {
+                                    page.open_encrypt_dialog(encrypted_project.clone(), window, cx)
+                                });
                             }),
                         )
                         .child(
@@ -211,9 +224,11 @@ impl HomePage {
         });
     }
 
+    /// 普通导出（`.keynn`）。`password` 为 `Some` 时走加密导出（原版 `doExport`）。
     fn export_keynn(
         &mut self,
         project: ProjectSummary,
+        password: Option<String>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -229,12 +244,14 @@ impl HomePage {
             window,
             cx,
             move || {
-                let bytes = storage::export_project(&shared, project.id, Some(false), None)?;
+                let encrypted = Some(password.is_some());
+                let bytes = storage::export_project(&shared, project.id, encrypted, password)?;
                 std::fs::write(&path, bytes).map_err(|error| format!("写入失败：{error}"))?;
                 Ok::<_, String>(path)
             },
             |page: &mut Self, result, window, cx| {
                 page.exporting = None;
+                page.password_dialog = None;
                 let note = match result {
                     Ok(path) => Notification::success(format!("已导出：{}", path.display())),
                     Err(error) => Notification::error(format!("导出失败：{error}")),
@@ -243,6 +260,41 @@ impl HomePage {
                 cx.notify();
             },
         );
+    }
+
+    /// 加密导出：先弹保存路径，再带密码导出（原版 `doExport`，与 `export_keynn` 同序）。
+    fn open_encrypt_dialog(
+        &mut self,
+        project: ProjectSummary,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let page = cx.weak_entity();
+        let dialog = PasswordDialog::open(window, cx, move |_window, cx| {
+            let submit_page = page.clone();
+            let cancel_page = page.clone();
+            let project = project.clone();
+            PasswordDialog::new(
+                PasswordMode::Encrypt,
+                Some(project.name.clone()),
+                move |password, window, cx| {
+                    window.close_dialog(cx);
+                    let _ = submit_page.update(cx, |page, cx| {
+                        page.export_keynn(project.clone(), Some(password), window, cx)
+                    });
+                },
+                move |_window, cx| {
+                    let _ = cancel_page.update(cx, |page, cx| {
+                        page.password_dialog = None;
+                        cx.notify();
+                    });
+                },
+                _window,
+                cx,
+            )
+        });
+        self.password_dialog = Some(dialog);
+        cx.notify();
     }
 
     fn export_pdf(&mut self, project: ProjectSummary, window: &mut Window, cx: &mut Context<Self>) {
@@ -266,7 +318,8 @@ impl HomePage {
         );
     }
 
-    /// 导入 `.keynn`（原版 `handleImport`）。加密文件待实现。
+    /// 导入 `.keynn`（原版 `handleImport` / `handlePasswordSubmit`）。
+    /// 加密文件先读入内存，弹 decrypt 密码对话框；密码错误不关闭对话框，可重试。
     fn import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(path) = rfd::FileDialog::new()
             .add_filter("幻述项目", &["keynn"])
@@ -283,19 +336,96 @@ impl HomePage {
             move || {
                 let bytes = std::fs::read(&path).map_err(|error| format!("读取失败：{error}"))?;
                 if storage::is_encrypted_file(&bytes) {
-                    return Err("加密文件的导入尚未在原生界面实现（见 parity.md）".to_string());
+                    // 加密文件：回界面弹密码对话框。
+                    Ok(ImportRead::Encrypted(bytes))
+                } else {
+                    storage::import_project(&shared, bytes, None)?;
+                    Ok::<ImportRead, String>(ImportRead::Imported)
                 }
-                storage::import_project(&shared, bytes, None)
             },
             |page: &mut Self, result, window, cx| {
                 page.importing = false;
                 match result {
-                    Ok(_) => {
+                    Ok(ImportRead::Imported) => {
                         window.push_notification(Notification::success("导入完成"), cx);
                         page.reload(window, cx);
                     }
+                    Ok(ImportRead::Encrypted(bytes)) => page.open_decrypt_dialog(bytes, window, cx),
                     Err(error) => window
                         .push_notification(Notification::error(format!("导入失败：{error}")), cx),
+                }
+                cx.notify();
+            },
+        );
+    }
+
+    /// 加密导入的密码对话框（原版 decrypt 模式的 `PasswordDialog`）。
+    fn open_decrypt_dialog(&mut self, bytes: Vec<u8>, window: &mut Window, cx: &mut Context<Self>) {
+        self.pending_import = Some(bytes);
+        let page = cx.weak_entity();
+        let dialog = PasswordDialog::open(window, cx, move |_window, cx| {
+            let submit_page = page.clone();
+            let cancel_page = page.clone();
+            PasswordDialog::new(
+                PasswordMode::Decrypt,
+                None,
+                move |password, window, cx| {
+                    let _ = submit_page.update(cx, |page, cx| {
+                        page.submit_import_password(password, window, cx)
+                    });
+                },
+                move |_window, cx| {
+                    let _ = cancel_page.update(cx, |page, cx| {
+                        page.pending_import = None;
+                        page.password_dialog = None;
+                        cx.notify();
+                    });
+                },
+                _window,
+                cx,
+            )
+        });
+        self.password_dialog = Some(dialog);
+        cx.notify();
+    }
+
+    /// 原版 `handlePasswordSubmit`：解密并导入；失败不关闭对话框，错误显示在框内。
+    fn submit_import_password(
+        &mut self,
+        password: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(bytes) = self.pending_import.clone() else {
+            window.close_dialog(cx);
+            self.password_dialog = None;
+            cx.notify();
+            return;
+        };
+        self.importing = true;
+        cx.notify();
+        let shared = self.handle.shared().clone();
+        run_bg(
+            window,
+            cx,
+            move || storage::import_project(&shared, bytes, Some(password)),
+            |page: &mut Self, result, window, cx| {
+                page.importing = false;
+                match result {
+                    Ok(_) => {
+                        window.close_dialog(cx);
+                        page.pending_import = None;
+                        page.password_dialog = None;
+                        window.push_notification(Notification::success("导入完成"), cx);
+                        page.reload(window, cx);
+                    }
+                    // 密码错误等：保持对话框打开，把错误显示在框里（原版 externalError）。
+                    Err(error) => {
+                        if let Some(dialog) = page.password_dialog.clone() {
+                            let _ = dialog
+                                .update(cx, |dialog, cx| dialog.set_external_error(error, cx));
+                        }
+                    }
                 }
                 cx.notify();
             },

@@ -9,6 +9,7 @@ mod export;
 mod icons;
 mod images;
 mod pages;
+mod password_dialog;
 mod present;
 mod router;
 mod shell;

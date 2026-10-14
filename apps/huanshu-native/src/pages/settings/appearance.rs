@@ -1199,16 +1199,17 @@ mod tests {
 
     #[test]
     fn reset_fonts_returns_to_defaults() {
-        let mut settings = FontSettings {
+        // 原版 resetFonts：全部角色归 Microsoft YaHei（core FontSettings::default）。
+        let settings = FontSettings {
             interface: "Arial".into(),
             title: "KaiTi".into(),
             ..FontSettings::default()
         };
-        // 原版 resetFonts：全部角色归 Microsoft YaHei（core FontSettings::default）。
-        settings = FontSettings::default();
-        assert_eq!(settings, normalize_fonts(&settings));
-        assert_eq!(settings.interface, DEFAULT_FONT);
-        assert_eq!(settings.title, DEFAULT_FONT);
+        assert_ne!(settings, FontSettings::default());
+        let reset = FontSettings::default();
+        assert_eq!(reset, normalize_fonts(&reset));
+        assert_eq!(reset.interface, DEFAULT_FONT);
+        assert_eq!(reset.title, DEFAULT_FONT);
     }
 
     #[test]
