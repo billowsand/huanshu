@@ -15,27 +15,17 @@ export interface TypstThumbnail {
   placeholder: boolean
 }
 
-/** 关闭开关用的 localStorage 键（`'0'` 表示禁用，便于 A/B 对比）。 */
-export const TYPST_THUMBNAILS_KEY = 'huanshu.typstThumbnails'
-
 /** 缩略图宽度向上取整到这个倍数，避免窗口每变 1px 就整副重渲。 */
 const WIDTH_BUCKET = 64
 /** 牌组变化后等这么久再渲染，生成过程中一页页到达不会触发多次整副编译。 */
 const DEBOUNCE_MS = 200
 
-function thumbnailsEnabledByPreference(): boolean {
-  try {
-    return localStorage.getItem(TYPST_THUMBNAILS_KEY) !== '0'
-  } catch {
-    return true
-  }
-}
-
 /**
- * 用 Typst 光栅化的 PNG 作为幻灯片缩略图。
+ * 用 Typst 光栅化的 PNG 作为幻灯片画面（缩略图、详情大图、演示主画面、编辑器预览）。
  *
- * 一次展示很多页时，每页挂一个完整的幻灯片组件（玻璃主题还带 backdrop-filter）代价很高，
- * 所以改为把牌组交给 Rust 侧编译一次、逐页光栅化，这里只负责 `<img>` 需要的数据。
+ * 每页挂一个完整的幻灯片组件（还得把网页渲染器搬进来）代价很高，所以把牌组交给 Rust 侧编译
+ * 一次、逐页光栅化，这里只负责 `<img>` 需要的数据。**没有图时由调用方显示加载框**
+ * （`components/SlideFrame.vue`），这里不再提供任何回退渲染。
  *
  * 要点：
  * - **子集与页序**：`slides()` 里还没有蓝图的页（生成中的空位）被跳过，只有已有蓝图组成子集
@@ -55,17 +45,17 @@ function thumbnailsEnabledByPreference(): boolean {
  *   时间、每次响应都可能更新画面，而最后完成的那个响应一定是最新内容；停手后不会再有待请求
  *   的内容，画面落在最新一版。
  * - **`resetKey`**：值变化说明调用方换了目标（编辑者换了页），前一页的在途响应整批作废，
- *   已显示的图和键一并清空，调用方立刻回退到幻灯片组件。
- * - **失败**：命令报错时 `failed` 为真（调用方回退到幻灯片组件），并 `console.warn` 一次；
- *   不自动重试，下一次内容/主题/尺寸变化时这些页会重新请求。
- * - **停用**：`enabled()` 为假时只是不发请求，已有的图保留（全览关了再开不用重渲）；
- *   localStorage 开关关掉时才清空，让调用方回退到幻灯片组件。
+ *   已显示的图和键一并清空，调用方立刻显示加载框。
+ * - **失败**：命令报错时 `failed` 为真（调用方在画面角上显示「渲染失败 · 重试」，旧图仍然
+ *   照常显示），并 `console.warn` 一次；不自动重试，下一次内容/主题/尺寸变化时这些页会重新
+ *   请求，调用方也可以直接调 `refresh()` 重试。
+ * - **`enabled()` 为假**：只是不发请求，已有的图保留（全览关了再开不用重渲）。
  * - **`wanted` / `maxCached`**：只要 `wanted()` 里出现的下标（`thumbs` 的键，即传入数组的下标）
  *   才进 `only`；`wanted` 不影响发给 Rust 的牌组，仍是整副、仍按子集位置（缓存键里有子集位置，
  *   按 `wanted` 裁剪牌组会让翻一页就整批失效）。`maxCached` 超出时淘汰「不在 `wanted` 里、
  *   最久没被请求过」的图，并同步忘掉它们的已显示键，这样它们回到 `wanted` 时会重新请求。
  *
- * `thumbs` 以传入数组的下标为键（不是子集位置），没有缩略图的页不出现。
+ * `thumbs` 以传入数组的下标为键（不是子集位置），还没有图的页不出现。
  */
 export function useTypstThumbnails(opts: {
   /** 下标 = 牌组页序；`null` / `undefined` 表示该页还没有蓝图。 */
@@ -181,7 +171,7 @@ export function useTypstThumbnails(opts: {
     thumbs.value = next
   }
 
-  /** 清空全部图和键。`resetKey` 变化与整体关闭开关都走这里，调用方随即回退到幻灯片组件。 */
+  /** 清空全部图和键，调用方随即显示加载框（`resetKey` 变化：换了目标页）。 */
   function resetAll() {
     generation += 1
     resetPending = true
@@ -194,11 +184,6 @@ export function useTypstThumbnails(opts: {
 
   function refresh() {
     if (disposed) return
-    if (!thumbnailsEnabledByPreference()) {
-      resetAll()
-      pending.value = false
-      return
-    }
     if (!(opts.enabled?.() ?? true)) {
       pending.value = false
       return
@@ -309,7 +294,7 @@ export function useTypstThumbnails(opts: {
       failed.value = true
       if (!warned) {
         warned = true
-        console.warn('[thumbnails] Typst 缩略图渲染失败，回退到幻灯片组件：', e)
+        console.warn('[thumbnails] Typst 渲染失败：', e)
       }
     }
     // 成功或失败都要清掉在途标记：失败的页会留到下一次内容变化时重新请求。

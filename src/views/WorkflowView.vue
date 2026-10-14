@@ -95,7 +95,6 @@ const slideEditor = useSlideEditor({
   setActiveSlide: (v) => { activeSlide.value = v },
   currentStep: () => currentStep.value,
   projectId: () => projectId.value,
-  mediaMap: () => mediaLib.mediaMap.value,
   blueprints: () => gen.blueprints as unknown as SlideBlueprint[],
 })
 
@@ -499,7 +498,6 @@ onMounted(() => {
         :message="gen.message"
         :slide-count="gen.slideCount"
         :blueprints="(gen.blueprints as unknown as SlideBlueprint[])"
-        :media-map="mediaLib.mediaMap.value"
         :logs="gen.logs"
         :selected-slide-index="selectedSlideIndex"
         :page-statuses="gen.pageStatuses"
@@ -521,7 +519,6 @@ onMounted(() => {
         :project-id="projectId"
         :blueprints="(gen.blueprints as unknown as SlideBlueprint[])"
         :media-items="mediaLib.mediaItems.value"
-        :media-map="mediaLib.mediaMap.value"
         :json-text="slideEditor.jsonText.value"
         :json-error="slideEditor.jsonError.value"
         :live-slide="slideEditor.liveSlide.value"
@@ -530,12 +527,10 @@ onMounted(() => {
         :show-kind-picker="slideEditor.showKindPicker.value"
         :kind-picker-mode="slideEditor.kindPickerMode.value"
         :preview-area="slideEditor.previewArea.value"
-        :preview-scale="slideEditor.previewScale.value"
         :editor-kind="slideEditor.editorKind.value"
         :editor-preview-slide="slideEditor.editorPreviewSlide.value"
         :editor-stage-w="slideEditor.editorStageW.value"
         :editor-stage-h="slideEditor.editorStageH.value"
-        :current-slide-dims="slideEditor.currentSlideDims.value"
         :json-textarea-ref="slideEditor.jsonTextareaRef.value"
         :exporting-pdf="pdfExport.exporting.value"
         @replace-draft="slideEditor.replaceEditorDraft"
@@ -563,7 +558,6 @@ onMounted(() => {
     <PresentationOverlay
       v-if="presenting"
       :blueprints="(gen.blueprints as unknown as SlideBlueprint[])"
-      :media-map="mediaLib.mediaMap.value"
       :initial-slide="activeSlide"
       :project-id="projectId"
       @exit="presenting = false"
@@ -2009,12 +2003,6 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-/* 编辑器预览的 Typst 位图：CSS 尺寸就是舞台尺寸，位图本身按舞台比例渲染，直接铺满。 */
-.edit-preview-img {
-  display: block;
-  object-fit: fill;
-}
-
 /* 「渲染中」标记：`pending` 持续 150ms 以上才出现，不抢眼、不闪。（Step3Editor 的 scoped
    样式里没有这些类，这一块是全局的。） */
 .edit-rendering {
@@ -2032,10 +2020,6 @@ onMounted(() => {
   padding: 0.35rem 1rem 0.6rem;
   font-size: 0.7rem;
   color: #b45309;
-}
-
-.edit-preview-canvas {
-  pointer-events: none;
 }
 
 /* JSON editor */
@@ -2866,35 +2850,12 @@ kbd {
 
 .pres-overview-thumb {
   position: relative;
-  width: min(100%, 256px);
-  height: 144px;
+  max-width: 100%;
   margin: 0 auto;
   overflow: hidden;
   border-radius: 10px;
   background: var(--studio-bg);
   border: 1px solid color-mix(in srgb, var(--studio-border-hover) 72%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Typst 光栅化缩略图：按本页比例等比落位，32:9 / 48:9 不再被 1280×720 的框裁掉。 */
-.pres-overview-img {
-  display: block;
-  object-fit: contain;
-}
-
-/* 缩略图还没到时的加载底：按本页比例占位，不挂完整的幻灯片组件。 */
-.pres-overview-loading {
-  background: color-mix(in srgb, var(--studio-border-hover) 24%, transparent);
-}
-
-.pres-overview-slide {
-  width: 1280px;
-  height: 720px;
-  transform: scale(0.2);
-  transform-origin: top left;
-  pointer-events: none;
 }
 
 .pres-overview-meta {
@@ -2943,12 +2904,6 @@ kbd {
   height: 100%;
   position: relative;
   overflow: hidden;
-}
-
-/* 演示主画面的 Typst 位图：宽高就是舞台尺寸，拉伸模式要非等比铺满。 */
-.pres-slide-img {
-  display: block;
-  object-fit: fill;
 }
 
 /* ─── Slide page transitions ─── */
@@ -3007,10 +2962,6 @@ kbd {
 .slide-jump-leave-to  {
   opacity: 0;
   transform: scale(1.02);
-}
-
-.pres-slide {
-  pointer-events: none;
 }
 
 .pres-controls {

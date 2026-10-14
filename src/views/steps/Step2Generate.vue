@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import SlideRenderer from '../../components/SlideRenderer.vue'
+import SlideFrame from '../../components/SlideFrame.vue'
 import RetryLayoutDialog from '../../components/RetryLayoutDialog.vue'
 import type { SlideBlueprint, AspectRatio, SlideKind } from '../../components/types'
 import { ASPECT_DIMENSIONS } from '../../components/types'
@@ -47,7 +47,6 @@ const props = defineProps<{
   message: string
   slideCount: number
   blueprints: SlideBlueprint[]
-  mediaMap: Record<string, string>
   logs: GenerationLogEntry[]
   selectedSlideIndex: number | null
   pageStatuses: Map<number, PageProgressStatus>
@@ -149,18 +148,6 @@ const slideAspectRatio = computed<AspectRatio>(() => {
   return props.blueprints[0]?.aspect_ratio ?? 'ratio_16x9'
 })
 const slideDims = computed(() => ASPECT_DIMENSIONS[slideAspectRatio.value])
-const previewScale = computed(() => {
-  if (slideAspectRatio.value === 'ratio_48x9') return 0.067
-  if (slideAspectRatio.value === 'ratio_32x9') return 0.1
-  return 0.2
-})
-const detailPreviewScale = computed(() => {
-  if (detailStageWidth.value > 0 && slideDims.value.w > 0)
-    return detailStageWidth.value / slideDims.value.w
-  if (slideAspectRatio.value === 'ratio_48x9') return 0.105
-  if (slideAspectRatio.value === 'ratio_32x9') return 0.158
-  return 0.315
-})
 
 const pagePlans = computed(() => extractArrayDetail<PagePlan>('page_plans'))
 const layoutPlans = computed(() => extractArrayDetail<LayoutPlan>('layout_plans'))
@@ -204,24 +191,44 @@ const slideItems = computed<SlideProgressItem[]>(() => {
   })
 })
 
-// 生成看板的缩略图走 Typst 光栅化的 PNG：一次要展示很多页，每页挂一个完整幻灯片组件（玻璃主题
-// 还带 backdrop-filter）太重。直接用卡片自己的蓝图（含生成中的空位和取自日志的蓝图），
-// 缩略图下标就是 `item.index`。必须定义在 `slideItems` 之后：组合函数初始化时就会读取它。
+// 生成看板的缩略图走 Typst 光栅化的 PNG：一次要展示很多页。直接用卡片自己的蓝图（含生成中的空位和
+// 取自日志的蓝图），缩略图下标就是 `item.index`。必须定义在 `slideItems` 之后：组合函数初始化时
+// 就会读取它。位图宽度取卡片 frame 的实测宽度 × dpr，减去边框（按舞台尺寸缩放后铺满 frame）。
+const slidesGridRef = ref<HTMLElement | null>(null)
+const gridFrameWidth = ref(0)
+let gridResizeObserver: ResizeObserver | null = null
+
+watch(slidesGridRef, (el) => {
+  gridResizeObserver?.disconnect()
+  gridResizeObserver = null
+  if (!el) {
+    gridFrameWidth.value = 0
+    return
+  }
+  const measure = () => {
+    const frame = el.querySelector<HTMLElement>('.spc-preview-frame')
+    if (frame) gridFrameWidth.value = frame.clientWidth
+  }
+  gridResizeObserver = new ResizeObserver(measure)
+  gridResizeObserver.observe(el)
+  measure()
+})
+
+/** 卡片预览位的栅格宽度：还没量到时按 260px（`.slides-grid` 的最小列宽）估一个。 */
+const cardPreviewWidth = computed(() => {
+  const frame = gridFrameWidth.value || 260
+  return Math.max(Math.round((frame - 2) * slideDims.value.w / slideDims.value.h), 1)
+})
+
 const thumbnails = useTypstThumbnails({
   slides: () => slideItems.value.map(item => item.blueprint ?? null),
   projectId: () => props.projectId ?? null,
-  widthPx: () => Math.ceil(slideDims.value.w * previewScale.value * (window.devicePixelRatio || 1)),
+  widthPx: () => Math.ceil(cardPreviewWidth.value * (window.devicePixelRatio || 1)),
 })
 
-/** 有可用的 Typst 缩略图时返回它；占位页（模板还没有 Typst 版式）和失败时返回 null。 */
+/** 该页的 Typst 位图；还没有图时返回 null，由加载框占位。 */
 function thumbnailFor(index: number) {
-  const thumb = thumbnails.thumbs.value[index]
-  return thumb && !thumb.placeholder && !thumbnails.failed.value ? thumb : null
-}
-
-/** 缩略图还在路上：显示加载底，不挂幻灯片组件。占位页与失败时走幻灯片组件。 */
-function thumbnailPending(index: number) {
-  return !thumbnails.failed.value && !thumbnails.thumbs.value[index]
+  return thumbnails.thumbs.value[index] ?? null
 }
 
 function preferredSlideIndex(): number | null {
@@ -355,28 +362,27 @@ watch(detailStageRef, (el) => {
   }
 })
 
+/** 详情大图要覆盖的 CSS 宽度，取详情舞台的实测宽度（还没量到时按 16:9 的画布原宽估）。 */
+function detailStageSize() {
+  return { width: detailStageWidth.value || slideDims.value.w }
+}
+
 // 右侧详情大图同样改成 Typst 位图：牌组与看板相同（`slideItems` 的蓝图，含生成中的空位），
 // 只请求选中这一页，缓存上限 4 张。
 const detailThumbnails = useTypstThumbnails({
   slides: () => slideItems.value.map(item => item.blueprint ?? null),
   projectId: () => props.projectId ?? null,
-  widthPx: () => Math.ceil(detailCanvasSize().width * (window.devicePixelRatio || 1)),
+  widthPx: () => Math.ceil(detailStageSize().width * (window.devicePixelRatio || 1)),
   wanted: () => (props.selectedSlideIndex === null ? [] : [props.selectedSlideIndex]),
   maxCached: 4,
 })
 
-/** 详情位图要覆盖的 CSS 宽度：舞台宽（ResizeObserver 还没量到时按画布原宽，宁可清晰些）。 */
-function detailCanvasSize() {
-  return { width: detailStageWidth.value || slideDims.value.w }
-}
-
-/** 选中页的 Typst 位图；占位页（模板还没有 Typst 版式）与失败时返回 null。 */
+/** 选中页的 Typst 位图；还没有图时返回 null，由加载框占位。 */
 function detailThumbnail() {
   const index = props.selectedSlideIndex
-  if (index === null || detailThumbnails.failed.value)
+  if (index === null)
     return null
-  const thumb = detailThumbnails.thumbs.value[index]
-  return thumb && !thumb.placeholder ? thumb : null
+  return detailThumbnails.thumbs.value[index] ?? null
 }
 
 onMounted(() => {
@@ -387,6 +393,10 @@ onBeforeUnmount(() => {
   if (detailResizeObserver) {
     detailResizeObserver.disconnect()
     detailResizeObserver = null
+  }
+  if (gridResizeObserver) {
+    gridResizeObserver.disconnect()
+    gridResizeObserver = null
   }
 })
 </script>
@@ -475,7 +485,7 @@ onBeforeUnmount(() => {
           <p>生成开始后，这里会直接显示每一张幻灯片的生成进度。</p>
         </div>
 
-        <div v-else class="slides-grid">
+        <div v-else ref="slidesGridRef" class="slides-grid">
           <button
             v-for="item in slideItems"
             :key="item.index"
@@ -514,19 +524,13 @@ onBeforeUnmount(() => {
                 class="spc-preview-frame"
                 :style="{ aspectRatio: `${slideDims.w} / ${slideDims.h}` }"
               >
-                <img
-                  v-if="thumbnailFor(item.index)"
-                  class="spc-preview-img"
-                  :src="thumbnailFor(item.index)!.url"
-                  draggable="false"
+                <SlideFrame
+                  :src="thumbnailFor(item.index)?.url ?? null"
+                  :pending="thumbnails.pending.value"
+                  :error="thumbnails.failed.value"
                   alt=""
-                >
-                <div v-else-if="thumbnailPending(item.index)" class="spc-preview-loading" aria-hidden="true">
-                  <span class="i-carbon:image" />
-                </div>
-                <div v-else class="spc-preview-canvas" :style="{ width: slideDims.w + 'px', height: slideDims.h + 'px', transform: `scale(${previewScale})` }">
-                  <SlideRenderer :slide="item.blueprint" :slide-index="item.index" :media-map="props.mediaMap" />
-                </div>
+                  @retry="thumbnails.refresh()"
+                />
               </div>
               <div v-else class="spc-preview-placeholder">
                 <span class="i-carbon:task" />
@@ -563,19 +567,15 @@ onBeforeUnmount(() => {
             >
               <!--
                 Typst 位图直接铺满舞台（舞台已按页面比例定高），不放进带 `transform: scale()` 的
-                `.sdp-preview-canvas`：那里的 CSS 尺寸会再被缩放一次，图只剩左上角一小块。
+                画布里：那里的 CSS 尺寸会再被缩放一次，图只剩左上角一小块。
               -->
-              <img
-                v-if="detailThumbnail()"
-                class="sdp-preview-img"
-                :src="detailThumbnail()!.url"
-                draggable="false"
+              <SlideFrame
+                :src="detailThumbnail()?.url ?? null"
+                :pending="detailThumbnails.pending.value"
+                :error="detailThumbnails.failed.value"
                 alt=""
-              >
-              <!-- 还没有图、占位页或失败：照旧渲染幻灯片组件，详情不能空白。 -->
-              <div v-else class="sdp-preview-canvas" :style="{ width: slideDims.w + 'px', height: slideDims.h + 'px', transform: `scale(${detailPreviewScale})` }">
-                <SlideRenderer :slide="selectedSlide.blueprint" :slide-index="selectedSlide.index" :media-map="props.mediaMap" />
-              </div>
+                @retry="detailThumbnails.refresh()"
+              />
             </div>
             <div v-else class="sdp-preview-empty">
               <span class="i-carbon:image-search" />
@@ -993,38 +993,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border-radius: 12px;
   border: 1px solid var(--studio-border);
-  background: #0b1020;
-}
-
-.spc-preview-canvas {
-  width: 1280px;
-  height: 720px;
-  transform: scale(0.2);
-  transform-origin: top left;
-}
-
-/* Typst 光栅化的缩略图：整块 frame 就是这页的比例，图片按 contain 落位。 */
-.spc-preview-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-/* 缩略图还没到时的加载底：沿用 frame 的比例，不再挂完整的幻灯片组件。 */
-.spc-preview-loading {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: var(--studio-bg);
-  color: var(--studio-muted);
-}
-
-.spc-preview-loading span {
-  font-size: 1.4rem;
-  opacity: 0.35;
 }
 
 .spc-preview-placeholder,
@@ -1040,7 +1009,7 @@ onBeforeUnmount(() => {
   text-align: center;
   border-radius: 12px;
   border: 1px solid var(--studio-border);
-  background: #0b1020;
+  background: var(--studio-bg);
 }
 
 .spc-preview-placeholder span,
@@ -1092,22 +1061,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border-radius: 14px;
   border: 1px solid var(--studio-border);
-  background: #0b1020;
-}
-
-.sdp-preview-canvas {
-  width: 1280px;
-  height: 720px;
-  transform: scale(0.315);
-  transform-origin: top left;
-}
-
-/* 详情大图的 Typst 位图：铺满按页面比例定高的舞台。 */
-.sdp-preview-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: fill;
+  background: var(--studio-bg);
 }
 
 .sdp-note {

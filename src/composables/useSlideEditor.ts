@@ -409,7 +409,6 @@ export function useSlideEditor(options: {
   setActiveSlide: (v: number) => void
   currentStep: () => number
   projectId: () => number | null
-  mediaMap: () => Record<string, string>
   blueprints: () => SlideBlueprint[]
 }) {
   const projectsStore = useProjectsStore()
@@ -423,7 +422,8 @@ export function useSlideEditor(options: {
   const showKindPicker = ref(false)
   const kindPickerMode = ref<'add' | 'change'>('add')
   const previewArea = ref<HTMLElement | null>(null)
-  const previewScale = ref(0.45)
+  /** 预览舞台相对画布原尺寸的缩放：由预览区实测尺寸决定。 */
+  const previewFit = ref(0.45)
   const jsonTextareaRef = ref<HTMLTextAreaElement | null>(null)
   let editorRo: ResizeObserver | null = null
 
@@ -486,7 +486,7 @@ export function useSlideEditor(options: {
       const bp = editorPreviewSlide.value
       const ratio = bp?.aspect_ratio ?? 'ratio_16x9'
       const dims = ASPECT_DIMENSIONS[ratio]
-      previewScale.value = Math.min(w / dims.w, h / dims.h)
+      previewFit.value = Math.min(w / dims.w, h / dims.h)
     }
   }
 
@@ -626,8 +626,8 @@ export function useSlideEditor(options: {
     const ratio = bp?.aspect_ratio ?? 'ratio_16x9'
     return ASPECT_DIMENSIONS[ratio]
   })
-  const editorStageW = computed(() => Math.round(currentSlideDims.value.w * previewScale.value))
-  const editorStageH = computed(() => Math.round(currentSlideDims.value.h * previewScale.value))
+  const editorStageW = computed(() => Math.round(currentSlideDims.value.w * previewFit.value))
+  const editorStageH = computed(() => Math.round(currentSlideDims.value.h * previewFit.value))
 
   return {
     jsonText,
@@ -638,13 +638,11 @@ export function useSlideEditor(options: {
     showKindPicker,
     kindPickerMode,
     previewArea,
-    previewScale,
     jsonTextareaRef,
     editorKind,
     editorPreviewSlide,
     editorStageW,
     editorStageH,
-    currentSlideDims,
     replaceEditorDraft,
     onEditorJsonInput,
     onEditorJsonKeydown,

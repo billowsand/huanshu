@@ -1,4 +1,4 @@
-import { ref, computed, nextTick } from 'vue'
+import { ref, nextTick } from 'vue'
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 import { readFile } from '@tauri-apps/plugin-fs'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -32,10 +32,6 @@ export function useMediaLibrary(options: {
 
   const mediaItems = ref<MediaItem[]>([])
   const mediaDropOver = ref(false)
-
-  const mediaMap = computed<Record<string, string>>(() =>
-    Object.fromEntries(mediaItems.value.map(item => [String(item.id), item.url])),
-  )
 
   function getMimeType(ext: string): string {
     const map: Record<string, string> = {
@@ -196,7 +192,6 @@ export function useMediaLibrary(options: {
   return {
     mediaItems,
     mediaDropOver,
-    mediaMap,
     MEDIA_EXTS_IMG,
     MEDIA_EXTS_VID,
     MEDIA_EXTS,

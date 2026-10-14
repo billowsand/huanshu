@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import SlideRenderer from '../components/SlideRenderer.vue'
+import SlideFrame from '../components/SlideFrame.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import type { SlideBlueprint, AspectRatio } from '../components/types'
 import { ASPECT_DIMENSIONS } from '../components/types'
@@ -10,7 +10,6 @@ import { useTypstThumbnails } from '../composables/useTypstThumbnails'
 
 const props = defineProps<{
   blueprints: SlideBlueprint[]
-  mediaMap: Record<string, string>
   initialSlide?: number
   projectId?: number | null
 }>()
@@ -81,14 +80,6 @@ const stageSize = computed(() => {
     width: slideDimensions.value.w * uniformScale.value,
     height: slideDimensions.value.h * uniformScale.value,
   }
-})
-
-const slideTransform = computed(() => {
-  if (stretchToFill.value) {
-    return `scale(${stretchScale.value.scaleX}, ${stretchScale.value.scaleY})`
-  }
-
-  return `scale(${uniformScale.value})`
 })
 
 watch(
@@ -197,11 +188,12 @@ function selectSlide(idx: number) {
 }
 
 // 全览里的缩略图：256×144 的框装不下完整幻灯片组件（原来写死 1280×720 scale(0.2)，32:9 / 48:9
-// 的页面直接被裁掉），改用 Typst 光栅化的 PNG，按各页自己的比例等比缩放。只在全览打开时渲染。
+// 的页面直接被裁掉），改用 Typst 光栅化的 PNG，按各页自己的比例定框。只在全览打开时渲染。
 const OVERVIEW_WIDTH = 256
 const OVERVIEW_HEIGHT = 144
 
-function overviewImgSize(slide: SlideBlueprint | undefined) {
+/** 全览里这一页缩略框的像素尺寸（按本页比例装进 256×144）。 */
+function overviewBoxSize(slide: SlideBlueprint | undefined) {
   const dims = ASPECT_DIMENSIONS[slide?.aspect_ratio ?? 'ratio_16x9']
   const scale = Math.min(OVERVIEW_WIDTH / dims.w, OVERVIEW_HEIGHT / dims.h)
   return { width: `${Math.round(dims.w * scale)}px`, height: `${Math.round(dims.h * scale)}px` }
@@ -214,26 +206,14 @@ const thumbnails = useTypstThumbnails({
   enabled: () => showOverview.value,
 })
 
-/** 可直接显示的缩略图；占位页（模板还没有 Typst 版式）和失败时返回 null，走幻灯片组件。 */
+/** 该页的 Typst 缩略图；还没有图时返回 null，由加载框占位。 */
 function overviewThumb(idx: number) {
-  const thumb = thumbnails.thumbs.value[idx]
-  return thumb && !thumb.placeholder && !thumbnails.failed.value ? thumb : null
+  return thumbnails.thumbs.value[idx] ?? null
 }
 
 // ── 演示主画面 ────────────────────────────────────────────────────────────────
 // 与全览那个实例分开：全览只要 256px 宽、一次要整副，主画面要覆盖整个舞台、
-// 只要当前页前后各 2 页（翻页时下一页已经就绪），两者的宽度档位和缓存都不同。
-
-/** `'0'` 时主画面整体回退到幻灯片组件，用于 A/B 对比（与缩略图开关同一约定）。 */
-const TYPST_STAGE_KEY = 'huanshu.typstStage'
-
-function stageImageEnabled(): boolean {
-  try {
-    return localStorage.getItem(TYPST_STAGE_KEY) !== '0'
-  } catch {
-    return true
-  }
-}
+// 只要当前页前一页到后三页（往后翻比往前翻多得多），两者的宽度档位和缓存都不同。
 
 /**
  * 要覆盖舞台所需的位图宽度。页面比例固定，拉伸模式下舞台可能非等比，所以取
@@ -250,28 +230,22 @@ const stage = useTypstThumbnails({
   projectId: () => props.projectId ?? null,
   widthPx: stageImageWidth,
   // 演示中、且不在全览模式（全览时主画面根本不在 DOM 里）。
-  enabled: () => !showOverview.value && stageImageEnabled(),
+  enabled: () => !showOverview.value,
   wanted: () => {
     const last = props.blueprints.length - 1
-    return [presentSlide.value - 2, presentSlide.value - 1, presentSlide.value, presentSlide.value + 1, presentSlide.value + 2]
+    return [presentSlide.value - 1, presentSlide.value, presentSlide.value + 1, presentSlide.value + 2, presentSlide.value + 3]
       .filter(index => index >= 0 && index <= last)
   },
-  maxCached: 8,
+  maxCached: 10,
 })
 
 watch(presentSlide, () => {
   void stage.refresh()
 })
 
-function stageImageSize() {
-  return { width: `${stageSize.value.width}px`, height: `${stageSize.value.height}px` }
-}
-
-/** 当前页可用的位图；还没有图、是占位页或失败时返回 null，走 `.pres-slide` 里的幻灯片组件。 */
+/** 当前页的位图；还没有图时返回 null，由加载框占位。 */
 function stageThumb() {
-  if (!stageImageEnabled()) return null
-  const thumb = stage.thumbs.value[presentSlide.value]
-  return thumb && !thumb.placeholder && !stage.failed.value ? thumb : null
+  return stage.thumbs.value[presentSlide.value] ?? null
 }
 
 function handleStageClick() {
@@ -410,31 +384,16 @@ onBeforeUnmount(() => {
         <Transition :name="slideTransitionName">
           <div :key="presentSlide" class="pres-slide-wrapper">
             <!--
-              Typst 光栅化的当前页。img 直接放在 wrapper 里、尺寸就是舞台尺寸：放进
-              `.pres-slide` 的 `transform: scale()` 里会先按 1280×720 排版再放大，
-              位图可能按小尺寸栅格化而发糊。拉伸模式本来就要非等比铺满，所以 fill。
+              Typst 光栅化的当前页，尺寸就是舞台尺寸。拉伸模式本来就要非等比铺满，所以铺满整个 wrapper
+              （`SlideFrame` 里 `object-fit: fill`）。还没有图时显示加载框，主画面不放空白。
             -->
-            <img
-              v-if="stageThumb()"
-              class="pres-slide-img"
-              :src="stageThumb()!.url"
-              :style="stageImageSize()"
-              draggable="false"
+            <SlideFrame
+              :src="stageThumb()?.url ?? null"
+              :pending="stage.pending.value"
+              :error="stage.failed.value"
               alt=""
-            >
-            <!-- 还没有图（首次进入、跳页超出预取范围）、占位页或失败：照旧渲染幻灯片组件，主画面不能空白。 -->
-            <div
-              v-else
-              class="pres-slide"
-              :style="{
-                width: `${slideDimensions.w}px`,
-                height: `${slideDimensions.h}px`,
-                transform: slideTransform,
-                transformOrigin: 'top left',
-              }"
-            >
-              <SlideRenderer v-if="blueprints[presentSlide]" :slide="(blueprints[presentSlide] as unknown as SlideBlueprint)" :slide-index="presentSlide" :media-map="mediaMap" />
-            </div>
+              @retry="stage.refresh()"
+            />
           </div>
         </Transition>
       </div>
@@ -454,19 +413,14 @@ onBeforeUnmount(() => {
           :title="`${idx + 1}. ${bp.title}`"
           @click="selectSlide(idx)"
         >
-          <div class="pres-overview-thumb">
-            <img
-              v-if="overviewThumb(idx)"
-              class="pres-overview-img"
-              :src="overviewThumb(idx)!.url"
-              :style="overviewImgSize(bp)"
-              draggable="false"
+          <div class="pres-overview-thumb" :style="overviewBoxSize(bp)">
+            <SlideFrame
+              :src="overviewThumb(idx)?.url ?? null"
+              :pending="thumbnails.pending.value"
+              :error="thumbnails.failed.value"
               alt=""
-            >
-            <div v-else-if="!thumbnails.failed.value && !thumbnails.thumbs.value[idx]" class="pres-overview-loading" :style="overviewImgSize(bp)" aria-hidden="true" />
-            <div v-else class="pres-overview-slide">
-              <SlideRenderer :slide="(bp as unknown as SlideBlueprint)" :slide-index="idx" :media-map="mediaMap" />
-            </div>
+              @retry="thumbnails.refresh()"
+            />
           </div>
           <div class="pres-overview-meta">
             <span class="pres-overview-index">{{ idx + 1 }}</span>

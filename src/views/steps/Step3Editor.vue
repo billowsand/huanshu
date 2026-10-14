@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import SlideRenderer from '../../components/SlideRenderer.vue'
+import SlideFrame from '../../components/SlideFrame.vue'
 import { chartProblems } from '../../components/chartOptions'
 import { ALL_KINDS, KIND_FIELDS, KIND_META } from '../../composables/useSlideEditor'
 import { useTypstThumbnails } from '../../composables/useTypstThumbnails'
 import type { SlideBlueprint, SlideKind } from '../../components/types'
 import type { MediaItem } from '../../composables/useMediaLibrary'
-
-/** 编辑器预览的 Typst 位图开关（`'0'` 关闭，回退到 `SlideRenderer`，用于 A/B 对比）。 */
-const TYPST_EDITOR_PREVIEW_KEY = 'huanshu.typstEditorPreview'
 
 type FieldType = 'text' | 'textarea' | 'select' | 'boolean'
 
@@ -436,7 +433,6 @@ const props = defineProps<{
   projectId: number | null
   blueprints: SlideBlueprint[]
   mediaItems: MediaItem[]
-  mediaMap: Record<string, string>
   jsonText: string
   jsonError: string
   liveSlide: SlideBlueprint | null
@@ -445,12 +441,10 @@ const props = defineProps<{
   showKindPicker: boolean
   kindPickerMode: 'add' | 'change'
   previewArea: HTMLElement | null
-  previewScale: number
   editorKind: SlideKind
   editorPreviewSlide: SlideBlueprint | null
   editorStageW: number
   editorStageH: number
-  currentSlideDims: { w: number, h: number }
   jsonTextareaRef: HTMLTextAreaElement | null
   exportingPdf?: boolean
 }>()
@@ -774,39 +768,27 @@ function setActiveSlide(index: number) {
 }
 
 // ── Typst 预览位图 ────────────────────────────────────────────────────────────
-// 编辑器的预览改成 Typst 光栅化的 PNG（与缩略图、演示主画面同一条链路）。
-// **只发当前这一页**：版式只依赖本页数据，单页编译最快（`chart:<index>` 与溢出标记的下标
-// 都是 0，取图时换算回 `activeSlide`）。打字时每敲一个字内容就变，缓存帮不上忙，所以用
-// `serial`（同一时刻只有一个请求在途）把连续输入合并成一次尾部请求，再用 `progressive`
-// 让每个响应只要比画面新就先落下：预览最多落后一个请求的时间，停手后一定落在最新内容上。
-
-function editorPreviewEnabled(): boolean {
-  try {
-    return localStorage.getItem(TYPST_EDITOR_PREVIEW_KEY) !== '0'
-  } catch {
-    return true
-  }
-}
+// 编辑器的预览走 Typst 光栅化的 PNG（与缩略图、演示主画面同一条链路）。
+// **只发当前这一页**：版式只依赖本页数据，单页编译最快（溢出标记的下标是 0，取图时换算回
+// `activeSlide`）。打字时每敲一个字内容就变，缓存帮不上忙，所以用 `serial`（同一时刻只有一个
+// 请求在途）把连续输入合并成一次尾部请求，再用 `progressive` 让每个响应只要比画面新就先落下：
+// 预览最多落后一个请求的时间，停手后一定落在最新内容上。
 
 const typstPreview = useTypstThumbnails({
   slides: () => (props.editorPreviewSlide ? [props.editorPreviewSlide] : []),
   projectId: () => props.projectId ?? null,
   widthPx: () => Math.ceil(Math.max(props.editorStageW, 1) * (window.devicePixelRatio || 1)),
-  enabled: editorPreviewEnabled,
-  // 换页就是换目标：上一页的在途响应作废，图和键清空，调用方立刻回退到幻灯片组件。
+  // 换页就是换目标：上一页的在途响应作废，图清空，界面显示加载框。
   resetKey: () => props.activeSlide,
   serial: true,
   progressive: true,
   debounceMs: 120,
 })
 
-/** 这一页的 Typst 位图；占位页（模板还没有 Typst 版式）与失败时返回 null。 */
+/** 这一页的 Typst 位图；还没有图时返回 null，由加载框占位。 */
 const typstPreviewImage = computed(() => {
-  if (!editorPreviewEnabled() || typstPreview.failed.value)
-    return null
   // 只发这一页，所以它在数组里的下标恒为 0（`activeSlide` 是牌组页序，不是这里的键）。
-  const thumb = typstPreview.thumbs.value[0]
-  return thumb && !thumb.placeholder ? thumb : null
+  return typstPreview.thumbs.value[0] ?? null
 })
 
 
@@ -832,10 +814,6 @@ watch(() => typstPreview.pending.value, (pending) => {
 const typstPreviewClipped = computed(() =>
   Boolean(typstPreview.overflow.value[0]),
 )
-
-function typstPreviewSize() {
-  return { width: `${props.editorStageW}px`, height: `${props.editorStageH}px` }
-}
 
 function shouldIgnoreEditorKeydown(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement))
@@ -961,25 +939,16 @@ onBeforeUnmount(() => {
             :style="{ width: editorStageW + 'px', height: editorStageH + 'px' }"
           >
             <!--
-              Typst 位图直接按舞台尺寸显示（不能放进带 `transform: scale()` 的
-              `.edit-preview-canvas`，缩放过的位图会发糊）。
+              Typst 位图直接按舞台尺寸显示（不能放进带 `transform: scale()` 的画布，
+              缩放过的位图会发糊）。还没有图时显示加载框，预览不放空白。
             -->
-            <img
-              v-if="typstPreviewImage"
-              class="edit-preview-img"
-              :src="typstPreviewImage.url"
-              :style="typstPreviewSize()"
-              draggable="false"
+            <SlideFrame
+              :src="typstPreviewImage?.url ?? null"
+              :pending="typstPreview.pending.value"
+              :error="typstPreview.failed.value"
               alt=""
-            >
-            <!-- 还没有图（首次渲染、刚换页）、占位页或失败：照旧渲染幻灯片组件，预览不能空白。 -->
-            <div
-              v-else
-              class="edit-preview-canvas"
-              :style="{ transform: `scale(${previewScale})`, transformOrigin: 'top left', width: currentSlideDims.w + 'px', height: currentSlideDims.h + 'px' }"
-            >
-              <SlideRenderer :slide="(editorPreviewSlide as any)" :slide-index="activeSlide" :media-map="mediaMap" />
-            </div>
+              @retry="typstPreview.refresh()"
+            />
           </div>
         </div>
         <p v-if="typstPreviewClipped" class="edit-preview-clip" role="status">
