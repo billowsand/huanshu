@@ -3,6 +3,15 @@ members = [
     "src-tauri",
     "crates/huanshu-core",
     "crates/slide-typst",
+    "apps/huanshu-native",
+]
+# `huanshu-native` pulls in GPUI Kit, which is slow to build. Plain `cargo build` and
+# `cargo test` cover the three crates that ship with the Tauri app; `cargo test --workspace`
+# and an explicit `-p huanshu-native` still build the native UI.
+default-members = [
+    "src-tauri",
+    "crates/huanshu-core",
+    "crates/slide-typst",
 ]
 resolver = "2"
 
