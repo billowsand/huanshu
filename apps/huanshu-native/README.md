@@ -38,6 +38,8 @@ src/
   widgets.rs     共用部件：按钮、徽章、面板、标题栏、主题圆点、todo_block 占位
   icons.rs       Carbon 图标（与原版同一套）+ 品牌图标的资源源
   slides.rs      Typst 位图：SlideImages（调度、落图、释放）+ slide_frame（加载/失败/重试）
+  formulas.rs    预览里的数学公式：TextView 的 Markdown 插件（`$…$` / `$$…$$` → Typst 出图）
+                 + FormulaCache（上限 512 条，淘汰的图由 Step1 render 顺路 drop_all）
   tasks.rs       线程：run_bg（同步重活）、run_async（core 的 async，tokio）、listen_events（生成事件）
   present.rs     演示覆盖层
   export.rs      保存对话框、PDF 结果对话框
@@ -81,6 +83,10 @@ src/
 - 按钮的 `disabled` / `selected` 来自 trait：`use gpui_kit::component::{Disableable as _, Selectable as _};`
 - `img("brand/mark.svg")` 走资源源（彩色 SVG）；`Icon` 走单色遮罩，按文字颜色着色。
 - Markdown 渲染：`gpui_kit::component::text::TextView::markdown(id, text)`。
+  预览里的数学公式挂 `formulas.rs` 的插件（`markdown_extensions`）：`parse` 在后台只判定并带上
+  latex，`render_inline` / `render` 每帧只读 `FormulaCache`（出图在后台，键 = 公式 + 行内/块级 +
+  正文色 + 0.5pt 字号档）。**淘汰下来的公式图必须 `drop_all`**（`Step1::render` 顺路做），
+  与幻灯片位图同一条规矩。定界规则用 `huanshu_core::markdown_tools`（「价格 $5 和 $10」不被吞）。
 - 代码编辑器：`EditorState::new(window, cx).language("markdown")` + `Editor::new(&state)`。
 - **GPUI Kit 里改不掉的字重**（规矩 12 的例外，共两处）：`TextView::markdown` 的表头
   （`gpui-component` 的 `table_head` 固定 `FontWeight::BOLD`）；语法高亮里的 `emphasis.strong`（700）

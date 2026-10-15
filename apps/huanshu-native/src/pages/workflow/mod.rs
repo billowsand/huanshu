@@ -969,7 +969,8 @@ impl WorkflowPage {
         match self.view.take() {
             Some(StepView::Generate(view)) => view.update(cx, |view, cx| view.release(cx)),
             Some(StepView::Edit(view)) => view.update(cx, |view, cx| view.release(cx)),
-            Some(StepView::Prepare(_)) | None => {}
+            Some(StepView::Prepare(view)) => view.update(cx, |view, cx| view.release(cx)),
+            None => {}
         }
     }
 }

@@ -12,8 +12,15 @@ use image::{Frame as ImageFrame, ImageBuffer, Rgba};
 
 /// 把一页像素包成 GPUI 图片。
 pub fn to_render_image(page: PixelPage) -> Arc<RenderImage> {
-    let bgra = to_bgra(&page.pixels);
-    let buffer = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(page.width, page.height, bgra)
+    from_rgba(page.width, page.height, page.pixels)
+}
+
+/// RGBA8 原始像素（宽 × 高 × 4 字节）→ GPUI 图片。
+///
+/// 公式预览图（PNG 解码后也是 RGBA8）走这里：通道顺序的秘密只留在本模块。
+pub fn from_rgba(width: u32, height: u32, pixels: Vec<u8>) -> Arc<RenderImage> {
+    let bgra = to_bgra(&pixels);
+    let buffer = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(width, height, bgra)
         .expect("a raster page always holds width × height × 4 bytes");
     Arc::new(RenderImage::new([ImageFrame::new(buffer)]))
 }

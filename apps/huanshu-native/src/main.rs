@@ -11,6 +11,7 @@
 mod app;
 mod cli;
 mod export;
+mod formulas;
 mod generation;
 mod icons;
 mod images;

@@ -21,6 +21,7 @@ use huanshu_core::services::{generation, media, projects};
 use huanshu_core::types::AspectRatio;
 
 use super::{ProjectModel, WorkflowPage};
+use crate::formulas;
 use crate::icons::carbon;
 use crate::router::Route;
 use crate::shell::ShellHandle;
@@ -110,6 +111,8 @@ pub struct Step1 {
     /// 滚动同步的回声守卫：我们设编辑器滚动时期望的比例，编辑器观察器回来比对，
     /// 匹配则说明是回声，不再反向同步（原版 `syncingFromEditor` / `syncingFromPreview`）。
     sync_echo: Option<f32>,
+    /// 预览里的公式图（`formulas.rs`）：`TextView` 的插件只读它，出图在后台。
+    formulas: Entity<formulas::FormulaCache>,
     /// 模型里的名称被外部改写（自动保存兜底名、侧栏改名、上传/AI 优化取 H1）后，
     /// 观察器里发现与输入框不同步就置位，推迟到 render 里 `set_value` 回填
     /// （观察回调拿不到 window；`set_value` 不发 Change 事件，无回声）。
@@ -141,6 +144,7 @@ impl Step1 {
                 .placeholder(EDITOR_PLACEHOLDER)
                 .default_value(md)
         });
+        let formulas = cx.new(|_| formulas::FormulaCache::new());
         let subscriptions = vec![
             cx.subscribe(&name, |this: &mut Self, state, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -171,6 +175,8 @@ impl Step1 {
                     cx.notify();
                 }
             }),
+            // 公式出图落地（或失败）后重画预览：插件的渲染只读缓存，画什么由这一次通知决定。
+            cx.observe(&formulas, |_this: &mut Self, _cache, cx| cx.notify()),
         ];
         Self {
             model,
@@ -184,9 +190,17 @@ impl Step1 {
             media_drop_over: false,
             preview_scroll: ScrollHandle::new(),
             sync_echo: None,
+            formulas,
             name_sync_pending: false,
             subscriptions,
         }
+    }
+
+    /// 离开工作流 / 换步骤：交还公式图（`WorkflowPage::release` 调，README 规矩 5）。
+    /// 这里拿不到 window，`drop_all` 用 `None`（与 `SlideImages::release` 一致）。
+    pub fn release(&mut self, cx: &mut Context<Self>) {
+        let images = self.formulas.update(cx, |cache, _| cache.drain());
+        crate::images::drop_all(images, None, cx);
     }
 
     fn set_aspect(&mut self, aspect: AspectRatio, cx: &mut Context<Self>) {
@@ -660,6 +674,13 @@ impl Render for Step1 {
         let h2 = markdown_tools::count_exact_headings(&md, 2);
         let h3 = markdown_tools::count_exact_headings(&md, 3);
 
+        // 公式缓存淘汰下来的位图在这里真正交还 GPUI（`RenderImage` 不回收就漏图集 tile，
+        // 见 `images.rs`）。顺路做，不额外占一帧。
+        let released = self.formulas.update(cx, |cache, _| cache.take_released());
+        crate::images::drop_all(released, Some(window), cx);
+        // 插件每帧重建都可以（形状稳定 → 框架不重新解析文档）；实例里只有缓存实体的句柄。
+        let md_extensions = formulas::extensions(&self.formulas);
+
         let optimizing = self.optimizing;
         let optimize_error = self.optimize_error.clone();
         let tools_disabled = optimizing || !has_md;
@@ -791,7 +812,8 @@ impl Render for Step1 {
         };
 
         // 预览页卡片（原版 `MarkdownWorkbench.vue` 的 `md-preview-slide`）：
-        // 空文稿也是一张「P1」卡片 + 空态文案；否则按粒度切页，每页 `TextView::markdown`。
+        // 空文稿也是一张「P1」卡片 + 空态文案；否则按粒度切页，每页 `TextView::markdown`
+        // （挂上公式扩展：`$…$` / `$$…$$` 由 `formulas.rs` 出图）。
         let preview_card = |index: usize, content: Option<String>| {
             div()
                 .relative()
@@ -817,7 +839,10 @@ impl Render for Step1 {
                 .child(match content {
                     Some(chunk) => div()
                         .p(px(18.0))
-                        .child(TextView::markdown(("md-preview", index), chunk))
+                        .child(
+                            TextView::markdown(("md-preview", index), chunk)
+                                .markdown_extensions(md_extensions.clone()),
+                        )
                         .into_any_element(),
                     None => div()
                         .p(px(18.0))
