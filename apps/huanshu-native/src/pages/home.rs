@@ -13,6 +13,7 @@ use gpui_kit::component::{Disableable as _, Selectable as _};
 use gpui_kit::prelude::*;
 use gpui_kit::{div, px, Context, Entity, Render, SharedString, Window};
 use huanshu_core::db::ProjectSummary;
+use huanshu_core::services::generation;
 use huanshu_core::services::{projects, storage};
 use huanshu_core::types::AspectRatio;
 
@@ -21,12 +22,38 @@ use crate::icons::carbon;
 use crate::password_dialog::{PasswordDialog, PasswordMode};
 use crate::router::{Route, SettingsTab};
 use crate::shell::ShellHandle;
-use crate::tasks::run_bg;
+use crate::tasks::{run_async, run_bg};
 use crate::theme::StudioExt as _;
 use crate::widgets::{self, Tone2};
 
-/// 内容列的最大宽度（原版 `.home-body` 的 `max-width`）。
-const BODY_MAX_W: f32 = 750.0;
+/// 内容列的最大宽度（原版 `.home-body` 的 `max-width: 860px`，`box-sizing: border-box`
+/// 所以 1.5rem 的内边距算在里面）。
+const BODY_MAX_W: f32 = 860.0;
+
+/// 原版 `usePdfExport.ts` 的 `safeFileName`：PDF 的默认文件名去掉 Windows 不允许的字符
+/// （连续的非法字符合成一个 `_`，名字为空时用「未命名演示」）。`.keynn` 照原版不做处理
+/// （`HomeView.vue` 的 `doExport` 直接用 `${p.name}.keynn`）。
+fn safe_file_name(name: &str) -> String {
+    const INVALID: [char; 9] = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
+    let name = name.trim();
+    if name.is_empty() {
+        return "未命名演示".to_string();
+    }
+    let mut out = String::with_capacity(name.len());
+    let mut in_invalid = false;
+    for character in name.chars() {
+        if INVALID.contains(&character) {
+            if !in_invalid {
+                out.push('_');
+                in_invalid = true;
+            }
+        } else {
+            out.push(character);
+            in_invalid = false;
+        }
+    }
+    out
+}
 
 /// 导入读文件的两种走向（原版 `handleImport` 的分支）。
 enum ImportRead {
@@ -44,6 +71,8 @@ pub struct HomePage {
     show_theme_picker: bool,
     /// 正在导出的项目（按钮显示转圈，禁止重复点击）。
     exporting: Option<i64>,
+    /// PDF 导出互斥（原版 `usePdfExport.ts` 的全局 `exporting`：同一时刻只跑一次）。
+    pdf_exporting: bool,
     importing: bool,
     /// 加密导入：已读入内存、等待密码的 `.keynn` 字节（原版 `pendingImportData`）。
     pending_import: Option<Vec<u8>>,
@@ -59,11 +88,21 @@ impl HomePage {
             load_error: None,
             show_theme_picker: false,
             exporting: None,
+            pdf_exporting: false,
             importing: false,
             pending_import: None,
             password_dialog: None,
         };
         page.reload(window, cx);
+        // 原版 `onMounted` 的另一半：`invoke("ensure_icon_embeddings").catch(() => {})`
+        // （`HomeView.vue:35`）。结果与错误都忽略——没配向量库时让它失败就好，不挡界面。
+        let preheat = page.handle.shared().clone();
+        run_async(
+            window,
+            cx,
+            async move { generation::ensure_icon_embeddings(&preheat).await },
+            |_page: &mut Self, _result: Result<(), String>, _window, _cx| {},
+        );
         page
     }
 
@@ -298,10 +337,16 @@ impl HomePage {
     }
 
     fn export_pdf(&mut self, project: ProjectSummary, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(path) = export::ask_save_path(&format!("{}.pdf", project.name), "PDF", "pdf")
-        else {
+        // 原版 `usePdfExport.exportPdf` 开头就是 `if (exporting.value) return;`：同一时刻
+        // 只跑一次 PDF 导出，第二次静默忽略（连保存对话框都不弹）。
+        if self.pdf_exporting {
+            return;
+        }
+        let default_name = format!("{}.pdf", safe_file_name(&project.name));
+        let Some(path) = export::ask_save_path(&default_name, "PDF", "pdf") else {
             return;
         };
+        self.pdf_exporting = true;
         self.exporting = Some(project.id);
         cx.notify();
         let shared = self.handle.shared().clone();
@@ -311,6 +356,7 @@ impl HomePage {
             cx,
             move || crate::app::export_pdf(&shared, project.id, None, path, theme),
             |page: &mut Self, result, window, cx| {
+                page.pdf_exporting = false;
                 page.exporting = None;
                 export::show_report(result, None, window, cx);
                 cx.notify();
@@ -453,7 +499,7 @@ impl Render for HomePage {
         let (settings_handle, new_handle) = (handle.clone(), handle.clone());
         let top_bar = div()
             .flex_none()
-            .h(px(44.0))
+            .h(px(48.0))
             .px(px(20.0))
             .flex()
             .flex_row()
@@ -472,6 +518,12 @@ impl Render for HomePage {
                     .child(
                         div()
                             .relative()
+                            // 原版 `.theme-anchor` 的 `@click.stop`（`HomeView.vue:181`）：
+                            // 浮层里的点击不再往上冒泡，否则根节点的「点空白关浮层」会在
+                            // mouse down 时先把浮层拆掉，主题圆点就点不到了。
+                            .on_mouse_down(gpui_kit::MouseButton::Left, |_event, _window, cx| {
+                                cx.stop_propagation()
+                            })
                             .child(
                                 widgets::icon_button("theme", "color-palette", "切换主题")
                                     .selected(self.show_theme_picker)
@@ -489,14 +541,23 @@ impl Render for HomePage {
                                         .right_0()
                                         .p(px(10.0))
                                         .shadow_lg()
-                                        .child(widgets::theme_dots(
-                                            "home-theme",
-                                            theme_id,
-                                            move |id, window, cx| {
-                                                handle.set_theme(id, true, window, cx)
-                                            },
-                                            cx,
-                                        )),
+                                        .child(
+                                            // 原版 `ThemeToggle.vue` 的「主题」标签（`:29-30`）。
+                                            div()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap(px(8.0))
+                                                .child(widgets::section_label("主题", cx))
+                                                .child(widgets::theme_dots(
+                                                    "home-theme",
+                                                    theme_id,
+                                                    move |id, window, cx| {
+                                                        handle.set_theme(id, true, window, cx)
+                                                    },
+                                                    cx,
+                                                )),
+                                        ),
                                 )
                             }),
                     )
@@ -683,7 +744,8 @@ impl Render for HomePage {
                             .mx_auto()
                             .w_full()
                             .max_w(px(BODY_MAX_W))
-                            .px(px(4.0))
+                            // 原版 `.home-body` 的 `padding: 1.5rem`（含左右）。
+                            .px(px(24.0))
                             .py(px(24.0))
                             .flex()
                             .flex_col()
@@ -816,5 +878,19 @@ impl HomePage {
                         )),
                     ),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pdf_file_names_drop_the_characters_windows_refuses() {
+        assert_eq!(safe_file_name("图表"), "图表");
+        assert_eq!(safe_file_name("a/b:c*d?e"), "a_b_c_d_e");
+        assert_eq!(safe_file_name("a::b"), "a_b");
+        assert_eq!(safe_file_name("  压力  "), "压力");
+        assert_eq!(safe_file_name("   "), "未命名演示");
     }
 }

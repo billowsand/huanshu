@@ -50,7 +50,9 @@ impl SettingsPage {
                 .into_any_element()
         };
 
-        widgets::panel(cx)
+        let panel = widgets::panel(cx)
+            // 原版 `.prefs-simple-panel { max-width: 880px }`（settings.css 220）。
+            .max_w(px(880.0))
             .p(px(22.0))
             .flex()
             .flex_col()
@@ -75,20 +77,26 @@ impl SettingsPage {
                         .child(Input::new(&self.concurrency_input))
                         .into_any_element(),
                 ),
-            ))
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .gap(px(8.0))
-                    .text_size(px(12.0))
-                    .text_color(c.muted)
-                    .child(carbon("information"))
-                    .child(
-                        "并发越高，对模型服务的负载越大。遇到超时或资源不足时，可以降低并发数。",
-                    ),
-            )
+            ));
+
+        // 原版 `.prefs-guidance`（473 行 / settings.css 228–229）是**面板外**的一块
+        // 主色浅底提示，图标用主色。
+        div().flex().flex_col().gap(px(20.0)).child(panel).child(
+            div()
+                .max_w(px(880.0))
+                .flex()
+                .flex_row()
+                .items_start()
+                .gap(px(10.0))
+                .px(px(14.0))
+                .py(px(12.0))
+                .rounded(px(8.0))
+                .bg(c.primary_bg)
+                .text_size(px(13.0))
+                .text_color(c.muted)
+                .child(div().text_color(c.primary).child(carbon("information")))
+                .child("并发越高，对模型服务的负载越大。遇到超时或资源不足时，可以降低并发数。"),
+        )
     }
 }
 

@@ -7,7 +7,9 @@ use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Disableable as _, Sizable as _, WindowExt as _};
 use gpui_kit::prelude::*;
-use gpui_kit::{div, px, Context, Entity, Render, SharedString, Subscription, Window};
+use gpui_kit::{
+    div, px, Context, Entity, KeyDownEvent, Render, SharedString, Subscription, Window,
+};
 use huanshu_core::fonts::SystemFont;
 use huanshu_core::types::FontSettings;
 
@@ -405,7 +407,8 @@ impl SettingsPage {
                         .flex_row()
                         .items_center()
                         .gap(px(12.0))
-                        .child(div().text_size(px(17.0)).child("字体"))
+                        // 原版 `.prefs-section-title { font-size: 15px }`（settings.css 66）。
+                        .child(div().text_size(px(15.0)).child("字体"))
                         .child(
                             div()
                                 .text_size(px(13.0))
@@ -441,7 +444,7 @@ impl SettingsPage {
                             .flex_row()
                             .items_baseline()
                             .gap(px(12.0))
-                            .child(div().text_size(px(17.0)).child("界面主题"))
+                            .child(div().text_size(px(15.0)).child("界面主题"))
                             .child(
                                 div()
                                     .text_size(px(13.0))
@@ -480,14 +483,17 @@ impl SettingsPage {
                 role.get(&self.fonts).to_string(),
                 self.fonts_list.clone().unwrap_or_default(),
                 self.fonts_list.is_some(),
+                self.fonts_error.clone(),
                 page,
-                search,
+                search.clone(),
                 cx,
             )
         });
         window.open_dialog(cx, move |dialog, _window, _cx| {
             dialog.overlay(true).w(px(760.0)).child(picker.clone())
         });
+        // 原版打开弹层后把焦点放进搜索框（`SystemFontPicker.vue` 49 行的 `searchInput.focus()`）。
+        search.update(cx, |state, cx| state.focus(window, cx));
         cx.notify();
     }
 
@@ -617,15 +623,27 @@ impl SettingsPage {
             .border_t_1()
             .border_color(c.border)
             .font_family(specimen_font)
+            // 原版 `.prefs-specimen`（css 144–147）：标签用主色、12px、界面字体；
+            // 「Aa Bb」20px 常规字色；两个 span 13px 弱化色。
             .child(
                 div()
                     .text_size(px(12.0))
-                    .text_color(c.muted)
+                    .text_color(c.primary)
                     .child(self.preview_role.label()),
             )
-            .child(div().text_size(px(16.0)).child("Aa Bb"))
-            .child(div().text_size(px(14.0)).child("0123456789"))
-            .child(div().text_size(px(14.0)).child("中文字体示例"));
+            .child(div().text_size(px(20.0)).child("Aa Bb"))
+            .child(
+                div()
+                    .text_size(px(13.0))
+                    .text_color(c.muted)
+                    .child("0123456789"),
+            )
+            .child(
+                div()
+                    .text_size(px(13.0))
+                    .text_color(c.muted)
+                    .child("中文字体示例"),
+            );
 
         let code_specimen = div()
             .px(px(12.0))
@@ -704,6 +722,8 @@ pub struct FontPicker {
     fonts: Vec<SystemFont>,
     loaded: bool,
     refreshing: bool,
+    /// 读取失败 / 空列表的提示（原版 `systemFonts.error`，显示在搜索框下面）。
+    error: Option<String>,
     search: Entity<InputState>,
     /// `filtered` 里的选中项下标（原版 `activeIndex`）。
     active: usize,
@@ -719,6 +739,7 @@ impl FontPicker {
         current: String,
         fonts: Vec<SystemFont>,
         loaded: bool,
+        error: Option<String>,
         page: gpui_kit::WeakEntity<SettingsPage>,
         search: Entity<InputState>,
         cx: &mut Context<Self>,
@@ -743,6 +764,7 @@ impl FontPicker {
             fonts,
             loaded,
             refreshing: false,
+            error,
             search,
             active: 0,
             apply_all: false,
@@ -770,6 +792,8 @@ impl FontPicker {
             return;
         }
         self.refreshing = true;
+        // 原版 `load(true)`：重试前先清掉上一次的错误。
+        self.error = None;
         cx.notify();
         let page = self.page.clone();
         run_bg(
@@ -778,22 +802,56 @@ impl FontPicker {
             huanshu_core::fonts::enumerate_system_fonts,
             move |this: &mut Self, result, _window, cx| {
                 this.refreshing = false;
-                if let Ok(fonts) = result {
-                    this.fonts = fonts;
-                    this.loaded = true;
-                    this.active = 0;
-                    // 同步回设置页（页头显示「已安装 N 种字体」）。
-                    if let Some(page) = page.upgrade() {
-                        let fonts = this.fonts.clone();
-                        let _ = page.update(cx, |page, cx| {
-                            page.fonts_list = Some(fonts);
-                            cx.notify();
-                        });
+                match result {
+                    Ok(fonts) if !fonts.is_empty() => {
+                        this.fonts = fonts;
+                        this.loaded = true;
+                        this.error = None;
+                        this.active = 0;
+                        // 同步回设置页（页头显示「已安装 N 种字体」）。
+                        if let Some(page) = page.upgrade() {
+                            let fonts = this.fonts.clone();
+                            let _ = page.update(cx, |page, cx| {
+                                page.fonts_list = Some(fonts);
+                                page.fonts_error = None;
+                                cx.notify();
+                            });
+                        }
                     }
+                    // 原版 `stores/systemFonts.ts`：空列表也算失败。
+                    Ok(_) => {
+                        this.error = Some("没有读取到可用字体，请刷新重试。".to_string());
+                    }
+                    Err(error) => this.error = Some(error),
                 }
                 cx.notify();
             },
         );
+    }
+
+    /// 键盘：Enter 提交（原版 `onSearchKeydown` 里的 Enter → `select()`）。
+    ///
+    /// 原版还有 ↑/↓/Home/End 在候选里移动，但 GPUI 的单行输入框把它们当作光标移动动作
+    /// 消费掉了（`gpui-base` 的 `MoveUp`/`MoveDown`/`MoveHome`/`MoveEnd` 不 `propagate()`），
+    /// 弹层收不到这几个键；见 `docs/native/audit-settings.md`。
+    fn on_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if event.keystroke.key.as_str() != "enter" {
+            return;
+        }
+        let query = self.search.read(cx).value().to_string();
+        let filtered = filtered_font_indices(&self.fonts, &query, self.role);
+        let Some(&index) = filtered.get(self.active) else {
+            return;
+        };
+        let font = self.fonts[index].clone();
+        let role = self.role;
+        let apply_all = self.apply_all;
+        if let Some(page) = self.page.upgrade() {
+            let _ = page.update(cx, |page, cx| {
+                page.apply_font(role, &font.name, apply_all, window, cx)
+            });
+        }
+        window.close_dialog(cx);
     }
 }
 
@@ -845,75 +903,82 @@ impl Render for FontPicker {
         } else {
             "搜索结果"
         };
-        let list_content: gpui_kit::AnyElement = if !self.loaded && !self.refreshing {
-            div()
-                .p(px(24.0))
-                .text_size(px(13.0))
-                .text_color(c.muted)
-                .child("正在读取系统字体…")
-                .into_any_element()
-        } else if filtered.is_empty() {
-            div()
-                .p(px(24.0))
-                .text_size(px(13.0))
-                .text_color(c.muted)
-                .child(if self.loaded {
-                    "没有找到字体，试试其他名称。"
-                } else {
-                    "未读取到字体，请刷新重试。"
-                })
-                .into_any_element()
-        } else {
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(2.0))
-                .children(filtered.iter().enumerate().map(|(row, &index)| {
-                    let font = self.fonts[index].clone();
-                    let active = row == self.active;
-                    let is_current =
-                        find_system_font(std::slice::from_ref(&font), &self.current).is_some();
-                    div()
-                        .id(SharedString::from(format!("font-option-{row}")))
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap(px(8.0))
-                        .px(px(10.0))
-                        .py(px(8.0))
-                        .rounded(px(6.0))
-                        .cursor_pointer()
-                        .when(active, |option| {
-                            option.bg(c.primary_bg).text_color(c.primary)
-                        })
-                        .when(!active, |option| option.hover(|style| style.bg(c.surface)))
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .text_size(px(13.0))
-                                .truncate()
-                                .child(font.label.clone()),
-                        )
-                        .when(is_current, |option| {
-                            option
-                                .child(div().text_size(px(11.0)).text_color(c.muted).child("当前"))
-                        })
-                        .child(
-                            div()
-                                .w(px(14.0))
-                                .flex_none()
-                                .text_size(px(12.0))
-                                .text_color(c.primary)
-                                .child(if active { "✓" } else { "" }),
-                        )
-                        .on_click(cx.listener(move |this, _event, _window, cx| {
-                            this.active = row;
-                            cx.notify();
-                        }))
-                }))
-                .into_any_element()
-        };
+        // 原版 `SystemFontPicker.vue` 120 行：只有「还在读」时才是「正在读取系统字体…」；
+        // 读失败（error 有值）落到下面的空态，显示「未读取到字体，请刷新重试。」。
+        let list_content: gpui_kit::AnyElement =
+            if !self.loaded && self.error.is_none() && !self.refreshing {
+                div()
+                    .p(px(24.0))
+                    .text_size(px(13.0))
+                    .text_color(c.muted)
+                    .child("正在读取系统字体…")
+                    .into_any_element()
+            } else if filtered.is_empty() {
+                div()
+                    .p(px(24.0))
+                    .text_size(px(13.0))
+                    .text_color(c.muted)
+                    .child(if self.loaded {
+                        "没有找到字体，试试其他名称。"
+                    } else {
+                        "未读取到字体，请刷新重试。"
+                    })
+                    .into_any_element()
+            } else {
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(2.0))
+                    .children(filtered.iter().enumerate().map(|(row, &index)| {
+                        let font = self.fonts[index].clone();
+                        let active = row == self.active;
+                        let is_current =
+                            find_system_font(std::slice::from_ref(&font), &self.current).is_some();
+                        div()
+                            .id(SharedString::from(format!("font-option-{row}")))
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap(px(8.0))
+                            .px(px(10.0))
+                            .py(px(8.0))
+                            .rounded(px(6.0))
+                            .cursor_pointer()
+                            .when(active, |option| {
+                                option.bg(c.primary_bg).text_color(c.primary)
+                            })
+                            .when(!active, |option| option.hover(|style| style.bg(c.surface)))
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .text_size(px(13.0))
+                                    .truncate()
+                                    .child(font.label.clone()),
+                            )
+                            .when(is_current, |option| {
+                                option.child(
+                                    div().text_size(px(11.0)).text_color(c.muted).child("当前"),
+                                )
+                            })
+                            .child(
+                                div()
+                                    .w(px(14.0))
+                                    .flex_none()
+                                    .text_size(px(12.0))
+                                    .text_color(c.primary)
+                                    .child(if active { "✓" } else { "" }),
+                            )
+                            .on_click(cx.listener(move |this, _event, window, cx| {
+                                this.active = row;
+                                // 原版 `@click="activeIndex = index; searchInput?.focus()"`。
+                                let search = this.search.clone();
+                                search.update(cx, |state, cx| state.focus(window, cx));
+                                cx.notify();
+                            }))
+                    }))
+                    .into_any_element()
+            };
 
         let catalog = div()
             .flex()
@@ -959,6 +1024,16 @@ impl Render for FontPicker {
                     .child(meta_label)
                     .child(filtered.len().to_string()),
             )
+            // 原版 `SystemFontPicker.vue` 118 行的 `font-warning`（读失败时显示在列表上方）。
+            .when_some(self.error.clone(), |catalog, error| {
+                catalog.child(
+                    div()
+                        .px(px(4.0))
+                        .text_size(px(12.0))
+                        .text_color(c.primary)
+                        .child(error),
+                )
+            })
             .child(
                 div()
                     .id("font-picker-list")
@@ -1109,9 +1184,16 @@ impl Render for FontPicker {
             );
 
         div()
+            .id("font-picker")
             .flex()
             .flex_col()
             .bg(c.panel)
+            // Enter 从搜索框冒泡上来（单行输入框对 Enter 会 `cx.propagate()`）。
+            .on_key_down(
+                cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                    this.on_key(event, window, cx)
+                }),
+            )
             .child(header)
             .child(div().flex().flex_row().child(catalog).child(preview))
             .child(footer)

@@ -110,10 +110,12 @@ impl SettingsPage {
             .trim()
             .to_string();
 
+        // 原版 494 行用 `is-ok` / `is-untested`，而 settings.css 只给 `is-ok` 换了颜色，
+        // `is-untested` 回落到 `.prefs-status` 的默认弱化底。
         let (chip_fg, chip_bg, chip_border) = if ready {
             (c.success, c.success_bg, c.success)
         } else {
-            (c.warning, c.warning_bg, c.warning_border)
+            (c.muted, c.surface, c.border)
         };
         let status_badge = div()
             .flex_none()
@@ -149,7 +151,9 @@ impl SettingsPage {
             .flex_col()
             .gap(px(18.0))
             .child(
+                // 原版 `.prefs-simple-panel { max-width: 880px }`（settings.css 220）。
                 widgets::panel(cx)
+                    .max_w(px(880.0))
                     .p(px(18.0))
                     .flex()
                     .flex_col()
@@ -160,6 +164,7 @@ impl SettingsPage {
             )
             .child(
                 widgets::panel(cx)
+                    .max_w(px(880.0))
                     .p(px(18.0))
                     .flex()
                     .flex_col()
@@ -201,6 +206,10 @@ impl SettingsPage {
                                 div()
                                     .flex()
                                     .flex_row()
+                                    // 原版 `.prefs-summary > div + div`：虚线分隔（css 208）。
+                                    .border_t_1()
+                                    .border_dashed()
+                                    .border_color(c.border)
                                     .justify_between()
                                     .text_size(px(13.0))
                                     .child(div().text_color(c.muted).child("缓存对应模型"))

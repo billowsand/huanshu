@@ -243,7 +243,9 @@ impl WizardPage {
             .flex()
             .flex_col()
             .gap(px(4.0))
-            .child(div().text_size(px(12.0)).text_color(c.muted).child(label))
+            // 原版 `.field label`（:760-763）不设颜色，继承 `--studio-text`；只有 `.field-hint`
+            // 是 muted（:780-784）。
+            .child(div().text_size(px(12.0)).text_color(c.text).child(label))
             .child(
                 div()
                     .flex()
@@ -447,20 +449,22 @@ impl Render for WizardPage {
                     .justify_center()
                     .text_size(px(13.0))
                     .border_2()
-                    .when(active, |dot| {
+                    // 原版 CSS 的层叠顺序是 `.active`（:701）→ `.done`（:707）→ `.skipped`（:713）：
+                    // 同权重时后写的赢，所以「跳过」的样式盖过 active / done。
+                    .when(skipped, |dot| {
+                        dot.bg(c.surface).border_color(c.muted).text_color(c.muted)
+                    })
+                    .when(!skipped && active, |dot| {
                         dot.bg(c.primary_bg)
                             .border_color(c.primary)
                             .text_color(c.primary)
                     })
-                    .when(!active && done && !skipped, |dot| {
+                    .when(!skipped && !active && done, |dot| {
                         dot.bg(c.primary)
                             .border_color(c.primary)
                             .text_color(c.primary_contrast)
                     })
-                    .when(!active && skipped, |dot| {
-                        dot.bg(c.surface).border_color(c.muted).text_color(c.muted)
-                    })
-                    .when(!active && !done && !skipped, |dot| {
+                    .when(!skipped && !active && !done, |dot| {
                         dot.bg(c.surface).border_color(c.border).text_color(c.muted)
                     })
                     .child((index + 1).to_string());
@@ -550,8 +554,8 @@ impl Render for WizardPage {
                     .into_any_element()
             }
             2 => {
-                // 进度条：窄卡内宽 = 560 - 2*32(padding) = 496。
-                let bar_w = 496.0f32;
+                // 进度条：窄卡内宽 = 560 - 2*40(padding) = 480。
+                let bar_w = 480.0f32;
                 let fill_w = bar_w * (self.embedding_progress as f32) / 100.0;
                 div()
                     .flex()
@@ -584,11 +588,7 @@ impl Render for WizardPage {
                                 "开始初始化"
                             },
                         )
-                        .icon(carbon(if self.initializing {
-                            "renew"
-                        } else {
-                            "data-base"
-                        }))
+                        .when(self.initializing, |button| button.icon(carbon("renew")))
                         .disabled(self.initializing)
                         .on_click(cx.listener(
                             |page, _event, window, cx| page.start_embedding_init(window, cx),
@@ -613,7 +613,8 @@ impl Render for WizardPage {
                         .justify_between()
                         .text_size(px(13.0))
                         .child(div().text_color(c.muted).child(label))
-                        .child(div().max_w(px(340.0)).truncate().child(value))
+                        // 原版 `.summary-value`（:902-909）max-width: 280px + 省略号。
+                        .child(div().max_w(px(280.0)).truncate().child(value))
                         .into_any_element()
                 };
                 let model_of = |target: ModelTarget| -> String {
@@ -739,7 +740,7 @@ impl Render for WizardPage {
                 .when(self.step == 0 && self.can_proceed_step1(cx), |footer| {
                     footer.child(
                         widgets::primary_button("next", "下一步")
-                            .icon(carbon("arrow-right"))
+                            .child(carbon("arrow-right"))
                             .on_click(cx.listener(|page, _event, _window, cx| page.next_step(cx))),
                     )
                 })
@@ -751,7 +752,7 @@ impl Render for WizardPage {
                         .when(self.can_proceed_step2(cx), |footer| {
                             footer.child(
                                 widgets::primary_button("next-models", "下一步")
-                                    .icon(carbon("arrow-right"))
+                                    .child(carbon("arrow-right"))
                                     .disabled(self.verifying)
                                     .on_click(cx.listener(|page, _event, window, cx| {
                                         page.next_from_models(window, cx)
@@ -762,7 +763,7 @@ impl Render for WizardPage {
                 .when(self.step == 2, |footer| {
                     footer.child(
                         widgets::primary_button("next-3", "下一步")
-                            .icon(carbon("arrow-right"))
+                            .child(carbon("arrow-right"))
                             .disabled(!self.skip_embedding && self.embedding_progress < 100)
                             .on_click(cx.listener(|page, _event, _window, cx| {
                                 page.step = 3;
@@ -772,19 +773,12 @@ impl Render for WizardPage {
                 })
                 .when(self.step == 3, |footer| {
                     footer.child(
-                        widgets::primary_button(
-                            "finish",
-                            if self.finishing {
-                                "进入中…"
-                            } else {
-                                "进入 Studio"
-                            },
-                        )
-                        .icon(carbon("arrow-right"))
-                        .disabled(self.finishing)
-                        .on_click(
-                            cx.listener(|page, _event, window, cx| page.finish_wizard(window, cx)),
-                        ),
+                        widgets::primary_button("finish", "进入 Studio")
+                            .child(carbon("arrow-right"))
+                            .disabled(self.finishing)
+                            .on_click(cx.listener(|page, _event, window, cx| {
+                                page.finish_wizard(window, cx)
+                            })),
                     )
                 });
 
@@ -800,7 +794,9 @@ impl Render for WizardPage {
             .child(
                 widgets::panel(cx)
                     .w(px(if wide { 960.0 } else { 560.0 }))
-                    .p(px(32.0))
+                    // 原版 `.wizard-card`（:599-609）：padding 2.5rem、圆角 16px。
+                    .p(px(40.0))
+                    .rounded(px(16.0))
                     .flex()
                     .flex_col()
                     .gap(px(16.0))

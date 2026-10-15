@@ -28,14 +28,14 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use gpui_kit::component::button::Button;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::dialog::Dialog;
 use gpui_kit::component::input::{
     Editor, EditorState, Input, InputEvent, InputState, Textarea, TextareaState,
 };
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
-use gpui_kit::component::{Disableable as _, IndexPath, Sizable as _, WindowExt as _};
+use gpui_kit::component::{Disableable as _, IndexPath, Sizable as _, Size, WindowExt as _};
 use gpui_kit::prelude::*;
 use gpui_kit::{
     div, px, AnyElement, App, Context, Div, Entity, FocusHandle, Focusable as _, KeyDownEvent,
@@ -1565,6 +1565,11 @@ impl Step3 {
         // 标签组 / 图集在原版里**没有**这一行小标签，它们的「添加」按钮放在**列表末尾**
         // （`.ej-list-stack` 里的 `edit-add-btn`，满宽）；卡片里的要点列表才有小标签，
         // 「添加」跟在标签行右端。
+        //
+        // 已知差异（⚠️ 见 docs/native/audit-step3.md）：原版这个按钮也带
+        // `.edit-add-btn { width: 100% }`，在 `.ej-label-row` 里被压成「标签右侧的剩余宽度」、
+        // 文字居中（浏览器实测），代价是同行的标签被挤成竖排两行（`.ej-label` 没有 nowrap）。
+        // 原生保持紧凑靠右——宽按钮要包一层 `flex_1` + `w_full()`，也仍然复现不了那个折行。
         let mut block = div().flex().flex_col().gap(px(6.0));
         let mut tail_add = None;
         if label.is_empty() {
@@ -2703,8 +2708,12 @@ fn kind_picker_body(
                     .border_1()
                     .border_color(if is_current { c.primary } else { c.border })
                     .bg(if is_current { c.primary_bg } else { c.surface })
+                    // 原版 `.kp-card:hover { border-color: var(--studio-primary); background: var(--studio-primary-bg) }`。
+                    .hover(|style| style.border_color(c.primary).bg(c.primary_bg))
                     .cursor_pointer()
-                    .child(carbon(&entry.icon))
+                    // 原版 `.kp-card-icon { font-size: 1.5rem }`（1.5rem = 24px）：
+                    // 图标默认跟随文字大小（这里只有 ~14px），显式给 1.5rem。
+                    .child(carbon(&entry.icon).with_size(Size::Large))
                     .child(
                         div()
                             .text_size(px(13.0))
@@ -2936,6 +2945,8 @@ impl Render for Step3 {
                     .child(
                         widgets::small(widgets::ghost_button("export-pdf", "导出 PDF"))
                             .icon(carbon(if exporting { "renew" } else { "document-pdf" }))
+                            // 原版 `title="导出为 PDF 文档"`。
+                            .tooltip("导出为 PDF 文档")
                             .disabled(exporting || count == 0)
                             .on_click(move |_event, window, cx: &mut App| {
                                 let _ =
@@ -3032,14 +3043,21 @@ impl Render for Step3 {
                             }),
                     )
                     .child(
-                        widgets::small(widgets::icon_button("slide-del", "trash-can", "删除"))
-                            .disabled(locked || count <= 1)
-                            .on_click(move |_event, window, cx: &mut App| {
-                                let _ = del_weak.update(cx, |this, cx| {
-                                    let index = this.active(cx);
-                                    this.delete_slide(index, window, cx)
-                                });
-                            }),
+                        // 原版 `.edit-del-btn { color: var(--studio-error) }`：栏头这三个按钮里
+                        // 只有删除是红的（`.edit-json-acts` 里的卡片按钮仍是默认色）。
+                        widgets::small(
+                            Button::new("slide-del")
+                                .ghost()
+                                .icon(carbon("trash-can").text_color(c.error))
+                                .tooltip("删除"),
+                        )
+                        .disabled(locked || count <= 1)
+                        .on_click(move |_event, window, cx: &mut App| {
+                            let _ = del_weak.update(cx, |this, cx| {
+                                let index = this.active(cx);
+                                this.delete_slide(index, window, cx)
+                            });
+                        }),
                     ),
             )
             .child(

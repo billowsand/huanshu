@@ -24,8 +24,8 @@ use gpui_kit::component::{Disableable as _, IndexPath, WindowExt as _};
 use gpui_kit::prelude::*;
 use gpui_kit::{
     div, px, relative, uniform_list, Animation, AnimationExt as _, AnyElement, App, Context,
-    Entity, FocusHandle, Hsla, KeyDownEvent, Render, ScrollStrategy, SharedString, Subscription,
-    UniformListScrollHandle, WeakEntity, Window,
+    Entity, FocusHandle, Focusable as _, Hsla, KeyDownEvent, Render, ScrollStrategy, SharedString,
+    Subscription, UniformListScrollHandle, WeakEntity, Window,
 };
 use huanshu_core::editor_schema::{self, EditorSchema};
 use huanshu_core::events::GenerationLogEvent;
@@ -67,6 +67,8 @@ const DETAIL_MIN_W: f32 = 340.0;
 const PANEL_PAD: f32 = 16.0;
 /// 工作流侧栏宽度（与 `pages/workflow/mod.rs` 的 `sidebar` 一致）。
 const SIDEBAR_W: f32 = 204.0;
+/// 原版 `@media (max-width: 1200px)`：窗口不宽于它时两栏改成一栏。
+const NARROW_MAX_W: f32 = 1200.0;
 /// 看板卡片上的五个阶段短名（原版 `PAGE_STAGES` 的顺序）。
 const STEP_LABELS: [&str; 5] = ["规划", "布局", "内容", "规范", "校验"];
 
@@ -250,8 +252,19 @@ impl Render for Step2 {
         // ── 尺寸：先按窗口算出两栏的宽度，再按看板栏内宽算列数（原版 auto-fill） ──
         let viewport = window.viewport_size();
         let panel_w = (viewport.width.as_f32() - SIDEBAR_W).max(GRID_MIN_COL + 2.0 * GRID_PAD);
-        let detail_w = ((panel_w - PANEL_GAP) * 0.9 / 2.4).max(DETAIL_MIN_W);
-        let grid_w = (panel_w - PANEL_GAP - detail_w).max(GRID_MIN_COL + 2.0 * GRID_PAD);
+        // 原版 `@media (max-width: 1200px) { .slides-workbench { grid-template-columns: 1fr } }`：
+        // 窗口不宽于 1200px 时详情面板整宽排在看板下方（`.slide-detail-panel { max-height: none }`）。
+        let narrow = viewport.width.as_f32() <= NARROW_MAX_W;
+        let detail_w = if narrow {
+            panel_w
+        } else {
+            ((panel_w - PANEL_GAP) * 0.9 / 2.4).max(DETAIL_MIN_W)
+        };
+        let grid_w = if narrow {
+            panel_w
+        } else {
+            (panel_w - PANEL_GAP - detail_w).max(GRID_MIN_COL + 2.0 * GRID_PAD)
+        };
         let grid = Grid::new(grid_w);
         let columns = grid.columns;
         let column_w = grid.column_w;
@@ -508,7 +521,9 @@ impl Render for Step2 {
         let board = div()
             .flex_1()
             .min_w_0()
-            .h_full()
+            .min_h_0()
+            // 一栏模式（窄窗口）下两个面板按 `flex_1` 平分高度，`h_full` 会让它们各占满整列。
+            .when(!narrow, |panel| panel.h_full())
             .flex()
             .flex_col()
             .rounded(px(16.0))
@@ -524,7 +539,7 @@ impl Render for Step2 {
             )
             .child(board_grid);
 
-        // ── 详情（右侧） ────────────────────────────────────────────────────────
+        // ── 详情（右侧；窄窗口下在看板下方） ────────────────────────────────────
         let detail = detail_panel(
             DetailArgs {
                 item: selected.map(|index| &items[index]),
@@ -543,6 +558,7 @@ impl Render for Step2 {
                 debug_open: self.debug_open,
                 logs_open: self.logs_open,
                 code_font: code_font(&self.handle),
+                narrow,
                 this: cx.weak_entity(),
             },
             cx,
@@ -620,7 +636,8 @@ impl Render for Step2 {
                     .flex_1()
                     .min_h_0()
                     .flex()
-                    .flex_row()
+                    .when(narrow, |workbench| workbench.flex_col())
+                    .when(!narrow, |workbench| workbench.flex_row())
                     .gap(px(PANEL_GAP))
                     .child(board)
                     .child(detail),
@@ -701,8 +718,9 @@ fn blueprint_kind(item: &SlideProgressItem) -> Option<&str> {
         .and_then(|slide| field_str(slide, "kind"))
 }
 
-/// 卡片标题（原版 `pagePlan?.page_title || layoutPlan?.title || blueprint?.title || 第 n 张`）。
-fn card_title(item: &SlideProgressItem) -> String {
+/// 看板卡片与详情的标题来源
+/// （原版 `pagePlan?.page_title || layoutPlan?.title || blueprint?.title`）。
+fn plan_title(item: &SlideProgressItem) -> Option<String> {
     item.page_plan
         .as_ref()
         .and_then(|plan| field_str(plan, "page_title"))
@@ -717,7 +735,16 @@ fn card_title(item: &SlideProgressItem) -> String {
                 .and_then(|slide| field_str(slide, "title"))
         })
         .map(str::to_string)
-        .unwrap_or_else(|| format!("第 {} 张", item.index + 1))
+}
+
+/// 卡片标题：来源都为空时是「第 n 张」。
+fn card_title(item: &SlideProgressItem) -> String {
+    plan_title(item).unwrap_or_else(|| format!("第 {} 张", item.index + 1))
+}
+
+/// 详情标题：来源都为空时是「待生成幻灯片」（与卡片的兜底文案不同）。
+fn detail_title(item: &SlideProgressItem) -> String {
+    plan_title(item).unwrap_or_else(|| "待生成幻灯片".to_string())
 }
 
 /// 原版 tone 字符串 → 徽章色调。
@@ -1296,6 +1323,8 @@ struct DetailArgs<'a> {
     debug_open: bool,
     logs_open: bool,
     code_font: SharedString,
+    /// 原版 `@media (max-width: 1200px)`：一栏模式下详情占满整宽、与看板平分高度。
+    narrow: bool,
     this: WeakEntity<Step2>,
 }
 
@@ -1304,9 +1333,10 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
     let c = cx.studio().colors;
     let shell = |body: AnyElement| -> AnyElement {
         div()
-            .flex_none()
-            .w(px(args.width))
-            .h_full()
+            .when(args.narrow, |panel| panel.flex_1().min_h_0().w_full())
+            .when(!args.narrow, |panel| {
+                panel.flex_none().w(px(args.width)).h_full()
+            })
             .flex()
             .flex_col()
             .rounded(px(16.0))
@@ -1337,7 +1367,7 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
             .and_then(|plan| field_str(plan, "kind"))
     }))
     .to_string();
-    let title = card_title(item);
+    let title = detail_title(item);
     let section_label = item
         .page_plan
         .as_ref()
@@ -1741,11 +1771,9 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
                             .flex_row()
                             .flex_wrap()
                             .gap(px(8.0))
-                            .child(widgets::chip(
-                                status.label.clone(),
-                                tone_of(&status.tone),
-                                cx,
-                            ))
+                            // 原版 `.sdp-chip`（**没有** `--done/--active/--error` 这些色调类，
+                            // 只有下面那个版式 chip 是 `--accent`）：状态 chip 一律中性色。
+                            .child(widgets::chip(status.label.clone(), Tone2::Muted, cx))
                             .when(
                                 item.layout_plan
                                     .as_ref()
@@ -1927,6 +1955,9 @@ impl RetryLayoutDialog {
                             }
                         },
                     )];
+                    // 原版 `<select autofocus>`：对话框打开后下拉自己拿焦点。
+                    let focus = select.read(cx).focus_handle(cx);
+                    window.focus(&focus, cx);
                     self.select = Some(select);
                 }
             }

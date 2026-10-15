@@ -115,13 +115,17 @@ impl ServiceState {
     }
 
     /// 徽章色调（原版 `.prefs-status.is-*`）。
+    ///
+    /// settings.css 173–180 只给 `is-ok`（成功）与 `is-failed`（失败）换了颜色；
+    /// `is-testing` / `is-untested` / `is-unset` 都还是默认的弱化底（测试中只把圆点
+    /// 画成主色，见 `models::status_chip`）。
     pub fn tone(self) -> widgets::Tone2 {
         match self {
             ServiceState::Ok => widgets::Tone2::Success,
             ServiceState::Failed => widgets::Tone2::Error,
-            ServiceState::Testing => widgets::Tone2::Primary,
-            ServiceState::Untested => widgets::Tone2::Warning,
-            ServiceState::Unset => widgets::Tone2::Muted,
+            ServiceState::Testing | ServiceState::Untested | ServiceState::Unset => {
+                widgets::Tone2::Muted
+            }
         }
     }
 }
@@ -422,11 +426,15 @@ impl ServiceForm {
                 this.testing = false;
                 match result {
                     Ok((models, elapsed)) => {
+                        // 原版 `modelLists.value[target] = [...new Set(models)]`：整份换掉，
+                        // 不是与上一次的并集。
+                        let mut unique: Vec<String> = Vec::new();
                         for model in models {
-                            if !this.model_list.contains(&model) {
-                                this.model_list.push(model);
+                            if !unique.contains(&model) {
+                                unique.push(model);
                             }
                         }
+                        this.model_list = unique;
                         this.result = Some(TestResult {
                             signature,
                             ok: true,

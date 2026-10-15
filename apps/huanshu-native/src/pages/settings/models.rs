@@ -21,6 +21,12 @@ pub(super) fn status_chip(state: ServiceState, cx: &gpui_kit::App) -> impl IntoE
         Tone2::Error => (c.error, c.error_bg, c.error_border),
         Tone2::Muted => (c.muted, c.surface, c.border),
     };
+    // 原版 `.prefs-status.is-testing i { background: var(--prefs-accent) }`：只有圆点换主色。
+    let dot = if state == ServiceState::Testing {
+        c.primary
+    } else {
+        fg
+    };
     div()
         .flex_none()
         .flex()
@@ -35,7 +41,7 @@ pub(super) fn status_chip(state: ServiceState, cx: &gpui_kit::App) -> impl IntoE
         .bg(bg)
         .text_size(px(11.5))
         .text_color(fg)
-        .child(div().size(px(6.0)).rounded_full().bg(fg))
+        .child(div().size(px(6.0)).rounded_full().bg(dot))
         .child(state.label())
 }
 
@@ -162,21 +168,32 @@ impl SettingsPage {
                         "服务类型",
                         service_location(&draft.base_url).to_string(),
                     ))
-                    .child(summary_row(
-                        "模型",
-                        if draft.model.trim().is_empty() {
-                            "未选择".to_string()
-                        } else {
-                            draft.model.clone()
-                        },
-                    ))
-                    .child(summary_row(
-                        "响应耗时",
-                        match &active_result {
-                            Some(result) if result.ok => format!("{} ms", result.elapsed),
-                            _ => "—".to_string(),
-                        },
-                    )),
+                    // 原版 `.prefs-summary > div + div { border-top: 1px dashed }`（css 208）。
+                    .child(
+                        summary_row(
+                            "模型",
+                            if draft.model.trim().is_empty() {
+                                "未选择".to_string()
+                            } else {
+                                draft.model.clone()
+                            },
+                        )
+                        .border_t_1()
+                        .border_dashed()
+                        .border_color(c.border),
+                    )
+                    .child(
+                        summary_row(
+                            "响应耗时",
+                            match &active_result {
+                                Some(result) if result.ok => format!("{} ms", result.elapsed),
+                                _ => "—".to_string(),
+                            },
+                        )
+                        .border_t_1()
+                        .border_dashed()
+                        .border_color(c.border),
+                    ),
             )
             .child(
                 widgets::ghost_button(

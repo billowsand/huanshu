@@ -87,6 +87,8 @@ pub struct SettingsPage {
     unified: bool,
     /// 后台枚举的系统字体（`None` = 还在读，照原版显示「系统字体」）。
     fonts_list: Option<Vec<SystemFont>>,
+    /// 读取失败或读到空列表时的提示（原版 `stores/systemFonts.ts` 的 `error`）。
+    fonts_error: Option<String>,
     preview_tab: PreviewTab,
     preview_role: FontRole,
 
@@ -210,6 +212,7 @@ impl SettingsPage {
             fonts_baseline: app_settings.fonts.clone(),
             unified: false,
             fonts_list: None,
+            fonts_error: None,
             preview_tab: PreviewTab::Slides,
             preview_role: FontRole::Body,
             app_settings,
@@ -223,13 +226,28 @@ impl SettingsPage {
     }
 
     /// 字体枚举（DirectWrite，同步重活）走后台；照原版显示「已安装 N 种字体」。
+    /// 失败与空列表都算失败（原版 `stores/systemFonts.ts`：`!result.length` 抛错），
+    /// 设置页与字体弹层据此显示提示。
     fn load_fonts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         run_bg(
             window,
             cx,
             huanshu_core::fonts::enumerate_system_fonts,
             |page: &mut Self, result, _window, cx| {
-                page.fonts_list = result.ok();
+                match result {
+                    Ok(fonts) if !fonts.is_empty() => {
+                        page.fonts_list = Some(fonts);
+                        page.fonts_error = None;
+                    }
+                    Ok(_) => {
+                        page.fonts_list = None;
+                        page.fonts_error = Some("没有读取到可用字体，请刷新重试。".to_string());
+                    }
+                    Err(error) => {
+                        page.fonts_list = None;
+                        page.fonts_error = Some(error);
+                    }
+                }
                 cx.notify();
             },
         );
@@ -273,6 +291,10 @@ impl SettingsPage {
         self.draft_theme = id.to_string();
         self.just_saved = false;
         self.handle.set_theme(id, false, window, cx);
+        // 原版的主题预览（`data-theme`）与字体预览（`--font-interface`）是两条独立的实时通道；
+        // `set_theme` 用的是**已保存**的界面字体，这里把草稿补回去，否则换主题会丢掉字体预览。
+        let interface = self.fonts.interface.clone();
+        theme::apply(id, Some(&interface), Some(window), cx);
         cx.notify();
     }
 
@@ -585,6 +607,8 @@ impl Render for SettingsPage {
         } else {
             "所有更改已保存"
         };
+        // 有未保存的更改时补一个 `Ctrl + S` 提示（原版 `SettingsView.vue` 534 行的 `kbd`）。
+        let show_shortcut = self.dirty(cx) && !self.saving;
         let save_bar = div()
             .flex_none()
             .h(px(56.0))
@@ -596,12 +620,27 @@ impl Render for SettingsPage {
             .bg(c.panel)
             .border_t_1()
             .border_color(c.border)
+            // 原版 `.prefs-state-dot`：平时成功色，脏时用主色（settings.css 251–252）。
             .child(div().size(px(8.0)).rounded_full().bg(if self.dirty(cx) {
-                c.warning
+                c.primary
             } else {
                 c.success
             }))
             .child(div().text_size(px(13.0)).text_color(c.muted).child(status))
+            .when(show_shortcut, |bar| {
+                bar.child(
+                    div()
+                        .px(px(6.0))
+                        .py(px(1.0))
+                        .rounded(px(4.0))
+                        .border_1()
+                        .border_color(c.border)
+                        .bg(c.surface)
+                        .text_size(px(11.0))
+                        .text_color(c.muted)
+                        .child("Ctrl + S"),
+                )
+            })
             .when_some(self.save_error.clone(), |bar, error| {
                 bar.child(div().text_size(px(12.0)).text_color(c.error).child(error))
             })
@@ -658,7 +697,8 @@ impl Render for SettingsPage {
                                     .flex()
                                     .flex_col()
                                     .gap(px(6.0))
-                                    .child(div().text_size(px(26.0)).child(self.tab.label()))
+                                    // 原版 `.prefs-heading h1 { font-size: 24px }`（settings.css 62）。
+                                    .child(div().text_size(px(24.0)).child(self.tab.label()))
                                     .child(
                                         div()
                                             .text_size(px(14.0))
@@ -741,6 +781,7 @@ impl SettingsPage {
                     .border_color(if selected { c.primary } else { c.border })
                     .bg(color(t.bg))
                     .overflow_hidden()
+                    .relative()
                     .flex()
                     .flex_col()
                     .child(
@@ -796,7 +837,25 @@ impl SettingsPage {
                                         ),
                                     ),
                             ),
-                    ),
+                    )
+                    // 原版 `.prefs-theme-check`（277–278 行 / settings.css 108）：选中卡片的勾选徽章。
+                    .when(selected, |preview| {
+                        preview.child(
+                            div()
+                                .absolute()
+                                .top(px(6.0))
+                                .right(px(6.0))
+                                .size(px(18.0))
+                                .rounded_full()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .bg(c.primary)
+                                .text_color(c.primary_contrast)
+                                .text_size(px(12.0))
+                                .child(carbon("checkmark")),
+                        )
+                    }),
             )
             .child(
                 div()
@@ -829,6 +888,7 @@ impl SettingsPage {
                 .child(div().text_size(px(14.0)).child(text))
         };
         widgets::panel(cx)
+            .max_w(px(880.0))
             .p(px(22.0))
             .flex()
             .flex_col()
@@ -858,6 +918,8 @@ impl SettingsPage {
                     .text_size(px(14.0))
                     .child("将 Markdown 文档自动转化为精美的演示文稿。"),
             )
+            // 原版 `.prefs-about-divider`（517 行 / settings.css 240）。
+            .child(div().h(px(1.0)).w_full().bg(c.border))
             .child(div().text_size(px(15.0)).child("开始使用"))
             .child(step(
                 1,

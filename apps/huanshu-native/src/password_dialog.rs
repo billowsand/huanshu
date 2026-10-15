@@ -88,6 +88,10 @@ pub struct PasswordDialog {
     password: Entity<InputState>,
     confirm: Entity<InputState>,
     show_password: bool,
+    /// 回车提交的待办：订阅回调里没有 window，记下来在 `render` 里补
+    /// （同 `WorkflowPage::rename_commit`）。原版两个输入框都挂了
+    /// `@keyup.enter="canSubmit && handleSubmit()"`（`PasswordDialog.vue:110,139`）。
+    submit_requested: bool,
     on_submit: SubmitCallback,
     on_cancel: CancelCallback,
     _subscriptions: Vec<Subscription>,
@@ -117,15 +121,27 @@ impl PasswordDialog {
                 .masked(true)
         });
         let _subscriptions = vec![
-            cx.subscribe(&password, |this: &mut Self, _state, _: &InputEvent, cx| {
-                // 密码变化后清掉门槛错误（原版 internalError 只由提交设置，但重新输入
-                // 后旧错误继续显示会误导；原版 watch 只在 visible 时重置）。
-                this.internal_error.clear();
-                cx.notify();
-            }),
-            cx.subscribe(&confirm, |_this, _state, _: &InputEvent, cx| {
-                cx.notify();
-            }),
+            cx.subscribe(
+                &password,
+                |this: &mut Self, _state, event: &InputEvent, cx| {
+                    // 密码变化后清掉门槛错误（原版 internalError 只由提交设置，但重新输入
+                    // 后旧错误继续显示会误导；原版 watch 只在 visible 时重置）。
+                    this.internal_error.clear();
+                    if matches!(event, InputEvent::PressEnter { .. }) {
+                        this.submit_requested = true;
+                    }
+                    cx.notify();
+                },
+            ),
+            cx.subscribe(
+                &confirm,
+                |this: &mut Self, _state, event: &InputEvent, cx| {
+                    if matches!(event, InputEvent::PressEnter { .. }) {
+                        this.submit_requested = true;
+                    }
+                    cx.notify();
+                },
+            ),
         ];
         Self {
             mode,
@@ -135,6 +151,7 @@ impl PasswordDialog {
             password,
             confirm,
             show_password: false,
+            submit_requested: false,
             on_submit: Rc::new(on_submit),
             on_cancel: Rc::new(on_cancel),
             _subscriptions,
@@ -189,14 +206,28 @@ impl PasswordDialog {
         let dialog = cx.new(|cx| build(window, cx));
         let entity = dialog.clone();
         window.open_dialog(cx, move |dialog, _window, _cx| {
-            dialog.overlay(true).w(px(400.0)).child(entity.clone())
+            // 关掉 GPUI Kit 自带的关闭按钮：原版只有一个 X（`PasswordDialog.vue:82-84`），
+            // 内容里的那个才会走 `on_cancel`（清掉待导入的字节等）。
+            dialog
+                .overlay(true)
+                .close_button(false)
+                .w(px(400.0))
+                .child(entity.clone())
         });
         dialog
     }
 }
 
 impl Render for PasswordDialog {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // 回车提交（订阅回调里没有 window）：提交可能弹原生保存对话框，所以排到本帧之后
+        // 再由 `update_in` 补上窗口，不在绘制途中阻塞。
+        if std::mem::take(&mut self.submit_requested) {
+            cx.spawn_in(window, async move |this, window| {
+                let _ = this.update_in(window, |this, window, cx| this.submit(window, cx));
+            })
+            .detach();
+        }
         let c = cx.studio().colors;
         let password = self.password_value(cx);
         let confirm = self.confirm_value(cx);
@@ -393,7 +424,16 @@ impl Render for PasswordDialog {
                     .flex_col()
                     .gap(px(16.0))
                     .child(password_group)
-                    .when_some(confirm_group, |form, group| form.child(group)),
+                    .when_some(confirm_group, |form, group| form.child(group))
+                    .when(self.mode == PasswordMode::Encrypt, |form| {
+                        // 原版加密导出面板底部的提示（`ExportDialog.vue:203-205`）。
+                        form.child(
+                            div()
+                                .text_size(px(12.0))
+                                .text_color(c.muted)
+                                .child("密码至少 8 位，需包含大写字母、小写字母和数字。"),
+                        )
+                    }),
             )
             .when(!error.is_empty(), |dialog| {
                 dialog.child(

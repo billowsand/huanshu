@@ -41,6 +41,7 @@ use crate::shell::ShellHandle;
 use crate::tasks::{run_async, run_bg};
 use crate::theme::StudioExt as _;
 use crate::widgets;
+use crate::widgets::TooltipText as _;
 
 /// 一个项目在工作流里的全部数据。三步页面共享它。
 ///
@@ -170,7 +171,7 @@ impl DraftSnapshot {
 }
 
 /// 比例的存储字符串（`Step1ProjectMeta.aspect_ratio` 用）。
-fn aspect_str(aspect: AspectRatio) -> &'static str {
+pub(super) fn aspect_str(aspect: AspectRatio) -> &'static str {
     match aspect {
         AspectRatio::Ratio16x9 => "ratio_16x9",
         AspectRatio::Ratio32x9 => "ratio_32x9",
@@ -1042,6 +1043,8 @@ impl Render for WorkflowPage {
                 let done = step < self.step;
                 let active = step == self.step;
                 let clickable = self.clickable(step, cx);
+                // 原版三种状态的配色（`WorkflowView.vue:703-720`）：active = primary、
+                // done = success（**绿**）、error = error；pending 是 border + muted。
                 let circle = div()
                     .size(px(40.0))
                     .rounded_full()
@@ -1051,16 +1054,28 @@ impl Render for WorkflowPage {
                     .border_2()
                     .border_color(if status_error {
                         c.error
-                    } else if active || done {
+                    } else if active {
                         c.primary
+                    } else if done {
+                        c.success
                     } else {
                         c.border
                     })
-                    .bg(if active { c.primary_bg } else { c.panel })
+                    .bg(if status_error {
+                        c.error_bg
+                    } else if active {
+                        c.primary_bg
+                    } else if done {
+                        c.success_bg
+                    } else {
+                        c.panel
+                    })
                     .text_color(if status_error {
                         c.error
-                    } else if active || done {
+                    } else if active {
                         c.primary
+                    } else if done {
+                        c.success
                     } else {
                         c.muted
                     })
@@ -1077,8 +1092,10 @@ impl Render for WorkflowPage {
                     } else {
                         step.number().to_string().into_any_element()
                     });
+                let group = SharedString::from(format!("step-{}", step.number()));
                 div()
-                    .id(SharedString::from(format!("step-{}", step.number())))
+                    .id(group.clone())
+                    .group(group.clone())
                     .flex()
                     .flex_row()
                     .gap(px(14.0))
@@ -1099,8 +1116,9 @@ impl Render for WorkflowPage {
                     .child(div().flex().flex_col().items_center().child(circle).when(
                         i < 2,
                         |column| {
+                            // 原版 `.step-line`（`WorkflowView.vue:730-759`）：走过的连线是 success。
                             column.child(div().w(px(2.0)).h(px(40.0)).bg(if done {
-                                c.primary
+                                c.success
                             } else {
                                 c.border
                             }))
@@ -1109,17 +1127,28 @@ impl Render for WorkflowPage {
                     .child(
                         div()
                             .pt(px(8.0))
+                            .min_w_0()
                             .flex()
                             .flex_col()
                             .gap(px(2.0))
                             .child(
                                 div()
                                     .text_size(px(15.0))
-                                    .text_color(if active { c.text } else { c.muted })
+                                    // 原版：active 与 done 的标签都是 text（`WorkflowView.vue:772-773`）。
+                                    .text_color(if active || done { c.text } else { c.muted })
+                                    // 悬停时标签变亮（原版 `:680` `.step-item:not(.disabled):hover .step-label`）。
+                                    .when(clickable, |text| {
+                                        text.group_hover(group.clone(), move |style| {
+                                            style.text_color(c.text)
+                                        })
+                                    })
                                     .child(*label),
                             )
                             .child(
                                 div()
+                                    // 原版 `.steps-nav .step-desc`：max-width 130px + 省略号（`:775-783`）。
+                                    .max_w(px(130.0))
+                                    .truncate()
                                     .text_size(px(12.5))
                                     .text_color(c.muted)
                                     .child(descs[i].clone()),
@@ -1160,6 +1189,8 @@ impl Render for WorkflowPage {
                 .truncate()
                 .text_size(px(15.0))
                 .cursor_pointer()
+                // 原版 `:title="projectName || '未命名项目'"`（`:426`）：名字被省略号截断时悬停看全。
+                .tooltip_text(name.clone())
                 .child(name)
                 .on_click(cx.listener(|this, _event, window, cx| this.start_rename(window, cx)))
                 .into_any_element()

@@ -378,7 +378,7 @@ impl Step1 {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let (name, md, aspect) = {
+        let (name, md, aspect, meta) = {
             let model = self.model.read(cx);
             (
                 if model.name.trim().is_empty() {
@@ -388,6 +388,13 @@ impl Step1 {
                 },
                 model.md_content.clone(),
                 model.aspect,
+                // 原版 `persistStep1Meta(projectId.value, step1State.value)`：新建时写的是**当前
+                // 草稿**的文件名 / 粒度 / 比例（`WorkflowView.vue:59-69, 190-199`），不是默认值。
+                Step1ProjectMeta {
+                    md_filename: model.md_filename.clone(),
+                    granularity: model.granularity.as_str().to_string(),
+                    aspect_ratio: super::aspect_str(model.aspect).to_string(),
+                },
             )
         };
         let shared = self.handle.shared().clone();
@@ -397,18 +404,10 @@ impl Step1 {
             move || {
                 let id = projects::create_project(&shared, name, md)?;
                 projects::open_project(&shared, id)?;
-                // 原版 `persistStep1Meta`：新建即写下附加信息。
-                let meta = Step1ProjectMeta {
-                    md_filename: String::new(),
-                    granularity: Granularity::Auto.as_str().to_string(),
-                    aspect_ratio: match aspect {
-                        AspectRatio::Ratio16x9 => "ratio_16x9",
-                        AspectRatio::Ratio32x9 => "ratio_32x9",
-                        AspectRatio::Ratio48x9 => "ratio_48x9",
-                    }
-                    .to_string(),
-                };
                 projects::set_step1_project_meta(&shared, id, &meta)?;
+                // 原版 `persistStep1Meta` 顺带 `updateAspectRatio`（`:196-198`）：项目的比例列
+                // 也要写下，否则这一步新建的项目在库里一直是默认比例。
+                projects::update_project_aspect_ratio(&shared, id, aspect)?;
                 Ok::<i64, String>(id)
             },
             move |this: &mut Self, result, window, cx| {
@@ -523,9 +522,20 @@ impl Step1 {
 
     /// 编辑器按像素的「最大滚动量」估计：内容行数 × 行高 − 视口高。
     ///
-    /// 已知偏差：编辑器默认 soft-wrap，折行会让这里的行数估计偏小、比例偏大，
-    /// 长文稿折行多时会比原版更「激进」地把预览滚到底（编辑器侧的真实最大滚动量
-    /// 框架没有公开 API）。底部被钳住，两端一致，中间可能有偏差。见 parity.md。
+    /// 已知偏差：编辑器默认 soft-wrap（`gpui-base-0.7.3/src/input/base/state.rs:812`），
+    /// 折行会让这里的行数估计偏小、比例偏大，长文稿折行多时会比原版更「激进」地把预览滚到底。
+    /// 底部由框架钳住（`update_scroll_offset`，`state.rs:2607-2624`），两端一致，中间可能有偏差。
+    ///
+    /// **编辑器侧的真实最大滚动量拿不到**（2026-10 逐接口查过，`gpui-kit 0.7.3`）：
+    /// `EditorState` 就是 `InputBaseState<EditorMode>`（`gpui-base-0.7.3/src/input/editor/mod.rs:11`），
+    /// 公开的滚动接口只有 `text_bounds()` / `input_bounds()` / `scroll_offset()`（`state.rs:640/644/3111`）、
+    /// `set_scroll_offset()`（`:3118`）、`visible_row_range()`（`:3106`）。`text_bounds()` 返回的是
+    /// **视口大小**的矩形（origin 跟着 scroll_offset 平移，size 是元素尺寸：`base/element.rs:2860`、
+    /// `2983`、`3303-3311`），所以 `text_bounds.h − input_bounds.h` 恒为 0；真正的内容尺寸是私有的
+    /// `scroll_size`（`pub(crate)`，`state.rs:495`，由 prepaint 写入 `element.rs:3315`），
+    /// `DisplayMap::wrap_row_count()`（`editor/display_map/display_map.rs:375`）也隔着私有的 `display_map`。
+    /// 唯一能读到真值的办法是「把偏移设到越界、下一帧读回被钳制的值」这种探针，代价是编辑器会可见地
+    /// 跳到底部一帧，故不采用。见 `docs/native/audit-workflow-step1.md` B 节与 parity.md。
     fn editor_est_max_scroll(&self, cx: &gpui_kit::App) -> gpui_kit::Pixels {
         let state = self.editor.read(cx);
         let Some(line_height) = state.line_height() else {
@@ -569,6 +579,16 @@ impl Step1 {
     ///
     /// 本回调注册在容器内置滚动处理**之前**，此刻句柄里的偏移还是旧值，因此用
     /// `旧偏移 + delta` 先算出滚动后的比例；内置处理随后会把同样的 delta 应用进句柄。
+    ///
+    /// **只挂了滚轮，滚动条拖拽挂不上**（2026-10 查过 `gpui-kit 0.7.3` 的接口）：
+    /// 预览容器只有 `overflow_y_scroll()`，而这版 gpui 的 div **不画滚动条**
+    /// （`gpui-pre-0.3.9/src/elements/div.rs` 里没有任何滚动条代码，只有 `styled.rs:64`
+    /// 的 `scrollbar_width` 预留宽度），界面上没有可拖的滚动条；编辑器内建的滚动条
+    /// （`gpui-base-0.7.3/src/input/base/element.rs:194` 的 `EditorScrollbar`）拖拽时只调
+    /// `ScrollHandle::set_offset`（`gpui-pre-0.3.9/src/elements/div.rs:4400`），不通知实体、
+    /// 不会触发 `cx.observe`。要挂只能自己放一个 `Scrollbar` 元素、把句柄包成自己的
+    /// `ScrollbarHandle`（`gpui-base-0.7.3/src/scrollbar.rs:69-82` 有 `start_drag` /
+    /// `end_drag` / `set_offset` 三个回调），本轮不做。见审计表 B 节。
     fn sync_preview_wheel(
         &mut self,
         event: &gpui_kit::ScrollWheelEvent,
@@ -670,17 +690,19 @@ impl Render for Step1 {
             )
             .child(div().flex_1())
             .when(!md_filename.is_empty(), |bar| {
+                // 原版 `.filename-tag`：primary 色 + primary-bg + primary-border（`WorkflowView.vue:1030-1044`）。
                 bar.child(widgets::chip_icon(
                     "document",
                     md_filename.clone(),
-                    Tone2::Muted,
+                    Tone2::Primary,
                     cx,
                 ))
             })
             .when(!draft_text.is_empty(), |bar| {
                 bar.child(widgets::chip(draft_text, Tone2::Muted, cx))
             })
-            .child(widgets::chip(format!("{chars} 字"), Tone2::Primary, cx))
+            // 原版 `.char-pill`（muted + surface + border，`WorkflowView.vue:1046-1056`），不是 `.accent-pill`（`:1057-1063`）。
+            .child(widgets::chip(format!("{chars} 字"), Tone2::Muted, cx))
             .child(
                 widgets::ghost_button(
                     "ai-optimize",
@@ -819,6 +841,8 @@ impl Render for Step1 {
                 .collect()
         };
 
+        // 两栏宽度按原版 `.md-panes` 的 `minmax(0, 1.15fr) minmax(260px, 0.85fr)`
+        // （`MarkdownWorkbench.vue:395`）：编辑区略宽于预览区，预览区最小 260px。
         let workbench = div()
             .flex_1()
             .min_w_0()
@@ -828,7 +852,9 @@ impl Render for Step1 {
                 div()
                     .id("step1-editor-col")
                     .relative()
-                    .flex_1()
+                    .flex_grow(1.15)
+                    .flex_shrink(1.0)
+                    .flex_basis(px(0.0))
                     .min_w_0()
                     .flex()
                     .flex_col()
@@ -880,8 +906,10 @@ impl Render for Step1 {
             )
             .child(
                 div()
-                    .flex_1()
-                    .min_w_0()
+                    .flex_grow(0.85)
+                    .flex_shrink(1.0)
+                    .flex_basis(px(0.0))
+                    .min_w(px(260.0))
                     .flex()
                     .flex_col()
                     .child(pane_header("view", "预览"))
@@ -1009,6 +1037,10 @@ impl Render for Step1 {
         };
 
         // ── 素材库（原版「素材库」卡片 + `useMediaLibrary.ts`） ──
+        //
+        // 原版 `.media-thumb-wrap` / `.media-thumb`（`WorkflowView.vue:1194-1227`）：68px 宽的竖排小卡，
+        // 缩略图 68×51、名字居中省略（`.media-name` `:1251-1260`）、删除按钮**只在该缩略图悬停时**
+        // 才显示（`.media-del-btn` `:1229-1249`）。
         let media_thumb = |(id, name, url, is_image, width, height): &(
             i64,
             String,
@@ -1020,17 +1052,23 @@ impl Render for Step1 {
                            cx: &mut Context<Self>| {
             let (id, name, url, is_image, width, height) =
                 (*id, name.clone(), url.clone(), *is_image, *width, *height);
+            let group = SharedString::from(format!("media-thumb-{id}"));
             div()
                 .flex()
+                .flex_none()
                 .flex_col()
-                .gap(px(4.0))
-                .min_w_0()
+                .items_center()
+                .gap(px(2.0))
+                .w(px(68.0))
                 .child(
                     div()
+                        .id(SharedString::from(format!("media-thumb-box-{id}")))
+                        .group(group.clone())
                         .relative()
-                        .w_full()
-                        .h(px(64.0))
-                        .rounded(px(8.0))
+                        .w(px(68.0))
+                        .h(px(51.0))
+                        .flex_none()
+                        .rounded(px(6.0))
                         .border_1()
                         .border_color(c.border)
                         .bg(c.surface)
@@ -1048,12 +1086,14 @@ impl Render for Step1 {
                                 .into_any_element()
                         })
                         .child(
-                            div().absolute().top(px(4.0)).right(px(4.0)).child(
-                                widgets::icon_button(
+                            div().absolute().top(px(2.0)).right(px(2.0)).child(
+                                widgets::small(widgets::icon_button(
                                     SharedString::from(format!("media-del-{id}")),
                                     "close",
                                     "移除",
-                                )
+                                ))
+                                .opacity(0.0)
+                                .group_hover(group.clone(), |style| style.opacity(1.0))
                                 .on_click(cx.listener(
                                     move |this, _event, window, cx| {
                                         this.remove_media(id, window, cx);
@@ -1065,14 +1105,15 @@ impl Render for Step1 {
                 .child(
                     div()
                         .id(SharedString::from(format!("media-name-{id}")))
+                        .max_w(px(68.0))
                         .truncate()
-                        .text_size(px(11.5))
-                        .text_color(c.text)
+                        .text_size(px(10.0))
+                        .text_color(c.muted)
                         .tooltip_text(name.clone())
                         .child(name),
                 )
                 .when(is_image && width.is_some() && height.is_some(), |col| {
-                    col.child(div().text_size(px(11.0)).text_color(c.muted).child(format!(
+                    col.child(div().text_size(px(9.5)).text_color(c.muted).child(format!(
                         "{}×{}",
                         width.unwrap(),
                         height.unwrap()
@@ -1123,40 +1164,57 @@ impl Render for Step1 {
                     ),
             )
             .child(
+                // 原版 `.media-drop-zone`：**始终**是虚线框（空与否都一样，`WorkflowView.vue:1157-1171`），
+                // 拖入悬停时变 primary 色（`.dragover` `:1168-1171`）。
                 div()
                     .id("media-drop-zone")
                     .w_full()
                     .min_h(px(120.0))
+                    .p(px(8.0))
+                    .flex()
+                    .flex_col()
+                    .rounded(px(8.0))
+                    .border_1()
+                    .border_dashed()
+                    // 素材拖放悬停高亮同 `drag_over`，框架拿不到拖入事件（见 parity.md）。
+                    .border_color(if self.media_drop_over {
+                        c.primary
+                    } else {
+                        c.border
+                    })
+                    .when(self.media_drop_over, |zone| zone.bg(c.primary_bg))
                     .when(media.is_empty(), |zone| {
-                        // 素材拖放悬停高亮同 `drag_over`，框架拿不到拖入事件（见 parity.md）。
-                        zone.border_1()
-                            .border_dashed()
-                            .border_color(if self.media_drop_over {
-                                c.primary_border
-                            } else {
-                                c.border
-                            })
-                            .rounded(px(8.0))
-                            .flex()
-                            .flex_col()
-                            .items_center()
-                            .justify_center()
-                            .gap(px(8.0))
-                            .child(carbon("image-copy").size(px(28.0)).text_color(c.muted))
-                            .child(
-                                div()
-                                    .text_size(px(12.5))
-                                    .text_color(c.muted)
-                                    .child("拖拽图片 / 视频到此处"),
-                            )
+                        zone.child(
+                            div()
+                                .flex_1()
+                                .flex()
+                                .flex_col()
+                                .items_center()
+                                .justify_center()
+                                .gap(px(6.0))
+                                .child(carbon("image-copy").size(px(28.0)).text_color(c.muted))
+                                .child(
+                                    div()
+                                        .text_size(px(12.0))
+                                        .text_color(c.muted)
+                                        .child("拖拽图片 / 视频到此处"),
+                                ),
+                        )
                     })
                     .when(!media.is_empty(), |zone| {
                         zone.child(
-                            div().flex().flex_col().gap(px(10.0)).children(
-                                media
-                                    .iter()
-                                    .map(|asset| media_thumb(asset, cx).into_any_element()),
-                            ),
+                            // 原版 `.media-grid`：flex-wrap 的横排小卡（每张 68px 宽，`WorkflowView.vue:1188-1192`）。
+                            div()
+                                .w_full()
+                                .flex()
+                                .flex_row()
+                                .flex_wrap()
+                                .gap(px(8.0))
+                                .children(
+                                    media
+                                        .iter()
+                                        .map(|asset| media_thumb(asset, cx).into_any_element()),
+                                ),
                         )
                     })
                     .on_drop(cx.listener(|this, paths: &ExternalPaths, window, cx| {
