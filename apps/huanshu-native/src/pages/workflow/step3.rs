@@ -2097,7 +2097,7 @@ impl Step3 {
                     ))
                     .xsmall()
                     .w_full()
-                    .text_size(px(10.0))
+                    .text_size(px(9.0))
                     .disabled(locked)
                     .on_click(cx.listener(move |this, _event, _window, cx| {
                         this.set_path("image", Value::String(primary_ref.clone()), cx)
@@ -2112,7 +2112,7 @@ impl Step3 {
                             ))
                             .xsmall()
                             .w_full()
-                            .text_size(px(10.0))
+                            .text_size(px(9.0))
                             .disabled(locked)
                             .on_click(cx.listener(move |this, _event, _window, cx| {
                                 this.append_gallery_image(&gallery_ref, cx)

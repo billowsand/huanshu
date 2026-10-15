@@ -51,7 +51,6 @@ pub fn title_bar(cx: &App) -> impl IntoElement {
             .child(
                 div()
                     .text_size(px(12.3))
-                    .font_weight(gpui_kit::FontWeight::BOLD)
                     .text_color(colors.text)
                     .child("幻述"),
             ),
@@ -162,7 +161,8 @@ pub fn bar_divider(cx: &App) -> Div {
     div().w(px(1.0)).h(px(18.0)).bg(cx.studio().colors.border)
 }
 
-/// 素材小卡（原版 `.ej-media-strip` 里的 `.ej-media-item`：56px 宽、缩略图 + 名字 + 操作按钮）。
+/// 素材小卡（原版 `.ej-media-strip` 里的 `.ej-media-item`：缩略图 + 名字 + 操作按钮，
+/// 卡宽以放下完整的「设为主图」按钮为准）。
 ///
 /// 缩略图画法同第一步 `media_thumb`（`img` 铺满一个 52×36 的圆角框）。操作按钮由调用方给
 /// （第三步是「设为主图」/「加入图集」），所以它们带着自己的点击逻辑一起传进来。
@@ -176,7 +176,7 @@ pub fn media_tile(
     let c = cx.studio().colors;
     div()
         .id(id)
-        .w(px(56.0))
+        .w(px(64.0))
         .flex()
         .flex_col()
         .items_center()
@@ -196,7 +196,7 @@ pub fn media_tile(
         )
         .child(
             div()
-                .max_w(px(52.0))
+                .max_w(px(58.0))
                 .truncate()
                 .text_size(px(8.8))
                 .text_color(c.muted)
