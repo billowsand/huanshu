@@ -356,7 +356,7 @@ impl WorkflowPage {
                 if !page.generation.read(cx).busy() {
                     page.generation.update(cx, |store, cx| store.reset(cx));
                 }
-                page.show_step(Step::Prepare, window, cx);
+                page.mount_step(Step::Prepare, window, cx);
             }
         }
         page
@@ -947,6 +947,15 @@ impl WorkflowPage {
             },
             cx,
         );
+        self.mount_step(step, window, cx);
+    }
+
+    /// 挂上某一步的视图，不同步路由。
+    ///
+    /// 构造函数里只能用它：此时外壳正在 `update`（启动时在 `open_window` 里建 `Shell`，
+    /// 换页时在 `Shell::navigate` 里），再经 `retarget_route` 更新外壳会直接 panic；
+    /// 而外壳随后写入的路由就是正在构建的这一条，不需要再对准。
+    fn mount_step(&mut self, step: Step, window: &mut Window, cx: &mut Context<Self>) {
         let (model, handle) = (self.model.clone(), self.handle.clone());
         let page = cx.weak_entity();
         self.view = Some(match step {
