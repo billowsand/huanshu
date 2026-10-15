@@ -34,3 +34,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 # 生成事件通道（`tasks::listen_events`）。
 futures = "0.3"
 anyhow = "1.0"
+
+[build-dependencies]
+# Windows 图标签名/版本资源（`build.rs`）：exe 属性里的版本号与图标。
+# 只在 Windows MSVC 下实际工作，其它目标上 `build.rs` 直接返回。
+winresource = "0.1"

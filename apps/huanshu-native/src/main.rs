@@ -3,6 +3,11 @@
 //! 结构见 `README.md`「框架」一节与 `docs/native/parity.md`（逐项功能对照）。
 //! 业务逻辑全在 `huanshu_core`；本工程只做界面。
 
+// 发布版不弹控制台窗口：换回 Windows 子系统。
+// 命令行模式（`--quit-after`、`--export-pdf`）不受影响——父进程重定向的 stdout/stderr
+// 句柄照旧可写，`[coldstart]`、`[export]` 这些行仍在。debug 构建保留控制台，日志直接可见。
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod app;
 mod cli;
 mod export;
@@ -20,7 +25,7 @@ mod theme;
 mod widgets;
 
 use gpui_kit::prelude::*;
-use gpui_kit::{px, size, App, Bounds, WindowBounds};
+use gpui_kit::{px, size, App, Bounds, TitlebarOptions, WindowBounds};
 
 /// 进程入口时刻，用来报冷启动到首帧。
 static PROCESS_START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
@@ -71,6 +76,12 @@ fn main() {
             }
 
             let mut options = gpui_kit::component::TitleBar::window_options();
+            // 自绘标题栏不画系统标题，但 Win32 窗口文本 / 任务栏悬停仍要读它；
+            // 这里与 Tauri 版 `app.windows[0].title` 对齐（同时也是安装版验收看的标题）。
+            options.titlebar = Some(TitlebarOptions {
+                title: Some("幻述".into()),
+                ..gpui_kit::component::TitleBar::title_bar_options()
+            });
             options.window_min_size = Some(size(px(1080.), px(680.)));
             options.window_bounds = Some(WindowBounds::Windowed(Bounds::centered(
                 None,
