@@ -81,6 +81,7 @@
 | 项目改名（点名字编辑，回车/失焦保存，Esc 取消） | ✅ | `mod.rs::start_rename` / `save_name`（空名不保存、保持编辑态，照原版）；待截图对比 |
 | 新建项目的草稿（名称、文稿、粒度、比例）保存与恢复 | ✅ | 800ms 防抖自动保存（`WorkflowPage::schedule_autosave` / `persist_draft`，新建落库后 `retarget_route` 对准路由）；meta 存 `app_settings` 的 `project_meta:<id>`（`services::projects::Step1ProjectMeta`，单测 `step1_meta_*`）；待截图对比 |
 | 生成完成后自动跳到第 3 步 | ✅ | `sync_advance`：条件从**应用级 store** 读（`state_for` → `GenState`），与原版 watch 的 `[stage, retryingPages.size, 有失败页]` 一样「变了才判断」——`done` + 无重试 + 无失败页 + 用户正停在本项目的第 2 步时，800ms 后再查一遍再跳；计时走 `window.background_executor().timer`（不是 tokio）；自动跳页依赖一次成功的生成，**未真机验证**（需 LM Studio） |
+| 牌组的唯一写入路径 | ✅ | 第三步的每一处编辑（应用 / 新建 / 删除 / 移动 / 换版式）都只经 `WorkflowPage::commit_deck(deck, active, save, …)`：先写 `ProjectModel`（`deck` + `active_slide`）→ 再写应用级 store（`GenerationStore::set_deck`，只在 store 正持有本项目且不在生成中时写得进去）→ `save` 时整副 JSON 落库；`on_generation_changed` 的镜像比较后相等就不动，不会回环。落库状态由 `ProjectModel.deck_saving` / `deck_save_error` 单点表达（每条出口都复位） |
 | 库里停在 `running` 的旧运行（上次进程崩了） | 🟡 | **有意偏离**：原版会一直转圈；这里按「已中断」显示（`running=false`、阶段照 `slideStatus` 的非运行分支）且允许重新生成，**不改库**（`GenerationStore::apply_run`） |
 
 ## 第一步 `Step1Prepare.vue` + `MarkdownWorkbench.vue` → `workflow/step1.rs`
@@ -122,21 +123,22 @@
 
 | 功能 | 状态 | 说明 / 依据 |
 |---|---|---|
-| 工具栏：幻灯片数、页码、导出 PDF、演示 | ✅ | |
-| 左侧列表：序号、标题、版式；点击 / ↑↓ 换页 | ✅ | |
-| 中间实时预览（Typst 位图、加载 / 失败 / 重试） | ✅ | `slides::SlideImages` |
-| 裁切提示 | ✅ | 文案与原版一致 |
-| 只发当前页编译（`serial` + `progressive`） | ⬜ | 编辑接上后改成单页牌组 |
-| 版式卡片（图标、名称、kind） | ✅ | 来自 `editor_schema` |
-| 更换版式（KindPicker，change 模式） | ⬜ | `onKindPicked` |
-| 新建 / 删除 / 上下移动幻灯片 | ⬜ | `deleteEditorSlide` / `moveEditorSlide` |
-| 字段表单：简单字段（文本 / 多行 / 下拉 / 开关） | 🟡 | 现为只读展示 |
-| 列表区、嵌套列表、对象区 | ⬜ | `list_sections` / `object_sections` / `new_item` |
-| 图标推荐 | ⬜ | `services::generation::recommend_icons_for_query` |
-| 素材插图（主图、图集） | ⬜ | `setPrimaryImage` / `appendGalleryImage` |
-| 图表 JSON 框（防抖校验、失焦立即校验、只写回通过的） | ⬜ | `chart_check::chart_problems_json` |
-| 高级 JSON 模式（格式化、语义错误、插入素材引用） | ⬜ | `formatEditorJson` / `insertMediaUrl` |
-| 应用更改（`Ctrl+S`）与未保存标记 | ⬜ | `services::projects::update_project_blueprints` |
+| 工具栏：幻灯片数、页码、导出 PDF、演示 | ✅ | 拆成**三个栏头**（原版 `.edit-col-head`，同高连成一条）：左 `layers` +「幻灯片」+ 数量徽章 + `reset` 图标（回第 1 步）；中 `view` +「实时预览」+「● 未保存」+「渲染中…」+ `← N / M →`（两端禁用）+「导出 PDF」+「演示」；右 `edit` +「编辑 第 N 张」+ 上移 / 下移 / 删除。截图 `shell/project-step3-0.png`（对照 `reference/project-step3.png`） |
+| 左侧列表：序号、标题、版式；点击 / ↑↓ 换页 | ✅ | 行尾垃圾桶**只在悬停该行时显示**（`group` + `group_hover`，原版 `.edit-slide-row:hover .edit-row-del`）、只剩一页时不显示；点击行为实测（`3 / 18`、`4 / 19`）；↑↓ 只在第三步根节点自己有焦点时换页——焦点在输入框里时 ↑↓ 不换页（实测），KindPicker 开着时也不换页（实测） |
+| 中间实时预览（Typst 位图、加载 / 失败 / 重试） | ✅ | `slides::SlideImages` + `slide_frame`；舞台在栏头之下取最大比例框、四周 16px，比例按当前页草稿的 `aspect_ratio`（缺省回落项目比例）；实测 32:9 项目舞台明显变宽 |
+| 裁切提示 | ✅ | 「内容过多，已缩到最小字号仍放不下，超出部分被裁切」（`warning-alt` 图标），`SlideImages::overflow(0)` 为真时显示 |
+| 只发当前页编译（`serial` + `progressive`） | ✅ | 牌组恒为 `[draft]`（下标 0）；草稿变化 **120ms 防抖**（`debounceMs: 120`）后 `set_deck`；换页走 `SlideImages::reset`（清图 + 逐张 `drop_image`，不是重建实体）；`serial` / `progressive` 取 `PreviewOptions::default()`（都是真）；「渲染中…」在 `pending()` 持续 **150ms** 后才显示 |
+| 版式卡片（图标、名称、kind） | ✅ | 来自 `editor_schema`；`shell/project-step3-0.png` |
+| 更换版式（KindPicker，change 模式） | ✅ | 实测 feature_grid 页 →「更换」→「列表」（section_list）：`章节号 01` / `标题` / `副标题` **保留**，新内容来自 schema 的默认值，当前 kind 高亮；未点「应用更改」前 sqlite 里那一页仍是 `feature_grid`。标题「更换幻灯片类型」/「选择新类型后将自动保留可迁移的公共字段」逐字；截图 `shell/project-step3-kind-picker-0.png`（对照 `reference/step3-kind-picker.png`） |
+| 新建 / 删除 / 上下移动幻灯片 | ✅ | 「新建幻灯片」：徽章 18→19、`4 / 19`，**DB 仍 18 页**（新建只改内存，照原版）；新页章节号继承上一页——第 5 页（`section='02'`）之后新建得到 `'02'`，封面之后新建**没有** `section`（两者都用 sqlite 验过，测完还原）；删除 / 上移**立即落库**（sqlite：18→17 页且 `feature_grid` 消失；上移后页序交换） |
+| 字段表单：简单字段（文本 / 多行 / 下拉 / 开关） | ✅ | 全按 `editor_schema` 生成：`simple_fields ∩ kind.fields`、两列网格（`textarea` 占整行、`rows` 缺省 3）、`select` 未选中时显示「请选择」（= 空串，可清除）、`boolean` 是自带标签的勾选框（`Checkbox`）；表单表由 `tests/editor_schema.rs` 对着快照锁定 |
+| 列表区、嵌套列表、对象区 | ✅ | 18 个版式逐页走查（`tools/drive.ps1` 逐页截图 + 联系表；联系表是未提交的临时产物）+ compare / swot / process 全分辨率逐项核对：区标题 / `empty_text`（删空「列表项」→「还没有列表项」）/ 每项卡片「{label} {n}」+ 上移下移删除 / `string_lists` / `nested_lists`（process 的「阶段步骤」）/ `object_sections`（compare 的左右方案、swot 的四象限）/ `issue_stack` 的 cards 提示按张数二选一（逐字）；`icon_query_keys` 有值的卡片留「图标助手」占位 |
+| 图标推荐 | ⬜ | 卡片里留 `widgets::todo_block`（下一轮）；`iconQueryKeys` 的取词范围已显示在占位里 |
+| 素材插图（主图、图集） | ⬜ | 主图 / 图集的**文本输入与增删**已做（`image`、`images`，占位「media:12 或 https://...」）；素材条（缩略图、设为主图、加入图集）留 `widgets::todo_block`（下一轮，`setPrimaryImage` / `appendGalleryImage`） |
+| 图表 JSON 框（防抖校验、失焦立即校验、只写回通过的） | ⬜ | `chart_focus` 页留 `widgets::todo_block`（下一轮，`chart_check::chart_problems_json`） |
+| 高级 JSON 模式（格式化、语义错误、插入素材引用） | ⬜ | 「打开高级 JSON / 收起高级 JSON」可展开，内容是 `widgets::todo_block`（下一轮） |
+| 应用更改（`Ctrl+S`）与未保存标记 | ✅ | 三态逐字：`保存中…`（`renew`）/ `应用更改 (Ctrl+S)`（`save`）/ `已保存`（`checkmark`），保存失败时按钮下方是 `.ej-error` 样式的错误行；**Ctrl+S 在第三步任何位置都生效**（有意改进：原版只在高级 JSON 框里）；实测 sqlite 前后：`Auto Slidev Layout Blueprint Test Deck` → `… LOOP4`，杀进程重进项目仍是新值；`filter_slide_json` 的有意修改保住 `aspect_ratio`（32:9 项目改封面并应用后该页仍是 `ratio_32x9`，第 2 步看板卡片仍是 32:9） |
+| 生成中只读 | ✅ | **有意偏离**：`WorkflowPage::editing_locked` 为真时应用 / 新建 / 删除 / 移动 / 换版式与全部输入框禁用，保存按钮旁显示「生成进行中，完成后可编辑」（原版没挡，它遇到生成中的空位会出错） |
 
 ## 演示 `PresentationOverlay.vue` → `present.rs`
 

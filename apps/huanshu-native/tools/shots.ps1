@@ -45,6 +45,10 @@ foreach ($shot in $Shots) {
     $proc = Start-Process -FilePath $Exe -ArgumentList $args -PassThru -WindowStyle Normal
     Start-Sleep -Seconds $Wait
     & powershell -NoProfile -ExecutionPolicy Bypass -File $Tool -Prefix $name -OutDir $OutDir | Out-Null
+    # Screens that need a click are not in this list: the KindPicker shot is taken with drive.ps1,
+    #   powershell -NoProfile -ExecutionPolicy Bypass -File apps/huanshu-native/tools/drive.ps1 -Route project:2:3
+    #     -Steps "click:0.233,0.965;wait:2;shot:project-step3-kind-picker" -Out docs/native/shell -Boot 10
+    # which writes docs/native/shell/project-step3-kind-picker-0.png.
     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
 }

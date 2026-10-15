@@ -55,6 +55,16 @@ src/
 7. 没做完的区域用 `widgets::todo_block` 占位（写清对照的 Vue 位置与要做的事），代码里的小缺口写 `TODO(parity): …`。
    做完一项就删掉占位，并更新 `docs/native/parity.md`。
 8. 真机验证只在沙箱里做（`HUANSHU_HOME`），**绝不碰** `%LOCALAPPDATA%\auto-slidev-studio`。
+9. **表单输入框是实体，不能每帧新建**（会丢焦点、丢光标、漏内存）：按**完整路径**（`cards[2].title`）
+   缓存 `Entity<InputState>` / `Entity<TextareaState>` / `Entity<SelectState<_>>`，各自订阅；订阅与缓存同生共死。
+   列表增删移、换页、换版式、应用成功这些**结构变化**用「表单代次」整组重建（下标变了路径就指向别的项）；
+   字段里打字**不**重建。render 里同步值时跳过**正被编辑**的那个框（`focus_handle.is_focused(window)`），
+   `InputState::set_value` 不发 `Change`，不会回环（样板见 `pages/workflow/step3.rs`）。
+10. **位图换目标（换页、换牌组）用 `SlideImages::reset`**，不要重建 `SlideImages`（图集不会自己回收）；
+    `release` 只在页面离开时调。要显示「渲染中…」用 `SlideImages::pending()` + 自己计时（原版 150ms）。
+11. **第三步的牌组编辑只走 `WorkflowPage::commit_deck`**（唯一写入路径）：它写 `ProjectModel` → 应用级
+    store（`GenerationStore::set_deck`）→ 按需落库。不要在页面里直接改 `ProjectModel.deck` 或 store 的牌组
+    （store 的镜像会盖回去，或者污染别的项目）；动手前先问 `WorkflowPage::editing_locked`（生成中只读）。
 
 ### 已知的 GPUI Kit 细节
 
