@@ -67,6 +67,16 @@ pub fn is_known_theme(id: &str) -> bool {
     APP_THEMES.iter().any(|theme| theme.id == id)
 }
 
+/// 主题 id → 中文名。未知 id 原样返回：导出报告里的 `theme_fallback` 可能是一个旧版本
+/// （或更新版本）的 id，界面上没有它的名字也不能变成空白。
+/// 与前端 `APP_THEMES.find(t => t.id === id)?.name ?? id` 同义。
+pub fn theme_name(id: &str) -> &str {
+    APP_THEMES
+        .iter()
+        .find(|theme| theme.id == id)
+        .map_or(id, |theme| theme.name)
+}
+
 /// 按 id 取主题；未知 id 回落到 [`DEFAULT_THEME`]，第二个返回值说明有没有回落
 /// （与 `export_pdf` 报告里的 `theme_fallback` 同义）。
 pub fn theme_or_default(id: Option<&str>) -> (&'static AppTheme, Option<String>) {
@@ -108,6 +118,17 @@ mod tests {
         }
         assert!(APP_THEMES.iter().any(|t| t.tone.is_dark()));
         assert!(APP_THEMES.iter().any(|t| !t.tone.is_dark()));
+    }
+
+    /// 导出报告里的主题名：已知 id 给中文名，未知 id 原样返回（界面上不能变成空白）。
+    #[test]
+    fn theme_names_resolve_known_ids_and_pass_through_the_rest() {
+        for theme in APP_THEMES {
+            assert_eq!(theme_name(theme.id), theme.name, "{}", theme.id);
+        }
+        assert_eq!(theme_name("light-notes"), "便签·稿纸");
+        assert_eq!(theme_name("dark-blue"), "暗·星图");
+        assert_eq!(theme_name("no-such-theme"), "no-such-theme");
     }
 
     #[test]

@@ -349,6 +349,9 @@ impl HomePage {
         self.pdf_exporting = true;
         self.exporting = Some(project.id);
         cx.notify();
+        // 「正在生成 PDF…」（首次导出要扫系统字体，要几秒）。结果 / 失败对话框由
+        // `show_report` 接着开，它顺手收起这个框，这里不用再管。
+        export::begin_export(window, cx);
         let shared = self.handle.shared().clone();
         let theme = cx.studio().theme.id.to_string();
         run_bg(

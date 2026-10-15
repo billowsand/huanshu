@@ -44,7 +44,7 @@ pub struct PdfExportReport {
     /// Image references shown as placeholders, with the reason.
     pub missing_assets: Vec<slide_typst::MissingAsset>,
     /// The requested theme id when it has no PDF layout; the export fell back
-    /// to light-notes. `None` when the requested theme rendered as-is.
+    /// to [`FALLBACK_THEME`]. `None` when the requested theme rendered as-is.
     pub theme_fallback: Option<String>,
     pub elapsed_ms: u128,
 }
@@ -73,16 +73,21 @@ pub struct ThumbnailBatch {
     pub elapsed_ms: u128,
 }
 
+/// 没有 PDF 版式的主题回落到它（Typst 侧同样回落到 `themes.light-notes`，见 `typst/main.typ`）。
+/// 报告里的 `theme_fallback` 是**请求的** id；这个常量是实际用的那套版式，
+/// 界面要写出「已回落到「便签·稿纸」」就得知道它是谁。
+pub const FALLBACK_THEME: &str = "light-notes";
+
 /// Resolves the requested theme to one with a Typst layout. Unknown ids fall
-/// back to light-notes (the Typst side would fall back too, silently — see
+/// back to [`FALLBACK_THEME`] (the Typst side would fall back too, silently — see
 /// `themes` in `typst/main.typ`); the second return value names the requested
 /// id so the report can surface the fallback.
 fn resolve_theme(theme: Option<String>) -> (String, Option<String>) {
-    let requested = theme.unwrap_or_else(|| "light-notes".to_string());
+    let requested = theme.unwrap_or_else(|| FALLBACK_THEME.to_string());
     if slide_typst::SUPPORTED_THEMES.contains(&requested.as_str()) {
         (requested, None)
     } else {
-        ("light-notes".to_string(), Some(requested))
+        (FALLBACK_THEME.to_string(), Some(requested))
     }
 }
 
@@ -323,15 +328,31 @@ mod tests {
 
     #[test]
     fn unknown_theme_falls_back_to_notes_and_is_reported() {
-        assert_eq!(resolve_theme(None), ("light-notes".to_string(), None));
+        assert_eq!(resolve_theme(None), (FALLBACK_THEME.to_string(), None));
         assert_eq!(
             resolve_theme(Some("dark-blue".to_string())),
             ("dark-blue".to_string(), None)
         );
         assert_eq!(
             resolve_theme(Some("no-such-theme".to_string())),
-            ("light-notes".to_string(), Some("no-such-theme".to_string()))
+            (
+                FALLBACK_THEME.to_string(),
+                Some("no-such-theme".to_string())
+            )
         );
+    }
+
+    /// 回落目标必须是真主题：界面要写「已回落到「便签·稿纸」」，靠的是它的中文名；
+    /// 同时它得有 Typst 版式，否则回落之后还是占位页。
+    #[test]
+    fn the_fallback_theme_has_a_name_and_a_typst_layout() {
+        assert!(
+            slide_typst::SUPPORTED_THEMES.contains(&FALLBACK_THEME),
+            "{FALLBACK_THEME} 没有 Typst 版式"
+        );
+        let name = crate::themes::theme_name(FALLBACK_THEME);
+        assert_ne!(name, FALLBACK_THEME, "{FALLBACK_THEME} 没有中文名");
+        assert!(crate::themes::is_known_theme(FALLBACK_THEME));
     }
 
     #[test]

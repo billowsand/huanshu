@@ -799,6 +799,8 @@ impl Step3 {
         };
         self.exporting = true;
         cx.notify();
+        // 与首页一致：先开「正在生成 PDF…」，结果/失败框由 show_report 收起它。
+        crate::export::begin_export(window, cx);
         let shared = self.handle.shared().clone();
         let theme = cx.studio().theme.id.to_string();
         let slides = self.deck(cx);
