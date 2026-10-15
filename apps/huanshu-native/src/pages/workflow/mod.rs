@@ -9,8 +9,8 @@
 //! （侧栏说明、初始步骤、自动跳页）；`ProjectModel.deck` 跟着 store 的牌组走，第三步用它。
 //!
 //! **牌组只有一条写入路径**：第三步的编辑一律经 [`WorkflowPage::commit_deck`]（模型 → store 的
-//! 写入口 → 落库），`WorkflowPage`、`ProjectModel`、store 三处不会各改各的。生成进行中
-//! （[`WorkflowPage::editing_locked`]）第三步只读。
+//! 写入口 → 落库），`WorkflowPage`、`ProjectModel`、store 三处不会各改各的。**本项目**正在
+//! 生成 / 重试时（[`WorkflowPage::editing_locked`]）第三步只读；别的项目在生成不影响本项目的编辑。
 //!
 //! 已实现：加载 / 加载失败、侧栏（返回、项目名与改名、三步状态与说明、主题圆点、设置）、
 //! 按原版规则选初始步骤与判断能否点击、步骤切换时交还位图、第一步草稿防抖自动保存
@@ -38,7 +38,7 @@ use crate::generation::{GenState, GenerationStore};
 use crate::icons::carbon;
 use crate::router::{Route, SettingsTab, Step};
 use crate::shell::ShellHandle;
-use crate::tasks::run_bg;
+use crate::tasks::{run_async, run_bg};
 use crate::theme::StudioExt as _;
 use crate::widgets;
 
@@ -278,6 +278,20 @@ impl WorkflowPage {
             latest_run: None,
         });
         let generation = handle.generation();
+        // 原版 `WorkflowView.onMounted` 无条件预热图标向量
+        // （`invoke('ensure_icon_embeddings').catch(() => {})`）：第三步的「AI 推荐图标」要用它。
+        // 结果与错误都忽略——没配向量库 / 模型时让它失败就好，不挡界面（`/new` 也预热，
+        // 因为从 `/new` 存盘后是同一个页面实例，不会再挂载一次）。
+        let preheat_shared = handle.shared().clone();
+        run_async(
+            window,
+            cx,
+            async move { generation::ensure_icon_embeddings(&preheat_shared).await },
+            |_page: &mut Self,
+             _result: Result<(), String>,
+             _window: &mut Window,
+             _cx: &mut Context<Self>| {},
+        );
         let fingerprint = DraftSnapshot::capture(&model.read(cx));
         let rename = cx.new(|cx| {
             gpui_kit::component::input::InputState::new(window, cx).placeholder("演示名称")
@@ -615,15 +629,20 @@ impl WorkflowPage {
 
     /// 第三步此刻是不是只读（**有意偏离原版**：原版没挡，它的第三步遇到生成中的空位会出错）。
     ///
-    /// 本项目正在生成 / 重试时为真；store 正为**别的**项目跑时也为真——那时本项目的数据是
-    /// 库里的静态快照，写进 store 是污染别人、写回库里会盖掉生成结果。
+    /// **只在本项目正在生成 / 重试时为真**：store 正持有本项目（[`GenerationStore::live_for`]）
+    /// 且它在忙（`busy()` 是**全应用**的，所以两个条件都要）。别的项目在生成时本项目照常可编辑
+    /// ——那时 [`GenerationStore::set_deck`] 写不进去，模型就是唯一状态，[`Self::commit_deck`]
+    /// 照常把本项目自己的行落库，不会污染别人的牌组。
     /// 第三步的应用 / 新建 / 删除 / 移动 / 换版式动手前都问这里。
     ///
     /// 参数是 `&App` 而不是 `&Context<Self>`：第三步（[`step3::Step3`]）手上只有工作流页的
     /// `WeakEntity`，拿不到 `Context<WorkflowPage>`；这里也只用到 `App` 的那一半。
     pub fn editing_locked(&self, cx: &App) -> bool {
-        // `busy()` 是**全应用**的：生成中或还有页在重试（含别的项目），两种情形都要挡。
-        self.generation.read(cx).busy()
+        let id = self.model.read(cx).id;
+        self.generation
+            .read(cx)
+            .live_for(id)
+            .is_some_and(|store| store.busy())
     }
 
     /// **第三步唯一的牌组写入路径**（原版 `useSlideEditor` 自己改 `gen.blueprints`，
@@ -634,7 +653,8 @@ impl WorkflowPage {
     /// `save` 时把整副牌组的 JSON 落库（原版 `saveBlueprints`，紧凑格式）。
     /// 第三步的每一处编辑都只走这里。
     ///
-    /// 调用方先看 [`Self::editing_locked`]（生成中只读）；本函数不自己挡，免得悄悄丢掉调用方的改动。
+    /// 调用方先看 [`Self::editing_locked`]（**本项目**生成 / 重试中只读）；本函数不自己挡，
+    /// 免得悄悄丢掉调用方的改动。
     ///
     /// `deck_saving` 的每条出口（每条都复位）：
     /// 1. `save == false`（原版：新建页只插进牌组，随下一次应用 / 删除 / 移动一起存）；

@@ -537,16 +537,24 @@ impl GenerationStore {
                     Some(aspect_ratio),
                 )
                 .await;
-                // 原版紧接着 `invoke('get_blueprints')`。成功与失败都要读：
-                // 失败时它是「已经组装出来的牌组」（原版只在首张是封面时采用）。
-                let blueprints = generation::get_blueprints(&shared)
-                    .map(|slides| {
-                        slides
-                            .into_iter()
-                            .map(|slide| serde_json::to_value(slide).ok())
-                            .collect::<Vec<Option<Value>>>()
-                    })
-                    .unwrap_or_default();
+                // 原版紧接着 `invoke('get_blueprints')`：这里换成**按发起生成的项目**取牌组
+                // （core 的 `get_generation_deck`），不看「当前打开的项目」——生成中用户可能
+                // 已经打开了别的项目，那时 `get_blueprints` 拿到的是别人的牌组。
+                // 成功与失败两条路都要读：失败时它是「已经组装出来的牌组」（原版只在首张是
+                // 封面时采用）；运行没到达过组装时 core 返回空，库里上一次的旧牌组不会被当成
+                // 这次的结果。也不等事件里的运行 id——事件可能比这个结果晚到。
+                let blueprints = match project_id {
+                    Some(id) => generation::get_generation_deck(&shared, id),
+                    // 还没落库的项目（原版 `/new` 的 `activeProjectId` 为 null）：退回当前牌组。
+                    None => generation::get_blueprints(&shared),
+                }
+                .map(|slides| {
+                    slides
+                        .into_iter()
+                        .map(|slide| serde_json::to_value(slide).ok())
+                        .collect::<Vec<Option<Value>>>()
+                })
+                .unwrap_or_default();
                 (result, blueprints)
             },
             move |store, (result, blueprints), cx| {
