@@ -155,4 +155,4 @@
 | 切页动画 | ➖ | 原版有淡入/滑动；GPUI 下先不做 |
 | 触摸滑动翻页 | ✅ | `on_swipe` + `Swipe` 状态机（`ScrollWheelEvent.touch_phase` 累计，\|dx\|>\|dy\| 且 \|dx\|>50 翻页，左滑下一页；`did_swipe` 吞掉随后的舞台点击）；鼠标滚轮不触发；5 个单测。**真机触摸未验证**（本机无触摸屏，方向符号与合成点击需人工验收）；`target/drive/w1-w3`（滚轮不翻页） |
 | 全屏时控制条浮动 | ✅ | 全屏时控制条不再占位、叠在舞台底部：底色 72%、上边框 45% 不透明，默认透明下移 8px、悬停（只挂控制条自己）淡入上移 0.3s（`with_animation` 两端态，悬停标志拼进元素 id；`backdrop-filter` 模糊省略）；截图 `shell/present-full-0.png` / `present-full-hover-0.png`；非全屏照旧 flex 底部占位 |
-| 全屏铺满 / 非全屏留白 | ✅ | 舞台可用区全屏 = 覆盖层满幅、非全屏 = 覆盖层 − 96/88（原版 `stretchedViewport` 的 padH/padV，覆盖层口径即原版口径减原生标题栏）；非全屏四周黑底留白照原版 |
+| 全屏铺满 / 非全屏留白 | ✅ | 全屏时外壳不画标题栏（原版是覆盖层元素自己 `requestFullscreen`），舞台可用区 = 整个屏幕；非全屏 = 标题栏下的覆盖层 − 96/88（原版 `stretchedViewport` 的 padH/padV），四周黑底留白照原版；`shell/present-full-0.png` |

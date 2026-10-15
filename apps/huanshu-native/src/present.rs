@@ -263,19 +263,17 @@ impl Presentation {
     /// 原版：非全屏时可用区 = `window.innerWidth - 96` × `window.innerHeight - 88`
     /// （`padH` / `padV`），全屏时都是 0（幻灯片铺满）；两个方向都 `max(…, 1)`。
     ///
-    /// 原生差异：原版的覆盖层是 `position: fixed; inset: 0`，铺满整个窗口（连标题栏那条也盖住，
-    /// 标题栏再用更高的 z-index 浮在上面），`window.innerHeight` 因此含标题栏；原生覆盖层是外壳里
-    /// 标题栏**下面**的一层（`shell.rs`，标题栏仍在），可视区只有 `viewport_size` 减掉标题栏。
-    /// 所以这里按覆盖层自己的区域算：全屏时正好铺满，非全屏时留出原版的 96 / 88 边距，
-    /// 否则全屏那张图会溢出容器 36px（上下各露 18px 到标题栏和屏幕外）。
-    /// 窗口视口用 `window.viewport_size()`（含标题栏，与原版 `window.innerHeight` 同口径）。
+    /// 原版全屏时是覆盖层元素自己进全屏（`presOverlayRef.requestFullscreen()`），标题栏看不见；
+    /// 原生外壳在全屏演示时也不画标题栏（`shell.rs`），所以全屏可用区是整个视口。非全屏时原生
+    /// 覆盖层在标题栏**下面**，可用区是视口减标题栏，再留原版的 96 / 88 边距。
     fn stage_size(&self, window: &Window) -> (f32, f32) {
         let size = window.viewport_size();
         let area_w = size.width.as_f32().max(1.0);
-        let area_h = (size.height.as_f32() - crate::theme::TITLEBAR_HEIGHT).max(1.0);
+        // 全屏时外壳不画标题栏（见 `shell.rs`），覆盖层就是整个屏幕；非全屏时它在标题栏下面。
         let (avail_w, avail_h) = if window.is_fullscreen() {
-            (area_w, area_h)
+            (area_w, size.height.as_f32().max(1.0))
         } else {
+            let area_h = (size.height.as_f32() - crate::theme::TITLEBAR_HEIGHT).max(1.0);
             ((area_w - 96.0).max(1.0), (area_h - 88.0).max(1.0))
         };
         if self.stretch {

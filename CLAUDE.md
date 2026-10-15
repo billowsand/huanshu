@@ -68,7 +68,9 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
   Tauri 侧 store 生成结束取牌组走 `get_generation_deck`（发起生成的项目；`/new` 未落库时保留
   `get_blueprints`）；用户已打开别的项目时（`activeProjectId` 变了）结果不写进 store，`loadFromJson` 会
   `stopListening`，`WorkflowView` 生成后不再自己存 `gen.blueprints`（core 已落库，再存会把别的项目的牌组写进来）。
-- 演示是盖在当前页上的覆盖层（与原版一致），打开即全屏，Esc 先关全览再退出并退出全屏。
+- 演示是盖在当前页上的覆盖层（与原版一致），打开即全屏，全屏时外壳不画标题栏。Esc 照原版：先关全览；
+  全屏时只退出全屏，非全屏时才退出演示。
+- `apps/huanshu-native/build.rs` 把 Windows 主线程栈调到 8 MiB：默认 1 MiB，debug 构建打开第三步表单就栈溢出（release 不会）。
 - 主题存在 `app_settings` 的 `app_theme` 键，与 Tauri 版（WebView localStorage）暂不同步。
 - 量内存要量**本进程**：PowerShell 里的 `$PID` 是 PowerShell 自己。只读查看器阶段实测（release，5 分钟每 100ms 翻一页）工作集稳定在 385–412 MiB。
 - **原版首次向导在沙箱里会指回真实目录**：`FirstRunWizard.vue` 用前端的 `localDataDir()` 拼默认目录，不认 `HUANSHU_HOME`。

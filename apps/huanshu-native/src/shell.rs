@@ -216,7 +216,7 @@ fn build_page(
 }
 
 impl Render for Shell {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if !self.first_frame_logged {
             self.first_frame_logged = true;
             crate::note_first_frame();
@@ -236,7 +236,11 @@ impl Render for Shell {
             .text_color(studio.colors.text)
             .font_family(studio.interface_font.clone())
             .text_size(px(14.0))
-            .child(widgets::title_bar(cx))
+            // 全屏演示时没有标题栏：原版是演示元素自己进全屏（`requestFullscreen`），盖住整个屏幕。
+            .when(
+                !(self.presentation.is_some() && window.is_fullscreen()),
+                |shell| shell.child(widgets::title_bar(cx)),
+            )
             .child(
                 div()
                     .relative()
