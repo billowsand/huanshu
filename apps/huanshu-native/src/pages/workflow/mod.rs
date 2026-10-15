@@ -843,10 +843,14 @@ impl WorkflowPage {
                         });
                         // 原版 onMounted 的顺序（loadLatestRun → loadFromJson / reset →
                         // loadLatestRun）都在 store 里；它对齐完再决定进哪一步。
+                        // 这次读回来的运行也要给 store：store 正为别的项目跑时，它照这份 id
+                        // 判断静态分支的缓存要不要重读（`ensure_static`）。
+                        let run = page.model.read(cx).latest_run.clone();
                         let page_weak = cx.weak_entity();
                         page.generation.update(cx, |store, cx| {
                             store.open_project(
                                 id,
+                                run.as_ref(),
                                 &blueprints_json,
                                 cx,
                                 move |store, active, cx| {

@@ -18,7 +18,11 @@
 //!    `onMounted` 会在打开任何项目时 `loadFromJson` / `reset`，把另一个项目正在跑的生成
 //!    从 store 里抹掉（进度界面死掉，事件还在往一个被清空的 store 上写）。这里的
 //!    [`GenerationStore::open_project`] 在 store 正为别的项目跑时**不碰 store**，那个项目
-//!    按库里的数据显示（[`GenerationStore::state_for`] 的静态分支）。
+//!    按库里的数据显示（[`GenerationStore::state_for`] 的静态分支）。**静态分支的数据照样完整**：
+//!    [`GenerationStore::ensure_static`] 在项目打开与第二步实体创建时按项目读一次「最近一次运行 +
+//!    它的日志」并缓存（`StaticCache`），第二步据此显示失败页、关键事件与最近日志——原版这些
+//!    一定在，因为它不管在给谁跑生成，总会 `loadLatestRun` 把日志装进 store。第二步的渲染只读
+//!    缓存（[`GenerationStore::snapshot_for`]），不读库。
 //! 2. **库里停在 `running` 的旧运行按「已中断」显示**：原版 `loadLatestRun` 见到
 //!    `status === 'running'` 就 `running = true` 并等事件——进程上次崩了的话它会一直转圈。
 //!    这里只要 store 并没有在为这个项目跑（例如上次进程崩了），就保留阶段文案但
@@ -132,6 +136,15 @@ pub struct GenSnapshot {
     pub message: String,
     /// 原版 `gen.running`。
     pub running: bool,
+    /// 这份快照是不是 store 在实时更新（同 [`GenState::live`]；原版没有这个字段，它总是把
+    /// store 对准当前项目）。静态分支里「重试这一页」要经 store 而 store 不持有本项目
+    /// （`retry_page` 用的是它手上的运行与逐页状态，也就是**别人**的），所以界面按它禁用——
+    /// 否则重试会排到别的项目的运行上。
+    pub live: bool,
+    /// store 正为**别的**项目跑生成 / 重试（原版没有这个字段）。全局规则「同一时刻只许一次
+    /// 生成或重试」是**全应用**的（第一步的 `canGenerate` 也是），界面据此把「重新生成全部」
+    /// 禁用：那条路会静默返回，点了什么都不发生（`WorkflowPage::start_generation`）。
+    pub busy_elsewhere: bool,
     /// 原版 `slideItems`。
     pub items: Vec<SlideProgressItem>,
     /// 原版 `gen.pageStatuses`。
@@ -182,6 +195,125 @@ pub fn stored_message(deck_len: usize) -> String {
     }
 }
 
+/// 静态分支（store 不持有本项目）的完整快照：牌组来自模型、整体阶段来自库里的运行，
+/// 逐页状态、看板条目、关键事件与最近日志来自 [`StaticCache`] 里的那一份
+/// （原版对应 `loadFromJson` + `loadLatestRun`，它的日志与逐页状态一定在）。
+///
+/// 抽成自由函数有两个原因：不碰 GPUI 就能单测；[`GenerationStore::snapshot_for`] 的
+/// 两条分支在这里只差数据来源。
+fn static_snapshot(
+    run: Option<&GenerationRun>,
+    deck: &[Value],
+    logs: &[GenerationLogEvent],
+    statuses: Statuses,
+    busy_elsewhere: bool,
+) -> GenSnapshot {
+    let slots: Vec<Option<Value>> = deck.iter().cloned().map(Some).collect();
+    let items = progress::slide_items(&slots, logs, &statuses);
+    GenSnapshot {
+        stage: stored_stage(run, deck.len()),
+        message: stored_message(deck.len()),
+        running: false,
+        live: false,
+        busy_elsewhere,
+        thumbs: items.iter().map(|item| item.blueprint.clone()).collect(),
+        items,
+        statuses,
+        // 静态分支没有正在跑的重试（重试要经 store，而 store 不持有本项目）。
+        retrying: PageSet::new(),
+        recent_logs: progress::recent_logs(logs).into_iter().cloned().collect(),
+        important: progress::important_log_count(logs),
+        prompt_count: progress::prompt_log_count(logs),
+        current_run: run.cloned(),
+        // 原版 `props.blueprints[0]?.aspect_ratio`；静态分支的牌组就是库里的那一副。
+        aspect_source: slots.first().cloned().flatten(),
+    }
+}
+
+/// 静态分支（store 正为别的项目跑）要用的一份库数据：某个项目的最近一次运行、它的日志，
+/// 以及从日志恢复出来的逐页状态（[`progress::statuses_from_logs`]，含失败页）。
+///
+/// 原版没有这份东西：它 `loadLatestRun` + `loadFromJson` 把日志与状态装进 store，代价是把
+/// 另一个项目正在跑的生成从 store 里抹掉（模块文档「差异」第 1 条）。这里留着那个生成，
+/// 改为按项目缓存一份只读数据。
+struct StaticEntry {
+    project_id: i64,
+    /// 读这份数据时库里的运行 id（`None` = 那时还没有运行）。
+    run_id: Option<i64>,
+    statuses: Statuses,
+    logs: Vec<GenerationLogEvent>,
+}
+
+/// 静态分支的缓存与读库去重（**单槽**：同时只有一个工作流页在显示，换项目就整槽换掉）。
+///
+/// 与 GPUI 无关的纯逻辑，便于单测。
+#[derive(Default)]
+struct StaticCache {
+    entry: Option<StaticEntry>,
+    /// 已经为哪一对 `(项目 id, 运行 id)` 排过读库。它在读库在途时挡住重复请求；结果回来之后
+    /// 即使与调用方手上的运行对不上（例如模型里的 `latest_run` 还是旧的），也不再重读——
+    /// 库里就是那份数据，反复读只会每帧打库。
+    requested: Option<(i64, Option<i64>)>,
+    /// 读库的代次：每排一次 +1。回调里对不上就说明期间又排过别的（换了项目 / 运行），整条作废。
+    seq: u64,
+}
+
+impl StaticCache {
+    /// 这个项目的静态数据；没有（或缓存属于别的项目）就是 `None`。
+    fn entry_for(&self, project_id: Option<i64>) -> Option<&StaticEntry> {
+        let project_id = project_id?;
+        self.entry
+            .as_ref()
+            .filter(|entry| entry.project_id == project_id)
+    }
+
+    /// 要不要为这一对 `(项目 id, 运行 id)` 排一次读库：项目或运行变了、还没有数据，
+    /// 且这一对没有排过。
+    fn should_read(&self, project_id: i64, run_id: Option<i64>) -> bool {
+        if self.requested == Some((project_id, run_id)) {
+            return false;
+        }
+        self.entry_for(Some(project_id))
+            .map(|entry| entry.run_id != run_id)
+            .unwrap_or(true)
+    }
+
+    /// 排一次读库，返回这次的代次（结果回来时用它比对身份）。
+    fn begin_read(&mut self, project_id: i64, run_id: Option<i64>) -> u64 {
+        self.seq += 1;
+        self.requested = Some((project_id, run_id));
+        self.seq
+    }
+
+    /// 读回来的数据落进缓存；代次对不上（期间排过别的读，例如打开了别的项目）时整条丢弃，
+    /// 返回有没有落进去。
+    fn put(&mut self, seq: u64, entry: StaticEntry) -> bool {
+        if seq != self.seq {
+            return false;
+        }
+        self.entry = Some(entry);
+        true
+    }
+
+    /// store 接手这个项目（打开 / 开始生成 / 重试）时丢掉它的静态缓存：那时本项目的数据
+    /// 由 store 实时持有，旧的一份只会过期。
+    fn invalidate(&mut self, project_id: i64) {
+        if self
+            .entry
+            .as_ref()
+            .is_some_and(|entry| entry.project_id == project_id)
+        {
+            self.entry = None;
+            self.requested = None;
+        }
+    }
+
+    fn clear(&mut self) {
+        self.entry = None;
+        self.requested = None;
+    }
+}
+
 pub struct GenerationStore {
     shared: AppShared,
     /// 原版 `activeProjectId`：这份状态描述哪个项目。
@@ -205,6 +337,8 @@ pub struct GenerationStore {
     version: u64,
     /// 原版 `startListening` / `stopListening` 的活跃期：只有本次生成请求在途时才收事件。
     receiving: bool,
+    /// 静态分支（store 不持有本项目）的库数据缓存，见 [`Self::ensure_static`]。
+    static_cache: StaticCache,
     /// 事件通道（常驻；见模块文档）。
     sink: ChannelSink,
 }
@@ -231,6 +365,7 @@ impl GenerationStore {
             last_error: String::new(),
             version: 0,
             receiving: false,
+            static_cache: StaticCache::default(),
             sink,
         }
     }
@@ -302,7 +437,14 @@ impl GenerationStore {
             },
             None => {
                 let slots: Vec<Option<Value>> = deck.iter().cloned().map(Some).collect();
-                let statuses = Statuses::new();
+                // 日志里恢复出来的失败页也算数（原版从日志装 pageStatuses，`hasFailedPages`
+                // 会挡住「完成后 800ms 自动进第 3 步」）：静态分支的摘要因此与第二步一致。
+                // 有失败页时看板条目也按日志算（规划 / 布局结果来自日志）。
+                let cached = self.static_cache.entry_for(project_id);
+                let statuses = cached
+                    .map(|entry| entry.statuses.clone())
+                    .unwrap_or_default();
+                let logs = cached.map(|entry| entry.logs.as_slice()).unwrap_or(&[]);
                 GenState {
                     live: false,
                     stage: stored_stage(run, deck.len()),
@@ -311,9 +453,9 @@ impl GenerationStore {
                     running: false,
                     retrying: 0,
                     slide_count: deck.len(),
-                    board_items: progress::slide_items(&slots, &[], &statuses).len(),
+                    board_items: progress::slide_items(&slots, logs, &statuses).len(),
                     has_blueprints: !deck.is_empty(),
-                    failed_pages: false,
+                    failed_pages: statuses.values().any(|status| status.stage == "error"),
                 }
             }
         }
@@ -322,6 +464,10 @@ impl GenerationStore {
     /// 第二步（看板与详情）读生成状态的入口：与 [`Self::state_for`] 判同一套
     /// 「store 是不是正持有本项目」，但把逐页状态、日志、牌组一并交出来
     /// （原版 `Step2Generate.vue` 的 props 全部来自 `useGenerationStore()`）。
+    ///
+    /// 静态分支的数据来自 [`Self::ensure_static`] 缓存的那一份（这里**只读缓存、不读库**）；
+    /// 缓存还没到或与调用方手上的运行对不上时先按现有的数据显示，下一次
+    /// [`Self::ensure_static`] 会给上新的。
     pub fn snapshot_for(
         &self,
         project_id: Option<i64>,
@@ -335,6 +481,8 @@ impl GenerationStore {
                     stage: live.stage.clone(),
                     message: live.message.clone(),
                     running: live.running,
+                    live: true,
+                    busy_elsewhere: false,
                     thumbs: items.iter().map(|item| item.blueprint.clone()).collect(),
                     items,
                     statuses: live.page_statuses.clone(),
@@ -350,26 +498,66 @@ impl GenerationStore {
                 }
             }
             None => {
-                let slots: Vec<Option<Value>> = deck.iter().cloned().map(Some).collect();
-                let statuses = Statuses::new();
-                let items = progress::slide_items(&slots, &[], &statuses);
-                GenSnapshot {
-                    stage: stored_stage(run, deck.len()),
-                    message: stored_message(deck.len()),
-                    running: false,
-                    thumbs: items.iter().map(|item| item.blueprint.clone()).collect(),
-                    items,
-                    statuses,
-                    retrying: PageSet::new(),
-                    recent_logs: Vec::new(),
-                    important: 0,
-                    prompt_count: 0,
-                    current_run: run.cloned(),
-                    // 原版 `props.blueprints[0]?.aspect_ratio`；没有运行的静态分支用牌组的第一张。
-                    aspect_source: slots.first().cloned().flatten(),
-                }
+                let cached = self.static_cache.entry_for(project_id);
+                static_snapshot(
+                    run,
+                    deck,
+                    cached.map(|entry| entry.logs.as_slice()).unwrap_or(&[]),
+                    cached
+                        .map(|entry| entry.statuses.clone())
+                        .unwrap_or_default(),
+                    // 到这里 store 一定不持有本项目，`busy()` 只可能是为别的项目忙。
+                    self.busy(),
+                )
             }
         }
+    }
+
+    /// 确保静态分支（[`Self::snapshot_for`] 的 `None` 分支）的数据按这个项目读过一次：
+    /// 读库由这里排到后台（`read_run_and_logs`），第二步的渲染只读缓存。
+    ///
+    /// 调用点：项目打开（[`Self::open_project`] 的忙早退分支）与第二步实体创建
+    /// （`pages/workflow/step2.rs::Step2::new`）。项目或运行变了（`run.id` 不同）才算失效，
+    /// 同一对 `(项目, 运行)` 只读一次；还没落库的项目（`/new`）库里没有它的运行，不读。
+    ///
+    /// store 正持有本项目时，这一步读出来的数据暂时用不上（第二步读的是实时状态）；照样读
+    /// 是为了它后来接手别的项目、本项目落到静态分支时缓存已经在了——同一对只读一次，
+    /// 代价就一次查询。
+    pub fn ensure_static(
+        &mut self,
+        project_id: Option<i64>,
+        run: Option<&GenerationRun>,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(project_id) = project_id else {
+            return;
+        };
+        let run_id = run.map(|run| run.id);
+        if !self.static_cache.should_read(project_id, run_id) {
+            return;
+        }
+        let seq = self.static_cache.begin_read(project_id, run_id);
+        let shared = self.shared.clone();
+        run_bg_in(
+            cx,
+            move || read_run_and_logs(&shared, project_id),
+            move |store, result, cx| {
+                // 读失败（项目被删了之类）当作没有数据；迟到的结果由代次作废。
+                let Ok((run, logs)) = result else {
+                    return;
+                };
+                let entry = StaticEntry {
+                    project_id,
+                    run_id: run.as_ref().map(|run| run.id),
+                    statuses: progress::statuses_from_logs(&logs),
+                    logs,
+                };
+                if !store.static_cache.put(seq, entry) {
+                    return;
+                }
+                cx.notify();
+            },
+        );
     }
 
     // ── 第三步的写入口（原版 `useSlideEditor` 直接改 `gen.blueprints`） ────────
@@ -517,6 +705,10 @@ impl GenerationStore {
         self.stage = "start".to_string();
         self.message.clear();
         self.progress = 0.0;
+        // 这个项目的数据从此由 store 实时持有：静态缓存里那一份（上一次运行）现在过期了。
+        if let Some(id) = project_id {
+            self.static_cache.invalidate(id);
+        }
         cx.notify();
 
         let shared = self.shared.clone();
@@ -812,10 +1004,12 @@ impl GenerationStore {
     /// `loadFromJson` 写下的「全部 done」。
     ///
     /// `done(has_active_generation)` 在 store 对齐完之后回调，页面据此决定进第几步。
-    /// store 正为别的项目跑时**不碰 store**（模块文档「差异」第 1 条）。
+    /// store 正为别的项目跑时**不碰 store**（模块文档「差异」第 1 条），但**照样读一次**这个
+    /// 项目的最近一次运行 + 日志并缓存（[`Self::ensure_static`]），第二步据此显示失败页与日志。
     pub fn open_project(
         &mut self,
         project_id: i64,
+        run: Option<&GenerationRun>,
         blueprints_json: &str,
         cx: &mut Context<Self>,
         done: impl FnOnce(&mut Self, bool, &mut Context<Self>) + 'static,
@@ -827,6 +1021,8 @@ impl GenerationStore {
             // 租约（`page.generation.update(...)` 在 `page.update(...)` 里面），回调里再
             // `page.update()` 会撞上「already being updated」——release 构建下就是生成中回首页、
             // 再点别的项目卡片时的 0xc0000409 崩溃。推到本次 effect 跑完（租约已还）再回调。
+            // （`ensure_static` 只是排一个后台读，不在这次调用的同步路径上。）
+            self.ensure_static(Some(project_id), run, cx);
             let store = cx.weak_entity();
             cx.defer(move |cx| {
                 let _ = store.update(cx, |store, cx| done(store, false, cx));
@@ -879,6 +1075,8 @@ impl GenerationStore {
         // 进来时 store 若在忙，只可能是为本项目忙（`open_project` 已经挡掉别的项目）。
         let was_active = self.busy() && self.project_id == Some(project_id);
         self.project_id = Some(project_id);
+        // store 从此描述这个项目：静态分支不会再用到它的缓存，旧的那一份直接丢掉。
+        self.static_cache.invalidate(project_id);
         self.current_run = run;
         let Some(run) = self.current_run.clone() else {
             self.logs.clear();
@@ -961,6 +1159,8 @@ impl GenerationStore {
         self.page_statuses.clear();
         self.queued_retries.clear();
         self.retrying_pages.clear();
+        // store 不再描述任何项目：静态缓存也一起清掉（下次打开项目再读）。
+        self.static_cache.clear();
     }
 }
 
@@ -975,4 +1175,289 @@ fn read_run_and_logs(
         None => Vec::new(),
     };
     Ok((run, logs))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// 一条日志，只填断言用得到的字段（title / detail 另有断言时自己改）。
+    #[allow(clippy::too_many_arguments)]
+    fn log(
+        run_id: i64,
+        seq: i64,
+        slide_index: Option<i32>,
+        stage: &str,
+        kind: &str,
+        summary: &str,
+        important: bool,
+    ) -> GenerationLogEvent {
+        GenerationLogEvent {
+            id: seq,
+            run_id,
+            seq,
+            slide_index,
+            stage: stage.to_string(),
+            kind: kind.to_string(),
+            title: String::new(),
+            summary: summary.to_string(),
+            detail: json!({}),
+            important,
+            created_at: 1_700_000_000 + seq,
+        }
+    }
+
+    fn a_run(id: i64, status: &str) -> GenerationRun {
+        GenerationRun {
+            id,
+            project_id: Some(8),
+            status: status.to_string(),
+            current_stage: Some("validate".to_string()),
+            source_markdown: String::new(),
+            frontmatter_title: None,
+            debug_dir: String::new(),
+            created_at: 1_700_000_000,
+            updated_at: 1_700_000_000,
+            finished_at: None,
+        }
+    }
+
+    /// 「生成记录演示」那样的牌组：封面 + 内容页 + 结尾（首张是封面，`content_slots` 会切掉
+    /// 前两张与最后一张）。
+    fn a_deck(content: usize) -> Vec<Value> {
+        let mut deck = vec![
+            json!({"kind": "cover", "title": "园区能耗治理方案"}),
+            json!({"kind": "overview", "title": "提纲总览"}),
+        ];
+        for index in 0..content {
+            deck.push(json!({"kind": "section_list", "title": format!("第 {} 页", index + 1)}));
+        }
+        deck.push(json!({"kind": "closing", "title": "感谢聆听"}));
+        deck
+    }
+
+    fn an_entry(project_id: i64, run_id: i64, logs: Vec<GenerationLogEvent>) -> StaticEntry {
+        StaticEntry {
+            project_id,
+            run_id: Some(run_id),
+            statuses: progress::statuses_from_logs(&logs),
+            logs,
+        }
+    }
+
+    /// 库里读回来的那一次失败运行（10 条日志，第 3 页即下标 2 失败）——与「生成记录演示」
+    /// 的演示数据同形（`services::seed`）：整副规划 / 布局结果在一条日志的 `detail` 里，
+    /// 成功页各有一条 `content` / `slide` 日志，失败页是一条 `content` / `page_error`。
+    fn demo_logs(run_id: i64) -> Vec<GenerationLogEvent> {
+        let page_plans: Vec<Value> = (0..5)
+            .map(|page| json!({"page_title": format!("第 {} 页", page + 1)}))
+            .collect();
+        let layout_plans: Vec<Value> = (0..5).map(|_| json!({"kind": "section_list"})).collect();
+        let mut logs = vec![
+            log(run_id, 1, None, "start", "status", "开始生成流程", false),
+            log(run_id, 2, None, "start", "input", "本次生成输入", true),
+            log(
+                run_id,
+                3,
+                None,
+                "init",
+                "status",
+                "验证大模型连接...",
+                false,
+            ),
+        ];
+        let mut plans = log(
+            run_id,
+            4,
+            None,
+            "layout_plan",
+            "status",
+            "布局规划完成",
+            true,
+        );
+        plans.detail = json!({"page_plans": page_plans, "layout_plans": layout_plans});
+        logs.push(plans);
+        for page in 0..5i32 {
+            if page == 2 {
+                let mut failed = log(
+                    run_id,
+                    20,
+                    Some(page),
+                    "content",
+                    "page_error",
+                    "最终校验未通过：第 3 页缺少时间线事件",
+                    true,
+                );
+                failed.title = "页面生成失败".to_string();
+                logs.push(failed);
+                continue;
+            }
+            let mut content = log(
+                run_id,
+                10 + page as i64,
+                Some(page),
+                "content",
+                "slide",
+                "生成内容",
+                true,
+            );
+            content.title = format!("幻灯片 {}/5", page + 1);
+            content.detail = json!({
+                "page_plan": {"page_title": format!("第 {} 页", page + 1)},
+                "layout_plan": {"kind": "section_list"},
+                "blueprint": {"kind": "section_list", "title": format!("第 {} 页", page + 1)},
+            });
+            logs.push(content);
+        }
+        logs.push(log(run_id, 21, None, "done", "status", "生成结束", true));
+        logs
+    }
+
+    #[test]
+    fn the_static_branch_restores_failed_pages_logs_and_board_items() {
+        let logs = demo_logs(7);
+        let run = a_run(7, "error");
+        let deck = a_deck(5);
+        let statuses = progress::statuses_from_logs(&logs);
+        let snap = static_snapshot(Some(&run), &deck, &logs, statuses, true);
+
+        // 整体阶段来自库里的运行；静态分支不在跑，但别的项目正在跑。
+        assert_eq!(snap.stage, "error");
+        assert!(!snap.running);
+        assert!(!snap.live);
+        assert!(snap.busy_elsewhere);
+        assert_eq!(snap.message, "已加载 8 张幻灯片");
+        // 失败页从日志恢复出来了（失败段与「重试这一页」就靠它）。
+        assert_eq!(
+            snap.statuses.get(&2).map(|status| status.stage.as_str()),
+            Some("error")
+        );
+        assert_eq!(
+            snap.statuses
+                .get(&2)
+                .and_then(|status| status.message.clone()),
+            Some("最终校验未通过：第 3 页缺少时间线事件".to_string())
+        );
+        // 看板条目：五页内容页（规划 / 布局 / 蓝图都从日志里取回来）。
+        assert_eq!(snap.items.len(), 5);
+        assert_eq!(
+            snap.items[2].layout_plan.as_ref().unwrap()["kind"],
+            "section_list"
+        );
+        assert!(snap.items.iter().all(|item| item.blueprint.is_some()));
+        assert_eq!(snap.thumbs.len(), snap.items.len());
+        // 头部统计与「查看最近日志」的数据（10 条日志里 8 条关键事件、5 条算生成记录）。
+        assert_eq!(snap.important, 8);
+        assert_eq!(snap.prompt_count, 5);
+        assert_eq!(snap.recent_logs.len(), 10);
+        assert_eq!(snap.recent_logs.first().map(|log| log.seq), Some(21));
+        // 倒序：最旧的一条在最后（10 条全在里面）。
+        assert_eq!(snap.recent_logs.last().map(|log| log.seq), Some(1));
+        // 单页重试要运行 id。
+        assert_eq!(snap.current_run.as_ref().map(|run| run.id), Some(7));
+        // 页面比例取牌组第一张（封面）。
+        assert_eq!(snap.aspect_source.as_ref().unwrap()["kind"], "cover");
+    }
+
+    #[test]
+    fn the_static_branch_picks_up_a_succeeded_retry_in_the_logs() {
+        let mut logs = demo_logs(7);
+        let mut retry = log(7, 22, Some(2), "validate", "retry", "重试完成", true);
+        retry.detail = json!({"retry_succeeded": true});
+        logs.push(retry);
+        let run = a_run(7, "error");
+        let snap = static_snapshot(
+            Some(&run),
+            &a_deck(5),
+            &logs,
+            progress::statuses_from_logs(&logs),
+            true,
+        );
+        // 后写的 retry 日志盖掉 page_error：这一页不再是失败页。
+        assert_eq!(
+            snap.statuses.get(&2).map(|status| status.stage.as_str()),
+            Some("done")
+        );
+    }
+
+    #[test]
+    fn the_static_branch_without_cached_logs_shows_no_failures() {
+        // 缓存还没到（或项目没有运行）：与旧行为一致，只有牌组与运行决定显示。
+        let snap = static_snapshot(
+            Some(&a_run(7, "error")),
+            &a_deck(5),
+            &[],
+            Statuses::new(),
+            false,
+        );
+        assert_eq!(snap.stage, "error");
+        assert!(!snap.live);
+        assert!(!snap.busy_elsewhere);
+        assert!(snap.statuses.is_empty());
+        assert!(snap.recent_logs.is_empty());
+        assert_eq!(snap.important, 0);
+        assert_eq!(snap.prompt_count, 0);
+        assert_eq!(snap.items.len(), 5);
+        // 库里停在 running 的旧运行按「已中断」显示（有意偏离，`stored_stage`）。
+        let interrupted = static_snapshot(
+            Some(&a_run(7, "running")),
+            &a_deck(5),
+            &[],
+            Statuses::new(),
+            false,
+        );
+        assert_eq!(interrupted.stage, "validate");
+        assert!(!interrupted.running);
+    }
+
+    #[test]
+    fn the_static_cache_reads_once_per_project_and_run() {
+        let mut cache = StaticCache::default();
+        assert!(cache.should_read(8, Some(1)));
+        let seq = cache.begin_read(8, Some(1));
+        // 读库在途：同一对不重复排。
+        assert!(!cache.should_read(8, Some(1)));
+        assert!(cache.put(seq, an_entry(8, 1, demo_logs(1))));
+        // 已经有这一对的数据：不重读。
+        assert!(!cache.should_read(8, Some(1)));
+        assert_eq!(cache.entry_for(Some(8)).map(|e| e.logs.len()), Some(10));
+        // 缓存按项目分开：别的项目（或没有项目）读不到它。
+        assert!(cache.entry_for(Some(9)).is_none());
+        assert!(cache.entry_for(None).is_none());
+        assert!(cache.should_read(9, Some(3)));
+    }
+
+    #[test]
+    fn the_static_cache_drops_late_results_and_re_reads_after_a_change() {
+        let mut cache = StaticCache::default();
+        let first = cache.begin_read(8, Some(1));
+        // 期间又打开了别的项目（换了项目与运行）：第一次的结果迟到，整条作废。
+        let second = cache.begin_read(9, Some(3));
+        assert!(!cache.put(first, an_entry(8, 1, demo_logs(1))));
+        assert!(cache.put(second, an_entry(9, 3, demo_logs(3))));
+        assert!(cache.entry_for(Some(8)).is_none());
+        assert_eq!(cache.entry_for(Some(9)).map(|e| e.run_id), Some(Some(3)));
+        // 同一个项目、运行变了（又生成过一次）：要重读。
+        assert!(cache.should_read(9, Some(4)));
+        // 已经为这一对读过：不再重读（前面那次 `should_read` 不改变状态）。
+        assert!(!cache.should_read(9, Some(3)));
+        // store 接手这个项目（实时状态）时缓存失效，下次要重新读。
+        cache.invalidate(9);
+        assert!(cache.entry_for(Some(9)).is_none());
+        assert!(cache.should_read(9, Some(3)));
+    }
+
+    #[test]
+    fn the_static_cache_keeps_data_when_the_model_run_lags_the_database() {
+        // 打开项目时模型读到的运行与 store 那次读回来的可能不是同一对（模型手上是旧的、
+        // 甚至还没有）。已经为这一对排过读、数据也落了地，就不再打库——否则每帧一次查询。
+        let mut cache = StaticCache::default();
+        let seq = cache.begin_read(8, None);
+        assert!(cache.put(seq, an_entry(8, 1, demo_logs(1))));
+        assert!(!cache.should_read(8, None));
+        assert_eq!(cache.entry_for(Some(8)).map(|e| e.run_id), Some(Some(1)));
+        // 模型手上的运行正好是库里那条：也不必重读。
+        assert!(!cache.should_read(8, Some(1)));
+    }
 }

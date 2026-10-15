@@ -112,6 +112,17 @@ impl Step2 {
         let id = model.read(cx).id;
         let store = handle.generation();
         let shared = handle.shared().clone();
+        // store 正为别的项目跑时，本项目按库里的静态数据显示（`snapshot_for` 的静态分支）。
+        // 那一份数据（最近一次运行 + 日志 + 从日志恢复的逐页状态）在这里读一次并缓存到 store：
+        // 渲染只读缓存，不读库。项目或运行变了才会再读（`ensure_static` 自己判断）。
+        //
+        // 走 `cx.defer` 而不是直接 `update`：本实体正是被 `show_step` 建出来的，谁在什么
+        // 租约里叫它不好穷举（README 的规矩 4）；推到本次 effect 跑完，实体没了就丢掉。
+        let run = model.read(cx).latest_run.clone();
+        let static_store = store.clone();
+        cx.defer(move |cx| {
+            let _ = static_store.update(cx, |store, cx| store.ensure_static(id, run.as_ref(), cx));
+        });
         let subscriptions = vec![
             cx.observe(&model, |_this, _model, cx| cx.notify()),
             cx.observe(&store, |_this, _store, cx| cx.notify()),
@@ -230,6 +241,10 @@ impl Render for Step2 {
         let items = snap.items;
         let stage = snap.stage;
         let running = snap.running;
+        // 静态分支（store 不持有本项目）里重试不能走 store（它会排到别人的运行上），
+        // 而「重新生成全部」只在 store 正为别的项目跑时才被全局规则挡住（见 `GenSnapshot`）。
+        let live = snap.live;
+        let busy_elsewhere = snap.busy_elsewhere;
         let retrying = snap.retrying;
         let statuses = snap.statuses;
         let message = snap.message;
@@ -554,6 +569,7 @@ impl Render for Step2 {
                 aspect_ratio,
                 retrying: &retrying,
                 running,
+                live,
                 run_id,
                 recent_logs: &snap.recent_logs,
                 debug_open: self.debug_open,
@@ -607,9 +623,11 @@ impl Render for Step2 {
                     )
                     .child(
                         // 原版 `@retry="onStep1StartGenerate"`：与第一步「开始 AI 生成」同一条路。
+                        // 除了原版的「有页在重试」，store 正为别的项目跑时也要禁用：那条路
+                        // 同样被全局规则挡住（`start_generation` 会静默返回，点了什么都不发生）。
                         widgets::primary_button("s2-regenerate", "重新生成全部")
                             .icon(carbon("renew"))
-                            .disabled(retrying_any)
+                            .disabled(retrying_any || busy_elsewhere)
                             .on_click(move |_event, window, cx| {
                                 let _ = regenerate
                                     .update(cx, |page, cx| page.start_generation(window, cx));
@@ -1319,6 +1337,9 @@ struct DetailArgs<'a> {
     aspect_ratio: f32,
     retrying: &'a std::collections::BTreeSet<i64>,
     running: bool,
+    /// 这份快照是不是 store 在实时更新（[`GenSnapshot::live`]）：静态分支里重试要经 store，
+    /// 而 store 不持有本项目，禁用。
+    live: bool,
     run_id: Option<i64>,
     recent_logs: &'a [GenerationLogEvent],
     debug_open: bool,
@@ -1502,7 +1523,11 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
                     )
                     .icon(carbon("renew"))
                     // 原版禁用条件：本页在重试，或（不在生成中且已有页在重试）。
-                    .disabled(is_retrying || (!args.running && !args.retrying.is_empty()))
+                    // 再加上静态分支那条：store 不持有本项目时重试排不进本项目的运行
+                    // （`retry_page` 用 store 手上的运行与逐页状态，也就是别人的）。
+                    .disabled(
+                        is_retrying || (!args.running && !args.retrying.is_empty()) || !args.live,
+                    )
                     .on_click(move |_event, window, cx| {
                         let _ = this.update(cx, |this, cx| {
                             this.show_retry_dialog(run_id, page, window, cx)
