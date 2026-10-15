@@ -244,6 +244,15 @@ impl Default for FontRoles {
     }
 }
 
+/// Math fonts tried in order: Windows ships Cambria Math, the others come with
+/// TeX distributions.
+const MATH_FONTS: &[&str] = &[
+    "Cambria Math",
+    "New Computer Modern Math",
+    "STIX Two Math",
+    "Libertinus Math",
+];
+
 #[derive(Debug, Clone)]
 pub struct ExportOptions {
     /// Theme id from `src/themes/catalog.ts`; see [`SUPPORTED_THEMES`].
@@ -276,6 +285,8 @@ struct DeckInput<'a> {
     aspect_ratio: &'a str,
     title: Option<&'a str>,
     fonts: &'a FontRoles,
+    /// Installed entries of [`MATH_FONTS`], in order; empty if none is.
+    math_fonts: Vec<&'static str>,
     /// Image reference → path and size; unusable references are absent.
     assets: &'a HashMap<String, assets::ImageInfo>,
     slides: &'a [serde_json::Value],
@@ -562,6 +573,7 @@ impl Renderer {
             aspect_ratio: &options.aspect_ratio,
             title: options.title.as_deref(),
             fonts: &self.installed_fonts(&options.fonts),
+            math_fonts: self.installed_math_fonts(),
             assets: &prepared.paths,
             slides: &slides,
         })
@@ -676,6 +688,17 @@ impl Renderer {
                 diagnostics: errors.iter().map(|d| world.describe(d)).collect(),
             })?;
         Ok(())
+    }
+
+    /// Equations need an OpenType MATH font. Only installed ones are passed to
+    /// `main.typ`: Typst warns about every missing family in a fallback list.
+    fn installed_math_fonts(&self) -> Vec<&'static str> {
+        let book = self.fonts.book();
+        MATH_FONTS
+            .iter()
+            .copied()
+            .filter(|f| book.contains_family(&f.to_lowercase()))
+            .collect()
     }
 
     /// Drops families that are not installed so Typst does not warn about every

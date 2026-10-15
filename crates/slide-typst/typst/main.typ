@@ -93,9 +93,12 @@
 #set block(spacing: 0pt)
 #set stack(spacing: 0pt)
 
-// Equations need an OpenType MATH font; try the usual ones in order so export
-// works on Windows (Cambria Math) and machines with TeX fonts installed.
-#show math.equation: set text(font: ("Cambria Math", "New Computer Modern Math", "STIX Two Math", "Libertinus Math"))
+// Equations need an OpenType MATH font. Rust passes only the installed ones of
+// its `MATH_FONTS` list (missing families in a fallback list each warn).
+#show math.equation: it => if deck.math_fonts.len() > 0 {
+  set text(font: deck.math_fonts)
+  it
+} else { it }
 
 #for (index, slide) in deck.slides.enumerate() {
   if index > 0 { pagebreak() }
