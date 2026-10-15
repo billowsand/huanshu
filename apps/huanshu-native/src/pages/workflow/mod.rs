@@ -924,6 +924,16 @@ impl WorkflowPage {
 
     pub fn show_step(&mut self, step: Step, window: &mut Window, cx: &mut Context<Self>) {
         self.release(cx);
+        // 步骤同步回路由（原版 `/project/:id` 会在重挂载时按库里的状态重算步骤）：
+        // 从工作流侧栏进设置时，外壳记下的来源路由因此带上当前这一步，返回能回到原处。
+        let id = self.model.read(cx).id;
+        self.handle.retarget_route(
+            Route::Project {
+                id,
+                step: Some(step),
+            },
+            cx,
+        );
         let (model, handle) = (self.model.clone(), self.handle.clone());
         let page = cx.weak_entity();
         self.view = Some(match step {

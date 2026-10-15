@@ -31,7 +31,8 @@ cargo run -p huanshu-native --release
 ```
 src/
   main.rs        启动：读状态、应用主题、开窗口
-  shell.rs       外壳：标题栏 + 当前页 + 演示覆盖层；ShellHandle（换页、换主题、开演示）
+  shell.rs       外壳：标题栏 + 当前页 + 演示覆盖层；ShellHandle（换页、换主题、开演示，
+                 并记住进设置前的路由，供设置页「返回」回来源页）
   router.rs      路由（对应原版 main.ts 的五条路由）与 --route 解析
   theme/         Studio 配色 token（tokens.rs 由旧应用的计算值生成）→ cx.studio()
   widgets.rs     共用部件：按钮、徽章、面板、标题栏、主题圆点、todo_block 占位

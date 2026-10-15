@@ -33,6 +33,12 @@ pub struct Shell {
     presentation: Option<Entity<Presentation>>,
     /// 应用级生成状态（原版 pinia 的 `generation` store）：外壳创建、比任何页面活得久。
     generation: Entity<GenerationStore>,
+    /// 进设置之前的那条路由（原版 `window.history.state.back`）。
+    ///
+    /// 设置页的「返回工作台」按原版 `goBack()` 走 `router.back()`：从工作流侧栏进来就回
+    /// **那个项目的那个步骤**（`WorkflowPage::show_step` 会把步骤同步回路由），直接
+    /// `--route settings` 启动这类没有来源的情况才回首页。
+    settings_origin: Option<Route>,
     first_frame_logged: bool,
 }
 
@@ -65,10 +71,22 @@ impl ShellHandle {
     ///
     /// 工作流第一步的自动保存把新建项目落库后用它对准路由：`navigate` 会重建
     /// `WorkflowPage`，Step1 的编辑器实体（连同撤销历史）会整个丢掉，所以不能用。
+    /// 工作流换步骤也用它（`pages::workflow::WorkflowPage::show_step`），
+    /// 这样「从工作流进设置再返回」能回到原来那一步。
     pub fn retarget_route(&self, route: Route, cx: &mut App) {
         let _ = self
             .shell
             .update(cx, |shell, cx| shell.retarget_route(route, cx));
+    }
+
+    /// 从设置页返回来源页（原版 `goBack()`：`history.state.back ? router.back() : push('/')`）。
+    ///
+    /// 来源是进设置之前的那条路由，可能是「某个项目的某一步」；没有来源（直接启动进设置）时回首页。
+    pub fn leave_settings(&self, window: &mut Window, cx: &mut App) {
+        let _ = self.shell.update(cx, |shell, cx| {
+            let route = shell.settings_origin.take().unwrap_or(Route::Home);
+            shell.navigate(route, window, cx);
+        });
     }
 
     /// 切换主题。`save` 为真时写入设置（`app_settings.app_theme`）；设置页的「点击预览」传假。
@@ -136,6 +154,8 @@ impl Shell {
             page,
             presentation: None,
             generation,
+            // 直接以设置页启动（`--route settings`）时没有来源，返回走首页。
+            settings_origin: None,
             first_frame_logged: false,
         }
     }
@@ -149,6 +169,11 @@ impl Shell {
     }
 
     pub fn navigate(&mut self, route: Route, window: &mut Window, cx: &mut Context<Self>) {
+        // 进设置前先记住来源：设置页的「返回」要回这一条（原版 `router.back()`）。
+        // 设置内部换分区（route 还是 Settings）不算新来源，别把它自己记成来源。
+        if matches!(route, Route::Settings(_)) && !matches!(self.route, Route::Settings(_)) {
+            self.settings_origin = Some(self.route.clone());
+        }
         self.close_presentation(window, cx);
         self.release_page(cx);
         let handle = self.handle(cx);
@@ -159,8 +184,11 @@ impl Shell {
 
     /// 只更新路由字段、不动当前页面（[`ShellHandle::retarget_route`] 的实现）。
     fn retarget_route(&mut self, route: Route, cx: &mut Context<Self>) {
-        self.route = route;
-        cx.notify();
+        // 值没变就不要 notify：`show_step` 可能在 render 里被调到，无谓的通知会反复重绘。
+        if self.route != route {
+            self.route = route;
+            cx.notify();
+        }
     }
 
     fn release_page(&mut self, cx: &mut Context<Self>) {
