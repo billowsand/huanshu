@@ -37,7 +37,9 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
 
 ## 原生界面（`apps/huanshu-native`，GPUI Kit）
 
-逐页复刻 Tauri + Vue 版，**目标是完整替代原版**：可以按 GPUI 的特点调整细节，关键功能一项都不能丢。
+逐页对照 Tauri + Vue 版，**目标是完整替代原版**：关键功能一项都不能丢，但**要贴合 GPUI、用好它的能力，不是把网页逐像素复制过来**。
+功能性差距（缺信息、丢状态、数据安全、流程走不通）必须补；尺寸差几像素、悬停底色、控件形态、CSS 技巧（sticky、毛玻璃、两段式对话框）
+这类表现层差异优先用 GPUI Kit 组件的原生做法，不算缺陷，不要为了像原版去模拟。
 框架与写页面的规矩见 `apps/huanshu-native/README.md`；功能清单与进度是 `docs/native/parity.md`（做完一项改一项）；
 原版截图 `docs/native/reference/`，原生截图 `docs/native/shell/`（`tools/shots.ps1`，同一份沙箱数据、同一主题）。
 在根 workspace 里但**不在 `default-members`**：`bunx tauri dev`、裸 `cargo build` 不编 GPUI，`cargo test --workspace` 与 `-p huanshu-native` 会编。
