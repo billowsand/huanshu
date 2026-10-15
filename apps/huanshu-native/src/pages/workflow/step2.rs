@@ -8,6 +8,9 @@
 //! 规则（看板条目、逐页状态、整体进度、三张文案表）一律调 `huanshu_core::generation_progress`，
 //! 界面里不写规则；生成状态一律来自应用级的 [`GenerationStore`]（原版 pinia 的
 //! `generation` store，见 `src/generation.rs`），本页只读它、不存生成状态。
+//! 本页自己的状态只有展开 / 收起（`progress_open` / `debug_open` / `logs_open`）：看板上选中的页
+//! 是原版 `WorkflowView` 上的 `selectedSlideIndex`，存在 [`ProjectModel::selected_slide`] 上
+//! （见 [`resolve_selected`]），切到别的步骤再回来还是同一页。
 //!
 //! GPUI 下的三处做法（原版机制写在各自注释里）：
 //! - 看板用 `uniform_list`（一行 = 一行卡片）**只给可见行**的卡片要图
@@ -79,8 +82,6 @@ pub struct Step2 {
     store: Entity<GenerationStore>,
     handle: ShellHandle,
     page: WeakEntity<WorkflowPage>,
-    /// 原版 `selectedSlideIndex`（`None` = 还没选，按 `preferredSlideIndex` 取）。
-    selected: Option<usize>,
     /// 上一帧算出来的看板条目数与列数（键盘换页要用）。
     board_count: usize,
     columns: usize,
@@ -135,7 +136,6 @@ impl Step2 {
             store,
             handle,
             page,
-            selected: None,
             board_count: 0,
             columns: 1,
             progress_open: false,
@@ -186,15 +186,27 @@ impl Step2 {
         if self.board_count == 0 {
             return;
         }
-        let current = self.selected.unwrap_or(0).min(self.board_count - 1);
+        // 原版 `props.selectedSlideIndex ?? preferredSlideIndex() ?? 0`：下标在模型上，
+        // 渲染时已经归位过（[`resolve_selected`]），这里只兜底。
+        let current = self
+            .model
+            .read(cx)
+            .selected_slide
+            .unwrap_or(0)
+            .min(self.board_count - 1);
         let next = (current as i64 + delta).clamp(0, self.board_count as i64 - 1) as usize;
         if next != current {
             self.select(next, cx);
         }
     }
 
+    /// 原版 `selectSlide`：只把新下标交出去（下标存在 `WorkflowView` 上），这里写回模型，
+    /// 切到别的步骤再回来读的是同一个值。
     fn select(&mut self, index: usize, cx: &mut Context<Self>) {
-        self.selected = Some(index);
+        self.model.update(cx, |model, cx| {
+            model.selected_slide = Some(index);
+            cx.notify();
+        });
         self.scroll_to(index);
         cx.notify();
     }
@@ -291,11 +303,17 @@ impl Render for Step2 {
         self.columns = columns;
 
         // ── 选中的页：越界或没有时取 `preferredSlideIndex`（原版 `selectedSlide` 的 watch） ──
-        let selected = match self.selected {
-            Some(index) if index < items.len() => Some(index),
-            _ => progress::preferred_slide_index(&items),
-        };
-        self.selected = selected;
+        // 下标存在模型上（原版 `selectedSlideIndex` 在 `WorkflowView.vue:41`，跨步骤保留）：
+        // 原版的 watch 把归位结果 `emit` 回 `WorkflowView`，这里同样写回模型——本页每次
+        // 重建（`WorkflowPage::show_step`）读到的就是上一次选的那一页。
+        let stored = self.model.read(cx).selected_slide;
+        let selected = resolve_selected(stored, &items);
+        if selected != stored {
+            self.model.update(cx, |model, cx| {
+                model.selected_slide = selected;
+                cx.notify();
+            });
+        }
         self.board_count = items.len();
 
         // ── 缩略图（原版 `useTypstThumbnails`：牌组 = 看板条目的蓝图，下标 = 条目下标） ──
@@ -2144,4 +2162,62 @@ fn kind_desc(schema: &EditorSchema, kind: &SlideKind) -> String {
         .find(|entry| entry.kind == name)
         .map(|entry| entry.desc.clone())
         .unwrap_or_default()
+}
+
+/// 原版 `Step2Generate.vue:245-254` 的 watch：存着的下标还在看板条目范围内就留着，
+/// 越界或没有（`null`）就取 `preferredSlideIndex()`（最后一个有规划 / 布局 / 蓝图结果的页，
+/// 都没有就是第一页；一条条目都没有时是 `null`）。
+fn resolve_selected(stored: Option<usize>, items: &[SlideProgressItem]) -> Option<usize> {
+    match stored {
+        Some(index) if index < items.len() => Some(index),
+        _ => progress::preferred_slide_index(items),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// 一条看板条目：`plan` 为真时给它一个规划结果（`preferred_slide_index` 认的三种结果之一）。
+    fn item(index: i64, plan: bool) -> SlideProgressItem {
+        SlideProgressItem {
+            index,
+            page_plan: plan.then(|| json!({ "page_title": "页" })),
+            layout_plan: None,
+            blueprint: None,
+            content_log: None,
+        }
+    }
+
+    #[test]
+    fn a_valid_choice_is_kept() {
+        let items = vec![item(0, false), item(1, true), item(2, false)];
+        assert_eq!(resolve_selected(Some(1), &items), Some(1));
+        // 第一页也算「选了」，不会被 preferred 顶掉。
+        assert_eq!(resolve_selected(Some(0), &items), Some(0));
+        assert_eq!(resolve_selected(Some(2), &items), Some(2));
+    }
+
+    #[test]
+    fn an_out_of_range_choice_falls_back_to_preferred() {
+        let items = vec![item(0, true), item(1, false)];
+        // 越界（看板变短、换了项目）→ 取最后一个有结果的页。
+        assert_eq!(resolve_selected(Some(7), &items), Some(0));
+    }
+
+    #[test]
+    fn no_choice_falls_back_to_the_last_page_with_a_result() {
+        let items = vec![item(0, true), item(1, false), item(2, true), item(3, false)];
+        assert_eq!(resolve_selected(None, &items), Some(2));
+        // 一条结果都没有：非空看板取第一页。
+        let empty_plans = vec![item(0, false), item(1, false)];
+        assert_eq!(resolve_selected(None, &empty_plans), Some(0));
+    }
+
+    #[test]
+    fn an_empty_board_has_no_selection() {
+        assert_eq!(resolve_selected(None, &[]), None);
+        assert_eq!(resolve_selected(Some(0), &[]), None);
+    }
 }

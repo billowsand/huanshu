@@ -70,6 +70,12 @@ pub struct ProjectModel {
     /// 第三步当前编辑的页（原版 `WorkflowView.vue` 的 `activeSlide`）：切到别的步骤再回来、
     /// 打开演示都用它。牌组变短时收敛到最后一页。
     pub active_slide: usize,
+    /// 第二步看板上选中的页（原版 `WorkflowView.vue:41` 的 `selectedSlideIndex`，`number | null`）：
+    /// 与 [`Self::active_slide`] 一样挂在模型上，第二步每次重建（[`WorkflowPage::show_step`]）
+    /// 都从这里读，切到别的步骤再回来还是同一页。`None` = 还没选过，由第二步按看板条目
+    /// `preferred_slide_index` 归位（归位结果也写回这里，照原版 watch 的 emit）。
+    /// 每次「开始 AI 生成」（[`WorkflowPage::start_generation`]）清空。
+    pub selected_slide: Option<usize>,
     /// 牌组正在落库（原版 `useSlideEditor.editorSaving`；[`WorkflowPage::commit_deck`] 的
     /// 每条出口都会复位它）。
     // 第三步的保存按钮读它显示「保存中…」并禁用。
@@ -273,6 +279,7 @@ impl WorkflowPage {
             draft_save_error: String::new(),
             deck: Vec::new(),
             active_slide: 0,
+            selected_slide: None,
             deck_saving: false,
             deck_save_error: None,
             aspect: AspectRatio::Ratio16x9,
@@ -777,6 +784,12 @@ impl WorkflowPage {
             cx,
             Some(
                 move |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
+                    // 原版 `onStep1StartGenerate` 的 `selectedSlideIndex.value = null`：重新生成
+                    // 时清掉上一次的选择，第二步重建后按新的看板归位。
+                    this.model.update(cx, |model, cx| {
+                        model.selected_slide = None;
+                        cx.notify();
+                    });
                     this.show_step(Step::Generate, window, cx);
                     // 原版 `granularity === 'auto' ? undefined : granularity`。
                     let granularity = match granularity {
