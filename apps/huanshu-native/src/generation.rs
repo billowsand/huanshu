@@ -382,8 +382,6 @@ impl GenerationStore {
     ///
     /// 条件不满足返回 `false`，**调用方照常改模型**——store 不描述本项目时模型就是唯一状态
     /// （见 `WorkflowPage::commit_deck`）。
-    // 提交 3 的第三步界面接上编辑动作后开始调用（本轮先把入口备好）。
-    #[allow(dead_code)]
     pub fn set_deck(
         &mut self,
         project_id: Option<i64>,

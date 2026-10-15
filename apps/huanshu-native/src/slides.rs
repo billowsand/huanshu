@@ -79,6 +79,12 @@ impl SlideImages {
         self.cache.overflow(index)
     }
 
+    /// 有请求在途、或刚被标记要重发（原版 `useTypstThumbnails` 的 `pending`：
+    /// 编辑器的「渲染中…」标记看它）。
+    pub fn pending(&self) -> bool {
+        self.cache.is_pending()
+    }
+
     /// 失败后的手动重试（原版「渲染失败 · 重试」）。
     pub fn refresh(&mut self) {
         self.cache.refresh();
@@ -101,6 +107,16 @@ impl SlideImages {
     pub fn release(&mut self, cx: &mut App) {
         let mut released = self.cache.reset();
         released.extend(self.cache.take_released());
+        self.waiting = None;
+        drop_all(released, None, cx);
+    }
+
+    /// 换目标（原版 `useTypstThumbnails` 的 `resetKey` 换页清图）：清空全部图并作废在途响应，
+    /// 调用方随即显示加载框。牌组与 `wanted` 不动（由调用方随后交新的）。
+    pub fn reset(&mut self, cx: &mut App) {
+        let mut released = self.cache.reset();
+        released.extend(self.cache.take_released());
+        self.waiting = None;
         drop_all(released, None, cx);
     }
 

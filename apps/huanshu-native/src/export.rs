@@ -12,6 +12,7 @@ use gpui_kit::prelude::*;
 use gpui_kit::{div, px, App, Window};
 use huanshu_core::services::export::PdfExportReport;
 
+use crate::icons::carbon;
 use crate::theme::StudioExt as _;
 
 /// 弹原生保存对话框。用户取消时返回 `None`。
@@ -23,8 +24,15 @@ pub fn ask_save_path(default_name: &str, filter: &str, extension: &str) -> Optio
 }
 
 /// PDF 导出完成后的结果对话框：页数、占位页、裁切页、缺图、主题回落，带「在文件夹中显示」。
-/// 失败时是一条错误轻提示。
-pub fn show_report(result: Result<PdfExportReport, String>, window: &mut Window, cx: &mut App) {
+/// 失败时是一条错误轻提示。`note` 是调用方要额外说的一句话（第三步有未应用的修改时会传
+/// 「编辑器里还有未应用的修改，PDF 按应用前的内容导出。」，原版 `PdfExportDialog` 的第一条
+/// 说明），没有就传 `None`。
+pub fn show_report(
+    result: Result<PdfExportReport, String>,
+    note: Option<&str>,
+    window: &mut Window,
+    cx: &mut App,
+) {
     let report = match result {
         Ok(report) => report,
         Err(error) => {
@@ -32,6 +40,7 @@ pub fn show_report(result: Result<PdfExportReport, String>, window: &mut Window,
             return;
         }
     };
+    let note = note.map(str::to_string);
     window.open_dialog(cx, move |dialog: Dialog, _window, cx| {
         let c = cx.studio().colors;
         let path = report.path.clone();
@@ -53,6 +62,19 @@ pub fn show_report(result: Result<PdfExportReport, String>, window: &mut Window,
             .flex()
             .flex_col()
             .gap(px(6.0))
+            .when_some(note.clone(), |body, note| {
+                body.child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_start()
+                        .gap(px(6.0))
+                        .text_size(px(13.0))
+                        .text_color(c.warning)
+                        .child(carbon("information"))
+                        .child(div().flex_1().child(note)),
+                )
+            })
             .child(line("文件", report.path.clone()))
             .child(line(
                 "页数",

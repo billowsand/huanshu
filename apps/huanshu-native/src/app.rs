@@ -66,16 +66,19 @@ pub fn render_pages(
 }
 
 /// 导出 PDF，返回页数等报告要点。**只能在后台线程上调用。**
+/// `slides` 为 `None` 时用项目里保存的牌组；第三步要导出**内存里的牌组**
+/// （含还没落库的新建页）就把牌组传进来。
 pub fn export_pdf(
     shared: &AppShared,
     project_id: i64,
+    slides: Option<Vec<serde_json::Value>>,
     path: std::path::PathBuf,
     theme: String,
 ) -> Result<export::PdfExportReport, String> {
     export::export_pdf(
         shared,
         Some(project_id),
-        None,
+        slides,
         path.to_string_lossy().into(),
         Some(theme),
     )

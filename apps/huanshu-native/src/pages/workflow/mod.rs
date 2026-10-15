@@ -24,7 +24,7 @@ pub mod step3;
 use gpui_kit::component::Sizable as _;
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    div, px, Context, Entity, Focusable as _, Render, SharedString, Subscription, Task, Window,
+    div, px, App, Context, Entity, Focusable as _, Render, SharedString, Subscription, Task, Window,
 };
 use huanshu_core::db::GenerationRun;
 use huanshu_core::markdown_tools::{self, Granularity};
@@ -71,11 +71,9 @@ pub struct ProjectModel {
     pub active_slide: usize,
     /// 牌组正在落库（原版 `useSlideEditor.editorSaving`；[`WorkflowPage::commit_deck`] 的
     /// 每条出口都会复位它）。
-    // 提交 3 的保存按钮读这两个字段显示三态与错误（本轮先备好写入侧）。
-    #[allow(dead_code)]
+    // 第三步的保存按钮读它显示「保存中…」并禁用。
     pub deck_saving: bool,
-    /// 牌组落库失败的原因（原版 `useSlideEditor.jsonError`：第三步的保存按钮显示它）。
-    #[allow(dead_code)]
+    /// 牌组落库失败的原因（原版 `useSlideEditor.jsonError`：第三步保存失败时按钮下方显示它）。
     pub deck_save_error: Option<String>,
     pub aspect: AspectRatio,
     /// 库里最近一次生成运行（原版 `loadLatestRun` 读回来的那条；store 正为**别的**项目
@@ -249,8 +247,6 @@ pub struct WorkflowPage {
     pending_step: Option<Step>,
     /// 牌组落库的代次（[`Self::commit_deck`] 每提交一次加一）：迟到的落库结果整条作废，
     /// 不会去清掉后一次提交的「保存中」标记、也不会写回旧错误。
-    // 只在 `commit_deck` 内部读写，而提交 3 接上界面之前它没有调用方。
-    #[allow(dead_code)]
     deck_save_seq: u64,
     /// 持有订阅即保活：字段不读，但 drop 时会退订。
     #[allow(dead_code)]
@@ -622,9 +618,10 @@ impl WorkflowPage {
     /// 本项目正在生成 / 重试时为真；store 正为**别的**项目跑时也为真——那时本项目的数据是
     /// 库里的静态快照，写进 store 是污染别人、写回库里会盖掉生成结果。
     /// 第三步的应用 / 新建 / 删除 / 移动 / 换版式动手前都问这里。
-    // 提交 3 的第三步界面接上禁用逻辑后开始调用。
-    #[allow(dead_code)]
-    pub fn editing_locked(&self, cx: &Context<Self>) -> bool {
+    ///
+    /// 参数是 `&App` 而不是 `&Context<Self>`：第三步（[`step3::Step3`]）手上只有工作流页的
+    /// `WeakEntity`，拿不到 `Context<WorkflowPage>`；这里也只用到 `App` 的那一半。
+    pub fn editing_locked(&self, cx: &App) -> bool {
         // `busy()` 是**全应用**的：生成中或还有页在重试（含别的项目），两种情形都要挡。
         self.generation.read(cx).busy()
     }
@@ -646,8 +643,6 @@ impl WorkflowPage {
     /// 4. 落库失败：`deck_saving` 复位、原因写进 [`ProjectModel::deck_save_error`]；
     /// 5. 期间又提交过一次（`deck_save_seq` 变了）：这次的结果整条丢掉，不碰这两个字段；
     /// 6. 页面此时已被丢弃：`run_bg` 的回调根本不会执行（标志随模型一起消失）。
-    // 提交 3 的第三步界面接上应用 / 新建 / 删除 / 移动 / 换版式后开始调用。
-    #[allow(dead_code)]
     pub fn commit_deck(
         &mut self,
         deck: Vec<serde_json::Value>,
@@ -672,8 +667,11 @@ impl WorkflowPage {
         let (Some(json), Some(id)) = (saving, id) else {
             return;
         };
-        let seq = self.deck_save_seq;
+        // 本次提交的代次：每提交一次加一，回调里用它判断「期间又提交过一次」。
+        // 取**加一之后**的值——取加一之前的值会让每次回调都以为自己迟到（提交 2 的漏网之鱼：
+        // `deck_saving` 永远清不掉，保存按钮会一直卡在「保存中…」）。
         self.deck_save_seq += 1;
+        let seq = self.deck_save_seq;
         self.model.update(cx, |model, cx| {
             model.deck_saving = true;
             model.deck_save_error = None;

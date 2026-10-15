@@ -309,10 +309,10 @@ impl HomePage {
         run_bg(
             window,
             cx,
-            move || crate::app::export_pdf(&shared, project.id, path, theme),
+            move || crate::app::export_pdf(&shared, project.id, None, path, theme),
             |page: &mut Self, result, window, cx| {
                 page.exporting = None;
-                export::show_report(result, window, cx);
+                export::show_report(result, None, window, cx);
                 cx.notify();
             },
         );

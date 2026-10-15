@@ -99,7 +99,7 @@ pub fn note_first_frame() {
 fn export_only(project_id: i64, path: std::path::PathBuf, theme: Option<&str>) -> i32 {
     let (shared, current, _) = app::load();
     let theme = theme.unwrap_or(current.id).to_string();
-    match app::export_pdf(&shared, project_id, path, theme) {
+    match app::export_pdf(&shared, project_id, None, path, theme) {
         Ok(report) => {
             eprintln!("[export] {}", export::summarize(&report));
             0
