@@ -1,18 +1,21 @@
 //! 第三步「编辑完善」（原版 `steps/Step3Editor.vue` + `composables/useSlideEditor.ts`）——**骨架**。
 //!
 //! 已实现：工具栏（幻灯片数、页码、导出 PDF、演示）、左侧幻灯片列表（序号、标题、版式）、
-//! ↑/↓ 换页、中间 Typst 预览、右侧「幻灯片类型」卡片与按编辑器模式表列出的字段（只读）。
+//! ↑/↓ 换页（当前页是 [`ProjectModel::active_slide`]）、中间 Typst 预览、右侧「幻灯片类型」
+//! 卡片与按编辑器模式表列出的字段（只读）。
 //! 待实现：字段表单（编辑器模式表驱动的输入框、列表区、对象区、图标推荐、素材插图）、
 //! 图表 JSON 框与 `chart_problems` 校验、高级 JSON、换版式（KindPicker）、新建/删除/移动页、
-//! 应用更改（Ctrl+S，`services::projects::update_project_blueprints`）、未保存标记、裁切提示。
+//! 应用更改（Ctrl+S，走 `WorkflowPage::commit_deck`——牌组唯一的写入路径）、未保存标记、裁切提示。
 
 use gpui_kit::component::Disableable as _;
 use gpui_kit::prelude::*;
-use gpui_kit::{div, px, Context, Entity, FocusHandle, KeyDownEvent, Render, Subscription, Window};
+use gpui_kit::{
+    div, px, Context, Entity, FocusHandle, KeyDownEvent, Render, Subscription, WeakEntity, Window,
+};
 use huanshu_core::editor_schema::{self, EditorSchema};
 use huanshu_core::preview::PreviewOptions;
 
-use super::ProjectModel;
+use super::{ProjectModel, WorkflowPage};
 use crate::icons::carbon;
 use crate::present::PresentArgs;
 use crate::shell::ShellHandle;
@@ -27,9 +30,12 @@ const PANEL_W: f32 = 360.0;
 
 pub struct Step3 {
     model: Entity<ProjectModel>,
+    /// 工作流页面：牌组的编辑走它的 [`WorkflowPage::commit_deck`]（唯一写入路径）、
+    /// 生成中只读看 [`WorkflowPage::editing_locked`]。
+    #[allow(dead_code)]
+    page: WeakEntity<WorkflowPage>,
     handle: ShellHandle,
     schema: EditorSchema,
-    selected: usize,
     preview: SlideImages,
     exporting: bool,
     focus: FocusHandle,
@@ -41,6 +47,7 @@ impl Step3 {
     pub fn new(
         model: Entity<ProjectModel>,
         handle: ShellHandle,
+        page: WeakEntity<WorkflowPage>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -58,9 +65,9 @@ impl Step3 {
         let subscriptions = vec![cx.observe(&model, |_this, _model, cx| cx.notify())];
         Self {
             model,
+            page,
             handle,
             schema: editor_schema::editor_schema(),
-            selected: 0,
             preview,
             exporting: false,
             focus,
@@ -72,28 +79,38 @@ impl Step3 {
         self.preview.release(cx);
     }
 
+    /// 当前页（原版 `activeSlide`）：它是 [`ProjectModel`] 的字段，切步骤回来还在。
+    fn active(&self, cx: &Context<Self>) -> usize {
+        let model = self.model.read(cx);
+        model.active_slide.min(model.deck.len().saturating_sub(1))
+    }
+
+    /// 换当前页（原版 `v-model:active-slide`）。换页本身不改牌组，写的是模型的字段。
     fn select(&mut self, index: usize, cx: &mut Context<Self>) {
-        let count = self.model.read(cx).deck.len();
-        if index < count && index != self.selected {
-            self.selected = index;
-            cx.notify();
-        }
+        self.model.update(cx, |model, cx| {
+            if index < model.deck.len() && model.active_slide != index {
+                model.active_slide = index;
+                cx.notify();
+            }
+        });
     }
 
     fn on_key(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        let active = self.active(cx);
         match event.keystroke.key.as_str() {
-            "up" => self.select(self.selected.saturating_sub(1), cx),
-            "down" => self.select(self.selected + 1, cx),
+            "up" => self.select(active.saturating_sub(1), cx),
+            "down" => self.select(active + 1, cx),
             _ => {}
         }
     }
 
     fn present(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let start = self.active(cx);
         let model = self.model.read(cx);
         let args = PresentArgs {
             project_id: model.id,
             deck: model.deck.clone(),
-            start: self.selected,
+            start,
             aspect: model.aspect_ratio(),
         };
         self.handle.present(args, window, cx);
@@ -134,8 +151,9 @@ impl Render for Step3 {
             (model.deck.clone(), model.aspect_ratio())
         };
         let count = deck.len();
-        self.selected = self.selected.min(count.saturating_sub(1));
-        let selected = self.selected;
+        // 渲染里不改模型（那会在渲染途中触发观察者）；越界只在这一帧按最后一页显示，
+        // 真正的收敛在 `on_generation_changed` 与 `commit_deck` 里。
+        let selected = self.active(cx);
 
         // 舞台：在列表与右栏之间取最大的、保持比例的框。
         let viewport = window.viewport_size();

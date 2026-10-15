@@ -238,6 +238,7 @@ impl GenerationStore {
     // ── 只读状态 ──────────────────────────────────────────────────────────────
 
     /// 原版 `gen.blueprints`（工作流把牌组镜像进 `ProjectModel.deck`，第三步用它）。
+    /// 第三步的编辑不直接改它，走 [`Self::set_deck`]。
     pub fn blueprints(&self) -> &[Option<Value>] {
         &self.blueprints
     }
@@ -369,6 +370,32 @@ impl GenerationStore {
                 }
             }
         }
+    }
+
+    // ── 第三步的写入口（原版 `useSlideEditor` 直接改 `gen.blueprints`） ────────
+
+    /// 第三步唯一的牌组写入口（原版 `useSlideEditor` 改完 `gen.blueprints` 再整副存库）。
+    ///
+    /// 只有 store **正持有这个项目**（[`Self::live_for`]）且**不在生成中**（生成与重试都不行）
+    /// 时才写：store 正为别的项目跑时它不描述本项目（写进去是污染别人的牌组），本项目自己在
+    /// 生成时牌组里还有空位（下标对不上，写进去会错位）。
+    ///
+    /// 条件不满足返回 `false`，**调用方照常改模型**——store 不描述本项目时模型就是唯一状态
+    /// （见 `WorkflowPage::commit_deck`）。
+    // 提交 3 的第三步界面接上编辑动作后开始调用（本轮先把入口备好）。
+    #[allow(dead_code)]
+    pub fn set_deck(
+        &mut self,
+        project_id: Option<i64>,
+        deck: Vec<Value>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.live_for(project_id).is_none() || self.busy() {
+            return false;
+        }
+        self.blueprints = deck.into_iter().map(Some).collect();
+        cx.notify();
+        true
     }
 
     // ── 事件（原版 `startListening` 里那几个监听器） ──────────────────────────

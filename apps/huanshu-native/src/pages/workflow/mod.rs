@@ -8,6 +8,10 @@
 //! 由 `Shell` 创建、经 `ShellHandle` 发给页面）。本页只观察它、按原版规则显示
 //! （侧栏说明、初始步骤、自动跳页）；`ProjectModel.deck` 跟着 store 的牌组走，第三步用它。
 //!
+//! **牌组只有一条写入路径**：第三步的编辑一律经 [`WorkflowPage::commit_deck`]（模型 → store 的
+//! 写入口 → 落库），`WorkflowPage`、`ProjectModel`、store 三处不会各改各的。生成进行中
+//! （[`WorkflowPage::editing_locked`]）第三步只读。
+//!
 //! 已实现：加载 / 加载失败、侧栏（返回、项目名与改名、三步状态与说明、主题圆点、设置）、
 //! 按原版规则选初始步骤与判断能否点击、步骤切换时交还位图、第一步草稿防抖自动保存
 //! （含新建项目落库与路由对准）、项目附加信息读写、生成状态显示与自动跳页。
@@ -60,7 +64,19 @@ pub struct ProjectModel {
     pub draft_save_error: String,
     /// 牌组按**原始 JSON** 保存（与 core 的导出、预览一致；强类型往返会挡掉能渲染的牌组）。
     /// 由 [`GenerationStore`] 的牌组镜像而来（生成 / 重试改了牌组就跟着更新，第三步用它）。
+    /// 第三步的编辑只经 [`WorkflowPage::commit_deck`] 写它。
     pub deck: Vec<serde_json::Value>,
+    /// 第三步当前编辑的页（原版 `WorkflowView.vue` 的 `activeSlide`）：切到别的步骤再回来、
+    /// 打开演示都用它。牌组变短时收敛到最后一页。
+    pub active_slide: usize,
+    /// 牌组正在落库（原版 `useSlideEditor.editorSaving`；[`WorkflowPage::commit_deck`] 的
+    /// 每条出口都会复位它）。
+    // 提交 3 的保存按钮读这两个字段显示三态与错误（本轮先备好写入侧）。
+    #[allow(dead_code)]
+    pub deck_saving: bool,
+    /// 牌组落库失败的原因（原版 `useSlideEditor.jsonError`：第三步的保存按钮显示它）。
+    #[allow(dead_code)]
+    pub deck_save_error: Option<String>,
     pub aspect: AspectRatio,
     /// 库里最近一次生成运行（原版 `loadLatestRun` 读回来的那条；store 正为**别的**项目
     /// 跑时，界面的静态状态由它和牌组决定，见 [`GenerationStore::state_for`]）。
@@ -231,6 +247,11 @@ pub struct WorkflowPage {
     generation_dirty: bool,
     /// 加载完成后要进的那一步（store 的回调里没有 window，render 时补上）。
     pending_step: Option<Step>,
+    /// 牌组落库的代次（[`Self::commit_deck`] 每提交一次加一）：迟到的落库结果整条作废，
+    /// 不会去清掉后一次提交的「保存中」标记、也不会写回旧错误。
+    // 只在 `commit_deck` 内部读写，而提交 3 接上界面之前它没有调用方。
+    #[allow(dead_code)]
+    deck_save_seq: u64,
     /// 持有订阅即保活：字段不读，但 drop 时会退订。
     #[allow(dead_code)]
     subscriptions: Vec<Subscription>,
@@ -254,6 +275,9 @@ impl WorkflowPage {
             draft_save_state: DraftSaveState::Idle,
             draft_save_error: String::new(),
             deck: Vec::new(),
+            active_slide: 0,
+            deck_saving: false,
+            deck_save_error: None,
             aspect: AspectRatio::Ratio16x9,
             latest_run: None,
         });
@@ -303,6 +327,7 @@ impl WorkflowPage {
             advance_watch: None,
             generation_dirty: false,
             pending_step: None,
+            deck_save_seq: 0,
             subscriptions,
         };
         match id {
@@ -577,10 +602,101 @@ impl WorkflowPage {
                     model.deck = deck;
                     cx.notify();
                 }
+                // 牌组变短（生成收尾、删页、换项目）时当前页收敛到最后一页，
+                // 否则第三步会指着一张不存在的页。
+                let last = model.deck.len().saturating_sub(1);
+                if model.active_slide > last {
+                    model.active_slide = last;
+                    cx.notify();
+                }
             });
         }
         self.generation_dirty = true;
         cx.notify();
+    }
+
+    // ── 第三步的牌组（唯一写入路径） ─────────────────────────────────────────
+
+    /// 第三步此刻是不是只读（**有意偏离原版**：原版没挡，它的第三步遇到生成中的空位会出错）。
+    ///
+    /// 本项目正在生成 / 重试时为真；store 正为**别的**项目跑时也为真——那时本项目的数据是
+    /// 库里的静态快照，写进 store 是污染别人、写回库里会盖掉生成结果。
+    /// 第三步的应用 / 新建 / 删除 / 移动 / 换版式动手前都问这里。
+    // 提交 3 的第三步界面接上禁用逻辑后开始调用。
+    #[allow(dead_code)]
+    pub fn editing_locked(&self, cx: &Context<Self>) -> bool {
+        // `busy()` 是**全应用**的：生成中或还有页在重试（含别的项目），两种情形都要挡。
+        self.generation.read(cx).busy()
+    }
+
+    /// **第三步唯一的牌组写入路径**（原版 `useSlideEditor` 自己改 `gen.blueprints`，
+    /// `applyEditorChanges` / `deleteEditorSlide` / `moveEditorSlide` / `onKindPicked` 各改各的）。
+    ///
+    /// 顺序：模型（`deck` + `active_slide`）→ store 的写入口（store 正持有本项目且不在生成中时
+    /// 才写得进去，见 [`GenerationStore::set_deck`]；写不进去时模型就是唯一状态）→
+    /// `save` 时把整副牌组的 JSON 落库（原版 `saveBlueprints`，紧凑格式）。
+    /// 第三步的每一处编辑都只走这里。
+    ///
+    /// 调用方先看 [`Self::editing_locked`]（生成中只读）；本函数不自己挡，免得悄悄丢掉调用方的改动。
+    ///
+    /// `deck_saving` 的每条出口（每条都复位）：
+    /// 1. `save == false`（原版：新建页只插进牌组，随下一次应用 / 删除 / 移动一起存）；
+    /// 2. `save == true` 但项目还没落库（没有 id）：没有可写的地方，同原版 `!projectId` 直接返回；
+    /// 3. 落库成功：`deck_saving` 复位、错误清空；
+    /// 4. 落库失败：`deck_saving` 复位、原因写进 [`ProjectModel::deck_save_error`]；
+    /// 5. 期间又提交过一次（`deck_save_seq` 变了）：这次的结果整条丢掉，不碰这两个字段；
+    /// 6. 页面此时已被丢弃：`run_bg` 的回调根本不会执行（标志随模型一起消失）。
+    // 提交 3 的第三步界面接上应用 / 新建 / 删除 / 移动 / 换版式后开始调用。
+    #[allow(dead_code)]
+    pub fn commit_deck(
+        &mut self,
+        deck: Vec<serde_json::Value>,
+        active: usize,
+        save: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let active = active.min(deck.len().saturating_sub(1));
+        let id = self.model.read(cx).id;
+        // 整副牌组的 JSON（原版 `JSON.stringify(gen.blueprints)`：紧凑、不带空白）。
+        let saving =
+            save.then(|| serde_json::to_string(&deck).unwrap_or_else(|_| "[]".to_string()));
+        // store 正持有本项目时模型是它的镜像，只改模型会被下一次通知盖掉。
+        self.generation
+            .update(cx, |store, cx| store.set_deck(id, deck.clone(), cx));
+        self.model.update(cx, |model, cx| {
+            model.deck = deck;
+            model.active_slide = active;
+            cx.notify();
+        });
+        let (Some(json), Some(id)) = (saving, id) else {
+            return;
+        };
+        let seq = self.deck_save_seq;
+        self.deck_save_seq += 1;
+        self.model.update(cx, |model, cx| {
+            model.deck_saving = true;
+            model.deck_save_error = None;
+            cx.notify();
+        });
+        let shared = self.handle.shared().clone();
+        run_bg(
+            window,
+            cx,
+            move || projects::update_project_blueprints(&shared, id, json),
+            move |this: &mut Self, result, _window, cx| {
+                // 迟到的结果：后一次提交已经在等自己的落库结果了。
+                if this.deck_save_seq != seq {
+                    return;
+                }
+                this.model.update(cx, |model, cx| {
+                    model.deck_saving = false;
+                    model.deck_save_error = result.err();
+                    cx.notify();
+                });
+                cx.notify();
+            },
+        );
     }
 
     /// 原版 `WorkflowView.vue` 的 watch（`[gen.stage, gen.retryingPages.size, 有失败页]`）：
@@ -794,7 +910,9 @@ impl WorkflowPage {
             Step::Generate => {
                 StepView::Generate(cx.new(|cx| step2::Step2::new(model, handle, page, window, cx)))
             }
-            Step::Edit => StepView::Edit(cx.new(|cx| step3::Step3::new(model, handle, window, cx))),
+            Step::Edit => {
+                StepView::Edit(cx.new(|cx| step3::Step3::new(model, handle, page, window, cx)))
+            }
         });
         self.step = step;
         cx.notify();
