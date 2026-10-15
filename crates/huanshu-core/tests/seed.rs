@@ -127,7 +127,23 @@ fn the_failed_run_demo_serves_the_board_detail_and_retry_dialog() {
     // 日志：条数、规划日志、逐页日志、page_error 与失败的 retry。
     let logs = generation::get_generation_logs(state, run.id).expect("读日志");
     assert_eq!(logs.len(), run_info.logs);
-    assert_eq!(logs.len(), 16);
+    assert_eq!(logs.len(), 18);
+
+    // 组装标记：流水线把牌组写进项目之后记的那条 `assembling` / `assembled`。少了它
+    // `reached_assembly` 为假，`get_generation_deck` 读不到牌组、单页重试会被 core 挡下
+    // （「整副幻灯片尚未组装完成，请使用整副重试」）。
+    assert!(
+        logs.iter()
+            .any(|log| log.stage == "assembling" && log.kind == "assembled"),
+        "演示运行要有组装标记，否则「重试这一页」用不了"
+    );
+    assert_eq!(
+        generation::get_generation_deck(state, seeded.id)
+            .expect("读这次运行组装的牌组")
+            .len(),
+        seeded.pages,
+        "组装标记在时，`get_generation_deck` 要读到这次运行的牌组"
+    );
 
     let planning = logs
         .iter()

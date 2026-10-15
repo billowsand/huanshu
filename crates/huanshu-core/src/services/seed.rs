@@ -939,6 +939,28 @@ fn write_generation_run(
         json!({ "failed": 1, "total": pages.len() }),
         true,
     )?;
+    // 组装：`run_pipeline` 先发一次 assembling 进度、再把牌组写进项目并记一条 `assembled`。
+    // **这条 `assembled` 不能省**：`reached_assembly` 只看它，`get_generation_deck` 与单页重试
+    // （`retry_generation_page`）都拿它判断「库里的牌组是这次运行的产出」——演示数据少了它，
+    // 「重试这一页」会被 core 以「整副幻灯片尚未组装完成，请使用整副重试」挡下。
+    log(
+        None,
+        "assembling",
+        "status",
+        "assembling",
+        "组装封面与目录...",
+        json!({ "progress": 0.9 }),
+        false,
+    )?;
+    log(
+        None,
+        "assembling",
+        "assembled",
+        "已组装牌组",
+        &format!("共 {} 张幻灯片", deck.len()),
+        json!({ "slide_count": deck.len() }),
+        false,
+    )?;
     // 最终校验失败（detail 带 issues）：这次运行以 error 结束就是因为这一条。
     log(
         None,
