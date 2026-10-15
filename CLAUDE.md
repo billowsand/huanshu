@@ -488,7 +488,8 @@ cargo run -p slide-typst --example render_fixture -- --png
   - 输入字符串里的 `\u{1}`/`\u{2}` 会先被删掉，否则模型文本可以伪造哨兵段直接 `eval` 任意 Typst 代码（有单测）。
   - 内嵌的 mitex spec 在 `standard.typ` 的 `arrow-handle` 打了本地补丁（用 `math.stretch`）：上游依赖的 xarrow 用了
     Typst 0.15 已删除的 `style()`，且是 GPL-3.0，**不要重新 vendor xarrow**。
-  - 预览出图 4 px/pt，逻辑像素 = 像素 ÷ 4（`FORMULA_PIXEL_PER_PT`）；行内基线按图高 × 0.8 对齐（启发式）。
+  - 预览公式按「正文字号 px × 0.75」排成 pt、出图 4 px/pt，显示尺寸 = 像素 ÷ 4 ÷ 0.75（`formulas.rs::logical_px`；
+    只 ÷ 4 会把 pt 当 px，公式只有正文的 75%）；行内基线按图高 × 0.8 对齐（启发式）。
 - 已知差异：没有阴影和毛玻璃（便签主题本身也基本不用）；`text-wrap: balance`（`base.typ` 的 `balanced`）
   目前只用在 `center_grid` 的居中标题上，其他页面标题仍按普通换行；屏幕版标题还会先分词再换行，PDF 没有；
   屏幕上一行放不下的超长标题会被裁掉（如 cover），PDF 版换行显示；未知图标在 PDF 里渲染为兜底图标

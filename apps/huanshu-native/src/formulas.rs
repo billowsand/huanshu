@@ -116,7 +116,7 @@ fn size_half_pt(size_pt: f64) -> u32 {
     (size_pt.max(0.0) * 2.0).round() as u32
 }
 
-/// 一张出好的公式图：位图 + 逻辑尺寸（设备像素 ÷ [`PIXELS_PER_PT`]）。
+/// 一张出好的公式图：位图 + 逻辑尺寸（[`logical_px`]：出图像素 ÷ 4 px/pt → pt，再 ÷ 0.75 → 逻辑像素）。
 #[derive(Clone)]
 pub struct FormulaImage {
     pub image: Arc<RenderImage>,
@@ -529,9 +529,16 @@ fn decode(formula: slide_typst::RenderedFormula) -> Result<FormulaImage, String>
     let (width, height) = (rgba.width(), rgba.height());
     Ok(FormulaImage {
         image: images::from_rgba(width, height, rgba.into_raw()),
-        width: width as f32 / PIXELS_PER_PT as f32,
-        height: height as f32 / PIXELS_PER_PT as f32,
+        width: logical_px(width),
+        height: logical_px(height),
     })
+}
+
+/// 出图像素 → 逻辑像素。公式按 `字号(px) × 0.75` 排成 pt，Typst 出图 4 px/pt；显示时要换回
+/// 与正文同一个单位：像素 ÷ 4 得到 pt，再 ÷ 0.75 得到逻辑像素。只 ÷ 4 会把 pt 当成 px，
+/// 公式整体只有正文的 75%。
+fn logical_px(pixels: u32) -> f32 {
+    (pixels as f64 / PIXELS_PER_PT / PT_PER_PX) as f32
 }
 
 #[cfg(test)]
@@ -797,8 +804,9 @@ mod tests {
         let (pixel_width, pixel_height) = (formula.width, formula.height);
         assert!(pixel_width > 0 && pixel_height > 0);
         let image = decode(formula).expect("the formula png decodes");
-        assert_eq!(image.width, pixel_width as f32 / PIXELS_PER_PT as f32);
-        assert_eq!(image.height, pixel_height as f32 / PIXELS_PER_PT as f32);
+        // 16pt 的公式按 16pt = 16/0.75 px 显示：像素 ÷ 4 ÷ 0.75（即 ÷ 3）。
+        assert!((image.width - pixel_width as f32 / 3.0).abs() < 1e-3);
+        assert!((image.height - pixel_height as f32 / 3.0).abs() < 1e-3);
         assert!(image.width > 4.0, "16pt 的公式不该只有几个像素宽");
         assert!(image.height > 4.0);
     }
