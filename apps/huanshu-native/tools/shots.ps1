@@ -44,7 +44,7 @@ foreach ($shot in $Shots) {
     Write-Output "--- $name : $($args -join ' ')"
     $proc = Start-Process -FilePath $Exe -ArgumentList $args -PassThru -WindowStyle Normal
     Start-Sleep -Seconds $Wait
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $Tool -Prefix $name -OutDir $OutDir | Out-Null
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $Tool -Prefix $name -OutDir $OutDir -ProcessId $proc.Id | Out-Null
     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
 }

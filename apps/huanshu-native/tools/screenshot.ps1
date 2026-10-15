@@ -10,6 +10,8 @@
 param(
     [string]$Prefix = "shot",
     [string]$Process = "huanshu-native",
+    # Pick one process by id: an installed copy of the app may be running under the same name.
+    [int]$ProcessId = 0,
     [string]$OutDir = "",
     [double]$Scale = 1.0,
     [int]$Index = -1
@@ -80,7 +82,13 @@ public class Win32Shots {
 
 [void][Win32Shots]::SetProcessDPIAware()
 
-$proc = Get-Process -Name $Process -ErrorAction SilentlyContinue
+if ($ProcessId -gt 0) {
+    $proc = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+} else {
+    # Several processes of that name: prefer the one built in this repo (target\release or debug).
+    $proc = @(Get-Process -Name $Process -ErrorAction SilentlyContinue |
+        Sort-Object { if ($_.Path -like "*\target\*") { 0 } else { 1 } }) | Select-Object -First 1
+}
 if (-not $proc) { throw "process $Process is not running" }
 $handles = [Win32Shots]::WindowsOf([uint32]$proc.Id)
 if ($handles.Count -eq 0) { throw "no visible window for pid $($proc.Id)" }

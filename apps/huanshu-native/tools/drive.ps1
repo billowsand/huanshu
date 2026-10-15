@@ -85,7 +85,7 @@ foreach ($step in ($Steps -split ";")) {
             [Drive]::mouse_event(0x0800, 0, 0, [int]$arg * 120, [IntPtr]::Zero)
         }
         "wait" { Start-Sleep -Milliseconds ([int]([double]$arg * 1000)) }
-        "shot" { & powershell -NoProfile -ExecutionPolicy Bypass -File $Tool -Prefix $arg -OutDir $Out | Out-Null }
+        "shot" { & powershell -NoProfile -ExecutionPolicy Bypass -File $Tool -Prefix $arg -OutDir $Out -ProcessId $proc.Id | Out-Null }
         default { Write-Output "unknown step $step" }
     }
 }
