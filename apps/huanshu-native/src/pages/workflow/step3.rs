@@ -935,17 +935,25 @@ impl Step3 {
             .disabled(locked)
             .on_click(cx.listener(move |this, _event, _window, cx| this.add_string_item(&path, cx)))
         };
-        // 标签组 / 图集在原版里**没有**这一行小标签（只有卡片里的要点列表有）。
-        let mut block = div().flex().flex_col().gap(px(6.0)).child(
-            div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .gap(px(8.0))
-                .when(!label.is_empty(), |row| row.child(qf_label(label, cx)))
-                .child(div().flex_1())
-                .child(add),
-        );
+        // 标签组 / 图集在原版里**没有**这一行小标签，它们的「添加」按钮放在**列表末尾**
+        // （`.ej-list-stack` 里的 `edit-add-btn`，满宽）；卡片里的要点列表才有小标签，
+        // 「添加」跟在标签行右端。
+        let mut block = div().flex().flex_col().gap(px(6.0));
+        let mut tail_add = None;
+        if label.is_empty() {
+            tail_add = Some(add);
+        } else {
+            block = block.child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap(px(8.0))
+                    .child(qf_label(label, cx))
+                    .child(div().flex_1())
+                    .child(add),
+            );
+        }
         for (index, value) in items.iter().enumerate() {
             let item_path = format!("{path}[{index}]");
             let del_path = path.to_string();
@@ -977,6 +985,9 @@ impl Step3 {
                             })),
                     ),
             );
+        }
+        if let Some(add) = tail_add {
+            block = block.child(add.w_full());
         }
         block.into_any_element()
     }
