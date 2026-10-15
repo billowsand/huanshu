@@ -161,6 +161,8 @@ const TEMPLATES: &[(&str, &str)] = &[
     ),
     // Compile check for converted math spans (see `Renderer::failing_math`).
     ("/math-check.typ", include_str!("../typst/math-check.typ")),
+    // One formula, sized to its content (see `Renderer::render_formula`).
+    ("/formula.typ", include_str!("../typst/formula.typ")),
 ];
 
 /// Slide kinds with a native Typst layout; others render a visible placeholder page.
@@ -292,6 +294,23 @@ struct DeckInput<'a> {
     slides: &'a [serde_json::Value],
 }
 
+/// The single formula `/formula.typ` lays out (see [`Renderer::render_formula`]).
+#[derive(Serialize)]
+struct FormulaInput<'a> {
+    /// Typst math source from mitex.
+    source: &'a str,
+    /// Block-level (centered) instead of inline.
+    display: bool,
+    /// Text color as `#rrggbb`; `rgb(…)` in Typst parses this string.
+    fill: String,
+    /// Font size in points.
+    size_pt: f64,
+    /// Body font fallbacks, for `\text{…}` parts of the formula.
+    fonts: Vec<String>,
+    /// Installed entries of [`MATH_FONTS`], in order; empty if none is.
+    math_fonts: Vec<&'static str>,
+}
+
 /// A slide whose content did not fit even at the smallest fit factor; it was
 /// clipped. Emitted by `overflow-marker` in `typst/lib/base.typ`.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -358,11 +377,36 @@ pub struct RenderedFrames {
     pub missing_assets: Vec<MissingAsset>,
 }
 
+/// One formula as a transparent PNG (see [`Renderer::render_formula`]).
+#[derive(Debug)]
+pub struct RenderedFormula {
+    /// PNG bytes with an alpha channel; the formula's surroundings are fully
+    /// transparent, so the host can draw it on any background.
+    pub png: Vec<u8>,
+    /// Frame size in device pixels, at [`FORMULA_PIXEL_PER_PT`] pixels per point.
+    pub width: u32,
+    pub height: u32,
+}
+
 /// Allowed thumbnail widths, in device pixels.
 const MIN_PNG_WIDTH: u32 = 64;
 const MAX_PNG_WIDTH: u32 = 3840;
 
+/// Rasterization scale of [`Renderer::render_formula`]: 4 device pixels per
+/// point, so the image stays crisp on HiDPI displays. Hosts that lay the image
+/// out in the surrounding text divide [`RenderedFormula::width`] and
+/// `height` by this to get logical pixels.
+pub const FORMULA_PIXEL_PER_PT: f64 = 4.0;
+
+/// Formula font sizes outside this range (in points) are clamped to it: an
+/// editor only asks for a body-text size, and a nonsensical one must not blow
+/// up the page size or the raster.
+const MIN_FORMULA_SIZE_PT: f64 = 4.0;
+const MAX_FORMULA_SIZE_PT: f64 = 200.0;
+
 /// A compile failure with Typst's diagnostics resolved to `file:line:col`.
+/// [`Renderer::render_formula`] reports a formula's problems — LaTeX mitex
+/// cannot convert, or Typst rejecting the converted source — the same way.
 #[derive(Debug)]
 pub struct RenderError {
     pub diagnostics: Vec<String>,
@@ -483,6 +527,84 @@ impl Renderer {
             pages,
             overflows,
             missing_assets,
+        })
+    }
+
+    /// Typesets one LaTeX formula into a small transparent PNG, for a host that
+    /// shows formulas in its own text (the native editor's Markdown preview).
+    ///
+    /// `latex` is the formula body without `$` delimiters; `display` lays it out
+    /// block-level (centered) instead of inline; `color` is the text color, which
+    /// is what a formula inherits — pass the surrounding body color so it stays
+    /// readable on a dark theme; `size_pt` is the font size in points, clamped to
+    /// 4–200pt.
+    ///
+    /// The conversion is the one slides use (`math::convert_formula`: sentinel
+    /// characters stripped, then mitex), and the formula is `eval`ed into a page
+    /// sized to its content, at `pixel_per_pt` = [`FORMULA_PIXEL_PER_PT`]. A
+    /// formula mitex cannot convert, or one Typst rejects, comes back as `Err`
+    /// with the reason — the caller shows the source text instead. Formula
+    /// problems never touch other formulas or the deck export.
+    pub fn render_formula(
+        &self,
+        latex: &str,
+        display: bool,
+        color: [u8; 3],
+        size_pt: f64,
+    ) -> Result<RenderedFormula, RenderError> {
+        // Why an eval error is fatal here: `formula.typ` evals the converted
+        // source, and Typst cannot catch that — a rejected formula is a failed
+        // compile, which is exactly the `Err` the caller falls back on.
+        let source = math::convert_formula(latex).map_err(|err| RenderError {
+            diagnostics: vec![format!("convert LaTeX {:?}: {err}", latex.trim())],
+        })?;
+        let [r, g, b] = color;
+        let deck = serde_json::to_vec(&FormulaInput {
+            source: &source,
+            display,
+            fill: format!("#{r:02x}{g:02x}{b:02x}"),
+            size_pt: if size_pt.is_finite() {
+                size_pt.clamp(MIN_FORMULA_SIZE_PT, MAX_FORMULA_SIZE_PT)
+            } else {
+                MIN_FORMULA_SIZE_PT
+            },
+            fonts: self.installed_fonts(&FontRoles::default()).body,
+            math_fonts: self.installed_math_fonts(),
+        })
+        .map_err(|err| RenderError {
+            diagnostics: vec![format!("serialize formula: {err}")],
+        })?;
+        let world = SlideWorld {
+            renderer: self,
+            main: file_id("/formula.typ"),
+            deck: Bytes::new(deck),
+            images: HashMap::new(),
+            sources: Mutex::new(HashMap::new()),
+            missing_icons: Mutex::new(HashSet::new()),
+        };
+        let result = typst::compile::<PagedDocument>(&world);
+        // Same process-wide layout cache as `compile()`; see the note there.
+        typst::comemo::evict(50);
+        let document = result.output.map_err(|errors| RenderError {
+            diagnostics: errors.iter().map(|d| world.describe(d)).collect(),
+        })?;
+        let page = document.pages().first().ok_or_else(|| RenderError {
+            diagnostics: vec!["formula.typ laid out no page".to_string()],
+        })?;
+        let pixmap = typst_render::render(
+            page,
+            &typst_render::RenderOptions {
+                pixel_per_pt: typst::utils::Scalar::new(FORMULA_PIXEL_PER_PT),
+                render_bleed: false,
+            },
+        );
+        let png = pixmap.encode_png().map_err(|err| RenderError {
+            diagnostics: vec![format!("encode formula as PNG: {err}")],
+        })?;
+        Ok(RenderedFormula {
+            png,
+            width: pixmap.width(),
+            height: pixmap.height(),
         })
     }
 
@@ -898,7 +1020,171 @@ impl World for SlideWorld<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::unpremultiply;
+    use super::*;
+
+    use std::sync::OnceLock;
+
+    /// Scanning system fonts is expensive, so the tests share one renderer, as
+    /// the app does.
+    fn renderer() -> &'static Renderer {
+        static RENDERER: OnceLock<Renderer> = OnceLock::new();
+        RENDERER.get_or_init(Renderer::with_system_fonts)
+    }
+
+    /// A plausible light-theme body color (preview formulas follow the theme).
+    const INK: [u8; 3] = [0x1e, 0x1e, 0x1e];
+
+    fn formula(latex: &str, display: bool) -> RenderedFormula {
+        renderer()
+            .render_formula(latex, display, INK, 16.0)
+            .unwrap_or_else(|err| panic!("{latex:?} failed: {err}"))
+    }
+
+    fn assert_png(image: &RenderedFormula, what: &str) {
+        assert!(image.png.starts_with(b"\x89PNG"), "{what}: not a PNG");
+        assert!(image.width > 0 && image.height > 0, "{what}: empty image");
+    }
+
+    /// The decoded RGBA of a formula image, for pixel-level assertions.
+    fn pixels(image: &RenderedFormula) -> image::RgbaImage {
+        image::load_from_memory_with_format(&image.png, image::ImageFormat::Png)
+            .expect("formula PNG decodes")
+            .to_rgba8()
+    }
+
+    #[test]
+    fn inline_formula_renders_on_a_transparent_page() {
+        let image = formula("x^2 + y^2 = z^2", false);
+        assert_png(&image, "inline");
+        // `fill: none` on the page: the margin around the formula is see-through,
+        // so the host can draw it on the surrounding background.
+        assert_eq!(pixels(&image).get_pixel(0, 0)[3], 0, "background is opaque");
+        // 4 device pixels per point, so the caller divides by that for logical ones.
+        assert_eq!(image.width, pixels(&image).width());
+    }
+
+    #[test]
+    fn display_formula_renders_its_limits_above_and_below() {
+        // Block-level: `\sum`'s limits move above and below the sign, which makes
+        // the image taller than the same formula laid out inline.
+        let inline = formula("\\sum_{i=1}^{n} i", false);
+        let display = formula("\\sum_{i=1}^{n} i", true);
+        assert_png(&display, "display");
+        assert!(
+            display.height > inline.height,
+            "display {} is not taller than inline {}",
+            display.height,
+            inline.height
+        );
+    }
+
+    #[test]
+    fn fraction_renders() {
+        // Fractions, roots and accents are the cases where a clipped image shows;
+        // the ~1pt page margin must keep the full formula in frame.
+        let image = formula("x_{1,2} = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}", true);
+        assert_png(&image, "fraction");
+        assert_eq!(pixels(&image).get_pixel(0, 0)[3], 0);
+    }
+
+    #[test]
+    fn font_size_scales_the_formula() {
+        // Typst math follows the surrounding text size, which is how `size_pt`
+        // reaches the equation (see formula.typ).
+        let small = renderer().render_formula("x^2", false, INK, 10.0).unwrap();
+        let large = renderer().render_formula("x^2", false, INK, 20.0).unwrap();
+        assert!(
+            large.width > small.width && large.height > small.height,
+            "20pt {}x{} is not bigger than 10pt {}x{}",
+            large.width,
+            large.height,
+            small.width,
+            small.height
+        );
+    }
+
+    #[test]
+    fn fill_reaches_the_raster() {
+        let ink = renderer()
+            .render_formula("x^2", false, [0x1e, 0x1e, 0x1e], 16.0)
+            .unwrap();
+        let paper = renderer()
+            .render_formula("x^2", false, [0xff, 0xff, 0xff], 16.0)
+            .unwrap();
+        assert_ne!(
+            ink.png, paper.png,
+            "the fill color did not reach the formula"
+        );
+        assert_png(&paper, "white formula");
+    }
+
+    #[test]
+    fn latex_mitex_or_typst_rejects_is_an_error() {
+        // `\badcmd{` is LaTeX mitex does not know; the rest convert, but Typst
+        // rejects the result (missing argument, unclosed delimiter, dangling
+        // label). All of them must come back as an error for the caller to show
+        // as plain text — never as a panic or a broken image.
+        for latex in ["\\badcmd{", "\\frac{1}", "\\left(", "\\ref{eq}"] {
+            let err = renderer()
+                .render_formula(latex, false, INK, 16.0)
+                .expect_err(&format!("{latex:?} should not render"));
+            assert!(!err.diagnostics.is_empty(), "{latex:?}: no diagnostics");
+        }
+    }
+
+    #[test]
+    fn sentinel_chars_in_the_formula_are_stripped() {
+        // The sentinel characters wrap converted spans inside decks; text that
+        // already carries them must be stripped rather than reach `eval` as
+        // markup. Stripping is observable: the wrapped formula renders exactly
+        // like the bare one.
+        let bare = formula("x^2", false);
+        let wrapped = formula("\u{1}\u{2}x^2", false);
+        assert_eq!(bare.png, wrapped.png);
+    }
+
+    #[test]
+    fn typst_markup_in_the_formula_is_never_executed() {
+        // These would panic or read the deck if they ever reached Typst as
+        // markup instead of as LaTeX: `#` is literal in math mode, and the
+        // sentinel-wrapped text is stripped first. Either an image or an error
+        // is fine; a panic is not.
+        for latex in [
+            "#panic(\"x\")",
+            "\u{1}I#panic(\"injected\")\u{2}",
+            "#read(\"/deck.json\")",
+        ] {
+            match renderer().render_formula(latex, false, INK, 16.0) {
+                Ok(image) => assert_png(&image, latex),
+                Err(err) => assert!(!err.diagnostics.is_empty(), "{latex:?}: no diagnostics"),
+            }
+        }
+    }
+
+    #[test]
+    fn one_renderer_serves_many_formulas() {
+        // The preview reuses the process-wide renderer (fonts are scanned once)
+        // and asks for the same formula more than once as it re-renders.
+        let first = formula("a^2 + b^2 = c^2", false);
+        let again = formula("a^2 + b^2 = c^2", false);
+        assert_eq!(
+            first.png, again.png,
+            "the same formula rendered differently"
+        );
+        assert_png(&formula("\\frac{1}{2}", true), "second formula");
+    }
+
+    #[test]
+    fn nonsensical_sizes_do_not_break_the_render() {
+        // Sizes are clamped instead of reaching Typst as-is: a preview that asks
+        // for 0pt or NaN must get an image, not a panic.
+        for size in [0.0, -5.0, f64::NAN, 10_000.0] {
+            let image = renderer()
+                .render_formula("x^2", false, INK, size)
+                .unwrap_or_else(|err| panic!("{size}pt: {err}"));
+            assert_png(&image, &format!("{size}pt"));
+        }
+    }
 
     #[test]
     fn unpremultiply_undoes_the_rasterizer_alpha() {

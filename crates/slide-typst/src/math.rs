@@ -15,6 +15,7 @@
 //! that already contained `\u{1}I…\u{2}` would otherwise reach `eval` as raw
 //! Typst code.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use serde::Serialize;
@@ -56,14 +57,33 @@ fn rewrite_value(value: &mut serde_json::Value, rejected: &HashSet<String>, span
     }
 }
 
-fn rewrite_str(input: &str, rejected: &HashSet<String>, spans: &mut Vec<Span>) -> String {
-    let stripped;
-    let input = if input.contains([SPAN_OPEN, SPAN_CLOSE]) {
-        stripped = input.replace([SPAN_OPEN, SPAN_CLOSE], "");
-        stripped.as_str()
+/// `input` without the sentinel characters, borrowed when there are none.
+///
+/// Every string that is scanned or converted goes through this first: text that
+/// already contained `\u{1}I…\u{2}` would otherwise reach `eval` as raw Typst
+/// code. [`convert_formula`] needs the very same rule, so it lives here.
+pub(crate) fn strip_sentinels(input: &str) -> Cow<'_, str> {
+    if input.contains([SPAN_OPEN, SPAN_CLOSE]) {
+        Cow::Owned(input.replace([SPAN_OPEN, SPAN_CLOSE], ""))
     } else {
-        input
-    };
+        Cow::Borrowed(input)
+    }
+}
+
+/// Typst math source for one LaTeX formula with no `$` delimiters, or mitex's
+/// error message when the LaTeX cannot be converted. The result is meant to be
+/// `eval`ed as `$…$`, exactly like a converted span of [`rewrite_deck`];
+/// whether Typst accepts it is only known at that point.
+///
+/// Sentinel characters are stripped first, so the caller's text can never
+/// introduce markup ([`Renderer::render_formula`] uses this).
+pub(crate) fn convert_formula(latex: &str) -> Result<String, String> {
+    mitex::convert_math(&strip_sentinels(latex), None)
+}
+
+fn rewrite_str(input: &str, rejected: &HashSet<String>, spans: &mut Vec<Span>) -> String {
+    let stripped = strip_sentinels(input);
+    let input = stripped.as_ref();
     if !input.contains('$') {
         return input.to_owned();
     }
@@ -243,6 +263,17 @@ mod tests {
         let out = converted("\u{1}I#panic(\"x\")\u{2} 文本 $x$");
         assert_eq!(out.matches(SPAN_OPEN).count(), 1, "{out:?}");
         assert!(out.starts_with("I#panic"), "{out:?}");
+    }
+
+    #[test]
+    fn convert_formula_strips_sentinels_like_a_span() {
+        // `Renderer::render_formula` converts through here, so a formula the
+        // caller wrapped in sentinels converts as its stripped self.
+        assert_eq!(
+            convert_formula("\u{1}\u{2}x^2").unwrap(),
+            convert_formula("x^2").unwrap()
+        );
+        assert!(convert_formula("\\badcmd{").is_err());
     }
 
     #[test]
