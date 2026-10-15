@@ -45,11 +45,31 @@ foreach ($shot in $Shots) {
     $proc = Start-Process -FilePath $Exe -ArgumentList $args -PassThru -WindowStyle Normal
     Start-Sleep -Seconds $Wait
     & powershell -NoProfile -ExecutionPolicy Bypass -File $Tool -Prefix $name -OutDir $OutDir | Out-Null
-    # Screens that need a click are not in this list: the KindPicker shot is taken with drive.ps1,
+    Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+}
+
+# Screens that need interaction are driven with drive.ps1 instead of --route:
+#   name, route, steps, boot
+# `present` is only reachable by clicking the third step's "present" button (~0.70, 0.065 of the
+# window); the presentation opens fullscreen by itself, so two shots are taken there: pointer off
+# the controls bar (the bar must stay hidden) and pointer on it (the bar fades in).
+# The leading comma keeps the single tuple from being flattened by `@(...)`.
+$Interactive = @(
+    ,@("present", "project:2:3",
+       "click:0.697,0.065;wait:6;move:0.5,0.4;wait:1.5;shot:present-full;move:0.5,0.97;wait:1.5;shot:present-full-hover",
+       12)
+)
+
+foreach ($item in $Interactive) {
+    $name = $item[0]
+    if ($Only.Count -gt 0 -and -not ($Only -contains $name)) { continue }
+    Write-Output "--- $name (drive.ps1) : $($item[1]) $($item[2])"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "drive.ps1") `
+        -Route $item[1] -Steps $item[2] -Out $OutDir -Theme $Theme -Boot $item[3]
+    # The KindPicker shot is manual, in the same shape:
     #   powershell -NoProfile -ExecutionPolicy Bypass -File apps/huanshu-native/tools/drive.ps1 -Route project:2:3
     #     -Steps "click:0.233,0.965;wait:2;shot:project-step3-kind-picker" -Out docs/native/shell -Boot 10
     # which writes docs/native/shell/project-step3-kind-picker-0.png.
-    Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
 }
 Write-Output "done"
