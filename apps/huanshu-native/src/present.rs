@@ -331,6 +331,9 @@ impl Render for Presentation {
                 .items_center()
                 .justify_center()
                 .bg(gpui_kit::rgb(0x000000))
+                .when_some(cx.studio().paper, |area, p| {
+                    area.child(widgets::wood_grain(&p))
+                })
                 .child(frame)
                 .on_mouse_down(
                     MouseButton::Left,
@@ -592,6 +595,9 @@ impl Render for Presentation {
             // 全屏时控制条 `absolute` 贴在底边，相对本层定位。
             .relative()
             .bg(c.bg)
+            .when_some(cx.studio().paper, |area, p| {
+                area.child(widgets::wood_grain(&p))
+            })
             .child(content)
             .child(controls)
     }
@@ -610,6 +616,7 @@ impl Presentation {
             .pump(None, |this: &mut Self| &mut this.thumbs, window, cx);
         div()
             .id("pres-overview")
+            .relative()
             .flex_1()
             .min_h_0()
             .overflow_y_scroll()
@@ -635,6 +642,12 @@ impl Presentation {
                             .rounded(px(8.0))
                             .border_2()
                             .border_color(if active { c.primary } else { c.border })
+                            .when_some(cx.studio().paper, |sheet, p| {
+                                sheet
+                                    .bg(p.card)
+                                    .rounded(px(2.0))
+                                    .shadow(widgets::paper_shadow(&p))
+                            })
                             .cursor_pointer()
                             .child(slide_frame(
                                 ("ov-frame", index),

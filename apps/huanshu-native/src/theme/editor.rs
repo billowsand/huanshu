@@ -9,7 +9,7 @@
 //! 左侧略深的页边、宋体正文、深棕墨色；预览区是木纹桌面上的一叠便签卡。
 
 use gpui_kit::component::highlighter::HighlightTheme;
-use gpui_kit::{rgba, App, Hsla, SharedString};
+use gpui_kit::{rgba, Hsla, SharedString};
 use std::sync::Arc;
 
 /// Markdown 语法的几类颜色（对应原版 `.tok-*`）。
@@ -187,7 +187,7 @@ fn paper(theme_id: &str) -> Option<PaperLook> {
         margin_line: c(0x7462522e),
         shadow_near: c(0x7462541c),
         shadow_far: c(0x74625438),
-        backing: c(0xf1debdff),
+        backing: c(0xf3e3c5ff),
         bar_top: c(0xfbf7ecff),
         bar_bottom: c(0xf1ebdfff),
         ink: c(0x5c4637ff),
@@ -213,38 +213,14 @@ pub struct EditorLook {
     pub rule: Option<Hsla>,
 }
 
-/// 便签主题的写字字体：宋体系，按顺序取本机第一个装了的（锤子便签的正文是宋体）。
-const NOTES_FONTS: &[&str] = &[
-    "Noto Serif SC Medium",
-    "Noto Serif SC",
-    "Source Han Serif SC",
-    "Source Han Serif CN",
-    "思源宋体",
-    "霞鹜新致宋＋",
-    "方正书宋_GBK",
-    "方正书宋简体",
-    "华文中宋",
-    "STZhongsong",
-    "SimSun",
-    "宋体",
-];
-
-fn first_installed(candidates: &[&str], cx: &App) -> Option<SharedString> {
-    let installed = cx.text_system().all_font_names();
-    candidates
-        .iter()
-        .find(|name| installed.iter().any(|font| font == *name))
-        .map(|name| SharedString::from(name.to_string()))
-}
-
-pub(super) fn look(theme_id: &str, cx: &App) -> (EditorLook, Option<PaperLook>) {
+pub(super) fn look(theme_id: &str) -> (EditorLook, Option<PaperLook>) {
     let t = table(theme_id);
     let paper = paper(theme_id);
     let c = |value: u32| -> Hsla { rgba(value).into() };
     let look = match paper {
         Some(paper) => EditorLook {
             background: t.background.map(c),
-            font: first_installed(NOTES_FONTS, cx),
+            font: None,
             text_size: 15.0,
             line_height: 32.0,
             rule: Some(paper.rule),

@@ -78,6 +78,9 @@ pub struct Studio {
     pub colors: StudioColors,
     /// 「设置 → 外观与字体」的「界面」字体（原版 `--font-interface`）。
     pub interface_font: SharedString,
+    pub fonts: huanshu_core::types::FontSettings,
+    pub body_font: SharedString,
+    pub font_fallbacks: gpui_kit::FontFallbacks,
     /// 第一步 Markdown 编辑器的字体、行高与稿纸横线（`editor.rs`）。
     pub editor: EditorLook,
     /// 稿纸主题的纸张与木纹桌面（只有便签主题有，对应原版 `notes*.css` 与 Typst 的 `deco` 开关）。
@@ -85,6 +88,36 @@ pub struct Studio {
 }
 
 impl Global for Studio {}
+
+// Root-level defaults also reach dialogs, menus, notifications and tooltips,
+// which are siblings of Shell rather than its children.
+struct TypographyLayer;
+
+pub fn init_typography(cx: &mut App) {
+    gpui_kit::base::Root::register_plugin(cx, |_, _| TypographyLayer);
+}
+
+impl gpui_kit::Render for TypographyLayer {
+    fn render(
+        &mut self,
+        _: &mut Window,
+        _: &mut gpui_kit::Context<Self>,
+    ) -> impl gpui_kit::IntoElement {
+        gpui_kit::Empty
+    }
+}
+
+impl gpui_kit::base::RootPlugin for TypographyLayer {
+    fn style(&self, surface: &mut gpui_kit::Stateful<gpui_kit::Div>, _: &mut Window, cx: &mut App) {
+        use gpui_kit::{Refineable as _, Styled as _};
+        surface
+            .style()
+            .refine(&gpui_kit::StyleRefinement::default().font(gpui_kit::Font {
+                fallbacks: Some(cx.studio().font_fallbacks.clone()),
+                ..gpui_kit::font(cx.studio().interface_font.clone())
+            }));
+    }
+}
 
 /// `cx.studio()`：页面取色的唯一入口。
 pub trait StudioExt {
@@ -107,18 +140,36 @@ pub const DEFAULT_INTERFACE_FONT: &str = "Microsoft YaHei";
 /// 只改显示；**保存**设置由调用方决定（设置页是「点击预览、保存后生效」）。
 pub fn apply(
     theme_id: &str,
-    interface_font: Option<&str>,
+    fonts: Option<&huanshu_core::types::FontSettings>,
     window: Option<&mut Window>,
     cx: &mut App,
 ) {
     let (theme, _) = themes::theme_or_default(Some(theme_id));
     let theme = *theme;
     let colors = StudioColors::from_table(tokens::table(theme.id));
-    let font: SharedString = interface_font
-        .filter(|font| !font.trim().is_empty())
-        .unwrap_or(DEFAULT_INTERFACE_FONT)
+    let mut fonts = fonts.cloned().unwrap_or_default();
+    fonts.normalize();
+    let installed = cx.text_system().all_font_names();
+    let resolve = |family: &str| -> SharedString {
+        [
+            family,
+            fonts.fallback.as_str(),
+            DEFAULT_INTERFACE_FONT,
+            "Segoe UI",
+        ]
+        .into_iter()
+        .find(|name| installed.iter().any(|f| f.eq_ignore_ascii_case(name)))
+        .unwrap_or(".SystemUIFont")
         .to_string()
-        .into();
+        .into()
+    };
+    let font = resolve(&fonts.interface);
+    let code = resolve(&fonts.code);
+    let body_font = resolve(&fonts.body);
+    let editor_font = resolve(&fonts.editor);
+    let font_fallbacks = gpui_kit::FontFallbacks::from_fonts(
+        slide_typst::FontRoles::with_fallbacks(&fonts.fallback),
+    );
 
     Theme::change(
         if theme.tone.is_dark() {
@@ -129,11 +180,20 @@ pub fn apply(
         window,
         cx,
     );
+    let (mut editor, paper) = editor::look(theme.id);
+    editor.font = Some(editor_font);
     let kit = Theme::global_mut(cx);
     kit.font_family = font.clone();
+    kit.mono_font_family = code;
     kit.radius = px(8.0);
     let k = &mut kit.colors;
-    k.background = colors.bg;
+    // Component surfaces are paper, not the wooden desktop. Both dialogs and
+    // light-mode input fields read this value.
+    k.background = if paper.is_some() {
+        colors.panel_2
+    } else {
+        colors.bg
+    };
     k.foreground = colors.text;
     k.border = colors.border;
     k.input = colors.border;
@@ -196,12 +256,17 @@ pub fn apply(
     // 必须在 `Theme::change` 之后写，它会把高亮主题重置成默认的明 / 暗。
     kit.highlight_theme = editor::highlight_theme(theme.id, theme.tone.is_dark());
 
-    let (editor, paper) = editor::look(theme.id, cx);
     cx.set_global(Studio {
         theme,
         colors,
         interface_font: font,
+        body_font,
+        fonts,
+        font_fallbacks,
         editor,
         paper,
     });
+    // Rich text/code blocks use Base's theme projection, separate from Kit.
+    Theme::sync_base(cx);
+    cx.refresh_windows();
 }

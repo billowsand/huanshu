@@ -96,8 +96,8 @@ impl ShellHandle {
                 eprintln!("[native] 保存主题失败：{error}");
             }
         }
-        let font = interface_font(&self.shared);
-        theme::apply(theme_id, font.as_deref(), Some(window), cx);
+        let font = font_settings(&self.shared);
+        theme::apply(theme_id, Some(&font), Some(window), cx);
         cx.refresh_windows();
     }
 
@@ -117,10 +117,11 @@ impl ShellHandle {
 }
 
 /// 「设置 → 外观与字体」的界面字体。
-pub fn interface_font(shared: &AppShared) -> Option<String> {
-    let state = shared.lock().ok()?;
-    let font = state.app_settings.fonts.interface.clone();
-    (!font.trim().is_empty()).then_some(font)
+pub fn font_settings(shared: &AppShared) -> huanshu_core::types::FontSettings {
+    shared
+        .lock()
+        .map(|state| state.app_settings.fonts.clone())
+        .unwrap_or_default()
 }
 
 impl Shell {
@@ -262,7 +263,10 @@ impl Render for Shell {
             .size_full()
             .bg(studio.colors.bg)
             .text_color(studio.colors.text)
-            .font_family(studio.interface_font.clone())
+            .font(gpui_kit::Font {
+                fallbacks: Some(studio.font_fallbacks.clone()),
+                ..gpui_kit::font(studio.interface_font.clone())
+            })
             .text_size(px(14.0))
             // 全屏演示时没有标题栏：原版是演示元素自己进全屏（`requestFullscreen`），盖住整个屏幕。
             .when(

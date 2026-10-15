@@ -140,6 +140,8 @@ struct CachedSelect {
 }
 
 pub struct Step3 {
+    list_scroll: gpui_kit::ScrollHandle,
+    panel_scroll: gpui_kit::ScrollHandle,
     model: Entity<ProjectModel>,
     /// 工作流页面：牌组的编辑走它的 `WorkflowPage::commit_deck`（唯一写入路径）、
     /// 生成中只读看 `WorkflowPage::editing_locked`。
@@ -292,6 +294,8 @@ impl Step3 {
             ),
         ];
         Self {
+            list_scroll: gpui_kit::ScrollHandle::new(),
+            panel_scroll: gpui_kit::ScrollHandle::new(),
             model,
             page,
             handle,
@@ -1446,7 +1450,7 @@ impl Step3 {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let c = cx.studio().colors;
-        let mut card = div()
+        let mut card = widgets::paper_card(cx)
             .flex()
             .flex_col()
             .gap(px(4.0))
@@ -1455,7 +1459,10 @@ impl Step3 {
             .rounded(px(6.0))
             .border_1()
             .border_color(c.border)
-            .bg(c.surface);
+            .bg(c.surface)
+            .when_some(cx.studio().paper, |card, p| {
+                card.bg(p.card).rounded(px(3.0))
+            });
         match field.field_type.as_str() {
             // 勾选框自带标签，不再显示上方小标签（原版 `.ej-bool-row`）。
             "boolean" => {
@@ -2221,7 +2228,7 @@ impl Step3 {
                             .overflow_hidden()
                             .child(
                                 Textarea::new(&self.chart_input)
-                                    .font_family(widgets::code_font(&self.handle))
+                                    .font_family(widgets::code_font(cx))
                                     .text_size(px(12.8))
                                     .disabled(locked),
                             ),
@@ -2287,7 +2294,7 @@ impl Step3 {
                             // 行号栏由代码编辑器自己画（`.ej-gutter` / `.ej-line-num`）。
                             Editor::new(&self.json_editor)
                                 .h(px(JSON_EDITOR_H))
-                                .font_family(widgets::code_font(&self.handle))
+                                .font_family(widgets::code_font(cx))
                                 .disabled(locked),
                         ),
                 );
@@ -2865,12 +2872,13 @@ impl Render for Step3 {
                             }),
                     ),
             )
-            .child(
+            .child(widgets::scroll_edges(
                 div()
                     .id("slide-list")
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
+                    .track_scroll(&self.list_scroll)
                     .p(px(6.0))
                     .flex()
                     .flex_col()
@@ -2878,7 +2886,9 @@ impl Render for Step3 {
                     .children(deck.iter().enumerate().map(|(index, slide)| {
                         self.slide_row(index, slide, index == selected, count, locked, cx)
                     })),
-            )
+                &self.list_scroll,
+                cx,
+            ))
             .child(
                 div()
                     .flex_none()
@@ -3080,15 +3090,18 @@ impl Render for Step3 {
                         }),
                     ),
             )
-            .child(
+            .child(widgets::scroll_edges(
                 div()
                     .id("editor-panel")
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
+                    .track_scroll(&self.panel_scroll)
                     .p(px(12.0))
                     .child(self.render_form(window, cx)),
-            );
+                &self.panel_scroll,
+                cx,
+            ));
         // 操作区固定在栏底，不参与上面那块滚动（没有草稿＝这一页没内容时不画）。
         if self.draft.is_some() {
             panel = panel.child(self.render_actions(cx));

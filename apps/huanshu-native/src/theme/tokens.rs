@@ -146,10 +146,10 @@ pub fn table(theme_id: &str) -> TokenTable {
             warning_border: 0xe7c77bff, // filled
         },
         "light-notes" => TokenTable {
-            bg: 0xf1debdff,
-            panel: 0xfbf7ecff,
-            panel_2: 0xf8f3e9ff,
-            surface: 0xf1e7d6ff,
+            bg: 0xf3e3c5ff,
+            panel: 0xfaf7efff,
+            panel_2: 0xfdfaf4ff,
+            surface: 0xeee8dcff,
             border: 0xded5c7ff,
             border_hover: 0xa38767ff,
             text: 0x786051ff,

@@ -14,6 +14,7 @@
 | 自绘标题栏（品牌、最小化/最大化/关闭、拖动、贴靠） | `TitleBar.vue` | ✅ | `widgets::title_bar`；贴靠与多屏需人工验收 |
 | 六个主题、外壳配色 | `style.css` `--studio-*` | ✅ | `theme/tokens.rs`（从运行中的旧应用读出的计算值） |
 | GPUI Kit 组件跟随主题（按钮、输入框、对话框） | — | ✅ | `theme::apply` 映射 `colors` 并重派生 `tokens` |
+| 锤子便签材质统一 | 用户提供的锤子便签参考 | ✅ | 2026-10-16：浅木纹、横向金属回形针、元信息上置和页边线；生成看板与编辑字段使用纸卡；组件背景独立于木纹桌面，修复黄色输入框/弹窗；演示与全览铺木纹并添加纸张投影。设计见 `docs/design/notes-native-reference.png`；沙箱窗口核对首页、编辑器、演示、全览；74 项原生测试通过。 |
 | 主题切换并保存 | `ThemeToggle.vue` | ✅ | `widgets::theme_dots` → `ShellHandle::set_theme`（`app_settings.app_theme`） |
 | 界面字体（`--font-interface`） | `typography.ts` | ✅ | `theme::apply`；设置页改「界面」字体即时生效（`pages/settings/appearance.rs`） |
 | 首次启动进向导 | `App.vue` `is_first_run` | ✅ | `Shell::new` |
@@ -47,7 +48,7 @@
 | 读取设置失败：提示 + 重新加载，不许保存 | ✅ | 原版 252-255（`!ready` 时工作区整块禁用）：`mod.rs::read_settings` / `reload_settings` / `load_error`（失败态只画提示，保存按钮禁用 + `save()` 再挡一次）；core 记失败原因并支持重读（`AppState::{settings_load_error, settings_file_error, reload_settings}`、`services::settings::{read_error, reload_settings}`） |
 | 分区标题与说明 | ✅ | |
 | 界面主题卡片：点击预览、保存后生效、撤销 | ✅ | `shell/settings-appearance-0.png` |
-| 字体：七个角色、可搜索系统字体下拉、统一所有字体、恢复默认 | ✅ | `pages/settings/appearance.rs`（FontPicker 弹层照 `SystemFontPicker.vue`；`fonts::enumerate_system_fonts` 走 `run_bg`）；单测 `set_font_under_unified_fills_every_role` 等；审计补齐：弹层 Enter 应用高亮项、打开自动聚焦搜索框、字体枚举失败/空列表有提示；**弹层的 ↑/↓/Home/End 候选导航 ➖**：表现层，按 GPUI 原生做法——不换 GPUI Kit 的列表组件，因为 `List`/`Select`/`Combobox`/`Command` 把点击与回车合并成同一个确认动作（`list.rs:503-514` 等）、列表上下文不绑 `home`/`end`（`list.rs:26-35`），换过去会破坏原版「点击只高亮、回车才应用」；现状：搜索 ✅、回车应用 ✅、Home/End ❌ |
+| 字体：十个角色、可搜索系统字体下拉、统一所有字体、恢复默认 | ✅ | `pages/settings/appearance.rs`（FontPicker 弹层照 `SystemFontPicker.vue`；`fonts::enumerate_system_fonts` 走 `run_bg`）；单测 `set_font_under_unified_fills_every_role` 等；审计补齐：弹层 Enter 应用高亮项、打开自动聚焦搜索框、字体枚举失败/空列表有提示；**弹层的 ↑/↓/Home/End 候选导航 ➖**：表现层，按 GPUI 原生做法——不换 GPUI Kit 的列表组件，因为 `List`/`Select`/`Combobox`/`Command` 把点击与回车合并成同一个确认动作（`list.rs:503-514` 等）、列表上下文不绑 `home`/`end`（`list.rs:26-35`），换过去会破坏原版「点击只高亮、回车才应用」；现状：搜索 ✅、回车应用 ✅、Home/End ❌ |
 | 字体：演示预览 / 界面预览 | ✅ | `appearance.rs::font_preview_card`；界面字体随改随 `theme::apply` |
 | 模型服务：三类服务卡片与状态 | ✅ | `service_form.rs::service_state`（签名比对照原版）；单测 `testing_wins_over_everything` 等 |
 | 模型服务：地址、Key、模型下拉 / 手动输入 | ✅ | `service_form.rs::ServiceForm`（GPUI Kit Select；`services::settings::{get_settings, save_settings}`） |
@@ -159,3 +160,5 @@
 | 触摸滑动翻页 | ✅ | `on_swipe` + `Swipe` 状态机（`ScrollWheelEvent.touch_phase` 累计，\|dx\|>\|dy\| 且 \|dx\|>50 翻页，左滑下一页；`did_swipe` 吞掉随后的舞台点击）；鼠标滚轮不触发；5 个单测。**真机触摸未验证**（本机无触摸屏，方向符号与合成点击需人工验收）；`target/drive/w1-w3`（滚轮不翻页） |
 | 全屏时控制条浮动 | ✅ | 全屏时控制条不再占位、叠在舞台底部：底色 72%、上边框 45% 不透明，默认透明下移 8px、悬停（只挂控制条自己）淡入上移 0.3s（`with_animation` 两端态，悬停标志拼进元素 id；`backdrop-filter` 模糊省略）；截图 `shell/present-full-0.png` / `present-full-hover-0.png`；非全屏照旧 flex 底部占位 |
 | 全屏铺满 / 非全屏留白 | ✅ | 全屏时外壳不画标题栏（原版是覆盖层元素自己 `requestFullscreen`），舞台可用区 = 整个屏幕；非全屏 = 标题栏下的覆盖层 − 96/88（原版 `stretchedViewport` 的 padH/padV），四周黑底留白照原版；`shell/present-full-0.png` |
+
+- 字体覆盖复查：新增编辑器、数学公式与兜底字体；便签主题遵守字体设置，代码/日志与富文本同步组件主题，窗口根层覆盖弹层回退，幻灯片/公式/PDF 共用设置。见 [字体覆盖表](fonts.md)。

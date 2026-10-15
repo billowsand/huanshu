@@ -52,6 +52,33 @@ fn fixture_covers_every_supported_kind() {
     }
 }
 
+#[test]
+fn missing_role_fonts_use_custom_fallback_for_the_entire_deck() {
+    let slides = supported_fixture_slides();
+    let mut fonts = slide_typst::FontRoles::uniform("Huanshu Missing Font 12345");
+    let list = slide_typst::FontRoles::with_custom_fallback(
+        "Huanshu Missing Font 12345",
+        "Microsoft YaHei",
+    );
+    fonts.title = list.clone();
+    fonts.subtitle = list.clone();
+    fonts.body = list.clone();
+    fonts.caption = list.clone();
+    fonts.number = list.clone();
+    fonts.code = list;
+    fonts.math = vec!["Huanshu Missing Math 12345".into()];
+    render(
+        &slides,
+        &ExportOptions {
+            fonts: fonts.clone(),
+            ..Default::default()
+        },
+    );
+    renderer()
+        .render_formula_with_fonts(r"\frac{1}{2} + \text{中文}", false, [0, 0, 0], 16.0, &fonts)
+        .unwrap();
+}
+
 /// The layout fixture restricted to the kinds with a Typst layout.
 fn supported_fixture_slides() -> Vec<Value> {
     load("../../fixtures/all-layout-blueprints.json")

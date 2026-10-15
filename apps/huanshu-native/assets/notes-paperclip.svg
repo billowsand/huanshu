@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="28" viewBox="0 0 48 28" fill="none">
+  <defs><linearGradient id="metal" x1="0" y1="7" x2="0" y2="23" gradientUnits="userSpaceOnUse"><stop stop-color="#9b9996"/><stop offset=".24" stop-color="#fffefa"/><stop offset=".5" stop-color="#bab8b4"/><stop offset=".72" stop-color="#fffefa"/><stop offset="1" stop-color="#8b8985"/></linearGradient></defs>
+  <!-- Only one visible U. Its return wire passes behind the paper. -->
+  <path d="M-3 5H37Q43 5 43 11V19Q43 25 37 25H-3" stroke="#796a5c" stroke-opacity=".18" stroke-width="5" transform="translate(0 1)"/>
+  <path d="M-3 4H37Q43 4 43 10V18Q43 24 37 24H-3" stroke="#96938e" stroke-width="4"/>
+  <path d="M-3 4H37Q43 4 43 10V18Q43 24 37 24H-3" stroke="url(#metal)" stroke-width="2.6"/>
+  <path d="M-3 3H37Q42 3 42 10V18Q42 23 37 23H-3" stroke="#fff" stroke-opacity=".75" stroke-width=".6"/>
+</svg>

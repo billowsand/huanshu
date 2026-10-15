@@ -64,6 +64,7 @@ enum ImportRead {
 }
 
 pub struct HomePage {
+    scroll: gpui_kit::ScrollHandle,
     handle: ShellHandle,
     /// `None` = 正在加载（显示骨架卡片）。
     projects: Option<Vec<ProjectSummary>>,
@@ -83,6 +84,7 @@ pub struct HomePage {
 impl HomePage {
     pub fn new(handle: ShellHandle, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut page = Self {
+            scroll: gpui_kit::ScrollHandle::new(),
             handle,
             projects: None,
             load_error: None,
@@ -510,10 +512,24 @@ impl Render for HomePage {
             .justify_between()
             .bg(c.panel)
             // 便签主题：纸色渐变条（原版 `.top-bar { background: linear-gradient(#fbf7ec, #f1ebdf) }`）。
-            .when_some(cx.studio().paper, |bar, p| bar.bg(widgets::paper_bar(&p)))
+            .when_some(cx.studio().paper, |bar, p| {
+                bar.bg(gpui_kit::linear_gradient(
+                    180.0,
+                    gpui_kit::linear_color_stop(p.chrome_top, 0.0),
+                    gpui_kit::linear_color_stop(p.chrome_bottom, 1.0),
+                ))
+            })
             .border_b_1()
             .border_color(c.border)
-            .child(div().text_size(px(13.0)).text_color(c.muted).child("项目"))
+            .child(
+                div()
+                    .text_size(px(15.0))
+                    .text_color(c.muted)
+                    .when_some(cx.studio().paper, |label, p| {
+                        label.text_color(p.chrome_text)
+                    })
+                    .child("项目"),
+            )
             .child(
                 div()
                     .flex()
@@ -531,12 +547,17 @@ impl Render for HomePage {
                                 cx.stop_propagation()
                             })
                             .child(
-                                widgets::icon_button("theme", "color-palette", "切换主题")
-                                    .selected(self.show_theme_picker)
-                                    .on_click(cx.listener(|page, _event, _window, cx| {
+                                widgets::chrome_button(
+                                    widgets::icon_button("theme", "color-palette", "切换主题"),
+                                    cx,
+                                )
+                                .selected(self.show_theme_picker)
+                                .on_click(cx.listener(
+                                    |page, _event, _window, cx| {
                                         page.show_theme_picker = !page.show_theme_picker;
                                         cx.notify();
-                                    })),
+                                    },
+                                )),
                             )
                             .when(self.show_theme_picker, |anchor| {
                                 let handle = handle.clone();
@@ -577,13 +598,16 @@ impl Render for HomePage {
                     )
                     .child(widgets::bar_divider(cx))
                     .child(
-                        widgets::ghost_button(
-                            "import",
-                            if self.importing {
-                                "导入中…"
-                            } else {
-                                "导入"
-                            },
+                        widgets::chrome_button(
+                            widgets::ghost_button(
+                                "import",
+                                if self.importing {
+                                    "导入中…"
+                                } else {
+                                    "导入"
+                                },
+                            ),
+                            cx,
                         )
                         .icon(carbon(if self.importing {
                             "renew"
@@ -594,15 +618,17 @@ impl Render for HomePage {
                         .on_click(cx.listener(|page, _event, window, cx| page.import(window, cx))),
                     )
                     .child(
-                        widgets::icon_button("settings", "settings", "设置").on_click(
-                            move |_event, window, cx| {
-                                settings_handle.navigate(
-                                    Route::Settings(SettingsTab::default()),
-                                    window,
-                                    cx,
-                                )
-                            },
-                        ),
+                        widgets::chrome_button(
+                            widgets::icon_button("settings", "settings", "设置"),
+                            cx,
+                        )
+                        .on_click(move |_event, window, cx| {
+                            settings_handle.navigate(
+                                Route::Settings(SettingsTab::default()),
+                                window,
+                                cx,
+                            )
+                        }),
                     )
                     .child(
                         widgets::primary_button("new", "新建演示")
@@ -636,6 +662,7 @@ impl Render for HomePage {
                     .child(
                         div()
                             .size(px(42.0))
+                            .when(cx.studio().paper.is_some(), |logo| logo.hidden())
                             .rounded(px(10.0))
                             .flex()
                             .items_center()
@@ -653,6 +680,7 @@ impl Render for HomePage {
                                 div()
                                     .text_size(px(11.0))
                                     .text_color(c.primary)
+                                    .when(cx.studio().paper.is_some(), |brand| brand.hidden())
                                     .child("幻述 STUDIO"),
                             )
                             .child(div().text_size(px(18.0)).child("我的演示文稿")),
@@ -747,12 +775,13 @@ impl Render for HomePage {
                 }),
             )
             .child(top_bar)
-            .child(
+            .child(widgets::scroll_edges(
                 div()
                     .id("home-scroll")
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
+                    .track_scroll(&self.scroll)
                     .child(
                         div()
                             .mx_auto()
@@ -767,7 +796,9 @@ impl Render for HomePage {
                             .child(heading)
                             .child(body),
                     ),
-            )
+                &self.scroll,
+                cx,
+            ))
     }
 }
 
@@ -784,16 +815,52 @@ impl HomePage {
         };
         let export_project = project.clone();
         // 便签主题下是一张便签卡（纸张阴影、小圆角），卡片之间露出木纹桌面。
-        widgets::paper_card(cx)
+        widgets::note_sheet(cx)
             .id(SharedString::from(format!("project-{id}")))
+            .relative()
             .flex()
             .flex_row()
             .items_center()
             .gap(px(14.0))
             .px(px(18.0))
             .py(px(12.0))
+            .when_some(cx.studio().paper, |row, p| {
+                row.pl(px(68.0))
+                    .h(px(96.0))
+                    .py_0()
+                    .child(
+                        div()
+                            .absolute()
+                            .left_0()
+                            .top_0()
+                            .bottom_0()
+                            .w(px(48.0))
+                            .bg(p.margin)
+                            .border_r_1()
+                            .border_color(p.margin_line),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .left_0()
+                            .right_0()
+                            .top(px(34.0))
+                            .h(px(1.0))
+                            .bg(p.rule.opacity(0.55)),
+                    )
+                    .child(
+                        gpui_kit::img("notes/paperclip.svg")
+                            .absolute()
+                            .left(px(-30.0))
+                            .top(px(39.0))
+                            .w(px(48.0))
+                            .h(px(24.0)),
+                    )
+            })
             .cursor_pointer()
-            .hover(|style| style.border_color(c.border_hover))
+            .hover(|style| {
+                style.border_color(cx.studio().paper.map(|p| p.edge).unwrap_or(c.border_hover))
+            })
             .on_click(move |_event, window, cx| {
                 handle.navigate(
                     Route::Project {
@@ -804,19 +871,21 @@ impl HomePage {
                     cx,
                 )
             })
-            .child(
-                div()
-                    .flex_none()
-                    .size(px(37.0))
-                    .rounded(px(9.0))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .bg(c.surface)
-                    .border_1()
-                    .border_color(c.border)
-                    .child(widgets::brand_mark(24.0)),
-            )
+            .when(cx.studio().paper.is_none(), |row| {
+                row.child(
+                    div()
+                        .flex_none()
+                        .size(px(37.0))
+                        .rounded(px(9.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .bg(c.surface)
+                        .border_1()
+                        .border_color(c.border)
+                        .child(widgets::brand_mark(24.0)),
+                )
+            })
             .child(
                 div()
                     .flex_1()
@@ -824,10 +893,21 @@ impl HomePage {
                     .flex()
                     .flex_col()
                     .gap(px(4.0))
+                    .when(cx.studio().paper.is_some(), |text| {
+                        text.flex_col_reverse().gap_0().h_full()
+                    })
                     .child(
                         div()
                             .text_size(px(15.0))
                             .truncate()
+                            .when_some(cx.studio().paper, |title, p| {
+                                title
+                                    .h(px(60.0))
+                                    .flex()
+                                    .items_center()
+                                    .text_size(px(20.0))
+                                    .text_color(p.ink)
+                            })
                             .child(project.name.clone()),
                     )
                     .child(
@@ -836,18 +916,41 @@ impl HomePage {
                             .flex_row()
                             .items_center()
                             .gap(px(8.0))
+                            .when(cx.studio().paper.is_some(), |meta| meta.h(px(34.0)))
                             .when_some(ratio, |meta, ratio| {
-                                meta.child(widgets::chip(ratio, Tone2::Warning, cx))
+                                if cx.studio().paper.is_some() {
+                                    meta.child(
+                                        div()
+                                            .text_size(px(13.0))
+                                            .text_color(c.muted.opacity(0.65))
+                                            .child(format!("{ratio} ·")),
+                                    )
+                                } else {
+                                    meta.child(widgets::chip(ratio, Tone2::Warning, cx))
+                                }
                             })
-                            .child(widgets::chip(
-                                format!("{} 张幻灯片", project.slide_count),
-                                Tone2::Primary,
-                                cx,
-                            ))
+                            .when(cx.studio().paper.is_none(), |meta| {
+                                meta.child(widgets::chip(
+                                    format!("{} 张幻灯片", project.slide_count),
+                                    Tone2::Primary,
+                                    cx,
+                                ))
+                            })
+                            .when(cx.studio().paper.is_some(), |meta| {
+                                meta.child(
+                                    div()
+                                        .text_size(px(13.0))
+                                        .text_color(c.muted.opacity(0.65))
+                                        .child(format!("{} 张幻灯片 ·", project.slide_count)),
+                                )
+                            })
                             .child(
                                 div()
                                     .text_size(px(12.0))
                                     .text_color(c.muted)
+                                    .when(cx.studio().paper.is_some(), |date| {
+                                        date.text_size(px(13.0)).text_color(c.muted.opacity(0.65))
+                                    })
                                     .child(format_date(project.updated_at)),
                             ),
                     ),
@@ -858,6 +961,9 @@ impl HomePage {
                     .flex_row()
                     .gap(px(4.0))
                     // 卡片的点击会打开项目；操作按钮自己处理点击，不往上冒泡。
+                    .when(cx.studio().paper.is_some(), |actions| {
+                        actions.absolute().top(px(2.0)).right(px(18.0))
+                    })
                     .on_mouse_down(gpui_kit::MouseButton::Left, |_event, _window, cx| {
                         cx.stop_propagation()
                     })

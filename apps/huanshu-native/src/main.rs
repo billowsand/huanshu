@@ -44,6 +44,7 @@ fn main() {
         .with_assets(icons::NativeAssets)
         .run(move |cx: &mut App| {
             gpui_kit::init(cx);
+            theme::init_typography(cx);
             let (shared, current, _data_dir) = app::load();
             let theme_id = match cli.theme.as_deref() {
                 Some(requested) => {
@@ -57,8 +58,8 @@ fn main() {
                 }
                 None => current.id.to_string(),
             };
-            let font = shell::interface_font(&shared);
-            theme::apply(&theme_id, font.as_deref(), None, cx);
+            let font = shell::font_settings(&shared);
+            theme::apply(&theme_id, Some(&font), None, cx);
 
             // 预热渲染器：扫描系统字体约 0.5 秒，不该由第一张图来付。
             cx.background_spawn(async move {

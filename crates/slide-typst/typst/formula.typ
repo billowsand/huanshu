@@ -32,7 +32,7 @@
 // Same rule as main.typ: equations need an OpenType MATH font, and Rust passes
 // only the installed families (missing ones in a fallback list each warn).
 #show math.equation: it => if spec.math_fonts.len() > 0 {
-  set text(font: spec.math_fonts)
+  set text(font: spec.math_fonts + spec.fonts)
   it
 } else { it }
 

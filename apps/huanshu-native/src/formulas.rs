@@ -87,6 +87,7 @@ pub struct FormulaKey {
     color: [u8; 3],
     /// 字号档位 = 0.5pt 的个数（[`size_half_pt`]）。
     size_half_pt: u32,
+    fonts: String,
 }
 
 impl FormulaKey {
@@ -96,7 +97,13 @@ impl FormulaKey {
             display,
             color,
             size_half_pt: size_half_pt(size_pt),
+            fonts: serde_json::to_string(&huanshu_core::types::FontSettings::default()).unwrap(),
         }
+    }
+
+    fn with_fonts(mut self, cx: &App) -> Self {
+        self.fonts = serde_json::to_string(&cx.studio().fonts).unwrap();
+        self
     }
 
     /// 出图用的点大小（档位中心）。
@@ -367,7 +374,7 @@ impl MarkdownPlugin for InlineFormulaPlugin {
     ) -> Option<InlineElement> {
         let data = node.data::<FormulaData>()?;
         let size_pt = context.font_size().as_f32() as f64 * PT_PER_PX;
-        let key = FormulaKey::new(&data.latex, data.display, text_rgb(cx), size_pt);
+        let key = FormulaKey::new(&data.latex, data.display, text_rgb(cx), size_pt).with_fonts(cx);
         // 先读出来（克隆一步，`Ready` 只是多一个 `Arc`），再决定要不要请后台出图：
         // 借用与 `update` 不能同时拿着。
         let entry = self.cache.read(cx).lookup(&key).cloned();
@@ -420,7 +427,8 @@ impl MarkdownPlugin for BlockFormulaPlugin {
             data.display,
             text_rgb(cx),
             body_size_pt(window),
-        );
+        )
+        .with_fonts(cx);
         let entry = self.cache.read(cx).lookup(&key).cloned();
         match entry {
             Some(FormulaEntry::Ready(image)) => {
@@ -515,7 +523,15 @@ fn channel(value: f32) -> u8 {
 /// 后台出图：mitex → Typst → PNG → GPUI 位图。`request` 与单测走的是同一个函数。
 fn render_formula_image(key: &FormulaKey) -> Result<FormulaImage, FormulaFailure> {
     huanshu_core::services::export::renderer()
-        .render_formula(&key.latex, key.display, key.color, key.size_pt())
+        .render_formula_with_fonts(
+            &key.latex,
+            key.display,
+            key.color,
+            key.size_pt(),
+            &huanshu_core::services::export::font_roles(
+                &serde_json::from_str(&key.fonts).unwrap_or_default(),
+            ),
+        )
         .map_err(|error| FormulaFailure(error.to_string()))
         .and_then(|formula| decode(formula).map_err(FormulaFailure))
 }
@@ -574,6 +590,24 @@ mod tests {
     }
 
     // ── 定界判定 ──
+
+    #[test]
+    fn changing_fonts_invalidates_formula_images() {
+        let first = FormulaKey::new("x^2", false, [0, 0, 0], 16.0);
+        for field in ["body", "math", "fallback"] {
+            let mut second = first.clone();
+            let mut fonts: huanshu_core::types::FontSettings =
+                serde_json::from_str(&second.fonts).unwrap();
+            match field {
+                "body" => fonts.body = "Different Font".into(),
+                "math" => fonts.math = "Different Font".into(),
+                "fallback" => fonts.fallback = "Different Font".into(),
+                _ => unreachable!(),
+            }
+            second.fonts = serde_json::to_string(&fonts).unwrap();
+            assert_ne!(first, second, "{field} must invalidate the cached bitmap");
+        }
+    }
 
     #[test]
     fn inline_formula_is_claimed() {

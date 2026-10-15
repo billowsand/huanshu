@@ -96,7 +96,7 @@
 // Equations need an OpenType MATH font. Rust passes only the installed ones of
 // its `MATH_FONTS` list (missing families in a fallback list each warn).
 #show math.equation: it => if deck.math_fonts.len() > 0 {
-  set text(font: deck.math_fonts)
+  set text(font: deck.math_fonts + deck.fonts.body)
   it
 } else { it }
 

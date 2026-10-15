@@ -294,14 +294,15 @@ fn render_thumbnails(
 }
 
 /// The user's slide font per role, each followed by CJK fallbacks.
-fn font_roles(fonts: &FontSettings) -> FontRoles {
+pub fn font_roles(fonts: &FontSettings) -> FontRoles {
     FontRoles {
-        title: FontRoles::with_fallbacks(&fonts.title),
-        subtitle: FontRoles::with_fallbacks(&fonts.subtitle),
-        body: FontRoles::with_fallbacks(&fonts.body),
-        caption: FontRoles::with_fallbacks(&fonts.caption),
-        number: FontRoles::with_fallbacks(&fonts.number),
-        code: FontRoles::with_fallbacks(&fonts.code),
+        math: vec![fonts.math.clone()],
+        title: FontRoles::with_custom_fallback(&fonts.title, &fonts.fallback),
+        subtitle: FontRoles::with_custom_fallback(&fonts.subtitle, &fonts.fallback),
+        body: FontRoles::with_custom_fallback(&fonts.body, &fonts.fallback),
+        caption: FontRoles::with_custom_fallback(&fonts.caption, &fonts.fallback),
+        number: FontRoles::with_custom_fallback(&fonts.number, &fonts.fallback),
+        code: FontRoles::with_custom_fallback(&fonts.code, &fonts.fallback),
     }
 }
 
@@ -325,6 +326,35 @@ fn export_assets(project_dir: &Path, media_dir: &Path, media_assets: &[MediaAsse
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn font_settings_keep_new_roles_and_fallback_across_save() {
+        let mut fonts: FontSettings = serde_json::from_value(serde_json::json!({
+            "code": "Consolas", "body": "SimSun"
+        }))
+        .unwrap();
+        assert_eq!(fonts.editor, "Microsoft YaHei");
+        assert_eq!(fonts.math, "Cambria Math");
+        fonts.editor = "KaiTi".into();
+        fonts.fallback = "DengXian".into();
+        fonts.math = "STIX Two Math".into();
+        let restored: FontSettings =
+            serde_json::from_str(&serde_json::to_string(&fonts).unwrap()).unwrap();
+        assert_eq!(restored, fonts);
+        let roles = font_roles(&restored);
+        for list in [
+            &roles.title,
+            &roles.subtitle,
+            &roles.body,
+            &roles.caption,
+            &roles.number,
+            &roles.code,
+        ] {
+            assert_eq!(list[1], "DengXian");
+        }
+        assert_eq!(roles.math, ["STIX Two Math"]);
+        assert_eq!(roles.body[0], "SimSun");
+    }
 
     #[test]
     fn unknown_theme_falls_back_to_notes_and_is_reported() {

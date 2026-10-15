@@ -226,7 +226,10 @@ pub fn slide_frame(
         .flex_none()
         .w(px(width))
         .h(px(height))
-        .overflow_hidden();
+        .overflow_hidden()
+        .when_some(cx.studio().paper, |sheet, p| {
+            sheet.shadow(widgets::paper_shadow(&p))
+        });
     let retry = on_retry.map(|on_retry| {
         widgets::small(widgets::ghost_button("slide-retry", "重试"))
             .on_click(move |_event, window, cx| on_retry(window, cx))

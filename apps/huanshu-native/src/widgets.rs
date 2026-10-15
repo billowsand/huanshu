@@ -310,6 +310,53 @@ pub fn paper_card(cx: &App) -> Div {
     }
 }
 
+/// Home sheets have a pale upper face, a warmer foot and a fine raised rim.
+pub fn note_sheet(cx: &App) -> Div {
+    paper_card(cx).when_some(cx.studio().paper, |sheet, p| {
+        sheet
+            .bg(linear_gradient(
+                180.0,
+                linear_color_stop(p.card.blend(gpui_kit::white().opacity(0.48)), 0.0),
+                linear_color_stop(p.bar_top, 1.0),
+            ))
+            .rounded(px(2.0))
+            .shadow(vec![
+                BoxShadow {
+                    color: p.ink.opacity(0.13),
+                    offset: point(px(0.0), px(1.0)),
+                    blur_radius: px(2.0),
+                    spread_radius: px(0.0),
+                    inset: false,
+                },
+                BoxShadow {
+                    color: p.ink.opacity(0.16),
+                    offset: point(px(0.0), px(3.0)),
+                    blur_radius: px(5.0),
+                    spread_radius: px(-1.0),
+                    inset: false,
+                },
+                BoxShadow {
+                    color: gpui_kit::white().opacity(0.7),
+                    offset: point(px(0.0), px(1.0)),
+                    blur_radius: px(0.0),
+                    spread_radius: px(0.0),
+                    inset: true,
+                },
+            ])
+    })
+}
+
+pub fn chrome_button(button: Button, cx: &App) -> Button {
+    button.when_some(cx.studio().paper, |button, p| {
+        button.custom(
+            gpui_kit::component::button::ButtonCustomVariant::new(cx)
+                .foreground(p.chrome_text)
+                .hover(p.chrome_hover)
+                .active(p.chrome_hover),
+        )
+    })
+}
+
 /// 纸张阴影（原版 `--notes-paper-shadow: 0 1px 2px …, 0 4px 8px -5px …`）。
 pub fn paper_shadow(paper: &PaperLook) -> Vec<BoxShadow> {
     vec![
@@ -322,9 +369,9 @@ pub fn paper_shadow(paper: &PaperLook) -> Vec<BoxShadow> {
         },
         BoxShadow {
             color: paper.shadow_far,
-            offset: point(px(0.0), px(4.0)),
-            blur_radius: px(8.0),
-            spread_radius: px(-5.0),
+            offset: point(px(0.0), px(5.0)),
+            blur_radius: px(10.0),
+            spread_radius: px(-3.0),
             inset: false,
         },
     ]
@@ -337,6 +384,64 @@ pub fn paper_bar(paper: &PaperLook) -> Background {
         linear_color_stop(paper.bar_top, 0.0),
         linear_color_stop(paper.bar_bottom, 1.0),
     )
+}
+
+/// Recessed scroll viewport: paper slips beneath a soft lip at either edge.
+/// Read the handle during paint, after the scroller has settled its offset.
+/// A canvas has no hitbox, so the shading never intercepts clicks or wheels.
+pub fn scroll_edges(content: impl IntoElement, scroll: &gpui_kit::ScrollHandle, cx: &App) -> Div {
+    let scroll = scroll.clone();
+    div()
+        .relative()
+        .flex_1()
+        .min_h_0()
+        .overflow_hidden()
+        .flex()
+        .flex_col()
+        .child(content)
+        .when_some(cx.studio().paper, |viewport, paper| {
+            viewport.child(
+                gpui_kit::canvas(
+                    |_, _, _| (),
+                    move |bounds, _, window, _cx| {
+                        let offset = -scroll.offset().y.as_f32();
+                        let remaining = scroll.max_offset().y.as_f32() - offset;
+                        let depth = bounds.size.height.min(px(16.0));
+                        for (top, distance) in [(true, offset), (false, remaining)] {
+                            if distance <= 0.5 {
+                                continue;
+                            }
+                            let strength = (distance / 12.0).clamp(0.0, 1.0);
+                            let shade = paper.ink.opacity(0.13 * strength);
+                            let clear = paper.ink.opacity(0.0);
+                            let (start, end) = if top { (shade, clear) } else { (clear, shade) };
+                            window.paint_quad(gpui_kit::fill(
+                                gpui_kit::Bounds::new(
+                                    point(
+                                        bounds.left(),
+                                        if top {
+                                            bounds.top()
+                                        } else {
+                                            bounds.bottom() - depth
+                                        },
+                                    ),
+                                    gpui_kit::size(bounds.size.width, depth),
+                                ),
+                                linear_gradient(
+                                    180.0,
+                                    linear_color_stop(start, 0.0),
+                                    linear_color_stop(end, 1.0),
+                                ),
+                            ));
+                        }
+                    },
+                )
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full(),
+            )
+        })
 }
 
 /// 小节标题（原版各处的 `.section-label` / `.sdp-label`：小号、弱化色）。
@@ -398,18 +503,10 @@ pub fn media_tile(
 }
 
 /// 「代码」角色的等宽字体（设置 → 外观与字体；第二步的调试块用的是同一套）。
-pub fn code_font(handle: &crate::shell::ShellHandle) -> SharedString {
-    let family = handle
-        .shared()
-        .lock()
-        .ok()
-        .map(|state| state.app_settings.fonts.code.clone())
-        .unwrap_or_default();
-    if family.is_empty() {
-        SharedString::from("Consolas")
-    } else {
-        SharedString::from(family)
-    }
+pub fn code_font(cx: &App) -> SharedString {
+    gpui_kit::component::Theme::global(cx)
+        .mono_font_family
+        .clone()
 }
 
 /// 主题切换圆点（原版 `ThemeToggle.vue`：六个圆点，当前主题带一圈主色）。

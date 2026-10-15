@@ -209,6 +209,7 @@ pub struct FontRoles {
     pub caption: Vec<String>,
     pub number: Vec<String>,
     pub code: Vec<String>,
+    pub math: Vec<String>,
 }
 
 impl FontRoles {
@@ -216,6 +217,7 @@ impl FontRoles {
     pub fn uniform(family: &str) -> Self {
         let list = Self::with_fallbacks(family);
         Self {
+            math: MATH_FONTS.iter().map(|f| f.to_string()).collect(),
             title: list.clone(),
             subtitle: list.clone(),
             body: list.clone(),
@@ -230,7 +232,16 @@ impl FontRoles {
     }
 
     pub fn with_fallbacks(family: &str) -> Vec<String> {
-        let mut list = vec![family.to_string()];
+        Self::with_custom_fallback(family, DEFAULT_FONT)
+    }
+
+    pub fn with_custom_fallback(family: &str, fallback: &str) -> Vec<String> {
+        let mut list = Vec::new();
+        for name in [family.trim(), fallback.trim()] {
+            if !name.is_empty() && !list.iter().any(|f: &String| f.eq_ignore_ascii_case(name)) {
+                list.push(name.to_string());
+            }
+        }
         for fallback in [DEFAULT_FONT, "PingFang SC", "Noto Sans CJK SC", "SimHei"] {
             if !list.iter().any(|f| f.eq_ignore_ascii_case(fallback)) {
                 list.push(fallback.to_string());
@@ -248,7 +259,7 @@ impl Default for FontRoles {
 
 /// Math fonts tried in order: Windows ships Cambria Math, the others come with
 /// TeX distributions.
-const MATH_FONTS: &[&str] = &[
+pub const MATH_FONTS: &[&str] = &[
     "Cambria Math",
     "New Computer Modern Math",
     "STIX Two Math",
@@ -288,7 +299,7 @@ struct DeckInput<'a> {
     title: Option<&'a str>,
     fonts: &'a FontRoles,
     /// Installed entries of [`MATH_FONTS`], in order; empty if none is.
-    math_fonts: Vec<&'static str>,
+    math_fonts: Vec<String>,
     /// Image reference → path and size; unusable references are absent.
     assets: &'a HashMap<String, assets::ImageInfo>,
     slides: &'a [serde_json::Value],
@@ -308,7 +319,7 @@ struct FormulaInput<'a> {
     /// Body font fallbacks, for `\text{…}` parts of the formula.
     fonts: Vec<String>,
     /// Installed entries of [`MATH_FONTS`], in order; empty if none is.
-    math_fonts: Vec<&'static str>,
+    math_fonts: Vec<String>,
 }
 
 /// A slide whose content did not fit even at the smallest fit factor; it was
@@ -554,6 +565,17 @@ impl Renderer {
         color: [u8; 3],
         size_pt: f64,
     ) -> Result<RenderedFormula, RenderError> {
+        self.render_formula_with_fonts(latex, display, color, size_pt, &FontRoles::default())
+    }
+
+    pub fn render_formula_with_fonts(
+        &self,
+        latex: &str,
+        display: bool,
+        color: [u8; 3],
+        size_pt: f64,
+        fonts: &FontRoles,
+    ) -> Result<RenderedFormula, RenderError> {
         // Why an eval error is fatal here: `formula.typ` evals the converted
         // source, and Typst cannot catch that — a rejected formula is a failed
         // compile, which is exactly the `Err` the caller falls back on.
@@ -570,8 +592,8 @@ impl Renderer {
             } else {
                 MIN_FORMULA_SIZE_PT
             },
-            fonts: self.installed_fonts(&FontRoles::default()).body,
-            math_fonts: self.installed_math_fonts(),
+            fonts: self.installed_fonts(fonts).body,
+            math_fonts: self.installed_math_fonts(&fonts.math),
         })
         .map_err(|err| RenderError {
             diagnostics: vec![format!("serialize formula: {err}")],
@@ -682,7 +704,7 @@ impl Renderer {
         // Convert LaTeX math spans to sentinel-wrapped Typst math before the
         // deck is serialized; `rich()` in lib/base.typ evals the spans. Typst
         // cannot catch an eval error, so one formula that mitex converts but
-        // Typst rejects (`rac{1}`, `ef{x}` …) would fail the whole export:
+        // Typst rejects (`\frac{1}`, `\ref{x}` …) would fail the whole export:
         // such spans are found up front and kept as literal text instead.
         let mut rewritten = slides.to_vec();
         let spans = math::rewrite_deck(&mut rewritten, &HashSet::new());
@@ -697,7 +719,7 @@ impl Renderer {
             aspect_ratio: &options.aspect_ratio,
             title: options.title.as_deref(),
             fonts: &self.installed_fonts(&options.fonts),
-            math_fonts: self.installed_math_fonts(),
+            math_fonts: self.installed_math_fonts(&options.fonts.math),
             assets: &prepared.paths,
             slides: &slides,
         })
@@ -816,13 +838,23 @@ impl Renderer {
 
     /// Equations need an OpenType MATH font. Only installed ones are passed to
     /// `main.typ`: Typst warns about every missing family in a fallback list.
-    fn installed_math_fonts(&self) -> Vec<&'static str> {
+    fn installed_math_fonts(&self, preferred: &[String]) -> Vec<String> {
         let book = self.fonts.book();
-        MATH_FONTS
+        let mut names = Vec::new();
+        // Only known OpenType MATH families can render equations reliably.
+        for name in preferred
             .iter()
-            .copied()
-            .filter(|f| book.contains_family(&f.to_lowercase()))
-            .collect()
+            .map(String::as_str)
+            .chain(MATH_FONTS.iter().copied())
+        {
+            if MATH_FONTS.iter().any(|f| f.eq_ignore_ascii_case(name))
+                && book.contains_family(&name.to_lowercase())
+                && !names.iter().any(|f: &String| f.eq_ignore_ascii_case(name))
+            {
+                names.push(name.to_string());
+            }
+        }
+        names
     }
 
     /// Drops families that are not installed so Typst does not warn about every
@@ -848,6 +880,7 @@ impl Renderer {
             caption: filter(&roles.caption),
             number: filter(&roles.number),
             code: filter(&roles.code),
+            math: self.installed_math_fonts(&roles.math),
         }
     }
 }

@@ -55,6 +55,9 @@ pub struct FontSettings {
     pub caption: String,
     pub number: String,
     pub code: String,
+    pub editor: String,
+    pub math: String,
+    pub fallback: String,
 }
 
 impl Default for FontSettings {
@@ -67,6 +70,9 @@ impl Default for FontSettings {
             caption: default_font(),
             number: default_font(),
             code: default_font(),
+            editor: default_font(),
+            math: "Cambria Math".to_string(),
+            fallback: default_font(),
         }
     }
 }
@@ -81,6 +87,8 @@ impl FontSettings {
             &mut self.caption,
             &mut self.number,
             &mut self.code,
+            &mut self.editor,
+            &mut self.fallback,
         ] {
             *font = if font.trim().is_empty() {
                 default_font()
@@ -88,6 +96,11 @@ impl FontSettings {
                 font.trim().to_string()
             };
         }
+        self.math = if self.math.trim().is_empty() {
+            "Cambria Math".to_string()
+        } else {
+            self.math.trim().to_string()
+        };
     }
 }
 

@@ -636,10 +636,7 @@ impl Render for Step1 {
         // 编辑器外观与稿纸（便签主题才有 `paper`），见 `theme/editor.rs`。
         let look = cx.studio().editor.clone();
         let paper = cx.studio().paper;
-        let editor_font = look
-            .font
-            .clone()
-            .unwrap_or_else(|| widgets::code_font(&self.handle));
+        let editor_font = look.font.clone().unwrap_or_else(|| widgets::code_font(cx));
         let model = self.model.read(cx);
         let md = model.md_content.clone();
         let chars = model.md_len();
@@ -810,6 +807,7 @@ impl Render for Step1 {
         // （挂上公式扩展：`$…$` / `$$…$$` 由 `formulas.rs` 出图）。
         let preview_body = |index: usize, content: Option<String>| match content {
             Some(chunk) => div()
+                .font_family(cx.studio().body_font.clone())
                 .p(px(18.0))
                 .child(
                     TextView::markdown(("md-preview", index), chunk)
@@ -945,7 +943,7 @@ impl Render for Step1 {
                     }))
                     .child(pane_header("edit", "编辑"))
                     // 编辑器不画自己的边框（原版 CodeMirror 铺满窗格）；字体、字号、行高随主题
-                    // （便签主题是宋体 15px、32px 稿纸行，其余是「代码」字体 13px、行高 1.8）。
+                    // 字体始终读取「编辑器」设置；便签主题仅改变字号、行高与稿纸。
                     .child(
                         div()
                             .relative()

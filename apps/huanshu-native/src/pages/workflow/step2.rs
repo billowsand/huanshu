@@ -80,7 +80,6 @@ pub struct Step2 {
     model: Entity<ProjectModel>,
     /// 应用级生成状态（原版 `stores/generation.ts`）：页面只读它，状态不在这里。
     store: Entity<GenerationStore>,
-    handle: ShellHandle,
     page: WeakEntity<WorkflowPage>,
     /// 上一帧算出来的看板条目数与列数（键盘换页要用）。
     board_count: usize,
@@ -134,7 +133,6 @@ impl Step2 {
         Self {
             model,
             store,
-            handle,
             page,
             board_count: 0,
             columns: 1,
@@ -565,6 +563,12 @@ impl Render for Step2 {
             .border_1()
             .border_color(c.border)
             .bg(c.surface)
+            .when_some(cx.studio().paper, |panel, p| {
+                panel
+                    .bg(p.card)
+                    .rounded(px(3.0))
+                    .shadow(widgets::paper_shadow(&p))
+            })
             .overflow_hidden()
             .child(
                 panel_head("catalog", "幻灯片生成看板", cx)
@@ -593,7 +597,7 @@ impl Render for Step2 {
                 recent_logs: &snap.recent_logs,
                 debug_open: self.debug_open,
                 logs_open: self.logs_open,
-                code_font: code_font(&self.handle),
+                code_font: widgets::code_font(cx),
                 narrow,
                 this: cx.weak_entity(),
             },
@@ -987,6 +991,11 @@ fn board_card(
         .bg(c.panel)
         .border_1()
         .border_color(if selected { c.primary_border } else { c.border })
+        .when_some(cx.studio().paper, |card, p| {
+            card.bg(p.card)
+                .rounded(px(3.0))
+                .shadow(widgets::paper_shadow(&p))
+        })
         .cursor_pointer()
         .on_click(move |_event, _window, cx| {
             let _ = on_pick.update(cx, |this, cx| this.select(index, cx));
@@ -1384,6 +1393,12 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
             .border_1()
             .border_color(c.border)
             .bg(c.surface)
+            .when_some(cx.studio().paper, |panel, p| {
+                panel
+                    .bg(p.card)
+                    .rounded(px(3.0))
+                    .shadow(widgets::paper_shadow(&p))
+            })
             .overflow_hidden()
             .child(panel_head("view", "幻灯片详情", cx))
             .child(body)
@@ -1863,21 +1878,6 @@ fn detail_text(value: &Value) -> String {
         Value::Null => String::new(),
         Value::String(text) => text.clone(),
         other => serde_json::to_string_pretty(other).unwrap_or_default(),
-    }
-}
-
-/// 调试块的等宽字体（设置页的「代码」角色）。
-fn code_font(handle: &ShellHandle) -> SharedString {
-    let family = handle
-        .shared()
-        .lock()
-        .ok()
-        .map(|state| state.app_settings.fonts.code.clone())
-        .unwrap_or_default();
-    if family.is_empty() {
-        SharedString::from("Consolas")
-    } else {
-        SharedString::from(family)
     }
 }
 

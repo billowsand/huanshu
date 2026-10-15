@@ -379,18 +379,15 @@ impl SettingsPage {
         self.handle.set_theme(id, false, window, cx);
         // 原版的主题预览（`data-theme`）与字体预览（`--font-interface`）是两条独立的实时通道；
         // `set_theme` 用的是**已保存**的界面字体，这里把草稿补回去，否则换主题会丢掉字体预览。
-        let interface = self.fonts.interface.clone();
-        theme::apply(id, Some(&interface), Some(window), cx);
+        theme::apply(id, Some(&self.fonts), Some(window), cx);
         cx.notify();
     }
 
-    /// 字体草稿变化：立即把「界面」字体应用到主题（原版 `applyFonts` 的 watch），
-    /// 其余角色体现在右侧预览。
+    /// 字体草稿变化：同步界面、代码、编辑器与窗口缺字回退；演示用途显示在预览中。
     fn fonts_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.just_saved = false;
         let theme_id = cx.studio().theme.id.to_string();
-        let interface = self.fonts.interface.clone();
-        theme::apply(&theme_id, Some(&interface), Some(window), cx);
+        theme::apply(&theme_id, Some(&self.fonts), Some(window), cx);
         cx.notify();
     }
 

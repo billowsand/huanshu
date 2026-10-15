@@ -1,5 +1,5 @@
 //! 「外观与字体」的字体区（原版 `SettingsView.vue` 286–340 行 + `SystemFontPicker.vue`
-//! + `typography.ts`）：七个角色各一个可搜索的系统字体选择（弹层对话框）、
+//! + `typography.ts`）：十个角色各一个可搜索的系统字体选择（弹层对话框）、
 //! 「统一所有字体」开关、「恢复默认」，右侧「演示预览 / 界面预览」实时预览。
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -22,7 +22,7 @@ use crate::widgets::{self};
 /// 原版 `DEFAULT_FONT`。
 pub const DEFAULT_FONT: &str = "Microsoft YaHei";
 
-/// 七个字体角色（原版 `FontRole`，顺序照 `fontRoles`）。
+/// 字体角色（原版 `FontRole`，顺序照 `fontRoles`）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FontRole {
     Interface,
@@ -32,10 +32,13 @@ pub enum FontRole {
     Caption,
     Number,
     Code,
+    Editor,
+    Math,
+    Fallback,
 }
 
 impl FontRole {
-    pub const ALL: [FontRole; 7] = [
+    pub const ALL: [FontRole; 10] = [
         FontRole::Interface,
         FontRole::Title,
         FontRole::Subtitle,
@@ -43,6 +46,9 @@ impl FontRole {
         FontRole::Caption,
         FontRole::Number,
         FontRole::Code,
+        FontRole::Editor,
+        FontRole::Math,
+        FontRole::Fallback,
     ];
 
     /// 存储键（`FontSettings` 字段名）。
@@ -55,6 +61,9 @@ impl FontRole {
             FontRole::Caption => "caption",
             FontRole::Number => "number",
             FontRole::Code => "code",
+            FontRole::Editor => "editor",
+            FontRole::Math => "math",
+            FontRole::Fallback => "fallback",
         }
     }
 
@@ -67,20 +76,26 @@ impl FontRole {
             FontRole::Body => "正文",
             FontRole::Caption => "注释与标签",
             FontRole::Number => "数字与序号",
-            FontRole::Code => "代码与编辑器",
+            FontRole::Code => "代码与日志",
+            FontRole::Editor => "编辑器",
+            FontRole::Math => "数学公式",
+            FontRole::Fallback => "兜底字体",
         }
     }
 
     /// 原版 `roleDescriptions`（逐字）。
     pub fn desc(self) -> &'static str {
         match self {
-            FontRole::Interface => "菜单、按钮与表单",
+            FontRole::Interface => "菜单、按钮、表单、弹窗与提示",
             FontRole::Title => "封面与章节标题",
             FontRole::Subtitle => "副标题与章节说明",
-            FontRole::Body => "演示正文与内容卡片",
+            FontRole::Body => "文稿预览、演示正文、内容卡片与图表",
             FontRole::Caption => "脚注、标签与辅助信息",
             FontRole::Number => "编号、序号与时间轴",
-            FontRole::Code => "Markdown 编辑器与代码块",
+            FontRole::Code => "代码块、JSON、生成日志与导出详情",
+            FontRole::Editor => "Markdown 源码、行号；所有主题一致",
+            FontRole::Math => "文稿预览与幻灯片公式（数学字体）",
+            FontRole::Fallback => "首选字体未安装或缺字时使用",
         }
     }
 
@@ -93,7 +108,10 @@ impl FontRole {
             FontRole::Body => "正文字体",
             FontRole::Caption => "注释与标签字体",
             FontRole::Number => "数字与序号字体",
-            FontRole::Code => "代码与编辑器字体",
+            FontRole::Code => "代码与日志字体",
+            FontRole::Editor => "编辑器字体",
+            FontRole::Math => "数学公式字体",
+            FontRole::Fallback => "兜底字体",
         }
     }
 
@@ -107,6 +125,9 @@ impl FontRole {
             FontRole::Caption => "资料来源 · 重点提示 · 更新于今日",
             FontRole::Number => "01 02 03 · 2026 · 1234567890",
             FontRole::Code => "## Hello 幻述 · const value = 42",
+            FontRole::Editor => "# 文稿编辑 · Markdown 123",
+            FontRole::Math => "∑ ∫ √ ∞ α β 123",
+            FontRole::Fallback => "中文 English · 0123456789",
         }
     }
 
@@ -119,6 +140,9 @@ impl FontRole {
             FontRole::Caption => &fonts.caption,
             FontRole::Number => &fonts.number,
             FontRole::Code => &fonts.code,
+            FontRole::Editor => &fonts.editor,
+            FontRole::Math => &fonts.math,
+            FontRole::Fallback => &fonts.fallback,
         }
     }
 
@@ -132,6 +156,9 @@ impl FontRole {
             FontRole::Caption => fonts.caption = value,
             FontRole::Number => fonts.number = value,
             FontRole::Code => fonts.code = value,
+            FontRole::Editor => fonts.editor = value,
+            FontRole::Math => fonts.math = value,
+            FontRole::Fallback => fonts.fallback = value,
         }
     }
 }
@@ -195,6 +222,12 @@ pub fn filtered_font_indices(fonts: &[SystemFont], query: &str, role: FontRole) 
         .iter()
         .enumerate()
         .filter(|(_, font)| matches_font(font, query))
+        .filter(|(_, font)| {
+            role != FontRole::Math
+                || slide_typst::MATH_FONTS
+                    .iter()
+                    .any(|name| font.name.eq_ignore_ascii_case(name))
+        })
         .map(|(index, _)| index)
         .collect();
     if !query.trim().is_empty() {
@@ -235,16 +268,18 @@ pub fn normalize_fonts(fonts: &FontSettings) -> FontSettings {
     normalized
 }
 
-/// 原版 `applyFontToAll`：全部角色设为同一字体。
+/// 同步普通文字用途；数学与兜底独立。
 pub fn apply_font_to_all(fonts: &mut FontSettings, value: &str) {
     for role in FontRole::ALL {
-        role.set(fonts, value);
+        if !matches!(role, FontRole::Math | FontRole::Fallback) {
+            role.set(fonts, value);
+        }
     }
 }
 
-/// 原版 `setFont`：统一开启时铺满全部，否则只改当前角色。
+/// 统一模式只同步普通文字用途。
 pub fn set_font(fonts: &mut FontSettings, role: FontRole, value: &str, unified: bool) {
-    if unified {
+    if unified && !matches!(role, FontRole::Math | FontRole::Fallback) {
         apply_font_to_all(fonts, value);
     } else {
         role.set(fonts, value);
@@ -389,7 +424,7 @@ impl SettingsPage {
                         div()
                             .text_size(px(12.0))
                             .text_color(c.muted)
-                            .child("开启后，修改任一用途会同步到全部用途"),
+                            .child("同步界面、编辑器与演示文字；数学公式和兜底字体单独设置"),
                     ),
             );
 
@@ -1141,7 +1176,8 @@ impl Render for FontPicker {
             .border_color(c.border)
             .child(
                 Checkbox::new("apply-all")
-                    .label("所有用途使用此字体")
+                    .label("统一文字字体（公式与兜底除外）")
+                    .disabled(matches!(self.role, FontRole::Math | FontRole::Fallback))
                     .checked(self.apply_all)
                     .on_change(cx.listener(|this, checked: &bool, _window, cx| {
                         this.apply_all = *checked;
@@ -1231,8 +1267,13 @@ mod tests {
         let mut settings = FontSettings::default();
         set_font(&mut settings, FontRole::Title, "KaiTi", true);
         for role in FontRole::ALL {
+            if matches!(role, FontRole::Math | FontRole::Fallback) {
+                continue;
+            }
             assert_eq!(role.get(&settings), "KaiTi", "{role:?} 应同步");
         }
+        assert_eq!(settings.math, "Cambria Math");
+        assert_eq!(settings.fallback, DEFAULT_FONT);
     }
 
     #[test]
@@ -1253,6 +1294,9 @@ mod tests {
         let body = settings.body.clone();
         apply_font_to_all(&mut settings, &body);
         for role in FontRole::ALL {
+            if matches!(role, FontRole::Math | FontRole::Fallback) {
+                continue;
+            }
             assert_eq!(role.get(&settings), "KaiTi");
         }
     }
