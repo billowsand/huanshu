@@ -476,14 +476,19 @@ cargo run -p slide-typst --example render_fixture -- --png
     backdrop-blur 糊掉，PDF 里会透过半透明卡显出来；phase-chip/step-dot 的 86%→62% mix 渐变画成平的 tone.solid；
     tl-node 的 glow 阴影、phase-head::after / steps-wrap__glow 模糊光斑省略。closing 的 kicker/subtitle/note/mark
     照抄了模板里硬编码的 slate/琥珀色（屏幕在这些主题下同样不随主题变量变）。
-- 数学公式（`$...$` / `$$...$$`）：屏幕由 `src/utils/richText.ts`（KaTeX）渲染，PDF 由 `src/math.rs` 经 mitex 转成
-  `\u{1}I…\u{2}` 哨兵段、`rich()` 里 `eval`。三处定界规则（另一处是生成侧 `generator/utils.rs` 的公式保护）必须一致。
+- 数学公式（`$...$` / `$$...$$`）：PDF 由 `src/math.rs` 经 mitex 转成 `\u{1}I…\u{2}` 哨兵段、`rich()` 里 `eval`；
+  原生界面的第一步预览由 `Renderer::render_formula` 出透明底 PNG 内嵌（`apps/huanshu-native/src/formulas.rs`
+  的 TextView 插件，出图在后台、按「公式 + 行内/块级 + 颜色 + 字号」缓存，坏公式显示红色原文）。屏幕公式与
+  幻灯片、PDF 是同一套 Typst 排版，**有意不用 KaTeX**（Vue 模板的 `markdown-it-katex` 已随模板删除）。
+  三处定界规则必须一致：`math.rs`（PDF）、`generator/utils.rs`（生成的公式保护）、
+  `huanshu_core::markdown_tools::{inline_math_content_ok, inline_math_close_ok, display_math_content_ok}`
+  （预览插件据此后退不合法的 `$…$`，价格类文本不被吞；markdown-rs 的解析器自己做记号化，逐字对齐以 PDF 侧为准）。
   - Typst 的 `eval` 出错无法捕获，一个坏公式会让整份导出失败：`Renderer::failing_math` 先用 `math-check.typ`
     试编译全部公式（一次），失败时逐个定位，被拒的公式退回原文。mitex 能转换但 Typst 会拒的例子：`\frac{1}`、`\left(`、`\ref{x}`。
   - 输入字符串里的 `\u{1}`/`\u{2}` 会先被删掉，否则模型文本可以伪造哨兵段直接 `eval` 任意 Typst 代码（有单测）。
   - 内嵌的 mitex spec 在 `standard.typ` 的 `arrow-handle` 打了本地补丁（用 `math.stretch`）：上游依赖的 xarrow 用了
     Typst 0.15 已删除的 `style()`，且是 GPL-3.0，**不要重新 vendor xarrow**。
-  - `richText.ts` 的白名单标签只输出裸标签（丢弃属性），结果要进 `v-html`。
+  - 预览出图 4 px/pt，逻辑像素 = 像素 ÷ 4（`FORMULA_PIXEL_PER_PT`）；行内基线按图高 × 0.8 对齐（启发式）。
 - 已知差异：没有阴影和毛玻璃（便签主题本身也基本不用）；`text-wrap: balance`（`base.typ` 的 `balanced`）
   目前只用在 `center_grid` 的居中标题上，其他页面标题仍按普通换行；屏幕版标题还会先分词再换行，PDF 没有；
   屏幕上一行放不下的超长标题会被裁掉（如 cover），PDF 版换行显示；未知图标在 PDF 里渲染为兜底图标
@@ -711,6 +716,48 @@ Start-Process "$env:LOCALAPPDATA\Huanshu\uninstall.exe" -ArgumentList '/S' -Wait
 - 安装包未签名，首次安装会有 SmartScreen 提示。
 - LM Studio 是外部依赖，不打包；装完需在应用「设置」里填模型名，否则生成流程不可用。
 - `build.rs` 依赖 `node_modules/@iconify-json/carbon`，所以打包前必须 `bun install`。
+
+## 打包与发布（原生版，`apps/huanshu-native`）
+
+### 一键打包
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-native.ps1
+```
+
+`cargo build --release -p huanshu-native` → 产物汇总到 `dist-package/`：
+
+| 产物 | 用途 |
+|---|---|
+| `huanshu-native_windows_x64.exe` | 免安装单文件，双击即跑 |
+| `HuanshuNative_<version>_x64-setup.exe` | NSIS 安装包（currentUser 静默 `/S`，卸载 `uninstall.exe /S`） |
+
+找不到 makensis（本机 Tauri 自带 `%LOCALAPPDATA%\tauri\NSIS`）时只出免安装版并提示，不失败。
+
+### 与 Tauri 版的关系
+
+- 安装目录 `%LOCALAPPDATA%\HuanshuNative`、产品/卸载项「幻述（原生版）」，与 Tauri 版
+  （`%LOCALAPPDATA%\Huanshu`、「幻述」）**完全分开**，不会互相覆盖或卸载。
+- 两版**共用同一个数据目录**（不设 `HUANSHU_HOME` 时的真实数据路径），这是有意的：原生版要接替 Tauri 版。
+- 版本号三处一致：`apps/huanshu-native/Cargo.toml`（`CARGO_PKG_VERSION` → exe 版本资源）、
+  `src-tauri/tauri.conf.json`、`scripts/package-native.ps1` 打的安装包文件名。 bump 版本时一起改。
+
+### 必须记住的坑
+
+1. **release 不弹控制台**：`main.rs` 的 `#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]`。
+   Windows 子系统进程在父进程重定向句柄时 stderr 仍可读——`tools/drive.ps1` 依赖的
+   `[coldstart]` 行（`Start-Process -RedirectStandardError`）与 `--export` 都不受影响（已实测）。
+2. **exe 图标与版本资源在 `build.rs`**（winresource）：ico 是 `src-tauri/icons/icon.ico`，
+   多分辨率原样嵌入（id 1）；GPUI 的 Windows 后端从 `MAKEINTRESOURCE(1)` 读窗口/任务栏图标，
+   没有 per-window 图标 API。中文产品名能正确进资源：winresource 写的 .rc 是 UTF-8 且带
+   `#pragma code_page(65001)`，MSVC `rc.exe` 认。
+3. **静态 CRT**：release 下 `/DEFAULTLIB:libcmt.lib` 等三条 link-arg（对齐 tauri_build 的做法），
+   免安装版在干净机器上不需要 VC++ Redistributable；debug 保留动态 CRT（libcmtd 与预编译依赖冲突）。
+4. **NSIS 脚本 ASCII-only**：PowerShell 5.1 与 makensis 都按 ANSI 读脚本。中文产品名「幻述（原生版）」
+   在 `package-native.ps1` 里用码点构造、经 makensis 命令行 `-D` 传入（Windows 命令行是 UTF-16）。
+5. 打包前关掉运行中的 huanshu-native（活映像占用，cargo 覆盖失败）；脚本内置 fail-fast 列出 pid。
+6. **真机验证只在沙箱**（`HUANSHU_HOME`）：免安装 exe 与安装版都一样。安装版验收一轮
+   「静默装 → 带沙箱启动 → 静默卸 → 查残留」，装/卸各一次就够，别反复。
 
 
 <!-- code-review-graph MCP tools -->

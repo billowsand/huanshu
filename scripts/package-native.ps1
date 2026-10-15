@@ -22,14 +22,10 @@
       * No WebView2 and no bundled browser: the UI is drawn by GPUI on DirectX 11
         (d3d11/dxgi/dcomp/dwmapi) and text goes through DirectWrite, all of which ship
         with Windows 10 and later.
-      * VCRUNTIME140.dll IS imported, plus the api-ms-win-crt-* Universal CRT api sets.
-        The UCRT is an OS component on Windows 10+, but VCRUNTIME140.dll is not: this exe
-        needs the Microsoft Visual C++ 2015-2022 Redistributable (x64) installed.
-        The Tauri exe does not have this requirement because tauri-build links
-        /DEFAULTLIB:libcmt.lib + /DEFAULTLIB:libvcruntime.lib + /DEFAULTLIB:ucrt.lib
-        (see target/release/build/auto-slidev-studio-*/output). Adding those same three
-        link args to apps/huanshu-native/build.rs would give the native exe static
-        vcruntime too - not done here, that is a separate decision.
+      * Static CRT (since d4be460, mirroring tauri_build): the release exe does NOT
+        import VCRUNTIME140.dll, so nothing extra to install - the api-ms-win-crt-*
+        Universal CRT api sets it still imports are an OS component on Windows 10+.
+        Debug builds keep the dynamic CRT (libcmtd conflicts with prebuilt deps).
       * LM Studio is an external dependency and is not packaged: the generation pipeline
         needs a model configured in the app's settings.
 
@@ -235,4 +231,4 @@ Get-ChildItem $outDir | ForEach-Object {
     '{0,-46} {1,9:N2} MB' -f $_.Name, ($_.Length / 1MB)
 }
 Write-Host "`nPortable exe runs as-is. Installer is currentUser-scoped (%LOCALAPPDATA%\$productKey); silent install /S, silent uninstall (uninstall.exe /S)." -ForegroundColor DarkGray
-Write-Host 'Runtime: no WebView2 needed (GPUI draws with DirectX); needs the Microsoft Visual C++ 2015-2022 Redistributable (x64) because the exe imports VCRUNTIME140.dll.' -ForegroundColor DarkGray
+Write-Host 'Runtime: no WebView2 needed (GPUI draws with DirectX); static CRT - no VC++ Redistributable needed on Windows 10+.' -ForegroundColor DarkGray

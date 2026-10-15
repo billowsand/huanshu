@@ -1,4 +1,4 @@
-# 原生界面逐页审计（第十四轮逐页 + 第十五轮修复与归并，对照 Tauri + Vue 原版）
+# 原生界面逐页审计（第十四轮逐页 + 第十五轮修复与归并 + 第十六轮公式与打包，对照 Tauri + Vue 原版）
 
 方法：每个原版界面文件按模板从上到下列出每一个用户能看到或操作的东西（文字、按钮、输入、提示、
 禁用/显示条件、快捷键、悬停/拖放、确认对话框、轻提示）与 `<script>` 里每一个副作用（调用了哪个
@@ -10,6 +10,16 @@
 「选中页跨步骤保留」、设置页的「返回来源」与「读失败提示」、第三步的「保存按钮固定底栏」）；
 纯表现层的 ⚠️ 一次性归档为 ➖「表现层，按 GPUI 原生做法」（理由只写这一句）；向导的模型校验标为
 **有意偏离：提前发现模型配置错误**；KaTeX 数学公式保持 ⚠️（另起一轮，需 KaTeX 等价排版/位图管线）。
+本总览与七个分节同口径。
+
+**第十六轮更新**：预览数学公式 ⚠️ 翻成 ✅——不上 KaTeX，用 `slide_typst::render_formula`
+出 Typst 位图（与幻灯片/PDF 同一套排版，`apps/huanshu-native/src/formulas.rs` 的 TextView 插件：
+行内/块级、坏公式红色原文、价格类 `$` 按 core 共享定界规则回落原文、出图在后台按
+公式+颜色+字号缓存）。真机验证：行内/块级/坏公式/价格/主题切换重出图/打字帧耗时
+（render 均值 1.8ms、最大 3.4ms，n=47）。**有意偏离**：公式外观是 Typst 排版而非 KaTeX；
+单行 `$$…$$` 按行内流渲染（不另起居中块）。打包：原生版发布构建
+（`scripts/package-native.ps1`，免安装 + NSIS，静态 CRT 免 Redist），见 CLAUDE.md
+「打包与发布（原生版）」。
 本总览与七个分节同口径。
 
 分节文件（本文末尾为各节全文）：
@@ -40,8 +50,9 @@
 
 🔧 合计 77 条（其中第十五轮把 16 条 ⚠️ 翻成 🔧：首页 PDF 结果对话框 11、设置页 2、第二步 2、第三步 1；
 其余 61 条来自第十四轮及更早），清单见各分节末节。
-⚠️ 合计 3 条是后续轮次的输入：工作流第一步的「文件拖入悬停（框架缺 drag-enter 钩子）」、
-「编辑区↔预览区滚动同步（含滚动条拖拽）」、「预览的 KaTeX 数学公式（另起一轮）」；
+⚠️ 合计 2 条是后续轮次的输入：工作流第一步的「文件拖入悬停（框架缺 drag-enter 钩子）」、
+「编辑区↔预览区滚动同步（含滚动条拖拽）」；「预览的 KaTeX 数学公式」已于第十六轮解决（翻 ✅，
+Typst 位图管线，见文首第十六轮更新）；
 本轮另有 20 条表现层 ⚠️ 归档为 ➖「表现层，按 GPUI 原生做法」（首页 7、设置页 5、向导 2、
 工作流第一步 1、第二步 1、第三步 4），它们不再占 ⚠️ 计数。
 
@@ -799,7 +810,8 @@
 
 本轮累计（正文第 1–5 节的逐项表，共 123 行）：**✅ 94 / 🔧 11 / ⚠️ 3 / ➖ 15**（另见 B 节两个调查项；统计明细见文末）。
 第十五轮只做记号归并：原「预览渲染语义差异（breaks/linkify/html）」的 ⚠️ 按新原则归入 ➖「表现层，按 GPUI 原生做法」；
-KaTeX 公式保持 ⚠️（另起一轮，需 KaTeX 等价排版/位图管线）。
+KaTeX 公式保持 ⚠️（另起一轮，需 KaTeX 等价排版/位图管线）。**第十六轮**：该 ⚠️ 翻 ✅
+（`formulas.rs` 插件 + `render_formula`，见文首第十六轮更新；分节末节「⚠️ 输入」表第 3 条同步关闭）。
 
 ---
 
@@ -905,7 +917,7 @@ KaTeX 公式保持 ⚠️（另起一轮，需 KaTeX 等价排版/位图管线�
 | 预览：每页一张卡片 + 右上角 `P{n}` 页码徽章 | `MarkdownWorkbench.vue:337-347`（`:344`）、样式 `:442-474` | `step1.rs::render` preview_card（`:795-829`，`P{index+1}` `:815`） | ✅ | |
 | 预览分页规则（`splitSlides`：H2/H3 切页；`$$` 显示公式块内不切） | `MarkdownWorkbench.vue:64-115` | core `markdown_tools::split_preview_pages`（快照单测 `tests/markdown_tools.rs`） | ✅ | 注释互相指认（`MarkdownWorkbench.vue:61-63`） |
 | 预览空态：「预览区将实时显示 Markdown 渲染效果」（空文稿也是一张 P1 卡） | `MarkdownWorkbench.vue:54-59`、`:101-104` | `step1.rs::render`（`:826`、空文稿分支 `:830-831`） | ✅ | |
-| 预览渲染：**数学公式（KaTeX）** | `MarkdownWorkbench.vue:4`（`@vscode/markdown-it-katex`）、`:47`（`md.use(markdownItKatex)`） | `TextView::markdown`（`step1.rs:820`） | ⚠️ | **公式不渲染**：gpui 的 markdown 对未被插件认领的公式回落成原文（`gpui-base-0.7.3/src/text/format/markdown.rs:869-880`），块级公式当代码块（`:1056-1060`）。工作量：**大**（要接一个 KaTeX 等价的排版/位图管线；框架只给了 inline plugin 钩子，见 `src/text/text_view.rs:1179` 的测试）——**另起一轮**（需 KaTeX 等价排版/位图管线），本轮不动 |
+| 预览渲染：**数学公式** | `MarkdownWorkbench.vue:4`（`@vscode/markdown-it-katex`）、`:47`（`md.use(markdownItKatex)`） | `formulas.rs` 插件（`MarkdownExtensions::plugin` 认领 `InlineMath`/`Math`）+ `slide_typst::render_formula` 出图 | ✅ | **第十六轮已渲染**：行内/块级（含单行 `$$…$$`，按 `$$` 源码前缀判 display）、坏公式（mitex 拒或 Typst 拒）显示红色原文、价格类 `$5 和 $10` 按 core 共享定界规则回落原文；出图在后台、键 = 公式+display+颜色+字号（0.5pt 档）、512 条 FIFO 淘汰并 `drop_image`；主题切换键变自动重出图。真机：暗/亮主题 `target/drive/m2-notes2`/`t2-light2`。**有意偏离**：外观是 Typst 排版不是 KaTeX（与幻灯片/PDF 一致）；单行 `$$…$$` 在行内流渲染不另起居中块 |
 | 预览渲染：软换行 `breaks: true` / `linkify` / `typographer` / `html: false` | `MarkdownWorkbench.vue:41-46` | `TextView::markdown`（标准 CommonMark） | ➖ | 表现层，按 GPUI 原生做法（原版单换行成 `<br>`、裸链接自动成链、`html:false` 让 HTML 当纯文本；gpui 侧软换行按空格合并、`Node::Html` 会被解析渲染——`TextView` 自带的 CommonMark 行为即可） |
 | 编辑区 ↔ 预览区滚动同步（按比例、80ms 回声守卫） | `MarkdownWorkbench.vue:219-262` | `step1.rs::sync_editor_to_preview`（`:563-570`）、`sync_preview_wheel`（`:592-620`）、`editor_est_max_scroll`（`:523-549`） | ⚠️ | 详情见 B-2：编辑器真实最大滚动量不可得（估计值）、滚动条拖拽挂不上。parity.md 第 95 行 🟡 |
 | 文稿变化 → 编辑器整体替换后同步一次预览 | `MarkdownWorkbench.vue:275-289`（`nextTick` + `syncEditorToPreview`） | `step1.rs` 订阅编辑器 observe（`:155-165`，每次状态通知都同步一次） | ✅ | 原生同步更频繁（打字也触发），有回声守卫，行为等价 |
@@ -1061,7 +1073,7 @@ parity.md 第 107 行（现已改成「图表围栏的校验提示 ✅ · 原版
 |---|---|---|---|
 | 1 | 文稿/素材拖入的**悬停**高亮与覆盖层显示不出来（框架无 drag-enter 钩子，只能收到 drop 与 exit） | 原版 `Step1Prepare.vue:213-220,236-243,474-484`；原生 `step1.rs:105,107`（两个标志位）、`:864-877`、`:1220-1226` | 大（要上游 gpui-kit 支持拖入悬停事件） |
 | 2 | 编辑区↔预览区滚动同步（正文一行，含两件事）：(a) 编辑器最大滚动量只能估计（soft-wrap 下中段有偏差）；(b) 双向的**滚动条拖拽**同步（编辑器内建滚动条拖拽不通知实体；预览侧干脆没有滚动条元素） | 原版 `MarkdownWorkbench.vue:219-262`；原生 `step1.rs:523-549`（估计）、`:592-620`（滚轮回调） | (a) 中（见 B-2：唯一办法是越界探针，会闪一帧，不建议；除非上游公开 `scroll_size`）；(b) 中-大（要自建 `Scrollbar` 元素 + 包装 `ScrollbarHandle`，约 40-60 行） |
-| 3 | 预览**不渲染数学公式**（原版 KaTeX；gpui 对未认领公式回落原文、块级公式当代码块） | 原版 `MarkdownWorkbench.vue:4,47`；gpui `text/format/markdown.rs:869-880,1056-1060` | 大（需要 KaTeX 等价排版；框架只给了 inline plugin 钩子）。**另起一轮**（需 KaTeX 等价排版/位图管线），本轮不动 |
+| 3 | 预览**不渲染数学公式**（原版 KaTeX；gpui 对未认领公式回落原文、块级公式当代码块） | 原版 `MarkdownWorkbench.vue:4,47`；原生 `formulas.rs` 插件 + `slide_typst::render_formula` | ✅（第十六轮）：Typst 位图管线，行内/块级/坏公式红字/价格回落/后台缓存全实测（`target/drive/m2-notes2`、`t2-light2`）；外观非 KaTeX 为**有意偏离**（与幻灯片/PDF 同一套排版） |
 
 > 另有两条**归入 ➖ 的「视觉细节」行**、未计入 ⚠️：预览标题配色未逐字对齐原版硬编码色（h2 `#f5d76e` / h3 `#8fd6ff` / h4 `#b9c5dd`，`MarkdownWorkbench.vue:503-519`，跟随 GPUI Kit 主题）；第一步预览区没有可见滚动条滑块（原版 WebView 的 `overflow-y: auto`）。
 

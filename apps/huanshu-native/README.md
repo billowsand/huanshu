@@ -23,6 +23,19 @@ cargo run -p huanshu-native --release
 截图：`powershell -NoProfile -ExecutionPolicy Bypass -File apps/huanshu-native/tools/shots.ps1 [-Only home,project-step3]`
 → `docs/native/shell/`，与 `docs/native/reference/` 同名对照。
 
+## 出包
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-native.ps1
+```
+
+产物（`dist-package/`）：免安装 `huanshu-native_windows_x64.exe` + NSIS 安装包
+`HuanshuNative_<version>_x64-setup.exe`（安装目录 `%LOCALAPPDATA%\HuanshuNative`、
+卸载项「幻述（原生版）」，与 Tauri 版分开；两版共用同一个真实数据目录，这是有意的）。
+release 不弹控制台、静态 CRT（免装 VC++ Redist）、exe 带图标与版本资源。
+细节与坑全在根 `CLAUDE.md` 的「打包与发布（原生版）」一节；**验收只在沙箱**，
+安装版一轮「静默装 → 带 `HUANSHU_HOME` 启动 → 静默卸 → 查残留」。
+
 交互验证：`tools/drive.ps1 -Route settings -Steps "click:0.21,0.29;wait:1.5;shot:a;key:^s" -Out target/drive`
 （按窗口比例点击、SendKeys、截图；同样只在沙箱里跑）。页面刚打开时字体等数据还在加载、布局会挪动，第一次点击前多等几秒（`-Boot 12`）。
 
