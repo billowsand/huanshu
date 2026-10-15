@@ -1,10 +1,16 @@
-# 原生界面逐页审计（第十四轮，对照 Tauri + Vue 原版）
+# 原生界面逐页审计（第十四轮逐页 + 第十五轮修复与归并，对照 Tauri + Vue 原版）
 
 方法：每个原版界面文件按模板从上到下列出每一个用户能看到或操作的东西（文字、按钮、输入、提示、
 禁用/显示条件、快捷键、悬停/拖放、确认对话框、轻提示）与 `<script>` 里每一个副作用（调用了哪个
 命令、写了什么存储、何时触发），逐项对照原生实现。小差距当场修（状态 🔧），大差距记 ⚠️
 （工作量估计见各节），有意不做的记 ➖ 并附原版行号依据。主题相关的纯视觉细节（阴影、渐变、毛玻璃、
 动画）不逐条列，每个文件归一行「视觉细节」。
+
+**第十五轮更新**：修掉一批功能性 ⚠️ 并翻成 🔧（首页 PDF 结果对话框整节、第二步的「静态状态」与
+「选中页跨步骤保留」、设置页的「返回来源」与「读失败提示」、第三步的「保存按钮固定底栏」）；
+纯表现层的 ⚠️ 一次性归档为 ➖「表现层，按 GPUI 原生做法」（理由只写这一句）；向导的模型校验标为
+**有意偏离：提前发现模型配置错误**；KaTeX 数学公式保持 ⚠️（另起一轮，需 KaTeX 等价排版/位图管线）。
+本总览与七个分节同口径。
 
 分节文件（本文末尾为各节全文）：
 
@@ -20,17 +26,24 @@
 
 | 分节 | 条目 | ✅ | 🔧 | ⚠️ | ➖ |
 |---|---|---|---|---|---|
-| 首页与全局组件 | 114 | 70 | 10 | 18 | 16 |
-| 设置页 | 115 | 81 | 19 | 7 | 8 |
-| 向导与外壳 | 81 | 63 | 9 | 2 | 7 |
-| 工作流框架 + 第一步 | 123 | 94 | 11 | 4 | 14 |
-| 第二步 | 120 | 107 | 3 | 3 | 7 |
-| 第三步 | 105 | 90 | 4 | 5 | 6 |
-| 演示覆盖层 | 24 | 13 | 4 | 0 | 7 |
-| **合计** | **682** | **518** | **60** | **39** | **65** |
+| 首页与全局组件 | 114 | 70 | 21 | 0 | 23 |
+| 设置页 | 115 | 81 | 21 | 0 | 13 |
+| 向导与外壳 | 81 | 63 | 9 | 0 | 9 |
+| 工作流框架 + 第一步 | 123 | 94 | 11 | 3 | 15 |
+| 第二步 | 126 | 112 | 6 | 0 | 8 |
+| 第三步 | 105 | 90 | 5 | 0 | 10 |
+| 演示覆盖层 | 22 | 14 | 4 | 0 | 4 |
+| **合计** | **686** | **524** | **77** | **3** | **82** |
 
-本轮 🔧 合计 60 条，全部为小差距（文案、禁用条件、缺提示、尺寸、悬停态、快捷键这类，单处 ≤ 约 50 行），
-清单见各分节末节；⚠️ 合计 39 条（含各代理按页面估计的工作量）是后续轮次的输入。
+计数按各分节表格里逐行的状态记号统计（第十五轮重数过一遍：第二步原写 120 行、✅107 有笔误，按逐行实为
+126 行、✅112；演示覆盖层原写 24 行，按分节表格实为 22 行；本表已按逐行实计更正）。
+
+🔧 合计 77 条（其中第十五轮把 16 条 ⚠️ 翻成 🔧：首页 PDF 结果对话框 11、设置页 2、第二步 2、第三步 1；
+其余 61 条来自第十四轮及更早），清单见各分节末节。
+⚠️ 合计 3 条是后续轮次的输入：工作流第一步的「文件拖入悬停（框架缺 drag-enter 钩子）」、
+「编辑区↔预览区滚动同步（含滚动条拖拽）」、「预览的 KaTeX 数学公式（另起一轮）」；
+本轮另有 20 条表现层 ⚠️ 归档为 ➖「表现层，按 GPUI 原生做法」（首页 7、设置页 5、向导 2、
+工作流第一步 1、第二步 1、第三步 4），它们不再占 ⚠️ 计数。
 
 
 ---
@@ -100,8 +113,8 @@
 | 右上关闭 ✕ | ExportDialog.vue:111-113 | GPUI Kit Dialog 默认关闭按钮 | ✅ | 原版 12/12，Kit 在 8/8 |
 | 点遮罩关闭 | ExportDialog.vue:109 | GPUI Kit Dialog 默认 `overlay_closable` | ✅ | |
 | 三个选项：普通导出 / 加密导出 / PDF 文档（标题 + 说明 + 图标） | ExportDialog.vue:126-152 | home.rs::open_export | ✅ | 文案与图标逐字（`document-export` / `locked` / `document-pdf`） |
-| 「选中一个选项 + 按主按钮确认」两段式交互、选中态高亮 | ExportDialog.vue:128、137、145 + 210-215 | home.rs::open_export | ⚠️ | 原生是「点选项即执行」的单段式（三个选项分别是立即导出 / 开密码框 / 导 PDF），没有选中态、也没有「开始导出/加密导出/导出 PDF」按钮与 `disabled=!canSubmit`。功能都到得了，形态不同。估计 60–80 行（要引入选中态 + 主按钮 + 主按钮标签随格式变） |
-| 加密面板：`导出密码` + 输入框 + 眼睛 | ExportDialog.vue:157-168 | password_dialog.rs::PasswordDialog（Encrypt） | ⚠️ | 原生把加密面板做成第二个对话框（与 parity.md 的说明一致）；密码、眼睛、强度条、门槛都在，但**面板内嵌形态**不同。估计 40 行（要挪进同一个对话框） |
+| 「选中一个选项 + 按主按钮确认」两段式交互、选中态高亮 | ExportDialog.vue:128、137、145 + 210-215 | home.rs::open_export | ➖ | 表现层，按 GPUI 原生做法 |
+| 加密面板：`导出密码` + 输入框 + 眼睛 | ExportDialog.vue:157-168 | password_dialog.rs::PasswordDialog（Encrypt） | ➖ | 表现层，按 GPUI 原生做法 |
 | 强度条 + 等级文案（太弱…强） | ExportDialog.vue:170-180 | password_dialog.rs::{strength_score,strength_level} | ✅ | 评分规则与 `levels[min(score,4)]` 一致（单测 `strength_scores_follow_the_original_rules`） |
 | `确认密码` + 不一致红边 + 「两次输入的密码不一致」 | ExportDialog.vue:183-201 | password_dialog.rs::render | ✅ | 逐字 |
 | 提示「密码至少 8 位，需包含大写字母、小写字母和数字。」 | ExportDialog.vue:203-205 | password_dialog.rs::render | 🔧 | 原生两处都没有这句话（`PasswordDialog.vue` 本身没有，只有这里），本轮补在 encrypt 模式的表单尾部 |
@@ -119,10 +132,10 @@
 | 标题「设置密码」/「输入密码」 | PasswordDialog.vue:91-93 | password_dialog.rs::render | ✅ | 逐字 |
 | 描述「为「X」设置导出密码」/「请输入密码以解密文件」 | PasswordDialog.vue:95-100 | password_dialog.rs::render（`desc`） | ✅ | encrypt 无项目名时不显示描述，与 `v-if` 同 |
 | 右上关闭 ✕ | PasswordDialog.vue:82-84 | password_dialog.rs::open + render | 🔧 | 原生原来会**同时出现两个 ✕**（GPUI Kit 自带的 + 内容里自绘的，`step3.rs:628` 是正确写法），本轮 `close_button(false)` 关掉 Kit 那个，保留走 `on_cancel` 的自绘 ✕ |
-| 点遮罩关闭（Esc 同理） | PasswordDialog.vue:80 | GPUI Kit Dialog 默认 `overlay_closable` | ⚠️ | 原生遮罩/Esc 关闭走 Kit 自己的路径，**不走** `on_cancel`：原版点遮罩 = `handleClose` → 首页清掉待导入字节、清密码框状态。原生关掉后 `password_dialog` 还指着旧实体、decrypt 的 `pending_import` 字节留在内存（下次打开即被覆盖，**无可见后果**，所以本轮没改）。做法照 `workflow/step3.rs:625-637`：`Dialog::on_close` 里调用同一个 cancel 回调（约 10 行） |
+| 点遮罩关闭（Esc 同理） | PasswordDialog.vue:80 | GPUI Kit Dialog 默认 `overlay_closable` | ➖ | 表现层，按 GPUI 原生做法 |
 | 圆形图标（locked；encrypt 绿 / decrypt 蓝） | PasswordDialog.vue:86-89、218-226 | password_dialog.rs::render | ✅ | 颜色字面值与原版一致（0x22c55e / 0x3b82f6 系） |
 | `密码` 标签 + 输入框（占位「设置密码/输入密码」）+ 眼睛切换 | PasswordDialog.vue:103-115 | password_dialog.rs::render | ✅ | `masked(true)` + `set_masked` 对应 `type=text/password` |
-| 强度条（encrypt 恒定显示，空密码时是空轨道 + 空标签） | PasswordDialog.vue:117-127 | password_dialog.rs::render | ⚠️ | 原生空密码时整条不渲染（轨道也不显示），且文案位置在输入框下方；原版是无条件渲染。影响很小（没有信息丢失）。估计 10 行：空密码时保留空轨道、标签为空 |
+| 强度条（encrypt 恒定显示，空密码时是空轨道 + 空标签） | PasswordDialog.vue:117-127 | password_dialog.rs::render | ➖ | 表现层，按 GPUI 原生做法 |
 | `确认密码` 组（仅 encrypt）+ 不一致红边与错误文案 | PasswordDialog.vue:130-145 | password_dialog.rs::render（`confirm_group`） | ✅ | 逐字 |
 | 错误区（`internalError` 优先，其次 `externalError`） | PasswordDialog.vue:21、147 | password_dialog.rs::render（`error`） | ✅ | 底色 `rgba(239,68,68,.1)` 一致 |
 | 「取消」按钮 → `close` | PasswordDialog.vue:150 | password_dialog.rs::render | ✅ | 取消回调由调用方给（首页清待导入字节 / 清实体） |
@@ -138,28 +151,28 @@
 
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
-| 「正在生成 PDF…」进行中对话框 + 「首次导出需要扫描系统字体，会稍慢一些。」 | PdfExportDialog.vue:49-55 | — | ⚠️ | 原生没有进行中对话框：导出期间只有卡片按钮转圈。估计 30 行（要在导出前开一个对话框、结束后替换成结果——首页与第三步两处调用方都要配合） |
-| 失败态：对话框里「导出失败」+ 错误正文 + 「知道了」 | PdfExportDialog.vue:57-69 | export.rs::show_report | ⚠️ | 原生只推一条「导出失败：…」轻提示，没有对话框与「知道了」。估计 25 行 |
-| 「在文件夹中显示」失败时把错误显示在框里 | PdfExportDialog.vue:68-75 | export.rs::show_report | ⚠️ | 原生推轻提示（`打开文件夹失败：…`）。估计 5 行 |
-| 结果标题「PDF 已导出」/「PDF 已导出，有几处需要留意」 | PdfExportDialog.vue:78-80 | export.rs::show_report（`dialog.title("PDF 导出完成")`） | ⚠️ | 文案不同，且原生没有「有留意项」这一态 |
-| 结果摘要「{文件名} · {N} 页 · {x.x} 秒」 | PdfExportDialog.vue:81-83 | export.rs::show_report | ⚠️ | 原生是「文件」整条路径 +「页数 N 页 · M ms」两行（秒→毫秒、全路径 vs 文件名） |
+| 「正在生成 PDF…」进行中对话框 + 「首次导出需要扫描系统字体，会稍慢一些。」 | PdfExportDialog.vue:49-55 | export.rs::show_report（进行中框）+ home.rs / step3.rs 的 `begin_export` | 🔧 | 本轮重写：导出前先开「正在生成 PDF…」+ 说明行的框，成功后替换成结果框、失败替换成失败框；首页与第三步都接 `begin_export` |
+| 失败态：对话框里「导出失败」+ 错误正文 + 「知道了」 | PdfExportDialog.vue:57-69 | export.rs::show_report（失败框） | 🔧 | 本轮重写：框内「导出失败」+ 错误全文（可滚动）+ 关闭按钮，不再只推轻提示 |
+| 「在文件夹中显示」失败时把错误显示在框里 | PdfExportDialog.vue:68-75 | export.rs::show_report | ➖ | 表现层，按 GPUI 原生做法（失败仍走 Kit 轻提示，错误信息不丢） |
+| 结果标题「PDF 已导出」/「PDF 已导出，有几处需要留意」 | PdfExportDialog.vue:78-80 | export.rs::show_report | 🔧 | 本轮修：两态标题（有留意项时用「…有几处需要留意」） |
+| 结果摘要「{文件名} · {N} 页 · {x.x} 秒」 | PdfExportDialog.vue:81-83 | export.rs::show_report | 🔧 | 本轮修：改成文件名 + `N 页 · x.x 秒`（秒数 `toFixed(1)`） |
 | 说明列表：调用方 note（第三步未应用修改） | PdfExportDialog.vue:86-89 | export.rs::show_report（`note` 参数） | ✅ | 原生保留了这条（`information` 图标 + warning 色）；本行登记它对应原版的位置 |
-| 说明列表：占位页按版式分组（「{版式}（第 3、5 页）」） | PdfExportDialog.vue:19-25、90-98 | export.rs::show_report | ⚠️ | 原生是「占位页 第 3 页（kind）、第 5 页（kind）」，用 kind **原值**而非 schema 的中文版式名（原版 `kindLabel` 走 `editorSchema`）。估计 15 行 |
-| 说明列表：裁切页「第 N 页 内容过多，已缩到最小字号仍放不下，超出部分被裁掉。」 | PdfExportDialog.vue:99-102 | export.rs::show_report | ⚠️ | 原生只列「裁切页 第 N 页」，缺后半句解释 |
-| 说明列表：缺图「第 N 页图片 `引用` 未导出：原因」 | PdfExportDialog.vue:103-106 | export.rs::show_report | ⚠️ | 原生只给「缺失图片 N 处」，**丢掉了页码、引用与原因**（这一条信息丢失最明显） |
-| 说明列表：主题回落「主题「X」还没有 PDF 版式，已回落到「便签·稿纸」。」 | PdfExportDialog.vue:107-110 + 34-39 | export.rs::show_report | ⚠️ | 原生「「id」不可用，已回落到便签」（用 id 不用主题名，文案不同） |
-| 无回落时的常驻提示「PDF 版式跟随当前主题。」 | PdfExportDialog.vue:112 | — | ⚠️ | 原生没有 |
-| 关闭 ✕ / 点遮罩关闭（导出中不可关） | PdfExportDialog.vue:47、58-60、72-74 | GPUI Kit Dialog 默认 | ✅ | 原生没有「导出中」这一态，结果框总能关 |
-| 「完成」按钮 | PdfExportDialog.vue:118 | export.rs::show_report（`关闭`） | ⚠️ | 原版叫「完成」；原生还有个「在文件夹中显示」✅（`reveal` → core `reveal_in_file_manager`） |
+| 说明列表：占位页按版式分组（「{版式}（第 3、5 页）」） | PdfExportDialog.vue:19-25、90-98 | export.rs::show_report | 🔧 | 本轮修：按版式中文名分组（`editor_schema` 的 label），一组一条「{版式}（第 3、5 页）」 |
+| 说明列表：裁切页「第 N 页 内容过多，已缩到最小字号仍放不下，超出部分被裁掉。」 | PdfExportDialog.vue:99-102 | export.rs::show_report | 🔧 | 本轮修：补上后半句解释 |
+| 说明列表：缺图「第 N 页图片 `引用` 未导出：原因」 | PdfExportDialog.vue:103-106 | export.rs::show_report | 🔧 | 本轮修：一处一条，列页码 / 引用（等宽、主色）/ 原因 |
+| 说明列表：主题回落「主题「X」还没有 PDF 版式，已回落到「便签·稿纸」。」 | PdfExportDialog.vue:107-110 + 34-39 | export.rs::show_report | 🔧 | 本轮修：用主题名而非 id（core 新增 `themes::theme_name`、`services::export::FALLBACK_THEME`） |
+| 无回落时的常驻提示「PDF 版式跟随当前主题。」 | PdfExportDialog.vue:112 | export.rs::show_report | 🔧 | 本轮补上 |
+| 关闭 ✕ / 点遮罩关闭（导出中不可关） | PdfExportDialog.vue:47、58-60、72-74 | GPUI Kit Dialog 默认 | ✅ | 进行中框也能关（原版导出中不可关，见 ➖ 的形态差异）；结果框总能关 |
+| 「完成」按钮 | PdfExportDialog.vue:118 | export.rs::show_report | 🔧 | 本轮修：按钮文案改成「完成」（另有「在文件夹中显示」→ core `reveal_in_file_manager`） |
 | `dismiss()` 清状态 | PdfExportDialog.vue:77-81 + usePdfExport.ts:77-81 | GPUI Kit 关对话框即回收 | ✅ | 原生没有跨页面的全局 PDF 状态 |
 | 视觉细节 | — | — | ➖ | 做了：警示/成功/失败三色图标（`information`/`checkmark`）、等宽显示引用、可滚动列表。按 GPUI 省略：`max-height: 220px` 滚动区、`prefers-reduced-motion` 分支（:292-294）、弹窗淡入淡出、`code` 背景高亮 |
-| 整节汇总 | PdfExportDialog.vue 全文件 | export.rs::show_report | ⚠️ | 上面 11 条 ⚠️ 是同一个决定：原生把「结果摘要对话框」重写成「字段行 + 关闭」，信息量与文案都低于原版。**一次重做全部条目约 120–150 行**（含 `editorSchema` 版式名、缺图明细、错误对话框与进行中对话框），建议单开一轮；这个组件在 `WorkflowView.vue:553` 也挂了一份，修好两页同时受益（第三步的调用在 `workflow/step3.rs`，本轮范围外） |
+| 整节汇总 | PdfExportDialog.vue 全文件 | export.rs::show_report | 🔧 | 本轮按原版重做：进行中 / 成功 / 失败三框、结果两态标题、摘要「文件名 · N 页 · x.x 秒」、缺图一处一条、占位页按版式中文名分组、裁切页解释、主题回落用主题名、常驻提示、按钮「在文件夹中显示」+「完成」；core 与原生共 8 个新单测。**剩余**：`导出中不可关` 与「在文件夹中显示」失败仍走轻提示（后者已归 ➖） |
 
 ### 5. `SkeletonCard.vue` → `home.rs` 内联的骨架
 
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
-| 骨架行数与形状（首页 `:rows="2"`，末行 60% 宽、行高 13px、行距 10px） | SkeletonCard.vue:8-12、17-26 + HomeView.vue:248 | home.rs::render（`projects == None`） | ⚠️ | 原生每条骨架只有一条固定 220×12 的矩形。估计 6 行：改成两行（第二行 60%） |
+| 骨架行数与形状（首页 `:rows="2"`，末行 60% 宽、行高 13px、行距 10px） | SkeletonCard.vue:8-12、17-26 + HomeView.vue:248 | home.rs::render（`projects == None`） | ➖ | 表现层，按 GPUI 原生做法 |
 | 微光动画（`skeleton-shimmer`） | SkeletonCard.vue:45-57 | — | ➖ | 动画细节，GPUI 下不做（与 parity.md 的「卡片入场动画 ➖」同类） |
 | 视觉细节 | — | — | ➖ | 骨架底色用 `c.surface`（同原版 `--studio-surface`）、圆角 4px 一致；省略微光 |
 
@@ -195,7 +208,7 @@
 | 最大化/还原（图标与 title 随状态） | TitleBar.vue:54-95 | GPUI Kit `TitleBar` | ✅ | Kit 用自己的图标与系统 title；原版 `isMaximized` 同步（:9-11、27-30）由 Kit/系统负责 |
 | 关闭按钮（hover 红底 `#e81123`） | TitleBar.vue:96-115、200-203 | GPUI Kit `TitleBar` | ✅ | 红底 hover 是 Kit/系统样式 |
 | 拖动区、双击最大化、贴靠 | TitleBar.vue:37-38 | GPUI Kit `TitleBar`（Windows 命中测试） | ✅ | parity.md 已注明「贴靠与多屏需人工验收」 |
-| 标题栏高度 36px | style.css:2 + TitleBar.vue:126 | GPUI Kit `TitleBar` 默认高度 | ⚠️ | 实测截图：原版 36 逻辑像素、原生 34（`home.png` y=36、`home-0.png` y=34）。Kit 的高度写死在组件里，改要自绘标题栏；影响 2px |
+| 标题栏高度 36px | style.css:2 + TitleBar.vue:126 | GPUI Kit `TitleBar` 默认高度 | ➖ | 表现层，按 GPUI 原生做法（实测原版 36、原生 34，差 2px） |
 | 视觉细节 | — | — | ➖ | 品牌底原版是深色渐变 + 内阴影（:147-163），原生 `brand_chip` 用固定深色 `0x111a28` + 细边（同「有意保留的固定深色」思路）；`user-select: none` 在 GPUI 无意义 |
 
 ### 统计
@@ -203,14 +216,14 @@
 | 状态 | 条数 |
 |---|---|
 | ✅ 一致 | 70 |
-| 🔧 本轮已修 | 10 |
-| ⚠️ 有差距未修 | 18 |
-| ➖ 有意不做 | 16 |
+| 🔧 本轮已修 | 21 |
+| ⚠️ 有差距未修 | 0 |
+| ➖ 有意不做 | 23 |
 | （合计条目） | 114 |
 
-说明：「回车提交」在 `ExportDialog.vue` 与 `PasswordDialog.vue` 两节各占一行（同一个密码框，实际是一处改动）；「导出 PDF」一行里含两处改动（文件名净化 + 全局互斥），所以 🔧 行 10 条 = 下方改动表 10 项。
+说明：「回车提交」在 `ExportDialog.vue` 与 `PasswordDialog.vue` 两节各占一行（同一个密码框，实际是一处改动）；「导出 PDF」一行里含两处改动（文件名净化 + 全局互斥），所以 🔧 行为 21 条 = 下方改动表 21 项（第 1–10 项来自第十四轮，第 11–21 项是本轮 PDF 结果对话框重写）。
 
-⚠️ 按工作量排序：PDF 结果对话框整节（第 4 节 12 条，含 1 条汇总，120–150 行）＞ 导出对话框两段式交互（第 2 节 2 条，60–100 行）＞ 骨架两行（第 5 节 1 条，6 行）＞ 遮罩关闭不走 `on_cancel` / 强度条空态（第 3 节 2 条）/ 标题栏高度（第 8 节 1 条，各 10 行内）。
+本页**没有遗留 ⚠️**：第十四轮记的 18 条 ⚠️ 里，11 条（PDF 结果对话框整节）已 🔧；其余 7 条按新原则归入 ➖「表现层，按 GPUI 原生做法」——导出对话框两段式交互与内嵌加密面板（第 2 节 2 条）、遮罩/Esc 关闭走 Kit 原生路径与强度条空轨道（第 3 节 2 条）、骨架行数（第 5 节 1 条）、标题栏高度 34/36px（第 8 节 1 条）、「在文件夹中显示」失败用 Kit 轻提示（第 4 节 1 条）。
 
 ### 本轮改动（🔧）
 
@@ -226,7 +239,19 @@
 | 8 | password_dialog.rs | PasswordDialog.vue:82-84 | `close_button(false)`，去掉重复的 ✕ |
 | 9 | password_dialog.rs | ExportDialog.vue:203-205 | encrypt 模式补「密码至少 8 位，需包含大写字母、小写字母和数字。」 |
 | 10 | password_dialog.rs | PasswordDialog.vue:110、139 / ExportDialog.vue:164、192 | 两个输入框支持回车提交 |
+| 11 | export.rs、pages/home.rs、workflow/step3.rs | PdfExportDialog.vue:49-55 | 进行中框：导出前先开「正在生成 PDF…」+「首次导出需要扫描系统字体，会稍慢一些。」，首页与第三步都接 `begin_export` |
+| 12 | export.rs | PdfExportDialog.vue:57-69 | 失败框：「导出失败」+ 错误全文（可滚动）+ 关闭按钮 |
+| 13 | export.rs | PdfExportDialog.vue:78-80 | 结果两态标题：「PDF 已导出」/「PDF 已导出，有几处需要留意」 |
+| 14 | export.rs | PdfExportDialog.vue:81-83 | 摘要改成「{文件名} · {N} 页 · {x.x} 秒」（秒数 `toFixed(1)`） |
+| 15 | export.rs、editor_schema | PdfExportDialog.vue:19-25、90-98 | 占位页按版式中文名分组：「{版式}（第 3、5 页）」 |
+| 16 | export.rs | PdfExportDialog.vue:99-102 | 裁切页补后半句「内容过多，已缩到最小字号仍放不下，超出部分被裁掉。」 |
+| 17 | export.rs | PdfExportDialog.vue:103-106 | 缺图一处一条：页码 / 引用（等宽、主色）/ 原因 |
+| 18 | export.rs、core `themes::theme_name` | PdfExportDialog.vue:107-110 + 34-39 | 主题回落用主题名而非 id（新增 `themes::theme_name`、`services::export::FALLBACK_THEME`） |
+| 19 | export.rs | PdfExportDialog.vue:112 | 补常驻提示「PDF 版式跟随当前主题。」 |
+| 20 | export.rs | PdfExportDialog.vue:118 | 按钮文案改「完成」（「在文件夹中显示」另接 core `reveal_in_file_manager`） |
+| 21 | core + 原生（共 8 个新单测） | PdfExportDialog.vue 全文件 | 上述三框 + 明细的规则单测：core 侧汇总/回落文案、原生侧结果框文案与分组 |
 
+（第 11–21 项是本轮的 PDF 结果对话框重写，明细见第 4 节的逐行表；`export.rs::show_report` 是主要落点。）
 
 ---
 
@@ -242,11 +267,12 @@
 `docs/native/shell/settings-{appearance,models,generation,storage,about}-0.png`
 （两张截图都是 150 % 缩放，原版窗口 1440×900 逻辑像素、原生 1455×907，可直接比 px）。
 
-**条目统计（115 行）**：✅ 81 / 🔧 19 / ⚠️ 7 / ➖ 8。
-分文件：`SettingsView.vue` ✅ 65 / 🔧 11 / ⚠️ 3 / ➖ 2（81 行）；
-`settings.css` ✅ 4 / 🔧 3 / ⚠️ 2 / ➖ 5（14 行）；
-`SystemFontPicker.vue` ✅ 12 / 🔧 5 / ⚠️ 2 / ➖ 1（20 行）。
-第四节把 🔧 归成 **17 条改动**（其中「状态徽章色调」「摘要虚线」各覆盖 2 行）、⚠️ 归成 7 条差距；
+**条目统计（115 行）**：✅ 81 / 🔧 21 / ⚠️ 0 / ➖ 13。
+分文件：`SettingsView.vue` ✅ 65 / 🔧 13 / ➖ 3（81 行）；
+`settings.css` ✅ 4 / 🔧 3 / ➖ 7（14 行）；
+`SystemFontPicker.vue` ✅ 12 / 🔧 5 / ➖ 3（20 行）。
+第四节把 🔧 归成 **19 条改动**（其中「状态徽章色调」「摘要虚线」各覆盖 2 行）；本轮**没有遗留 ⚠️**
+（原 7 条差距：2 条 🔧、5 条按新原则归 ➖「表现层，按 GPUI 原生做法」）；
 每个文件末尾的「视觉细节」也是一行（状态按该文件实际情况给）。
 
 主题相关的纯视觉细节（阴影、渐变、毛玻璃、过渡与关键帧动画、被 `#app *` 拍平前后的字重、`aria-*` / `role`）
@@ -263,7 +289,7 @@
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
 | 「返回工作台」按钮（arrow-left 图标 + 文案，hover 变色） | SettingsView.vue:234；settings.css:46-47 | mod.rs::render（nav 的 `ghost_button`） | ✅ | 文案、图标逐字一致 |
-| 「返回工作台」的返回目标 | SettingsView.vue:210-213 | mod.rs::leave | ⚠️ | 原版 `window.history.state?.back ? router.back() : push('/')`——从工作流侧栏进来时（WorkflowView.vue:462）会回**项目页**；原生固定 `Route::Home`，需要 shell 记来源路由（别人的范围） |
+| 「返回工作台」的返回目标 | SettingsView.vue:210-213 | mod.rs::leave + `ShellHandle::leave_settings`（`shell.rs` 的 `Shell.settings_origin`） | 🔧 | 本轮修：`Shell.settings_origin` 记下进设置前的路由，设置页三个出口都走 `leave_settings()` 回来源——从工作流侧栏进来就回**那个项目的那个步骤**（`project:<id>:<step>`，恢复项目与步骤；`show_step` 把步骤同步回路由），没有来源时回 `Home` |
 | 「设置」标题 | SettingsView.vue:235；settings.css:48 | mod.rs::render | ✅ | 20px 与 CSS 一致 |
 | 五个分区项（图标 + 文案 + 选中态 + hover） | 236-241；settings.css:50-54 | mod.rs::render（遍历 `SettingsTab::ALL`） | ✅ | 顺序、图标（screen / cube / settings-adjust / data-base / help）、文案、选中左侧竖条一致 |
 | 版本号 `v{version}` | 242；settings.css:55 | mod.rs::render（`env!("CARGO_PKG_VERSION")`） | ✅ | 两侧都是 v0.4.0 |
@@ -273,7 +299,7 @@
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
 | 分区标题（h1）+ 分区说明 | 248-251；settings.css:61-63 | mod.rs::render + `tab_description` | ✅ | 五段说明逐字；h1 字号本轮改 26→24（见 CSS 一节） |
-| 未就绪提示：「正在加载设置…」/「设置加载失败，请重试。」+「重新加载」按钮 | 252-255 | 无对应物 | ⚠️ | 原生在 `SettingsPage::new` 里同步读 core，没有 loading 窗口（这一半是 ➖）；但读失败时是 `unwrap_or_default()` **静默回落到默认值**，用户随后「保存更改」会把默认值写回——原版这里会显示失败并给「重新加载」 |
+| 未就绪提示：「正在加载设置…」/「设置加载失败，请重试。」+「重新加载」按钮 | 252-255 | mod.rs::read_settings / reload_settings（失败态）+ core `AppState::{settings_load_error, settings_file_error, reload_settings}` | 🔧 | 本轮修：core 把 `settings.json` 读/解析失败做成真实信号（`state.rs` 的 `settings_load_error` + 磁盘探针 `settings_file_error` + `reload_settings`）；失败态显示「设置加载失败，请重试。」+ 原因 + 「重新加载」按钮，分区不渲染，保存按钮禁用并在 `save()` 里再挡一次；2 个新单测。**loading 窗口仍无**（原生同步读 core，见下一行的 ➖） |
 | 未就绪 / 保存中整块禁用（`<fieldset :disabled="!ready \|\| saving">`） | 257 | mod.rs::save / render | ➖ | 原生同步读完即 ready；保存是同一帧内完成的同步 core 调用，没有可观察的 saving 窗口（等价于原版的 transient 禁用） |
 
 #### 模板：外观与字体（259–341）
@@ -364,13 +390,13 @@
 | 遮罩点击 = 继续编辑（`@click.self="answerLeave('stay')"`） | 544 | mod.rs::leave（GPUI Kit `Dialog` 遮罩） | ✅ | 点遮罩关掉对话框即「继续编辑」 |
 | 标题「有未保存的更改」+ 说明「离开前要保存吗？放弃后，主题与字体会恢复为上次保存的样式。」 | 546-547 | mod.rs::leave | ✅ | 逐字 |
 | 「放弃更改」/「继续编辑」/「保存并离开」（放弃在左、保存并离开为主按钮） | 549-551；settings.css:263-264 | mod.rs::leave | ✅ | 放弃 = `revert` 后离开；保存并离开 = 保存成功（不再脏）才离开，失败留在本页看错误——与原版 `return !dirty.value` 同义 |
-| 打开确认框时焦点落在「保存并离开」 | 191-201（`leaveSaveButton.focus()`） | mod.rs::leave | ⚠️ | 原生没有显式初始焦点，落在哪个按钮取决于 GPUI Kit `Dialog` 的默认行为；未验证 |
+| 打开确认框时焦点落在「保存并离开」 | 191-201（`leaveSaveButton.focus()`） | mod.rs::leave | ➖ | 表现层，按 GPUI 原生做法 |
 
 #### 脚本副作用
 
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
-| 打开页面：`config.load()` → `invoke('get_settings')` | 135-146、220 | mod.rs::new（`services::settings::get_settings`） | ✅ | 原生在构造时同步读，读失败回落默认值（见主栏那行的 ⚠️） |
+| 打开页面：`config.load()` → `invoke('get_settings')` | 135-146、220 | mod.rs::new（`services::settings::get_settings`） | ✅ | 原生在构造时同步读；读/解析失败现在会走失败态（见主栏那行的 🔧，core `settings_load_error` / `reload_settings`），不再静默回落默认值 |
 | 打开页面：`appSettings.load()` → `invoke('get_app_settings')` | 135-146、220 | mod.rs::new（`services::storage::get_app_settings`） | ✅ | 目录展示、向量缓存状态、字体基线都来自它 |
 | 打开页面：`systemFonts.load()` → `invoke('list_system_fonts')` | 221；stores/systemFonts.ts:13-32 | mod.rs::load_fonts（`run_bg`） | ✅ | 同步重活（DirectWrite）走后台线程；**空列表算失败**也在本轮补上（第三、四节） |
 | watch(fontDraft) → `applyFonts()`：写 `--font-*` 与 `--font-sans` | 68；typography.ts:51-58 | mod.rs::fonts_changed（`theme::apply`） | ✅ | 原生只实时应用「界面」角色（其余角色只在幻灯片里生效，页面里靠预览卡体现），有意收窄 |
@@ -396,7 +422,7 @@
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
 | 颜色全部来自 `--studio-*`（含 `--prefs-muted` 的 `color-mix` 提亮、成功 / 危险三件套） | settings.css:6-27 | theme/tokens.rs + `cx.studio().colors` | ✅ | 原生同源；`--prefs-muted`（muted 与 text 混合）用在 12px 帮助文字上，原生直接用 `colors.muted` |
-| 侧栏宽 220px（≤1200px 时 192 / 168） | settings.css:30、268、278 | mod.rs::render（`w(px(204.0))`） | ⚠️ | 差 16px；改一行即可，但会动到整页左右比例，留给集成方定 |
+| 侧栏宽 220px（≤1200px 时 192 / 168） | settings.css:30、268、278 | mod.rs::render（`w(px(204.0))`） | ➖ | 表现层，按 GPUI 原生做法 |
 | 内容区 `max-width: 1280px; margin: 0 auto`、内边距 28/32 | settings.css:60 | mod.rs::render（`px(30) py(28)`） | ➖ | 参考窗口 1440 逻辑像素、可用宽 1220 < 1280，原版也不会居中；只在 >1500px 窗口下才看得出，按 GPUI 省略 |
 | 页头 h1 24px、分区标题 15px、面板 h2 16px | settings.css:62、66、183 | mod.rs::render、appearance.rs::appearance | 🔧 | 本轮 h1 26→24、「字体」/「界面主题」17→15（面板 h2 本来就是 16） |
 | 按钮（高 36、内边距 7/16、hover 描边、active 下沉、禁用 45% 透明、主按钮主色） | settings.css:72-80 | widgets.rs::primary_button / ghost_button + GPUI Kit `Button` | ✅ | 形态由 GPUI Kit 决定（同高、同圆角、hover / disabled 由主题映射），active 下沉位移省略 |
@@ -404,7 +430,7 @@
 | 开关 38×22（「统一所有字体」与「网络代理」） | settings.css:158-161 | GPUI Kit `Switch` | ✅ | 形态一致（同色映射） |
 | 徽章 `.prefs-status` 五态配色 | settings.css:173-180 | models.rs::status_chip / service_form.rs::tone / storage.rs | 🔧 | 本轮照 CSS 修（待测试 / 未配置 / 测试中回默认弱化底，测试中只把圆点画成主色）；`is-testing i` 的 `prefs-pulse` 闪烁省略（视觉） |
 | 摘要行 / 设置行的分隔线（虚线 / 实线） | settings.css:208、222 | models.rs::models、storage.rs::storage | 🔧 | 本轮补摘要虚线；「设置行」下实线原生用行间距代替（视觉） |
-| 主题预览卡 136×84、hover 上移、选中双环 | settings.css:91-97 | mod.rs::theme_card（124×78 + 2px 主色描边） | ⚠️ | 尺寸小 12×6px（视觉几乎不可辨）、hover 上移省略、选中改为单圈主色描边 + 本轮补的勾选徽章 |
+| 主题预览卡 136×84、hover 上移、选中双环 | settings.css:91-97 | mod.rs::theme_card（124×78 + 2px 主色描边） | ➖ | 表现层，按 GPUI 原生做法（尺寸差 12×6px、选中用单圈描边 + 勾选徽章） |
 | 字体表 / 预览卡圆角与底 | settings.css:112-131 | widgets::panel + appearance.rs | ➖ | 原版「字体」区**没有**外层卡片（表自己带边框、`统一所有字体` 自己是张卡）；原生把它们装在一个面板里，见视觉细节 |
 | 动画与过渡（transition、`prefs-spin`、`prefs-pulse`、`transform`） | settings.css:46、74、83-84、96、179-180 等 | — | ➖ | 视觉细节，GPUI 下不做（转圈 / 抖动都是静态图标） |
 | 遮罩毛玻璃（`backdrop-filter: blur`）与卡片阴影 | settings.css:259-260 | GPUI Kit `Dialog` / `AlertDialog` | ➖ | 视觉细节，交给 GPUI Kit 的默认遮罩与阴影 |
@@ -425,13 +451,13 @@
 | 读取失败 / 空列表的错误提示（`systemFonts.error`，主色小字） | 118 | appearance.rs::FontPicker（`error`）+ mod.rs::load_fonts | 🔧 | 本轮补：原来读失败完全没提示（且空列表当成功） |
 | 列表空态：「正在读取系统字体…」/「没有找到字体，试试其他名称。」/「未读取到字体，请刷新重试。」 | 120-121 | appearance.rs::FontPicker::render（`list_content`） | 🔧 | 本轮修：读失败（error 有值）不再永远停在「正在读取系统字体…」，而是走空态第三条 |
 | 列表项：字体名（溢出省略）+「当前」徽章 + 勾选列 | 122-127 | appearance.rs::FontPicker::render（选项行） | ✅ | 「当前」用 `findSystemFont` 判定（name/label/aliases 全等） |
-| 候选列表的排序（无搜索词时「常用优先 + 其余按名称」） | 26-31；stores/systemFonts.ts:22 | appearance.rs::`filtered_font_indices` / `common_names` | ⚠️ | 常用名单与「常用优先」规则一致，但尾段顺序不同：原版按 `label.localeCompare(…,'zh-CN')`（拼音序）排，core 按英文名小写序排（`crates/huanshu-core/src/fonts.rs:48`）；Rust 标准库没有拼音序，要对齐得引入 collator |
+| 候选列表的排序（无搜索词时「常用优先 + 其余按名称」） | 26-31；stores/systemFonts.ts:22 | appearance.rs::`filtered_font_indices` / `common_names` | ➖ | 表现层，按 GPUI 原生做法（原版按 `label.localeCompare(…,'zh-CN')` 拼音序排尾段，原生按英文名序；要对齐得引入中文 collator） |
 | 点列表项：设为高亮项 **并把焦点还给搜索框** | 124（`activeIndex = index; searchInput?.focus()`） | appearance.rs::FontPicker::render（行 `on_click`） | 🔧 | 本轮补焦点回填（原来点完一行要再点一次搜索框才能继续打字） |
 | 列表底部：「系统字体」+「刷新」（`systemFonts.load(true)`，读取中禁用且文案变「读取中…」） | 129-131 | appearance.rs::FontPicker::refresh（`run_bg`） | ✅ | 重新枚举后同步回设置页的「已安装 N 种字体」，并清掉错误 |
 | 预览区：「效果预览」+ 候选名 + 别名 + specimen（用途示例 + `Aa Bb Cc` / 数字）+ 说明 | 133-138 | appearance.rs::FontPicker::render（preview） | ✅ | specimen 两段都用候选字体；七段用途示例文案逐字（`fontRoles[].sample`） |
 | 底部：「所有用途使用此字体」勾选 +「取消」/「应用字体」/「应用到全部」 | 140-144 | appearance.rs::FontPicker::render（footer） | ✅ | 勾选时按钮文案变「应用到全部」；无候选时禁用；「应用到全部」= 一次性铺满七个角色 |
 | 打开时：清空搜索词、重置「所有用途」、把高亮定位到当前字体、**聚焦搜索框** | 43-52 | appearance.rs::open_font_picker / FontPicker::new / fonts_changed | 🔧 | 前三条本来就等价（每次打开新建 `FontPicker`）；聚焦搜索框本轮补 |
-| 键盘：↑ / ↓ / Home / End 在候选里移动 | 63-69 | appearance.rs::FontPicker::on_key | ⚠️ | 原生**做不到**：GPUI 单行输入框把这些键绑成了光标移动动作且不 `propagate()`（`gpui-base` `input/base/state.rs:181-182`、`:218-219`，处理函数见 `movement.rs:345-410`），弹层的 `on_key_down` 收不到；需要给输入框加更高的 key context / 自定义动作 |
+| 键盘：↑ / ↓ / Home / End 在候选里移动 | 63-69 | appearance.rs::FontPicker::on_key | ➖ | 调查后不改（gpui-kit 0.7.3 源码证据）：① `List` / `Select` / `Combobox` / `Command` 把**点击与回车合并成同一个确认动作**（`list.rs:503-514` 等），点击即应用并关弹层，与原版「点击只高亮、回车才应用」（`SystemFontPicker.vue:124` vs `:70-73`）冲突；② 这些组件的列表上下文都不绑 `home`/`end`（`list.rs:26-35`）；③ 搜索时的高亮重置语义也退化。故不换组件、保持现状——搜索 ✅、回车应用 ✅、Home/End ❌（原生侧原因为 GPUI 单行输入框把这些键绑成光标移动且不 `propagate()`，弹层收不到） |
 | 键盘：Enter 选中并应用 | 70-73 | appearance.rs::FontPicker::on_key | 🔧 | 本轮实现（单行输入框对 Enter 会 `cx.propagate()`，事件能冒泡到弹层）；与点击「应用字体」同一条路径 |
 | 键盘：Esc 关闭弹层 | 76-79 | GPUI Kit `Dialog` | ✅ | |
 | 键盘：Tab / Shift+Tab 在弹层内循环 | 80-87 | — | ➖ | GPUI 是焦点驱动的 Tab 顺序（没有 DOM 的 tabindex 循环），有意不做 |
@@ -441,7 +467,7 @@
 
 ### 四、🔧 与 ⚠️ 明细
 
-#### 🔧 本轮已修（17 处）
+#### 🔧 已修（19 处）
 
 | # | 原版位置 | 改了什么 |
 |---|---|---|
@@ -462,51 +488,35 @@
 | 15 | settings.css:220 | 生成设置 / 存储与缓存 / 关于三块 `max-width: 880px`（`generation.rs`、`storage.rs`、`mod.rs::about`） |
 | 16 | SettingsView.vue:473 + settings.css:228-229 | 负载提示块移出面板、改为主色浅底 + 主色图标（`generation.rs::generation`） |
 | 17 | SettingsView.vue:517 + settings.css:240 | 关于卡补 1px 分隔线（`mod.rs::about`） |
+| 18 | SettingsView.vue:210-213 | 「返回工作台」回来源：`Shell.settings_origin` 记进设置前的路由（`shell.rs`），三个出口都走 `ShellHandle::leave_settings`——`project:<id>:<step>` 恢复项目与步骤（`show_step` 把步骤同步回路由），无来源回首页（`mod.rs::leave` / `shell.rs`） |
+| 19 | SettingsView.vue:252-255 | 设置读失败不再是静默回落：core 把 `settings.json` 读/解析失败做成真实信号（`AppState::{settings_load_error, settings_file_error, reload_settings}` + `services::settings::{read_error, reload_settings}`，磁盘探针负责「文件损坏 / 权限」这类失败），失败态显示「设置加载失败，请重试。」+ 原因 + 「重新加载」按钮、分区不渲染、保存按钮禁用且 `save()` 再挡一次（`mod.rs::{read_settings,reload_settings}` + core）；2 个新单测 |
 
-#### ⚠️ 未修（按影响面排序）
+#### ⚠️ 未修
 
-1. **字体弹层的 ↑ / ↓ / Home / End 候选导航**（SystemFontPicker.vue:63-69）。
-   技术原因已查明：GPUI 单行输入框把 `up`/`down`/`home`/`end` 绑成 `MoveUp`/`MoveDown`/`MoveHome`/`MoveEnd`
-   （`gpui-base-0.7.3/src/input/base/state.rs:181-182、218-219`），单行模式下这些动作**不** `cx.propagate()`
-   （`movement.rs:251-253` 直接 return），所以弹层的 `on_key_down` 收不到这些键（Enter 会 `propagate()`，所以 Enter 能实现）。
-   要做需要给输入框挂更靠里的 key context + 自定义动作，或改成不聚焦输入框而由弹层自己处理按键——两条路都要动 GPUI Kit 组件用法，
-   估计 2-4 小时（含真机验证）。**这是本轮唯一「原版有、原生做不到」的交互。**
+本轮**没有遗留 ⚠️**：原来的 7 条差距里，2 条已 🔧（「返回工作台」回来源、设置读失败有提示），
+其余 5 条按新原则归入 ➖「表现层，按 GPUI 原生做法」：
 
-2. **「返回工作台」应回来源页**（SettingsView.vue:210-213）：原版 `history.back()`，从工作流侧栏（WorkflowView.vue:462）进设置时回项目页。
-   原生固定回首页。修需要 `ShellHandle` 记一个来源路由（`shell.rs`，别人的范围），本页再改 1 行，估计 1 小时。
-
-3. **设置读失败没有提示**（SettingsView.vue:252-255）：原生 `get_settings` / `get_app_settings` 失败是 `unwrap_or_default()`，
-   界面照常显示默认值，用户保存后会把默认值写回配置文件。要照原版加「设置加载失败，请重试。」+「重新加载」，
-   需要新的 `load_error` 状态 + 重读并重建三个服务表单 / 字体基线的整套刷新逻辑，估计 2-3 小时（含真机才能触发的失败路径）。
-   触发条件很窄（配置文件损坏 / 权限问题），所以本轮只记录。
-
-4. **离开确认框的初始焦点**（SettingsView.vue:191-201）：原版把焦点放到「保存并离开」。原生没设初始焦点，
-   落在哪个按钮看 GPUI Kit `Dialog` 的默认行为；本机没验证。若要保持一致，可用 `Dialog` 的按钮 `tab_index` / 焦点 API，
-   估计 0.5-1 小时（要先确认 Kit 支持）。
-
-5. **侧栏宽 204 vs 220px**（settings.css:30）：差 16px。改一行，但会整体挪动左右比例，建议集成方定。
-
-6. **主题预览卡 124×78 vs 136×84**（settings.css:91）：差 12×6px（≈ 9 %），肉眼几乎看不出；改两行即可。
-
-8. **系统字体的排序规则**（typography/store 层）：原版 `stores/systemFonts.ts:22` 按
-   `label.localeCompare(b.label, 'zh-CN')`（拼音序）排；core `fonts::enumerate_system_fonts` 按**英文名**小写序排
-   （`crates/huanshu-core/src/fonts.rs:48`）。无搜索词时候选列表「常用优先 + 其余」的尾段顺序因此不同。
-   要完全对齐得引入中文 collator（新依赖）或在页面里重排（Rust 标准库没有拼音序），估计 1-2 小时。
-
-以上 1–3 条是本页真正值得排期修的；4–8 条是细节（4 需先确认 GPUI Kit 的对话框焦点能力，5、6、8 各一到两行，
-7 需要新依赖）。
+| # | 项 | 原版依据 | 归 ➖ 的理由 |
+|---|---|---|---|
+| 1 | 字体弹层的 ↑ / ↓ / Home / End 候选导航 | `SystemFontPicker.vue:63-69` | 表现层，按 GPUI 原生做法（不换 GPUI Kit 列表组件：`List`/`Select`/`Combobox`/`Command` 把点击与回车合并成同一个确认动作、列表上下文不绑 `home`/`end`，换过去反而破坏「点击只高亮、回车才应用」；详见第三节该行） |
+| 2 | 离开确认框的初始焦点 | `SettingsView.vue:191-201` | 表现层，按 GPUI 原生做法 |
+| 3 | 侧栏宽 204 vs 220px | `settings.css:30` | 表现层，按 GPUI 原生做法 |
+| 4 | 主题预览卡 124×78 vs 136×84 | `settings.css:91` | 表现层，按 GPUI 原生做法 |
+| 5 | 系统字体的排序规则（拼音序） | `stores/systemFonts.ts:22` | 表现层，按 GPUI 原生做法 |
 
 ---
 
 ### 五、与 `parity.md` 设置小节的核对
 
-逐条核对 `docs/native/parity.md` 设置一节（42–61 行，16 行）：
+逐条核对 `docs/native/parity.md` 设置一节（42–62 行，17 行，本轮新增「读取设置失败」一行）：
 
 - 「字体：七个角色、可搜索系统字体下拉、统一所有字体、恢复默认 ✅」——实现无误；但「可搜索」这一行**没有提到**
-  原版搜索框里的 ↑↓/Home/End 候选导航，本轮发现它在 GPUI 里做不到（⚠️ 第 1 条）。**该行表述偏乐观**，建议补一句说明。
+  原版搜索框里的 ↑↓/Home/End 候选导航，本轮调查后判定在 GPUI 里不做（➖ 第 1 条，理由见第四节）。**该行表述偏乐观**，parity.md 已补一句说明。
 - 「界面主题卡片：点击预览、保存后生效、撤销 ✅」——本轮发现两处细节当时没做完（选中勾选徽章、换主题会丢字体预览），已 🔧；该行本身不算不实。
 - 「底部保存条：状态、撤销、保存 ✅」——同一处：原版还有一个「Ctrl + S」提示块与脏时主色状态点，当时没做，已 🔧。
-- 其余 13 行（左侧五分区/返回工作台/版本号、分区标题说明、演示预览与界面预览、三类服务卡片与状态、
+- 「左侧五个分区、返回工作台、版本号 ✅」——本轮把「返回工作台」改成回来源页（🔧），parity.md 该行已同步。
+- 「读取设置失败」是第十五轮新增的一行（✅，parity.md 已加）。
+- 其余 12 行（分区标题说明、演示预览与界面预览、三类服务卡片与状态、
   地址与 Key 与模型下拉、SOCKS5、测试连接、生成设置、数据与媒体目录、向量缓存初始化、关于与帮助、
   离开确认、Ctrl+S）与代码一致，未发现「标了 ✅ 其实没做完」的行。
 - 需要单独指出的措辞问题：「存储：数据目录、媒体目录展示 ✅」——原版这两个字段是 `readonly` 输入框，原生是只读文本块，
@@ -516,19 +526,23 @@
 
 ### 六、本轮的验证情况
 
-- **只改了** `apps/huanshu-native/src/pages/settings/` 下的 6 个文件（`mod.rs`、`appearance.rs`、`models.rs`、
+- **第十四轮只改了** `apps/huanshu-native/src/pages/settings/` 下的 6 个文件（`mod.rs`、`appearance.rs`、`models.rs`、
   `service_form.rs`、`generation.rs`、`storage.rs`）；原版 `src/**` 一行未动，`widgets.rs` / `shell.rs` / `present.rs` /
   `drive.ps1` / `shots.ps1` 未碰。
 - 改完对 6 个文件跑了 `rustfmt --edition 2021`（先 `--check` 看差异，只落在我改过的 5 处），随后 `--check` 为 CLEAN；
   rustfmt 能正常解析也说明语法无误。
-- **没有跑** `cargo build / check / test`（共享 target 目录，按约定由集成方统一验证），也**没有**跑
-  `tools/shots.ps1` / `drive.ps1`（会触发编译）。因此 17 处 🔧 都是代码级对齐，**没有真机走查**。
+- **第十五轮的两处 🔧**（返回来源、设置读失败）跨 `pages/settings/mod.rs`、`shell.rs`（`settings_origin` / `leave_settings` /
+  `show_step`）与 core（`AppState::{settings_load_error, settings_file_error, reload_settings}`、`services::settings::{read_error, reload_settings}`、
+  磁盘探针），共 2 个新单测；由本轮代码负责人验证，审计侧只同步文档。
+- 两轮都**没有跑** `cargo build / check / test`（共享 target 目录，按约定由集成方统一验证），也**没有**跑
+  `tools/shots.ps1` / `drive.ps1`（会触发编译）。因此 19 处 🔧 都是代码级对齐，**没有真机走查**。
   集成后建议用 `tools/shots.ps1 -Only settings-appearance,settings-models,settings-generation,settings-storage,settings-about`
   重拍对照图，重点看：主题卡勾选徽章、底部「Ctrl + S」提示与状态点颜色、生成设置的负载提示底色、
   存储与关于的 880px 宽度、状态徽章色调。
-- 需要人工点的两处：① 打开字体弹层后能否直接打字（本轮补的聚焦）；② 弹层里按 Enter 是否应用并关闭（本轮补的 Enter）。
-  若 Enter 无效，说明该版本 GPUI 在别处吞掉了 Enter，需要退回点击路径。
-
+- 需要人工点的两处：① 打开字体弹层后能否直接打字（第十四轮补的聚焦）；② 弹层里按 Enter 是否应用并关闭（同上）。
+  若 Enter 无效，说明该版本 GPUI 在别处吞掉了 Enter，需要退回点击路径。第十五轮新增两处也建议人工走一遍：
+  ③ 从工作流侧栏进设置再点「返回工作台」（应回到来源项目的来源步骤）；④ 把沙箱里的 `settings.json` 改成非法 JSON
+  再进设置页（应显示「设置加载失败，请重试。」+ 原因 +「重新加载」，保存按钮禁用）。
 
 ---
 
@@ -587,7 +601,7 @@
 | 跳过提示条（information 图标 +「跳过此步骤仍可使用幻灯片播放功能，但无法生成新幻灯片」） | :337-340 | wizard.rs:532-552 | ✅ | 逐字 |
 | 三个面板标题：大语言模型 / 向量模型 / 多模态模型 | :344, 376, 408 | wizard.rs:515-531（`ModelTarget::ALL`） | ✅ | 顺序一致 |
 | 面板字段「API 地址」+ 占位 `http://127.0.0.1:1234` | :345-350, 377-382, 409-414 | `service_form.rs::ServiceForm::compact`（service_form.rs:534-538） | ✅ | 复用设置页表单，占位逐字 |
-| 面板字段「API Key (本地留空)」+ 密码框 + 占位 `sk-...` | :352-365, 384-397, 416-429 | service_form.rs:539-550 | ⚠️ | 两处差异，都在 service_form.rs（本轮不可改）：①原生是全角「（本地留空）」，原版是半角 `(本地留空)`（:356 字节为 `0x28`/`0x29`）；②原生多一个「显示/隐藏 API Key」眼睛按钮，原版向导的密码框没有切换（:360-364 只有 `type="password"`） |
+| 面板字段「API Key (本地留空)」+ 密码框 + 占位 `sk-...` | :352-365, 384-397, 416-429 | service_form.rs:539-550 | ➖ | 表现层，按 GPUI 原生做法（原生是全角「（本地留空）」、且多一个「显示/隐藏 API Key」眼睛按钮，都在 `service_form.rs`） |
 | 面板字段「模型」+ 占位（各服务默认模型名） | :366-372, 398-404, 430-436 | service_form.rs:551-557 | ✅ | 占位 = 草稿模型名，清空输入后可见（与原版同） |
 | 第 2 步错误提示块（`.error-msg`，`v-if="modelError"`） | :440, 911-919 | wizard.rs:855-868 | ✅ | 文案、配色、圆角一致 |
 | 错误提示只在第 2 步渲染 | :440（`v-if` 在第 2 步的 `div` 内，第 3、4 步没有） | wizard.rs:855-868（卡片级） | ➖ | 有意：第 3 步的失败原版另有 `embeddingStatus`（:173）兜底；第 4 步 `finishWizard` 失败原版**完全没有可见反馈**（只有 :212 写 `modelError`）。原生在所有步骤都显示，避免「进入 Studio」点了没反应 |
@@ -606,7 +620,7 @@
 | 底栏「上一步」+ `arrow-left`（第 2 步起显示） | :536-542 | wizard.rs:733-737 | ✅ | 图标在文字之前，与原版一致 |
 | 底栏第 1 步「下一步 →」（`canProceedStep1` 为真才出现） | :544-550 | wizard.rs:741-746 | 🔧 | 原生箭头画在文字前（GPUI 的 `Button::icon` 固定在前，gpui-component `button.rs:766-777`）→ 改用 `.child()` 追加，箭头落在文字之后 |
 | 底栏第 2 步「跳过」（永远显示） | :551-561 | wizard.rs:749-751 | ✅ | `skipLlm=skipEmbedding=true → step 4`（:79-81）一致 |
-| 底栏第 2 步「下一步 →」（`canProceedStep2` 为真才出现） | :562-568 | wizard.rs:753-761 | 🔧 | 箭头位置同上；另原生在此按钮上加了「校验中禁用」，涉及校验本身 → 见 ⚠️-1 |
+| 底栏第 2 步「下一步 →」（`canProceedStep2` 为真才出现） | :562-568 | wizard.rs:753-761 | 🔧 | 箭头位置同上；另原生在此按钮上加了「校验中禁用」，涉及校验本身 → 见第 6 节（有意偏离：提前发现模型配置错误） |
 | 底栏第 3 步「下一步 →」（`!skipEmbedding && progress<100` 时禁用） | :569-576 | wizard.rs:764-772 | 🔧 | 箭头位置同上；禁用条件逐字 |
 | 底栏第 4 步「进入 Studio →」（文案固定、pulse 动画） | :577-583 | wizard.rs:775-782 | 🔧 | 原生原先提交期间把文案改成「进入中…」→ 改回固定「进入 Studio」；提交中禁用（防重复提交）保留；pulse 动画见视觉细节 |
 | 第 2 步三列网格；`<700px` 时单列 | :342, 799-803, 823-827 | wizard.rs:553（flex 三列） | ✅ | 原版媒体查询在桌面窗口下永不触发（主窗口最小宽 1080，main.rs:74） |
@@ -629,7 +643,7 @@
 | `prevStep()`：第 2→1、第 3→2、第 4→（`skipLlm` ? 1 : 3） | :92-100 | `prev_step`:182-196 | ✅ | |
 | `browseDataDir()`：目录对话框；选中后 `dataDir = 选中`；媒体目录不含 `/projects/` 时设为 `<选中>/media` | :102-110 | `browse_data_dir`:207 + `suggest_media_dir`:26（单测 `browsing_data_dir_refreshes_media_dir_unless_it_is_a_projects_dir`:879） | ✅ | `\` 与 `/` 都容忍 |
 | `browseMediaDir()` | :112-117 | `browse_media_dir`:222 | ✅ | |
-| `verifyModels()`：依次 `list_models(llm/embedding/multimodal)`，任一失败写 `modelError` | :119-149 | `verify_models`:271-306 | ⚠️ | 原版**没有任何调用点**（全仓 grep 只有 :119 的定义与函数体内的三处 `invoke`）——原版第 2 步点「下一步」不校验、直接进第 3 步；原生把它接在「下一步」前，失败不翻页。详见 ⚠️-1 |
+| `verifyModels()`：依次 `list_models(llm/embedding/multimodal)`，任一失败写 `modelError` | :119-149 | `verify_models`:271-306 | ➖ | **有意偏离：提前发现模型配置错误**——原版**没有任何调用点**（全仓 grep 只有 :119 的定义与函数体内的三处 `invoke`），第 2 步点「下一步」不校验、直接进第 3 步；原生把它接在「下一步」前，失败不翻页（并在校验期间禁用「下一步」）。这是有意保留的偏离，不是未完成的差距 |
 | `startEmbeddingInit()`：置 `isInitializing`、进度 0、状态「正在初始化图标向量库...」→ 写三类服务到 config → `config.save()` → `invoke("ensure_icon_embeddings")` → 进度 100 /「初始化完成！」；失败 →「初始化失败: {e}」+ `modelError`；`finally` 复位 `isInitializing` | :151-178 | `start_embedding_init`:317-364 | ✅ | 原生：`get_settings` → 覆盖三类服务 → `save_settings` → `ensure_icon_embeddings`（`run_async`）；`initializing` 在成功/失败两条出口都复位（wizard.rs:346-358） |
 | `finishWizard()`：`save_app_settings`（data_dir、media_dir、llm_configured、embeddings_ready、initialized_embedding_model）→ 未跳过时写三类服务并 `config.save()` → `complete_first_run(llmConfigured)` → `router.push("/")`；失败 → `modelError` | :180-214 | `finish_wizard`:366-425 | ✅ | 顺序一致（`run_bg` 里做三步：读-改-写 `app_settings` → `save_settings` → `complete_first_run`）；`finishing` 在两条出口复位，成功回调 `navigate(Home)` |
 | `initialized_embedding_model` 的取值：`!skipLlm && !skipEmbedding ? 模型名 : ""` | :188-191 | `finish_wizard`:378-386 | ✅ | |
@@ -704,12 +718,14 @@
 |---|---|
 | ✅ 一致 | 63 |
 | 🔧 本轮已修 | 9 |
-| ⚠️ 有差距未修 | 2 |
-| ➖ 有意不做 | 7 |
+| ⚠️ 有差距未修 | 0 |
+| ➖ 有意不做 | 9 |
 | 合计 | 81 |
 
-（按第 1–3 节的表逐条计数：1.1 节 50 条 = ✅37 / 🔧9 / ➖3 / ⚠️1；1.2 节 16 条 = ✅14 / ➖1 / ⚠️1；
-第 2 节 7 条全 ✅；第 3 节 8 条 = ✅5 / ➖3。`1.3 节`与第 5 节是对已有 ➖ / 🔧 行的汇总，不重复计数。）
+（按第 1–3 节的表逐条计数：1.1 节 50 条 = ✅37 / 🔧9 / ➖4；1.2 节 16 条 = ✅14 / ➖2；
+第 2 节 7 条全 ✅；第 3 节 8 条 = ✅5 / ➖3。`1.3 节`与第 5 节是对已有 ➖ / 🔧 行的汇总，不重复计数。
+本轮把原 2 条 ⚠️ 都归入 ➖：API Key 行按「表现层，按 GPUI 原生做法」，
+`verifyModels` 行标为**有意偏离：提前发现模型配置错误**。）
 
 ### 5. 本轮改了什么（🔧）
 
@@ -730,19 +746,22 @@
 
 ### 6. 未修差距（⚠️）
 
-| # | 差距 | 原版依据 | 估计工作量 |
+本轮**没有遗留 ⚠️**。原来记的 2 条都改判了：
+
+| # | 原差距 | 原版依据 | 本轮结论 |
 |---|---|---|---|
-| 1 | 第 2 步点「下一步」的流程不同：原版**不校验**直接进第 3 步（`verifyModels` 定义在 :119-149 但全仓无调用点）；原生先对三类服务依次 `list_models`，任一失败就不翻页，并且在校验期间禁用「下一步」。没有 LM Studio 时必须点「跳过」才能往下走 | FirstRunWizard.vue:119-149（定义）、:562-568（按钮只接 `nextStep`）、:85-86（第 2 步只改 `currentStep`） | 去掉校验：删 `verify_models` / `next_from_models` / `verifying` 与其禁用，约 30 行（wizard.rs）。**这是产品决策**：留着能早发现模型配置错误，去掉才与原版逐字一致。若要保留，建议在 parity.md:69 标注为有意偏离 |
-| 2 | 第 2 步面板的「API Key」行：文案括号是全角「（本地留空）」（原版半角 `(本地留空)`，:356 字节 `0x28`/`0x29`），并且多一个显示/隐藏 API Key 的眼睛按钮（原版向导无切换，:360-364） | :352-365, 384-397, 416-429 | 2 行（`service_form.rs:539-550`）——但该文件不在本轮可改范围；它同时服务设置页，而设置页原版**有**眼睛按钮（`SettingsView.vue:374`），所以只能按页面区分：约 10 行（`ServiceForm::compact` 加一个开关） |
+| 1 | 第 2 步点「下一步」的流程不同：原版**不校验**直接进第 3 步（`verifyModels` 定义在 :119-149 但全仓无调用点）；原生先对三类服务依次 `list_models`，任一失败就不翻页，并且在校验期间禁用「下一步」。没有 LM Studio 时必须点「跳过」才能往下走 | FirstRunWizard.vue:119-149（定义）、:562-568（按钮只接 `nextStep`）、:85-86（第 2 步只改 `currentStep`） | 归 ➖：**有意偏离：提前发现模型配置错误**（保留校验，不再当作待修差距；若要对齐原版删掉约 30 行：`verify_models` / `next_from_models` / `verifying` 与其禁用） |
+| 2 | 第 2 步面板的「API Key」行：文案括号是全角「（本地留空）」（原版半角 `(本地留空)`，:356 字节 `0x28`/`0x29`），并且多一个显示/隐藏 API Key 的眼睛按钮（原版向导无切换，:360-364） | :352-365, 384-397, 416-429 | 归 ➖：表现层，按 GPUI 原生做法 |
 
 ### 7. parity.md 与实际的出入
 
-1. **`docs/native/parity.md:69`「配置大模型（三类服务）并校验」**：写的是「「下一步」前照 `verifyModels` 依次 `list_models`，
-   失败不翻页」。原生**确实**这么做了，但原版的 `verifyModels`（`FirstRunWizard.vue:119-149`）**没有任何调用点**——
-   原版点「下一步」不校验、直接进第 3 步。所以这一行描述的不是原版行为，建议补上「有意偏离」的说明（见 ⚠️-1）。
+1. **`docs/native/parity.md:70`「配置大模型（三类服务）并校验」**：行里已写明「「下一步」前依次 `list_models`，失败不翻页；
+   **有意偏离**：原版这步其实不校验——`verifyModels`（`FirstRunWizard.vue:119-149`）全仓无调用点，是死代码；
+   原生保留校验（能提前发现模型配置错误，若要对齐原版删掉即可，约 30 行）」。本轮据此把该行状态由 ✅ 改为
+   「有意偏离（提前发现模型配置错误）」，与本文档第 6 节一致。
 2. 其余首次向导与全局行（parity.md:12-23、:63-72）与代码一致：`Shell::new` 的首次启动进向导、
    `handle.navigate(Route::Home)` 的完成流程、`app_settings.app_theme` 的主题存储、五条路由与 `--route` 都在。
-3. `docs/native/parity.md` 未修改（按要求）。
+3. `docs/native/parity.md` 本轮按上面的口径改了两处（:70 向导校验这一行的「有意偏离：提前发现模型配置错误」、向导小节文字）；其余未动。
 
 ### 8. 代码文件之外
 
@@ -752,6 +771,12 @@
 与本次审计无关）。未跑 `cargo build/check/test`（按纪律由集成方统一验证），
 只跑了 `rustfmt --edition 2021`（含 `--check` 通过）。
 
+两处例外说明（第十五轮文档同步）：
+
+- 本节说的「`docs/native/parity.md` 未动」只对首次向导审计那一轮成立；第十五轮按第 7 节的口径改了 parity.md 的
+  向导两处（:70 的校验标注为「有意偏离：提前发现模型配置错误」、向导小节文字）。
+- 本文件（`audit-wizard.md`）在本轮的改动只有记号翻转（1.1 节的 API Key 行、1.2 节的 `verifyModels` 行）
+  与统计口径，**没有任何代码改动**。
 
 ---
 
@@ -772,7 +797,9 @@
 主题相关的纯视觉细节（阴影、渐变、毛玻璃、动画、字号/宽度的细微差）不逐条列，每个文件一行「视觉细节」。
 对照截图：`docs/native/reference/project-step1.png` / `new-step1.png` ↔ `docs/native/shell/project-step1-0.png` / `new-step1-0.png`（同一份沙箱数据、同一主题，肉眼已对齐）。
 
-本轮累计（正文第 1–5 节的逐项表，共 123 行）：**✅ 94 / 🔧 11 / ⚠️ 4 / ➖ 14**（另见 B 节两个调查项；统计明细见文末）。
+本轮累计（正文第 1–5 节的逐项表，共 123 行）：**✅ 94 / 🔧 11 / ⚠️ 3 / ➖ 15**（另见 B 节两个调查项；统计明细见文末）。
+第十五轮只做记号归并：原「预览渲染语义差异（breaks/linkify/html）」的 ⚠️ 按新原则归入 ➖「表现层，按 GPUI 原生做法」；
+KaTeX 公式保持 ⚠️（另起一轮，需 KaTeX 等价排版/位图管线）。
 
 ---
 
@@ -813,7 +840,7 @@
 | 草稿兜底名：名称 → 去扩展名文件名 → 「未命名演示」 | `WorkflowView.vue:229-233`、`:243`、`:263` | `mod.rs::draft_project_name`（`:200-210`） | ✅ | |
 | 「开始 AI 生成」：校验 → 取消防抖 → 立即保存 → 清选中页 → 切第 2 步 → `gen.generate(...)` | `WorkflowView.vue:291-310` | `mod.rs::start_generation`（`:758-794`） | ✅ | 生成的牌组由 core 落库，页面不再二次存（原版注释 `:308-309`） |
 | 「开始 AI 生成」可用条件：文稿非空 + 名称非空 + 没有生成/重试在跑 | `WorkflowView.vue:359-363` | `mod.rs::can_generate_local`（`:133-135`）+ `generation.rs::busy`（`:263-265`） | ✅ | 全应用同一时刻只有一次生成 → parity.md 第 103 行 |
-| 第三步 Ctrl+S / Esc（window 级 keydown） | `WorkflowView.vue:377-391` | 第三步自己的 `track_focus` + `on_key_down` | ➖ | 本轮范围外（`step3.rs` 审计）；原版是**全局** window 监听（`:389-391`），原生改成页面焦点内（有意改进）→ parity.md 第 140 行 |
+| 第三步 Ctrl+S / Esc（window 级 keydown） | `WorkflowView.vue:377-391` | 第三步自己的 `track_focus` + `on_key_down` | ➖ | 本轮范围外（`step3.rs` 审计）；原版是**全局** window 监听（`:389-391`），原生改成页面焦点内（有意改进）→ parity.md 第 143 行 |
 | 演示覆盖层 `<PresentationOverlay>` | `WorkflowView.vue:553-562` | `present.rs` | ➖ | 别人的负责范围（parity.md「演示」一节） |
 | `PdfExportDialog` / `exportPdf()` | `WorkflowView.vue:553`、`:78-90` | `export.rs` + 第三步栏头 | ➖ | 别人的负责范围 |
 | 确认对话框 / 轻提示 | 原版工作流页：**没有**（那四个文件里既没有 `window.confirm`，也没有 `alert` 或 toast 调用） | 原生同样没有 | ➖ | 依据：对 `WorkflowView.vue`、`Step1Prepare.vue`、`MarkdownWorkbench.vue`、`useMediaLibrary.ts` 检索 confirm / alert / toast → 0 命中 |
@@ -878,8 +905,8 @@
 | 预览：每页一张卡片 + 右上角 `P{n}` 页码徽章 | `MarkdownWorkbench.vue:337-347`（`:344`）、样式 `:442-474` | `step1.rs::render` preview_card（`:795-829`，`P{index+1}` `:815`） | ✅ | |
 | 预览分页规则（`splitSlides`：H2/H3 切页；`$$` 显示公式块内不切） | `MarkdownWorkbench.vue:64-115` | core `markdown_tools::split_preview_pages`（快照单测 `tests/markdown_tools.rs`） | ✅ | 注释互相指认（`MarkdownWorkbench.vue:61-63`） |
 | 预览空态：「预览区将实时显示 Markdown 渲染效果」（空文稿也是一张 P1 卡） | `MarkdownWorkbench.vue:54-59`、`:101-104` | `step1.rs::render`（`:826`、空文稿分支 `:830-831`） | ✅ | |
-| 预览渲染：**数学公式（KaTeX）** | `MarkdownWorkbench.vue:4`（`@vscode/markdown-it-katex`）、`:47`（`md.use(markdownItKatex)`） | `TextView::markdown`（`step1.rs:820`） | ⚠️ | **公式不渲染**：gpui 的 markdown 对未被插件认领的公式回落成原文（`gpui-base-0.7.3/src/text/format/markdown.rs:869-880`），块级公式当代码块（`:1056-1060`）。工作量：**大**（要接一个 KaTeX 等价的排版/位图管线；框架只给了 inline plugin 钩子，见 `src/text/text_view.rs:1179` 的测试） |
-| 预览渲染：软换行 `breaks: true` / `linkify` / `typographer` / `html: false` | `MarkdownWorkbench.vue:41-46` | `TextView::markdown`（标准 CommonMark） | ⚠️ | 原版单换行成 `<br>`、裸链接自动成链、`html:false` 让 HTML 当纯文本；gpui 侧：软换行按空格合并、`Node::Html` 会被**解析渲染**（`gpui-base-0.7.3/src/text/format/markdown.rs:1063-1068`）。工作量：中（要写 soft-break / html 的 inline·block plugin，并改用 `TextView::markdown_extensions`） |
+| 预览渲染：**数学公式（KaTeX）** | `MarkdownWorkbench.vue:4`（`@vscode/markdown-it-katex`）、`:47`（`md.use(markdownItKatex)`） | `TextView::markdown`（`step1.rs:820`） | ⚠️ | **公式不渲染**：gpui 的 markdown 对未被插件认领的公式回落成原文（`gpui-base-0.7.3/src/text/format/markdown.rs:869-880`），块级公式当代码块（`:1056-1060`）。工作量：**大**（要接一个 KaTeX 等价的排版/位图管线；框架只给了 inline plugin 钩子，见 `src/text/text_view.rs:1179` 的测试）——**另起一轮**（需 KaTeX 等价排版/位图管线），本轮不动 |
+| 预览渲染：软换行 `breaks: true` / `linkify` / `typographer` / `html: false` | `MarkdownWorkbench.vue:41-46` | `TextView::markdown`（标准 CommonMark） | ➖ | 表现层，按 GPUI 原生做法（原版单换行成 `<br>`、裸链接自动成链、`html:false` 让 HTML 当纯文本；gpui 侧软换行按空格合并、`Node::Html` 会被解析渲染——`TextView` 自带的 CommonMark 行为即可） |
 | 编辑区 ↔ 预览区滚动同步（按比例、80ms 回声守卫） | `MarkdownWorkbench.vue:219-262` | `step1.rs::sync_editor_to_preview`（`:563-570`）、`sync_preview_wheel`（`:592-620`）、`editor_est_max_scroll`（`:523-549`） | ⚠️ | 详情见 B-2：编辑器真实最大滚动量不可得（估计值）、滚动条拖拽挂不上。parity.md 第 95 行 🟡 |
 | 文稿变化 → 编辑器整体替换后同步一次预览 | `MarkdownWorkbench.vue:275-289`（`nextTick` + `syncEditorToPreview`） | `step1.rs` 订阅编辑器 observe（`:155-165`，每次状态通知都同步一次） | ✅ | 原生同步更频繁（打字也触发），有回声守卫，行为等价 |
 | 窄屏（≤980px）编辑 / 预览 tab 切换 + 单栏 | `MarkdownWorkbench.vue:303-320`、`:575-587` | 未做 | ➖ | 原生窗口最小 1080×680（`apps/huanshu-native/src/main.rs:74`），980px 断点**不可达**；1100px 断点（`WorkflowView.vue:1291-1297` 侧栏下移）只在 1080–1100 的窄带内可达，桌面版不做响应式栈叠 |
@@ -939,7 +966,7 @@
 #### B-1 图表围栏（```chart）的校验提示
 
 **结论：原版第一步没有任何围栏校验 UI；围栏错误只在「开始 AI 生成」后由 core 抛出，显示在第二步的头部消息里。**
-parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报错」把这件事挂在第一步，**不是一个未做项**（该行不实，本轮不改 parity.md，汇报里单独说明）。
+parity.md 第 107 行（现已改成「图表围栏的校验提示 ✅ · 原版无单独提示」并记为已真机验证）与本文档结论一致；第十四轮曾把它记成「⬜ `input.rs` 的解析报错」挂在第一步，那行当时不实，本轮确认已经修正。
 
 查证过程与依据：
 
@@ -1007,8 +1034,8 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 |---|---|---|
 | ✅ 一致 | 94 | 28 / 28 / 10 / 24 / 4 |
 | 🔧 本轮已修 | 11 | 5 / 5 / 0 / 0 / 1。见下表 |
-| ⚠️ 有差距未修 | 4 | 0 / 1 / 3 / 0 / 0。见下表 |
-| ➖ 有意不做 | 14 | 5 / 3 / 2 / 3 / 1。见下表（含 5 条「视觉细节」行） |
+| ⚠️ 有差距未修 | 3 | 0 / 1 / 2 / 0 / 0。见下表 |
+| ➖ 有意不做 | 15 | 5 / 3 / 3 / 3 / 1。见下表（含 5 条「视觉细节」行） |
 
 #### 本轮 🔧 清单
 
@@ -1028,14 +1055,13 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 
 #### 本轮 ⚠️ 清单（附估计工作量）
 
-（与上面正文的 4 条 ⚠️ 行一一对应；第 2 条在正文里是一行，实际含两个子问题。）
+（与上面正文的 3 条 ⚠️ 行一一对应；第 2 条在正文里是一行，实际含两个子问题。）
 
 | # | 差距 | 位置 | 工作量 |
 |---|---|---|---|
 | 1 | 文稿/素材拖入的**悬停**高亮与覆盖层显示不出来（框架无 drag-enter 钩子，只能收到 drop 与 exit） | 原版 `Step1Prepare.vue:213-220,236-243,474-484`；原生 `step1.rs:105,107`（两个标志位）、`:864-877`、`:1220-1226` | 大（要上游 gpui-kit 支持拖入悬停事件） |
 | 2 | 编辑区↔预览区滚动同步（正文一行，含两件事）：(a) 编辑器最大滚动量只能估计（soft-wrap 下中段有偏差）；(b) 双向的**滚动条拖拽**同步（编辑器内建滚动条拖拽不通知实体；预览侧干脆没有滚动条元素） | 原版 `MarkdownWorkbench.vue:219-262`；原生 `step1.rs:523-549`（估计）、`:592-620`（滚轮回调） | (a) 中（见 B-2：唯一办法是越界探针，会闪一帧，不建议；除非上游公开 `scroll_size`）；(b) 中-大（要自建 `Scrollbar` 元素 + 包装 `ScrollbarHandle`，约 40-60 行） |
-| 3 | 预览**不渲染数学公式**（原版 KaTeX；gpui 对未认领公式回落原文、块级公式当代码块） | 原版 `MarkdownWorkbench.vue:4,47`；gpui `text/format/markdown.rs:869-880,1056-1060` | 大（需要 KaTeX 等价排版；框架只给了 inline plugin 钩子） |
-| 4 | 预览**渲染语义差异**：原版 `breaks:true`（单换行成 `<br>`）/`linkify`/`typographer`/`html:false`，gpui 是标准 CommonMark 且会渲染内联 HTML | 原版 `MarkdownWorkbench.vue:41-46`；gpui `text/format/markdown.rs:1063-1068` | 中（写 soft-break / html 的 plugin，改用 `TextView::markdown_extensions`） |
+| 3 | 预览**不渲染数学公式**（原版 KaTeX；gpui 对未认领公式回落原文、块级公式当代码块） | 原版 `MarkdownWorkbench.vue:4,47`；gpui `text/format/markdown.rs:869-880,1056-1060` | 大（需要 KaTeX 等价排版；框架只给了 inline plugin 钩子）。**另起一轮**（需 KaTeX 等价排版/位图管线），本轮不动 |
 
 > 另有两条**归入 ➖ 的「视觉细节」行**、未计入 ⚠️：预览标题配色未逐字对齐原版硬编码色（h2 `#f5d76e` / h3 `#8fd6ff` / h4 `#b9c5dd`，`MarkdownWorkbench.vue:503-519`，跟随 GPUI Kit 主题）；第一步预览区没有可见滚动条滑块（原版 WebView 的 `overflow-y: auto`）。
 
@@ -1043,7 +1069,7 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 
 | # | 项 | 依据 / 原因 |
 |---|---|---|
-| 1 | 第三步 Ctrl+S / Esc（WorkflowView 的 window 级 keydown） | `WorkflowView.vue:377-391`：原版是全局 window 监听；原生按 README 规矩 6 用页面 `track_focus`（parity.md 第 140 行已记为有意改进），属第三步审计 |
+| 1 | 第三步 Ctrl+S / Esc（WorkflowView 的 window 级 keydown） | `WorkflowView.vue:377-391`：原版是全局 window 监听；原生按 README 规矩 6 用页面 `track_focus`（parity.md 第 143 行已记为有意改进），属第三步审计 |
 | 2 | 演示覆盖层 / PDF 导出对话框 | `WorkflowView.vue:553-562`、`:78-90`；present.rs / export.rs 是别人的范围 |
 | 3 | 工作流页的确认对话框 / 轻提示 | 那四个文件里既没有 `window.confirm`，也没有 `alert` 或 toast 调用（候选 0 命中） |
 | 4 | 拖入文稿的扩展名过滤（原生比原版**严**） | 原版 `Step1Prepare.vue:222-234` 不校验扩展名（任何文件当文本读）；原生 `step1.rs:67-69,865-870` 只认 `.md`/`.txt`——有意收紧，避免二进制进编辑器 |
@@ -1051,7 +1077,8 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 | 6 | `repairSlide` | `stores/generation.ts:356-360`；全仓库无调用方（检索 `repairSlide` 只命中定义本身） |
 | 7 | `completedSlides` | `stores/generation.ts:95,175,192,245,271,288,314,369,390`；界面无消费者（只有 store 内部读写） |
 | 8 | `progress` / `lastError` 的界面消费 | `stores/generation.ts:93,97`；检索 `gen.progress` / `lastError` 在界面侧 0 命中 |
-| 9 | 各节末尾的「视觉细节」行 | 共 5 行：框架（`WorkflowView.vue:598-606,689-759` 等）、第一步（`Step1Prepare.vue` 顶栏/工具行/素材卡样式）、编辑器预览（`MarkdownWorkbench.vue:449-519,117-179`）、store 无、media composable 无 | 阴影/渐变/动画/字号/宽度，逐条对齐无意义 |
+| 9 | 预览**渲染语义差异**：原版 `breaks:true`（单换行成 `<br>`）/`linkify`/`typographer`/`html:false`，gpui 是标准 CommonMark 且会渲染内联 HTML | 表现层，按 GPUI 原生做法（原版 `MarkdownWorkbench.vue:41-46`；gpui `text/format/markdown.rs:1063-1068`；`TextView` 自带 CommonMark 行为即可）。第十五轮由 ⚠️ 改判 |
+| 10 | 各节末尾的「视觉细节」行 | 共 5 行：框架（`WorkflowView.vue:598-606,689-759` 等）、第一步（`Step1Prepare.vue` 顶栏/工具行/素材卡样式）、编辑器预览（`MarkdownWorkbench.vue:449-519,117-179`）、store 无、media composable 无 | 阴影/渐变/动画/字号/宽度，逐条对齐无意义 |
 
 ---
 
@@ -1064,14 +1091,13 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 
 （`rustfmt --edition 2021` 已跑过两个文件，`--check` 干净。未跑 `cargo build/check/test`：共享 target 目录，由集成方统一验证。）
 
-
 ---
 
 ## 第二步「AI 生成」逐页审计（`Step2Generate.vue` + `RetryLayoutDialog.vue` + `stores/generation.ts`）
 
 对照对象：原版 `src/views/steps/Step2Generate.vue`、`src/components/RetryLayoutDialog.vue`、
 `src/stores/generation.ts`（行为契约）；原生 `apps/huanshu-native/src/pages/workflow/step2.rs`、
-`apps/huanshu-native/src/generation.rs`（只读参考，负责者是另一个代理）。
+`apps/huanshu-native/src/generation.rs`（第十四轮为只读参考；第十五轮的静态状态改动落在它上面）。
 规则侧核对过 `crates/huanshu-core/src/generation_progress.rs`（看板条目、逐页状态、整体进度、四张文案表），
 本页没有在自己的代码里写规则。
 
@@ -1079,11 +1105,11 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 原生位置一栏写「文件::函数（标识）」；`step2.rs` 即 `apps/huanshu-native/src/pages/workflow/step2.rs`，
 `generation.rs` 即 `apps/huanshu-native/src/generation.rs`。
 
-**条目统计（120 行）**：✅ 107 / 🔧 3 / ⚠️ 3 / ➖ 7。
-分文件：`Step2Generate.vue` ✅ 60 / 🔧 2 / ⚠️ 2 / ➖ 2；`RetryLayoutDialog.vue` ✅ 19 / 🔧 1 / ➖ 1；
-`stores/generation.ts` ✅ 28 / ⚠️ 1 / ➖ 4。
-🔧 与 ⚠️ 的明细在第四节。
-🔧 与 ⚠️ 的明细在第四节。
+**条目统计（126 行）**：✅ 112 / 🔧 6 / ⚠️ 0 / ➖ 8。
+分文件：`Step2Generate.vue` ✅ 64 / 🔧 4 / ➖ 3（71 行）；`RetryLayoutDialog.vue` ✅ 19 / 🔧 1 / ➖ 1（21 行）；
+`stores/generation.ts` ✅ 29 / 🔧 1 / ➖ 4（34 行）。
+（原表把第一节记成 66 行、✅ 107 是笔误，本轮按逐行重数更正。）
+🔧 与 ➖ 的明细在第四节。
 
 主题相关的纯视觉细节（阴影、渐变、毛玻璃、过渡/关键帧动画、字重被 `#app *` 拍平后的差异）不逐条列，
 每个文件末尾一行「视觉细节」；`aria-*` / `role` / `sr-only` 一并在那里说明。
@@ -1128,7 +1154,7 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 | 生成中的实时点（error 色闪烁） | 481 | step2.rs::live_dot | ✅ | 1.2s 闪烁照原版 |
 | 看板空状态（图标 + 文案） | 485-488 | step2.rs::empty_state | ✅ | 逐字 |
 | 卡片整卡可点选 + 选中态 | 491-501 | step2.rs::board_card | ✅ | 选中态 = 主色边框 ✓；原版另有 `box-shadow` 光晕与 hover 上浮（视觉细节） |
-| 卡片键盘可达（Tab 聚焦 + Enter/Space 选中） | 491（`<button>`）、500（`@click`） | step2.rs::board_card | ⚠️ | 原版是 `<button>`，键盘可聚焦并回车选中；原生是可点 `div`（没有焦点）。见第四节 ⚠️ 1 |
+| 卡片键盘可达（Tab 聚焦 + Enter/Space 选中） | 491（`<button>`）、500（`@click`） | step2.rs::board_card | ➖ | 表现层，按 GPUI 原生做法 |
 | 卡片序号 `#n`、标题（`pagePlan?.page_title \|\| layoutPlan?.title \|\| blueprint?.title \|\| 第 n 张`） | 502-505 | step2.rs::board_card + card_title | ✅ | |
 | 卡片状态徽章（`spc-status--{tone}`） | 507 | step2.rs::board_card + widgets::chip(tone_of) | ✅ | 四态文案与配色（done 绿 / active 蓝 / pending 灰 / error 红）照 `slide_status` |
 | 卡片五阶段标签（规划/布局/内容/规范/校验，三态配色） | 510-516 | step2.rs::board_card + STEP_LABELS | ✅ | 状态走 core `page_step_state`，running 参数 = `running \|\| retryingPages.size > 0` |
@@ -1188,7 +1214,7 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 | 详情缩略图请求（只请求选中页、`maxCached: 4`） | 374-380 | step2.rs::detail | ✅ | 换页靠 `set_wanted`，不清图（原版靠键比对） |
 | 选中下标归位（`watch(slideItems.length, blueprints.length, selectedSlideIndex)` → 越界/null 就取 `preferredSlideIndex`） | 245-254 | step2.rs::Render::render（`selected`） | ✅ | 每帧归位，语义同 watch |
 | `selectSlide` / `moveSelectedSlide` | 263-274 | step2.rs::Step2::select / on_key | ✅ | |
-| 选中下标跨步骤保留 | WorkflowView.vue:500、505（`selectedSlideIndex` 在 WorkflowView 上，本组件只 emit 更新） | step2.rs::Step2::selected | ⚠️ | 原生把下标存在 `Step2` 实体上，而 `show_step` 每次重建它（pages/workflow/mod.rs:929），进第 3 步再回来会跳回最后一个有结果的页。见第四节 ⚠️ 2 |
+| 选中下标跨步骤保留 | WorkflowView.vue:500、505（`selectedSlideIndex` 在 WorkflowView 上，本组件只 emit 更新） | `ProjectModel::selected_slide`（`mod.rs`）+ step2.rs::Step2::select / Render::render（`resolve_selected`） | 🔧 | 本轮修：下标移到 `ProjectModel::selected_slide`（`Option<usize>`，照原版 `selectedSlideIndex` 的 null 语义）：`Step2::select` 写、渲染归位（越界/未选回落 `preferred_slide_index`）、`WorkflowPage::start_generation` 整次重新生成前清空；4 个新单测（`resolve_selected`） |
 | 发出的事件：`update:selectedSlideIndex` / `go-to-step-3` / `go-to-step-1` / `retry` / `retry-page` | 59-65、251、500、592、668-676 | step2.rs::Render::render / show_retry_dialog | ✅ | 全部落地 |
 | 本文件自身不发命令、不写存储 | 1-403（无 `invoke` / `localStorage` / `sessionStorage`） | — | ✅ | 生成相关的命令都在 store（gen 事件由 `tasks::listen_events` 送进 `GenerationStore`） |
 | 视觉细节（卡片 `hover` 上浮 + 四态径向渐变、`is-active` 光晕、面板渐变底、`gpo-bar-fill` 宽度过渡、`.gpo-toggle:hover`、`spc-*`/`sdp-*` 的精确间距，`@media 1050px/720px` 两条断点，以及全部 `aria-*`/`role`/`sr-only`：437、448、454、457、461、469-470、714） | 682-1154 | step2.rs 各处（间距已按 CSS 逻辑像素抄） | ✅ | 视觉差异：渐变/阴影/过渡/动画省略；`aria-*` 与 `.sr-only`（461、714）在 GPUI 下没有对应物——无无障碍树，且 `.sr-only` 本身是给屏幕阅读器的隐藏文本；`@media 1050px`（715）与 `720px`（1139-1154）两条断点在原生窗口最小宽 1080px（main.rs:74）下不可达，未实现 |
@@ -1226,7 +1252,7 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 ### 三、`src/stores/generation.ts`（行为契约 → `generation.rs`）
 
 原版这个 store 是应用级 pinia store；原生是应用级的 `GenerationStore`（Shell 创建、`ShellHandle::generation()` 下发）。
-`generation.rs` 不在本轮修改范围，本节的「原生位置」只做对照，问题记 ⚠️。
+第十四轮 `generation.rs` 不在修改范围（本节只做对照、问题记 ⚠️）；第十五轮的静态缓存改动就落在 `generation.rs`（`StaticCache` / `snapshot_for` 静态分支），本节已同步为 🔧。
 
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
@@ -1261,7 +1287,7 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 | `activeProjectId`（这份状态描述哪个项目） | 100、248、269、279、403 | generation.rs::project_id + live_for | ✅ | 原生界面据此区分「store 正持有本项目（实时）/ 用库里的静态状态」 |
 | `completedSlides` | 95、176、188、271、314 | — | ➖ | 原版没有任何界面消费（`grep -rn "completedSlides" src/` 只有 store 内部读写），原生不存（generation.rs 模块文档第 3 条） |
 | store 的 `progress` 字段 | 93、131-133 | generation.rs::GenState::progress | ✅ | 第二步模板不读它（原版也不读），侧栏/其他页面用 |
-| **静态状态**（store 不持有本项目时的看板/详情） | 401-435（原版总会 `loadLatestRun` + `loadFromJson`，日志与逐页状态一定在） | generation.rs::snapshot_for 的 `None` 分支 | ⚠️ | 见下面 ⚠️ 3 |
+| **静态状态**（store 不持有本项目时的看板/详情） | 401-435（原版总会 `loadLatestRun` + `loadFromJson`，日志与逐页状态一定在） | generation.rs::snapshot_for 的静态分支 + `StaticCache`（`:352-372`） | 🔧 | 本轮修：`GenerationStore` 新增静态缓存（`StaticCache` 单槽，打开项目时经 `run_bg` 读最近运行 + 日志一次，运行变了才失效，`snapshot_for` 每帧只读缓存）；静态分支用 `progress::statuses_from_logs` 恢复失败页、关键事件 / 生成记录统计、最近 10 条日志、看板条目。**失败段与「重试这一页」也出现，但按全局规则禁用**：静态分支下 store 的重试会排到别的项目的运行上，故 `!live` 即禁用（「重新生成全部」仅 `busy_elsewhere` 禁用）；6 个新单测（`generation.rs::tests`） |
 | 有意偏离：库里停在 `running` 的旧运行按「已中断」显示 | 421-424（原版见到 running 就 `running=true` 等事件） | generation.rs::apply_run | ➖ | 进程崩过时原版会一直转圈；原生保留阶段文案但 `running=false`，且不改库（generation.rs 模块文档第 2 条） |
 | 有意偏离：切到别的项目不 reset / 不 `loadFromJson` | 213-224、380-382（原版会把另一个项目在跑的生成从 store 里抹掉） | generation.rs::open_project | ➖ | store 正为别的项目跑时不碰 store，那个项目按库里的数据显示（generation.rs 模块文档第 1 条） |
 
@@ -1269,21 +1295,20 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 
 ### 四、本轮的修改（🔧）与遗留（⚠️）
 
-#### 🔧 已修（全部在 `apps/huanshu-native/src/pages/workflow/step2.rs`）
+#### 🔧 已修
 
 | 原版位置 | 改了什么 |
 |---|---|
-| Step2Generate.vue:555 | 详情标题的兜底文案：抽出 `plan_title`，`card_title` 兜底「第 N 张」、新增 `detail_title` 兜底「待生成幻灯片」（改前详情也显示「第 N 张」） |
-| Step2Generate.vue:557 + CSS 852-872 | 详情头状态 chip 改回中性色：原版 `.sdp-chip` 没有色调类，改前按 `slide_status` 的 tone 上了绿/蓝/红（与版式 chip 的 `--accent` 抢重） |
-| Step2Generate.vue:1129-1137 | 窄窗口单列：新增 `NARROW_MAX_W = 1200.0`，窗口宽 ≤1200px 时工作区改用 `flex_col`（详情整宽排在看板下方、两者 `flex_1` 平分高度），宽窗口仍是 1.5fr / 0.9fr 两栏 |
-| RetryLayoutDialog.vue:70 | 下拉 `autofocus`：候选装载完成后聚焦下拉——`let focus = select.read(cx).focus_handle(cx); window.focus(&focus, cx);`（`SelectState` 实现了 `Focusable`，见 gpui-component 的 `impl Focusable for SelectState`） |
+| Step2Generate.vue:555 | 详情标题的兜底文案：抽出 `plan_title`，`card_title` 兜底「第 N 张」、新增 `detail_title` 兜底「待生成幻灯片」（改前详情也显示「第 N 张」）（`step2.rs`） |
+| Step2Generate.vue:557 + CSS 852-872 | 详情头状态 chip 改回中性色：原版 `.sdp-chip` 没有色调类，改前按 `slide_status` 的 tone 上了绿/蓝/红（与版式 chip 的 `--accent` 抢重）（`step2.rs`） |
+| Step2Generate.vue:1129-1137 | 窄窗口单列：新增 `NARROW_MAX_W = 1200.0`，窗口宽 ≤1200px 时工作区改用 `flex_col`（详情整宽排在看板下方、两者 `flex_1` 平分高度），宽窗口仍是 1.5fr / 0.9fr 两栏（`step2.rs`） |
+| RetryLayoutDialog.vue:70 | 下拉 `autofocus`：候选装载完成后聚焦下拉——`let focus = select.read(cx).focus_handle(cx); window.focus(&focus, cx);`（`SelectState` 实现了 `Focusable`，见 gpui-component 的 `impl Focusable for SelectState`）（`step2.rs`） |
+| WorkflowView.vue:500、505 | 选中下标跨步骤保留：下标移到 `ProjectModel::selected_slide`（`Option<usize>`），`Step2::select` 写、渲染归位（越界/未选回落 `preferred_slide_index`）、`WorkflowPage::start_generation` 整次重新生成前清空；4 个新单测（`resolve_selected`）（`mod.rs` / `step2.rs`） |
+| stores/generation.ts:401-435 | store 不持有本项目时的静态状态：`GenerationStore` 新增静态缓存（`StaticCache` 单槽，打开项目时经 `run_bg` 读最近运行 + 日志一次，运行变了才失效，`snapshot_for` 每帧只读缓存）；静态分支用 `progress::statuses_from_logs` 恢复失败页、关键事件 / 生成记录统计、最近 10 条日志、看板条目；失败段与「重试这一页」出现但按全局规则禁用（`!live` 即禁用，因为静态分支下 store 的重试会排到别的项目的运行上；「重新生成全部」仅 `busy_elsewhere` 禁用）；6 个新单测（`generation.rs::tests`）（`generation.rs` / `step2.rs`） |
 
-#### ⚠️ 未修（按影响面排序）
+#### ⚠️ 未修
 
-1. **卡片不能键盘选（Tab + Enter/Space）** — 原版卡片是 `<button class="slide-progress-card" @click="selectSlide(item.index)">`（Step2Generate.vue:491、500），键盘可达；原生 `board_card` 是可点 `div`（`cursor_pointer` + `on_click`），没有焦点。工作量大半在「给虚拟列表的卡片加 tab stop 后不能抢走页面的 ↑/↓」，估计 2-4 小时。
-2. **选中页在换步骤后不保留** — 原版 `selectedSlideIndex` 在 `WorkflowView.vue`（500、505），进第 3 步再回来仍是同一页；原生 `Step2` 实体每次 `show_step` 重建（`pages/workflow/mod.rs::show_step`，929），回来后按 `preferred_slide_index` 跳到最后一个有结果的页。修需要把下标放到 `ProjectModel`/`WorkflowPage`（mod.rs 是别人的范围），估计 1-2 小时。
-3. **store 不持有本项目时，第二步看不到日志与逐页状态** — `GenerationStore::snapshot_for` 的静态分支（`generation.rs:352-372`）没有日志：版式标签全是「等待布局排版结果」、「关键事件 / 生成记录」是 0、没有「查看最近日志」、**没有失败段与「重试这一页」**；原版总会 `loadLatestRun` + `loadFromJson`（generation.ts:401-435、380-399）把日志和 `page_error` 状态装进 store。触发条件是「本项目不是 store 当前描述的项目」——即**用户先给项目 A 起了生成、过程中打开了项目 B**（B 有历史运行）。修在 `generation.rs`（别人的范围）：静态分支要读该项目的最近运行 + 日志，并处理缓存与失效，估计 2-4 小时。
-4. **上一条的连带（同因）**：上述情形下详情里 `run_id` 取库里的运行 id，单页重试按钮不显示（因为失败段本身不显示），所以点了也走不到「缺少生成记录」的错误分支；guard 本身（Step2Generate.vue:592 的禁用条件、RetryLayoutDialog 的 `!runId`）实现是无误的。
+本轮**没有遗留 ⚠️**：原来的 3 条 ⚠️ 中，「选中页跨步骤保留」与「store 不持有本项目时的静态状态（含连带的重试按钮）」已 🔧；「卡片 Tab 键盘可达」按新原则归入 ➖（表现层，按 GPUI 原生做法）。
 
 #### 与 parity.md 第二步小节的核对
 
@@ -1293,18 +1318,18 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 - 「顶部状态与统计」行写「数字用主色」，实际只有「生成记录」一个数字用主色（另两个是文字色，Step2Generate.vue:422-433 + CSS WorkflowView.vue:1386-1394）。
 - 「详情：大图、标题、状态、版式」行在本轮修复前，兜底标题与状态 chip 配色与原版有差距（已 🔧），该行当时未记这两个差距。
 
+第十五轮同步（`parity.md` 第二步小节）：①「生成状态是应用级 store」那行的**已知偏差**（其他项目的第二步只有静态快照、缺日志 / 逐页状态 / 失败段）已修，该行改为 ✅；② 新增一行「选中页下标跨步骤保留」（`ProjectModel::selected_slide`）。
+
 #### 附带发现（不在我负责范围，供参考）
 
 - `docs/native/reference/project-step2.png` 与 `project-step1.png` **字节完全相同**（都是第 1 步「准备素材」的画面）；第二步的原版对照图实际是 `step2-board.png` / `step2-detail.png`。原生侧 `docs/native/shell/project-step2-0.png`（正常态）与 `project-step2-error-0.png`（失败态）是对的。
 
 #### 本轮的验证情况
 
-- 只改了 `apps/huanshu-native/src/pages/workflow/step2.rs`；改完 `rustfmt --edition 2021`（解析通过、无格式差异），并补上了 `Focusable as _` 的导入（原文件没有这个 trait，`focus_handle` 需要它）。
-- **没有跑** `cargo check / build / test`（共享 target 目录，按约定由集成方统一验证），也**没有**跑 `tools/shots.ps1` / `drive.ps1`（会触发编译）。因此四处的 🔧 都还只是代码级对齐，未做真机走查；需要集成时用
-  `tools/drive.ps1 -Route project:1:2` 走一遍：详情标题（选一张还没规划结果的页应显示「待生成幻灯片」）、详情头状态 chip 是中性色、窗口拉窄到 1200px 及以下时两栏变一栏、「重试这一页」对话框打开后焦点在下拉上。
+- 第十四轮只改了 `apps/huanshu-native/src/pages/workflow/step2.rs`；改完 `rustfmt --edition 2021`（解析通过、无格式差异），并补上了 `Focusable as _` 的导入（原文件没有这个 trait，`focus_handle` 需要它）。
+- 第十五轮的三处 🔧 跨 `pages/workflow/mod.rs`（`selected_slide` / `start_generation` 清空 / `show_step`）、`pages/workflow/step2.rs`（`resolve_selected`、静态快照的失败段禁用）与 `generation.rs`（`StaticCache`）三个文件，共 10 个新单测（`resolve_selected` 4 个、`generation.rs::tests` 6 个）；这些改动由本轮负责人验证（`cargo test` 见其汇报），审计侧只同步文档。
+- 两轮都**没有跑** `cargo check / build / test`（共享 target 目录，按约定由集成方统一验证），也**没有**跑 `tools/shots.ps1` / `drive.ps1`（会触发编译）；审计侧不改代码。第十四轮改动建议集成后用 `tools/drive.ps1 -Route project:1:2` 走一遍：详情标题（选一张还没规划结果的页应显示「待生成幻灯片」）、详情头状态 chip 是中性色、窗口拉窄到 1200px 及以下时两栏变一栏、「重试这一页」对话框打开后焦点在下拉上。
 - 纯逻辑部分（看板条目、逐页状态、整体进度、四张文案表）不在本文件里，由 core 的 `tests/generation_progress.rs` 快照守护。
-
-
 
 ---
 
@@ -1337,10 +1362,11 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 状态：✅ 一致 · 🔧 本轮已修 · ⚠️ 有差距未修 · ➖ 有意不做（附原版依据）。
 主题相关的纯视觉细节（阴影、渐变、毛玻璃、动画）每个文件归一行「视觉细节」。
 
-**条目统计（105 行）**：✅ 90 / 🔧 4 / ⚠️ 5 / ➖ 6。
-分节：`Step3Editor.vue` 模板 ✅ 45 / 🔧 4 / ⚠️ 5 / ➖ 5；`Step3Editor.vue` script ✅ 26；
+**条目统计（105 行）**：✅ 90 / 🔧 5 / ⚠️ 0 / ➖ 10。
+分节：`Step3Editor.vue` 模板 ✅ 45 / 🔧 5 / ➖ 9（59 行）；`Step3Editor.vue` script ✅ 26；
 `useSlideEditor.ts` ✅ 14 / ➖ 1；`SlideFrame.vue` ✅ 5。
-🔧 与 ⚠️ 的明细在第六、七节。
+🔧 的明细在第六节；本轮把原 4 条 ⚠️（添加按钮宽度、行号标红、素材小卡悬停底色、左栏行悬停底色）
+按新原则归入 ➖「表现层，按 GPUI 原生做法」，另 1 条（应用更改不吸底）已 🔧（见第八节）。
 
 ---
 
@@ -1353,7 +1379,7 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 | 左栏列表行：序号 / 标题 / 版式中文名（缺省回落 kind）/ 选中态 | Step3Editor.vue:571-588 | step3.rs:slide_row(2328) | ✅ | 版式名回落逻辑同（587） |
 | 行点击选中 | Step3Editor.vue:580 | step3.rs:select(409) | ✅ | 换页丢掉未应用的修改（原版 `initEditorSlide` 如此，无确认框） |
 | 行键盘 Enter / Space 选中（`tabindex="0"` + `role="button"`） | Step3Editor.vue:577-582 | — | ➖ | GPUI 列表行没有 Tab 焦点链，行不可聚焦；换页由 ↑/↓（`on_key`）与点击承担。属可达性，不是功能缺失 |
-| 行尾垃圾桶：`title="删除"`、只在悬停该行时显示、只剩一页时 disabled + 透明 | Step3Editor.vue:589 + WorkflowView.vue:1931-1948 | step3.rs:slide_row（`group`/`group_hover`、`count<=1` 时 opacity 0） | ✅ | 悬停变红（WorkflowView.vue:1947）是 kit 按钮悬停色改不掉，见「视觉细节」；行本身的悬停底色见 ⚠️ 5 |
+| 行尾垃圾桶：`title="删除"`、只在悬停该行时显示、只剩一页时 disabled + 透明 | Step3Editor.vue:589 + WorkflowView.vue:1931-1948 | step3.rs:slide_row（`group`/`group_hover`、`count<=1` 时 opacity 0） | ✅ | 悬停变红（WorkflowView.vue:1947）是 kit 按钮悬停色改不掉，见「视觉细节」；行本身的悬停底色归 ➖「表现层，按 GPUI 原生做法」 |
 | 「新建幻灯片」（`.edit-add-btn` 满宽）→ KindPicker(add) | Step3Editor.vue:594-598 | step3.rs:render + `open_kind_picker(600)` | ✅ | 满宽靠 flex 列的 stretch（原版是 `.edit-add-btn { width: 100% }`）；若实测不成立，加 `.w_full()` 即可 |
 | 中栏栏头「实时预览」 | Step3Editor.vue:603-604 | step3.rs:render（`col_head`） | ✅ | |
 | 「● 未保存」 | Step3Editor.vue:605 | step3.rs:render（`has_unsaved`） | ✅ | 原版 `.edit-unsaved` 在任何 CSS 里都没有规则（全局 grep 0 命中）→ 继承栏头的 muted 色，原生同 |
@@ -1365,7 +1391,7 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 | 舞台里的加载 / 失败重试（`SlideFrame`） | Step3Editor.vue:638-644 | slides.rs:slide_frame(213) | ✅ | 300ms 延迟「渲染中…」、有旧图时角上「渲染失败 · 重试」都在 `SlideFrame.vue:32-56,73-89` 对照下逐条一致 |
 | 裁切提示（`warning-alt` + 文案） | Step3Editor.vue:647-650 | step3.rs:render（`preview.overflow(0)`） | ✅ | 原版颜色是硬编码 `#b45309`（WorkflowView.vue:2018-2020），原生用主题 `warning`，见「视觉细节」 |
 | 右栏栏头「编辑 第 N 张」 | Step3Editor.vue:654-656 | step3.rs:render（`col_head`） | ✅ | |
-| 栏头上移 / 下移 / 删除（禁用条件） | Step3Editor.vue:657-667 | step3.rs:render（`slide-up/down/del`） | ✅ | 删除另加 `locked`（原版没有生成中只读，见 parity.md:141 的有意偏离） |
+| 栏头上移 / 下移 / 删除（禁用条件） | Step3Editor.vue:657-667 | step3.rs:render（`slide-up/down/del`） | ✅ | 删除另加 `locked`（原版没有生成中只读，见 parity.md:144 的有意偏离） |
 | 删除按钮是 error 色 | WorkflowView.vue:2048 | step3.rs:render（`carbon("trash-can").text_color(c.error)`） | 🔧 | **本轮修**：原来用通用 `widgets::icon_button`（默认色），现在贴 `.edit-del-btn { color: var(--studio-error) }` |
 | 版式表未就绪两态：「读取版式信息失败：…」/「正在读取版式信息…」 | Step3Editor.vue:670-677 | — | ➖ | 原生 schema 是同步取（step3.rs:244 `editor_schema::editor_schema()`），不存在这两个状态；失败即 panic，不可能出现 |
 | 幻灯片类型行：图标 + 中文名 + `kind` + 「更换」 | Step3Editor.vue:680-690 | step3.rs:render_form(1856) | ✅ | 「更换」在 `locked` 时禁用（原版没有锁） |
@@ -1382,20 +1408,20 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 | `issue_stack` 的 `cards` 区提示（按张数二选一） | Step3Editor.vue:826-830 | step3.rs:issue_stack_hint(2462) | ✅ | 两句逐字一致 |
 | 卡片字段网格（textarea 占整行 / select / boolean 自带标签 / text） | Step3Editor.vue:848-887 | step3.rs:fields_grid + field_card | ✅ | 快照里 `boolean` 只出现在列表区与对象区子列表（`focus_example.ranking.muted`、`compare.*.items.highlight`），简单字段里没有——所以原版「简单字段只有 text/textarea/select」这条推断成立 |
 | 图标助手（`iconQueryKeys` 有值才有）：按钮「AI 推荐图标 / 推荐中…」+ 候选小片 | Step3Editor.vue:889-912 | step3.rs:icon_box(959) | ✅ | 候选小片 = 图标预览 + 去掉 `i-carbon:` 的名字（1015-1018） |
-| 卡片里的字符串列表（每个 stringList 一行标签 + 「添加」+ 每项输入框 + 删除） | Step3Editor.vue:914-937 | step3.rs:string_list（有 label → 标签行） | ✅ | 标签行「添加」的宽度差异见 ⚠️ |
+| 卡片里的字符串列表（每个 stringList 一行标签 + 「添加」+ 每项输入框 + 删除） | Step3Editor.vue:914-937 | step3.rs:string_list（有 label → 标签行） | ✅ | 标签行「添加」的宽度差异归 ➖「表现层，按 GPUI 原生做法」 |
 | 嵌套列表（`nestedLists`）：卡片标题 + 删除（**没有**上移/下移）+ 字段 | Step3Editor.vue:939-981 | step3.rs:nested_block(1737) | ✅ | 原版嵌套字段只有 text / textarea（`process.steps`），原生用通用 field_card，多支持的类型用不到 |
 | 对象区（`objectSections`）：区标题（无添加按钮）+ 字段网格 + 子列表区 | Step3Editor.vue:985-1149 | step3.rs:object_block(1817) | ✅ | 对象区各 def 的 `stringLists` 在快照里都是空（原生多渲染了一轮，无副作用）；boolean 不显示上方小标签也一致（992-1016） |
 | 子列表区：区标题 + 添加 + emptyText + 卡片（上移/下移/删除 + 字段 + 图标助手 + 字符串列表） | Step3Editor.vue:1030-1148 | step3.rs:list_block + list_card | ✅ | |
 | 图表数据（JSON）框：标签 + hint 两态（「正在校验…」/「type / data / encoding / series，校验通过才会应用到预览」） | Step3Editor.vue:1151-1158 | step3.rs:render_form ⑧ | ✅ | |
 | 图表 JSON 框本体：`rows="12"`、`spellcheck="false"`、占位 JSON、错误时整框变红 + 「JSON 语法错误：…」/「问题；问题」 | Step3Editor.vue:1159-1174 | step3.rs:render_form ⑧ + `TextareaState::rows(12)` + `error_row` | ✅ | 等宽字体（`.ej-chart-json` 的 `--font-code`）与 12.8px 字号都对上了（WorkflowView.vue:2181-2187） |
 | 高级 Blueprint JSON：标签 + 「保留给高级用户和特殊字段」+ 「格式化」 | Step3Editor.vue:1177-1184 | step3.rs:render_form ⑨ + `format_json(1220)` | ✅ | |
-| 高级 JSON 编辑框：行号栏 + 「第 N 行：{原因}」+ 语义错误块（`warning` 图标 + 每条一行） | Step3Editor.vue:1185-1217 | step3.rs:render_form ⑨ + `json_error_text(2535)` + `semantic_errors_block(2496)` | ✅ | 原版行号栏会把出错的那一行标红，见 ⚠️ |
+| 高级 JSON 编辑框：行号栏 + 「第 N 行：{原因}」+ 语义错误块（`warning` 图标 + 每条一行） | Step3Editor.vue:1185-1217 | step3.rs:render_form ⑨ + `json_error_text(2535)` + `semantic_errors_block(2496)` | ✅ | 原版行号栏会把出错的那一行标红（已归 ➖「表现层」） |
 | 「应用更改」三态（保存中… / 应用更改 (Ctrl+S) / 已保存）+ 禁用条件 | Step3Editor.vue:1220-1229 | step3.rs:render_form ⑩ | ✅ | 禁用语一致：`jsonError \|\| !hasUnsavedChanges \|\| editorSaving`（原生另加 `locked`） |
-| 「应用更改」按钮不吸底（长表单要滚到底才能点） | WorkflowView.vue:2061-2065 | step3.rs:render_form ⑩（列尾普通元素） | ⚠️ | `.ej-save-btn { position: sticky; bottom: 0 }`；GPUI 没有 sticky，见第七节 ⚠️ 1 |
-| 标签行里的「添加」按钮宽度 | WorkflowView.vue:1956-1959 | step3.rs:string_list / list_block / nested_block（紧凑靠右） | ⚠️ | 原版 `.edit-add-btn { width: 100% }` 会占满标签右侧剩余宽度；见 ⚠️ 2 |
-| 高级 JSON 出错行的行号标红 | WorkflowView.vue:2352-2356 | — | ⚠️ | GPUI Kit 的 Editor 行号栏不可着色；见 ⚠️ 3 |
-| 图片素材小卡悬停底色 | WorkflowView.vue:2538-2540 | step3.rs:render_form ⑤（`widgets::media_tile`） | ⚠️ | 需要 `widgets.rs` 支持；见 ⚠️ 4 |
-| 左栏行悬停底色（仅 notes 主题下原版有） | WorkflowView.vue:1895 + src/themes/notes.css:83 | step3.rs:slide_row | ⚠️ | 需要 `StudioColors` 加 hover token；见 ⚠️ 5 |
+| 「应用更改」按钮不吸底（长表单要滚到底才能点） | WorkflowView.vue:2061-2065 | step3.rs:render（`render_actions`：滚动表单区 + 固定底操作区） | 🔧 | **本轮修**：右栏拆成「滚动表单区 + 固定底操作区」（应用更改三态按钮 + locked 提示 + 保存错误行），不模拟 `.ej-save-btn { position: sticky }`；短表单时操作区自然落栏底 |
+| 标签行里的「添加」按钮宽度 | WorkflowView.vue:1956-1959 | step3.rs:string_list / list_block / nested_block（紧凑靠右） | ➖ | 表现层，按 GPUI 原生做法 |
+| 高级 JSON 出错行的行号标红 | WorkflowView.vue:2352-2356 | — | ➖ | 表现层，按 GPUI 原生做法 |
+| 图片素材小卡悬停底色 | WorkflowView.vue:2538-2540 | step3.rs:render_form ⑤（`widgets::media_tile`） | ➖ | 表现层，按 GPUI 原生做法 |
+| 左栏行悬停底色（仅 notes 主题下原版有） | WorkflowView.vue:1895 + src/themes/notes.css:83 | step3.rs:slide_row | ➖ | 表现层，按 GPUI 原生做法 |
 | 保存失败时按钮下方的错误行 | useSlideEditor.ts:175-176（`jsonError = String(e)`） | step3.rs:render_form ⑩（`deck_save_error`） | ✅ | 原版只在**展开高级 JSON**时才看得见这个错误（模板里 `v-if="jsonError"` 在 1206，属于高级段），原生常显；功能不丢，算改进 |
 | KindPicker 头部：模式图标（`add-alt` / `arrows-horizontal`）+ 标题 + 关闭按钮 | Step3Editor.vue:1238-1244 | step3.rs:kind_picker_body(2644) | ✅ | 标题两种模式逐字一致 |
 | KindPicker 副标题：add →「新幻灯片将插入到第 N 张之后」/ change →「选择新类型后将自动保留可迁移的公共字段」 | Step3Editor.vue:1245-1248 | step3.rs:kind_picker_body（`after = active + 1`） | ✅ | |
@@ -1434,7 +1460,7 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 | `useTypstThumbnails`：只发当前页、`serial` + `progressive`、`debounceMs: 120`、`resetKey: activeSlide`、宽度 = 舞台宽 × dpr、`overflow[0]` | Step3Editor.vue:470-509（命令是 `invoke('render_slide_thumbnails')`） | step3.rs:`SlideImages`（`new` 里 `max_cached: Some(4)`、`set_wanted(&[0])`、`schedule_preview` 的 120ms、`init_draft` 里的 `reset`）→ `app::render_pages`（`crate::tasks::run_bg`） | ✅ | `PreviewOptions::default()` 的 serial/progressive 都是 true（core `preview.rs:35-44`）；失败不自动重试（只给「重试」按钮） |
 | `renderBusy`：`pending` 持续 150ms 才置真 | Step3Editor.vue:488-504 | step3.rs:sync_render_busy(751) | ✅ | |
 | `handleEditorArrowKeydown`：window 级；KindPicker 开着不处理；带修饰键不处理；焦点在 INPUT/TEXTAREA/SELECT/contentEditable 里不处理 | Step3Editor.vue:511-535 | step3.rs:on_key(701) | ✅ | 原生按 README 规矩 6 用 `track_focus` + `on_key_down`，判据换成「根节点自己有焦点」——等价于原版「焦点不在表单里」 |
-| `handleTextareaKeydown`：JSON 框里 Ctrl/⌘+S → 应用；其余转发 | Step3Editor.vue:537-544 | step3.rs:on_key（Ctrl/⌘+S 在**第三步任何位置**都生效） | ✅ | 有意改进（README 与 parity.md:140 已记） |
+| `handleTextareaKeydown`：JSON 框里 Ctrl/⌘+S → 应用；其余转发 | Step3Editor.vue:537-544 | step3.rs:on_key（Ctrl/⌘+S 在**第三步任何位置**都生效） | ✅ | 有意改进（README 与 parity.md:143 已记） |
 | JSON 框的 Tab → 插两个空格 | useSlideEditor.ts:147-155 | GPUI Kit `EditorState` 默认 `tab_size = 2`（`gpui-base/src/input/editor/indent.rs:23`，`tab` 绑到 `IndentInline`） | ✅ | |
 | `onMounted` / `onBeforeUnmount`：注册、注销 window 监听 + 清 `renderBusyTimer` | Step3Editor.vue:546-556 | step3.rs:render 的 `.track_focus` + `release`(337) | ✅ | |
 | 若干 `emit`（`update:activeSlide`、`replace-draft`、`apply-changes`、`delete-slide`、`move-slide`、`go-to-step-1` …） | Step3Editor.vue:47-64, 533-544 | step3.rs 直接调同名方法，经 `WorkflowPage::commit_deck` 落库 | ✅ | |
@@ -1456,7 +1482,7 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 | `openKindPicker` / `onKindPicked`：change → `createKindBlueprint(kind, liveSlide)`（**只改草稿**）；add → 插到当前页之后、章节号继承上一页（cover/overview/closing 不继承）、只改内存不落库 | useSlideEditor.ts:182-207 | step3.rs:open_kind_picker(600) + pick_kind(651) + `slide_edit::insert_new_slide`（slide_edit.rs:427） | ✅ | 章节号继承规则在 core，有单测 |
 | `deleteEditorSlide`：只剩一页不动；删完当前页落到 `min(idx, len-1)`；**立即落库** | useSlideEditor.ts:209-214 | step3.rs:delete_slide(562) + `slide_edit::delete_slide`（slide_edit.rs:453） | ✅ | |
 | `moveEditorSlide`：与相邻页交换、当前页跟过去、越界不动、**立即落库** | useSlideEditor.ts:216-223 | step3.rs:move_slide(576) + `slide_edit::move_slide`（slide_edit.rs:467） | ✅ | |
-| `insertMediaUrl`：往 JSON 里插引用，没有 textarea 时退化成写剪贴板 | useSlideEditor.ts:225-237 | — | ➖ | 原版模板里**没有**任何触发入口（`grep -n insert-media-url src/views/WorkflowView.vue` 只在 543 行接了个空事件，模板里没有 `$emit('insert-media-url')`），parity.md:139 已记「未做」；原生也没有入口 |
+| `insertMediaUrl`：往 JSON 里插引用，没有 textarea 时退化成写剪贴板 | useSlideEditor.ts:225-237 | — | ➖ | 原版模板里**没有**任何触发入口（`grep -n insert-media-url src/views/WorkflowView.vue` 只在 543 行接了个空事件，模板里没有 `$emit('insert-media-url')`），parity.md:142 已记「未做」；原生也没有入口 |
 | `editorKind` / `editorPreviewSlide` / `currentSlideDims` / `editorStageW/H` | useSlideEditor.ts:239-251 | step3.rs:`draft` + render 里的 `aspect`/`stage_w/h` | ✅ | |
 
 ### 四、`src/components/SlideFrame.vue`
@@ -1476,12 +1502,13 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 | 状态 | 条数 |
 |---|---|
 | ✅ 一致 | 90 |
-| 🔧 本轮已修 | 4 |
-| ⚠️ 有差距未修 | 5 |
-| ➖ 有意不做 | 6 |
+| 🔧 本轮已修 | 5 |
+| ⚠️ 有差距未修 | 0 |
+| ➖ 有意不做 | 10 |
 | 合计 | 105 |
 
-（统计口径：第一至第四节四张表里的数据行；「视觉细节」行也计入 ✅。⚠️ 的 5 条在表里各占一行，明细见第七节。）
+（统计口径：第一至第四节四张表里的数据行；「视觉细节」行也计入 ✅。本轮没有遗留 ⚠️：1 条已 🔧（见第六节第 5 条），
+另 4 条归 ➖「表现层，按 GPUI 原生做法」（见第八节）。）
 
 ### 六、本轮已修（🔧，全部在 `apps/huanshu-native/src/pages/workflow/step3.rs`）
 
@@ -1499,18 +1526,23 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 4. **右栏栏头的删除按钮不是红色**
    原版 `WorkflowView.vue:2048`：`.edit-del-btn { color: var(--studio-error) }`（同栏头另外两个按钮是默认色，卡片里的删除按钮也不是红的）。
    改法：这一处不再用通用 `widgets::icon_button`，直接 `Button::new("slide-del").ghost().icon(carbon("trash-can").text_color(c.error)).tooltip("删除")`（新引入 `ButtonVariants as _`、`Size` 两个 import）。
-
-改动量：`git diff --stat` = 29 行新增 / 11 行删除（含注释），已 `rustfmt`。未跑任何 `cargo` 命令（按纪律交给集成方）。
+5. **「应用更改」按钮不吸底**（第十五轮修）
+   原版 `WorkflowView.vue:2061-2065` 用 `.ej-save-btn { position: sticky; bottom: 0 }` 把按钮吸在右栏底；GPUI 没有 sticky。
+   改法：右栏拆成「滚动表单区 + 固定底操作区」（`render_actions`：应用更改三态按钮 + locked 提示 + 保存错误行），
+   长表单下按钮始终可见；**有意偏离**：短表单时操作区落在栏底（原版按钮紧跟内容之后），与参考截图不同。
+   （前 4 条是第十四轮；改动量 `git diff --stat` = 29 行新增 / 11 行删除（含注释），已 `rustfmt`。未跑任何 `cargo` 命令，按纪律交给集成方验证。）
 
 ### 七、有差距未修（⚠️）
 
-| # | 差距 | 原版依据 | 估计工作量 |
-|---|---|---|---|
-| 1 | 「应用更改」按钮不吸底：长表单时要滚到底才能点，原版随时可见 | `WorkflowView.vue:2061-2065` `.ej-save-btn { position: sticky; bottom: 0 }`（模板 `Step3Editor.vue:1220`，右栏滚动容器 `.edit-json-inner` 内） | GPUI 没有 sticky 定位（`grep "fn sticky" gpui-base` 0 命中）。二选一：① 等 GPUI 支持 sticky；② 把右栏拆成「滚动区 + 固定底栏」，但**短表单时按钮会贴到栏底**，与参考截图（按钮紧跟内容）不符，需要先拿一张长表单的原版截图确认取舍。约 0.5 天含目检 |
-| 2 | 标签行里的「添加」按钮宽度：原版占满「标签右侧的剩余宽度、文字居中」，原生是紧凑按钮靠右（列表区 / 嵌套列表 / 卡片字符串列表 / 图标助手行，共 4 处） | `WorkflowView.vue:1956-1959` `.edit-add-btn { width: 100%; justify-content: center }` + 模板里的 `.ej-label-row`（如 `Step3Editor.vue:820-825`、`889-899`、`914-919`、`939-945`） | 已用 Edge headless 复现原版渲染（`target/audit-flex/probe.html` + `probe.png`，CSS 与 DOM 逐条抄自原版）：按钮确实被压成剩余宽度、文字居中，但**同时把同行的标签挤成竖排两行**（`.ej-label` 没有 `nowrap`，CJK 的 min-content 是一字宽）。原生要做出宽按钮得包一层 `flex_1` + `w_full()`，仍然复现不了那个折行——两条路都要求先拿原版截图定标准。约 2 小时 + 目检 |
-| 3 | 高级 JSON 出错时，原版行号栏会把出错那一行的行号标红 | `WorkflowView.vue:2352-2356` `.ej-line-num--error { color: error; background: error-bg }`，模板 `Step3Editor.vue:1188-1193` | GPUI Kit 的 `Editor` 行号栏没有「某一行着色」的接口（组件内部），要么等 kit 支持，要么放弃这个提示（错误文案里的「第 N 行：」仍在）。≈1 天（含读 kit 源码） |
-| 4 | 图片素材小卡没有悬停底色 | `WorkflowView.vue:2538-2540` `.ej-media-item:hover { background: var(--studio-primary-bg) }` | 卡片现在画在 `widgets.rs::media_tile`（**别人的范围**）：需要给它加一个 hover 参数或内部加 `.hover(...)`。≈5 行 + 目检 |
-| 5 | 左栏幻灯片行缺悬停底色（notes 主题下原版有） | `WorkflowView.vue:1895` `.edit-slide-row:hover { background: var(--studio-hover) }`；而 `--studio-hover` **只在** `src/themes/notes.css:83` 定义，其余五个主题下这条声明无效（悬停本来就没有底色） | 要给 `theme/StudioColors` 加一个 hover token（**别人的文件**）才做得出来；不改 theme 就只能在 notes 主题下少一个悬停底色。≈0.5 小时 + 六主题目检 |
+本轮**没有遗留 ⚠️**。原 5 条的处理：
+
+| # | 原差距 | 处理 |
+|---|---|---|
+| 1 | 「应用更改」按钮不吸底（原版 `.ej-save-btn { position: sticky; bottom: 0 }`，`WorkflowView.vue:2061-2065`） | 已 🔧：右栏拆成「滚动表单区 + 固定底操作区」（见第六节第 5 条） |
+| 2 | 标签行里的「添加」按钮宽度（原版 `.edit-add-btn { width: 100% }` 占满标签右侧剩余宽度；`WorkflowView.vue:1956-1959`） | ➖：表现层，按 GPUI 原生做法（曾经的探针证据 `target/audit-flex/probe.html`） |
+| 3 | 高级 JSON 出错行的行号标红（`WorkflowView.vue:2352-2356`） | ➖：表现层，按 GPUI 原生做法（错误文案里的「第 N 行：」仍在） |
+| 4 | 图片素材小卡悬停底色（`WorkflowView.vue:2538-2540`） | ➖：表现层，按 GPUI 原生做法 |
+| 5 | 左栏幻灯片行悬停底色（`WorkflowView.vue:1895`；`--studio-hover` 只在 notes 主题定义） | ➖：表现层，按 GPUI 原生做法 |
 
 ### 八、有意不做（➖，逐条附原版依据）
 
@@ -1519,20 +1551,24 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 2. **版式表未就绪两态**（`Step3Editor.vue:670-677` 的「读取版式信息失败：」/「正在读取版式信息…」）：
    原生 schema 是同步取（`step3.rs:244`），不存在「正在读取」，也没有可失败的命令调用。
 3. **`insertMediaUrl` 与它的剪贴板回退**（`useSlideEditor.ts:225-237`）：
-   原版模板里没有任何触发入口（`WorkflowView.vue:543` 接了个空事件，模板里找不到 `insert-media-url` 的发出点），parity.md:139 已记「原版没有触发入口，未做」。
-4. **图表校验的「校验失败：…」出口**（`Step3Editor.vue:313-317`）：原版经 `invoke('chart_problems')`，命令可能失败；原生直接调 core 的纯函数（step3.rs:1160），没有失败这条路径。
-5. **`aria-*` / `role="button"` / `role="status"`**（模板多处，如 606、647、826）：GPUI 的可访问性树由框架生成，页面不写这些属性。
-6. **`#app * { font-weight: normal !important }` 之外的字重**：原版 KindPicker 被 `Teleport to="body"` 挪出 `#app`，它的标题/卡片名仍是 700/600（`WorkflowView.vue:2608-2613, 2653-2657`）；原生按 README 规矩 12 一律常规体，这一条 README 已声明为有意偏离。
+   原版模板里没有任何触发入口（`WorkflowView.vue:543` 接了个空事件，模板里找不到 `insert-media-url` 的发出点），parity.md:142 已记「原版没有触发入口，未做」。
+4. **标签行「添加」按钮宽度**（`WorkflowView.vue:1956-1959`）：表现层，按 GPUI 原生做法。
+5. **高级 JSON 出错行的行号标红**（`WorkflowView.vue:2352-2356`）：表现层，按 GPUI 原生做法。
+6. **图片素材小卡悬停底色**（`WorkflowView.vue:2538-2540`）：表现层，按 GPUI 原生做法。
+7. **左栏行悬停底色**（`WorkflowView.vue:1895`，仅 notes 主题下原版有效）：表现层，按 GPUI 原生做法。
+8. **图表校验的「校验失败：…」出口**（`Step3Editor.vue:313-317`）：原版经 `invoke('chart_problems')`，命令可能失败；原生直接调 core 的纯函数（step3.rs:1160），没有失败这条路径。
+9. **`aria-*` / `role="button"` / `role="status"`**（模板多处，如 606、647、826）：GPUI 的可访问性树由框架生成，页面不写这些属性。
+10. **`#app * { font-weight: normal !important }` 之外的字重**：原版 KindPicker 被 `Teleport to="body"` 挪出 `#app`，它的标题/卡片名仍是 700/600（`WorkflowView.vue:2608-2613, 2653-2657`）；原生按 README 规矩 12 一律常规体，这一条 README 已声明为有意偏离。
 
-### 九、`parity.md` 第三步复查（不改 parity.md，只报告）
+### 九、`parity.md` 第三步复查
 
-逐行核对 `docs/native/parity.md:124-141` 的 16 行，**都做完了**，没有发现「写了没做」的行。几点补充：
+逐行核对 `docs/native/parity.md` 第三步小节的 16 行（第十四轮为 124-141 行，第十五轮插入/改写了几行后行号右移），**都做完了**，没有发现「写了没做」的行。几点补充：
 
-- parity.md:127 写「行尾垃圾桶只在**悬停该行时**显示」——✅ 代码属实（`group_hover`），但原版在只剩一页时是 `opacity: 0 !important`（`WorkflowView.vue:1948`），原生两条 `.when` 都写了，属实。
-- parity.md:135 写「（`tools/drive.ps1` 逐页截图 + 联系表；联系表是未提交的临时产物）+ compare / swot / process 全分辨率逐项核对」——截图现在还在 `target/drive/`（129 个文件，`target/` 被 gitignore，随时可能被清掉），建议把关键几张（compare / swot / process 的逐项、issue_stack 的两种提示）收进 `docs/native/shell/`，否则这行以后没法复核。**这条不影响功能结论。**
-- parity.md:130 写「`serial` / `progressive` 取 `PreviewOptions::default()`（都是真）」——✅ 属实（`crates/huanshu-core/src/preview.rs:35-44`）。
-- parity.md:126 写「左 `layers` +「幻灯片」+ 数量徽章 + `reset` 图标（回第 1 步）」——✅ 代码属实；**参考截图里看不到这个 `reset` 按钮**（见第十节）。
-- 本轮另有两处「parity.md 没提、但确实与原版有差距」的地方，已记在 ⚠️ 1（保存按钮 sticky 吸底）与 ⚠️ 2（标签行「添加」按钮宽度）；parity.md 里没有任何一行声称这两处已完成，所以不算「写了没做」。
+- parity.md 写「行尾垃圾桶只在**悬停该行时**显示」——✅ 代码属实（`group_hover`），但原版在只剩一页时是 `opacity: 0 !important`（`WorkflowView.vue:1948`），原生两条 `.when` 都写了，属实。
+- parity.md 写「（`tools/drive.ps1` 逐页截图 + 联系表；联系表是未提交的临时产物）+ compare / swot / process 全分辨率逐项核对」——截图现在还在 `target/drive/`（129 个文件，`target/` 被 gitignore，随时可能被清掉），建议把关键几张（compare / swot / process 的逐项、issue_stack 的两种提示）收进 `docs/native/shell/`，否则这行以后没法复核。**这条不影响功能结论。**
+- parity.md 写「`serial` / `progressive` 取 `PreviewOptions::default()`（都是真）」——✅ 属实（`crates/huanshu-core/src/preview.rs:35-44`）。
+- parity.md 写「左 `layers` +「幻灯片」+ 数量徽章 + `reset` 图标（回第 1 步）」——✅ 代码属实；**参考截图里看不到这个 `reset` 按钮**（见第十节）。
+- 第十五轮改动：parity.md 第三步「应用更改」那行的**已知偏差（原版 sticky 吸底）已删掉**，改为「固定底操作区」的做法说明（另有短表单时操作区落栏底的**有意偏离**）；其它 ⚠️（「添加」按钮宽度、行号标红、素材小卡悬停底色、左栏行悬停底色）在本文件第八节归 ➖「表现层，按 GPUI 原生做法」，parity.md 里本来就没有任何一行声称它们已完成，所以不算「写了没做」。
 
 ### 十、参考截图与当前原版 CSS 冲突的地方（供复核，不要据此改代码）
 
@@ -1543,13 +1579,13 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 
 ### 十一、改动文件
 
-只改了一个文件，没有碰任何负责范围外的文件：
+第十四轮只改了一个文件，没有碰任何负责范围外的文件：
 
 - `apps/huanshu-native/src/pages/workflow/step3.rs`（🔧 4 处 + 1 段已知差异注释；`rustfmt` 过）
 - 新增证据文件（`target/` 下，不入库）：`target/audit-flex/probe.html`、`target/audit-flex/probe.png`、`target/audit-n-*.png`、`target/audit-r-*.png`、`target/kp-*.png`、`target/ref-head-icons*.png`
 
-未做的事：没有 `git commit`、没有跑 `cargo build/check/test`、没有改原版 `src/`、没有改 `widgets.rs` / `shell.rs` / `present.rs` / `mod.rs` / `step1.rs` / `step2.rs` / `drive.ps1` / `shots.ps1`、没有改 `docs/native/parity.md`。
-
+未做的事：没有 `git commit`、没有跑 `cargo build/check/test`、没有改原版 `src/`、没有改 `widgets.rs` / `shell.rs` / `present.rs` / `mod.rs` / `step1.rs` / `step2.rs` / `drive.ps1` / `shots.ps1`。
+（`docs/native/parity.md` 在第十四轮未改；第十五轮按本轮口径更新了第三步「应用更改」那一行与向导/设置/首页/第二步的相关行。）
 
 ---
 

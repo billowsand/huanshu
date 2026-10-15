@@ -10,11 +10,12 @@
 `docs/native/shell/settings-{appearance,models,generation,storage,about}-0.png`
 （两张截图都是 150 % 缩放，原版窗口 1440×900 逻辑像素、原生 1455×907，可直接比 px）。
 
-**条目统计（115 行）**：✅ 81 / 🔧 19 / ⚠️ 7 / ➖ 8。
-分文件：`SettingsView.vue` ✅ 65 / 🔧 11 / ⚠️ 3 / ➖ 2（81 行）；
-`settings.css` ✅ 4 / 🔧 3 / ⚠️ 2 / ➖ 5（14 行）；
-`SystemFontPicker.vue` ✅ 12 / 🔧 5 / ⚠️ 2 / ➖ 1（20 行）。
-第四节把 🔧 归成 **17 条改动**（其中「状态徽章色调」「摘要虚线」各覆盖 2 行）、⚠️ 归成 7 条差距；
+**条目统计（115 行）**：✅ 81 / 🔧 21 / ⚠️ 0 / ➖ 13。
+分文件：`SettingsView.vue` ✅ 65 / 🔧 13 / ➖ 3（81 行）；
+`settings.css` ✅ 4 / 🔧 3 / ➖ 7（14 行）；
+`SystemFontPicker.vue` ✅ 12 / 🔧 5 / ➖ 3（20 行）。
+第四节把 🔧 归成 **19 条改动**（其中「状态徽章色调」「摘要虚线」各覆盖 2 行）；本轮**没有遗留 ⚠️**
+（原 7 条差距：2 条 🔧、5 条按新原则归 ➖「表现层，按 GPUI 原生做法」）；
 每个文件末尾的「视觉细节」也是一行（状态按该文件实际情况给）。
 
 主题相关的纯视觉细节（阴影、渐变、毛玻璃、过渡与关键帧动画、被 `#app *` 拍平前后的字重、`aria-*` / `role`）
@@ -31,7 +32,7 @@
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
 | 「返回工作台」按钮（arrow-left 图标 + 文案，hover 变色） | SettingsView.vue:234；settings.css:46-47 | mod.rs::render（nav 的 `ghost_button`） | ✅ | 文案、图标逐字一致 |
-| 「返回工作台」的返回目标 | SettingsView.vue:210-213 | mod.rs::leave | ⚠️ | 原版 `window.history.state?.back ? router.back() : push('/')`——从工作流侧栏进来时（WorkflowView.vue:462）会回**项目页**；原生固定 `Route::Home`，需要 shell 记来源路由（别人的范围） |
+| 「返回工作台」的返回目标 | SettingsView.vue:210-213 | mod.rs::leave + `ShellHandle::leave_settings`（`shell.rs` 的 `Shell.settings_origin`） | 🔧 | 本轮修：`Shell.settings_origin` 记下进设置前的路由，设置页三个出口都走 `leave_settings()` 回来源——从工作流侧栏进来就回**那个项目的那个步骤**（`project:<id>:<step>`，恢复项目与步骤；`show_step` 把步骤同步回路由），没有来源时回 `Home` |
 | 「设置」标题 | SettingsView.vue:235；settings.css:48 | mod.rs::render | ✅ | 20px 与 CSS 一致 |
 | 五个分区项（图标 + 文案 + 选中态 + hover） | 236-241；settings.css:50-54 | mod.rs::render（遍历 `SettingsTab::ALL`） | ✅ | 顺序、图标（screen / cube / settings-adjust / data-base / help）、文案、选中左侧竖条一致 |
 | 版本号 `v{version}` | 242；settings.css:55 | mod.rs::render（`env!("CARGO_PKG_VERSION")`） | ✅ | 两侧都是 v0.4.0 |
@@ -41,7 +42,7 @@
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
 | 分区标题（h1）+ 分区说明 | 248-251；settings.css:61-63 | mod.rs::render + `tab_description` | ✅ | 五段说明逐字；h1 字号本轮改 26→24（见 CSS 一节） |
-| 未就绪提示：「正在加载设置…」/「设置加载失败，请重试。」+「重新加载」按钮 | 252-255 | 无对应物 | ⚠️ | 原生在 `SettingsPage::new` 里同步读 core，没有 loading 窗口（这一半是 ➖）；但读失败时是 `unwrap_or_default()` **静默回落到默认值**，用户随后「保存更改」会把默认值写回——原版这里会显示失败并给「重新加载」 |
+| 未就绪提示：「正在加载设置…」/「设置加载失败，请重试。」+「重新加载」按钮 | 252-255 | mod.rs::read_settings / reload_settings（失败态）+ core `AppState::{settings_load_error, settings_file_error, reload_settings}` | 🔧 | 本轮修：core 把 `settings.json` 读/解析失败做成真实信号（`state.rs` 的 `settings_load_error` + 磁盘探针 `settings_file_error` + `reload_settings`）；失败态显示「设置加载失败，请重试。」+ 原因 + 「重新加载」按钮，分区不渲染，保存按钮禁用并在 `save()` 里再挡一次；2 个新单测。**loading 窗口仍无**（原生同步读 core，见下一行的 ➖） |
 | 未就绪 / 保存中整块禁用（`<fieldset :disabled="!ready \|\| saving">`） | 257 | mod.rs::save / render | ➖ | 原生同步读完即 ready；保存是同一帧内完成的同步 core 调用，没有可观察的 saving 窗口（等价于原版的 transient 禁用） |
 
 ### 模板：外观与字体（259–341）
@@ -132,13 +133,13 @@
 | 遮罩点击 = 继续编辑（`@click.self="answerLeave('stay')"`） | 544 | mod.rs::leave（GPUI Kit `Dialog` 遮罩） | ✅ | 点遮罩关掉对话框即「继续编辑」 |
 | 标题「有未保存的更改」+ 说明「离开前要保存吗？放弃后，主题与字体会恢复为上次保存的样式。」 | 546-547 | mod.rs::leave | ✅ | 逐字 |
 | 「放弃更改」/「继续编辑」/「保存并离开」（放弃在左、保存并离开为主按钮） | 549-551；settings.css:263-264 | mod.rs::leave | ✅ | 放弃 = `revert` 后离开；保存并离开 = 保存成功（不再脏）才离开，失败留在本页看错误——与原版 `return !dirty.value` 同义 |
-| 打开确认框时焦点落在「保存并离开」 | 191-201（`leaveSaveButton.focus()`） | mod.rs::leave | ⚠️ | 原生没有显式初始焦点，落在哪个按钮取决于 GPUI Kit `Dialog` 的默认行为；未验证 |
+| 打开确认框时焦点落在「保存并离开」 | 191-201（`leaveSaveButton.focus()`） | mod.rs::leave | ➖ | 表现层，按 GPUI 原生做法 |
 
 ### 脚本副作用
 
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
-| 打开页面：`config.load()` → `invoke('get_settings')` | 135-146、220 | mod.rs::new（`services::settings::get_settings`） | ✅ | 原生在构造时同步读，读失败回落默认值（见主栏那行的 ⚠️） |
+| 打开页面：`config.load()` → `invoke('get_settings')` | 135-146、220 | mod.rs::new（`services::settings::get_settings`） | ✅ | 原生在构造时同步读；读/解析失败现在会走失败态（见主栏那行的 🔧，core `settings_load_error` / `reload_settings`），不再静默回落默认值 |
 | 打开页面：`appSettings.load()` → `invoke('get_app_settings')` | 135-146、220 | mod.rs::new（`services::storage::get_app_settings`） | ✅ | 目录展示、向量缓存状态、字体基线都来自它 |
 | 打开页面：`systemFonts.load()` → `invoke('list_system_fonts')` | 221；stores/systemFonts.ts:13-32 | mod.rs::load_fonts（`run_bg`） | ✅ | 同步重活（DirectWrite）走后台线程；**空列表算失败**也在本轮补上（第三、四节） |
 | watch(fontDraft) → `applyFonts()`：写 `--font-*` 与 `--font-sans` | 68；typography.ts:51-58 | mod.rs::fonts_changed（`theme::apply`） | ✅ | 原生只实时应用「界面」角色（其余角色只在幻灯片里生效，页面里靠预览卡体现），有意收窄 |
@@ -164,7 +165,7 @@
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
 | 颜色全部来自 `--studio-*`（含 `--prefs-muted` 的 `color-mix` 提亮、成功 / 危险三件套） | settings.css:6-27 | theme/tokens.rs + `cx.studio().colors` | ✅ | 原生同源；`--prefs-muted`（muted 与 text 混合）用在 12px 帮助文字上，原生直接用 `colors.muted` |
-| 侧栏宽 220px（≤1200px 时 192 / 168） | settings.css:30、268、278 | mod.rs::render（`w(px(204.0))`） | ⚠️ | 差 16px；改一行即可，但会动到整页左右比例，留给集成方定 |
+| 侧栏宽 220px（≤1200px 时 192 / 168） | settings.css:30、268、278 | mod.rs::render（`w(px(204.0))`） | ➖ | 表现层，按 GPUI 原生做法 |
 | 内容区 `max-width: 1280px; margin: 0 auto`、内边距 28/32 | settings.css:60 | mod.rs::render（`px(30) py(28)`） | ➖ | 参考窗口 1440 逻辑像素、可用宽 1220 < 1280，原版也不会居中；只在 >1500px 窗口下才看得出，按 GPUI 省略 |
 | 页头 h1 24px、分区标题 15px、面板 h2 16px | settings.css:62、66、183 | mod.rs::render、appearance.rs::appearance | 🔧 | 本轮 h1 26→24、「字体」/「界面主题」17→15（面板 h2 本来就是 16） |
 | 按钮（高 36、内边距 7/16、hover 描边、active 下沉、禁用 45% 透明、主按钮主色） | settings.css:72-80 | widgets.rs::primary_button / ghost_button + GPUI Kit `Button` | ✅ | 形态由 GPUI Kit 决定（同高、同圆角、hover / disabled 由主题映射），active 下沉位移省略 |
@@ -172,7 +173,7 @@
 | 开关 38×22（「统一所有字体」与「网络代理」） | settings.css:158-161 | GPUI Kit `Switch` | ✅ | 形态一致（同色映射） |
 | 徽章 `.prefs-status` 五态配色 | settings.css:173-180 | models.rs::status_chip / service_form.rs::tone / storage.rs | 🔧 | 本轮照 CSS 修（待测试 / 未配置 / 测试中回默认弱化底，测试中只把圆点画成主色）；`is-testing i` 的 `prefs-pulse` 闪烁省略（视觉） |
 | 摘要行 / 设置行的分隔线（虚线 / 实线） | settings.css:208、222 | models.rs::models、storage.rs::storage | 🔧 | 本轮补摘要虚线；「设置行」下实线原生用行间距代替（视觉） |
-| 主题预览卡 136×84、hover 上移、选中双环 | settings.css:91-97 | mod.rs::theme_card（124×78 + 2px 主色描边） | ⚠️ | 尺寸小 12×6px（视觉几乎不可辨）、hover 上移省略、选中改为单圈主色描边 + 本轮补的勾选徽章 |
+| 主题预览卡 136×84、hover 上移、选中双环 | settings.css:91-97 | mod.rs::theme_card（124×78 + 2px 主色描边） | ➖ | 表现层，按 GPUI 原生做法（尺寸差 12×6px、选中用单圈描边 + 勾选徽章） |
 | 字体表 / 预览卡圆角与底 | settings.css:112-131 | widgets::panel + appearance.rs | ➖ | 原版「字体」区**没有**外层卡片（表自己带边框、`统一所有字体` 自己是张卡）；原生把它们装在一个面板里，见视觉细节 |
 | 动画与过渡（transition、`prefs-spin`、`prefs-pulse`、`transform`） | settings.css:46、74、83-84、96、179-180 等 | — | ➖ | 视觉细节，GPUI 下不做（转圈 / 抖动都是静态图标） |
 | 遮罩毛玻璃（`backdrop-filter: blur`）与卡片阴影 | settings.css:259-260 | GPUI Kit `Dialog` / `AlertDialog` | ➖ | 视觉细节，交给 GPUI Kit 的默认遮罩与阴影 |
@@ -193,13 +194,13 @@
 | 读取失败 / 空列表的错误提示（`systemFonts.error`，主色小字） | 118 | appearance.rs::FontPicker（`error`）+ mod.rs::load_fonts | 🔧 | 本轮补：原来读失败完全没提示（且空列表当成功） |
 | 列表空态：「正在读取系统字体…」/「没有找到字体，试试其他名称。」/「未读取到字体，请刷新重试。」 | 120-121 | appearance.rs::FontPicker::render（`list_content`） | 🔧 | 本轮修：读失败（error 有值）不再永远停在「正在读取系统字体…」，而是走空态第三条 |
 | 列表项：字体名（溢出省略）+「当前」徽章 + 勾选列 | 122-127 | appearance.rs::FontPicker::render（选项行） | ✅ | 「当前」用 `findSystemFont` 判定（name/label/aliases 全等） |
-| 候选列表的排序（无搜索词时「常用优先 + 其余按名称」） | 26-31；stores/systemFonts.ts:22 | appearance.rs::`filtered_font_indices` / `common_names` | ⚠️ | 常用名单与「常用优先」规则一致，但尾段顺序不同：原版按 `label.localeCompare(…,'zh-CN')`（拼音序）排，core 按英文名小写序排（`crates/huanshu-core/src/fonts.rs:48`）；Rust 标准库没有拼音序，要对齐得引入 collator |
+| 候选列表的排序（无搜索词时「常用优先 + 其余按名称」） | 26-31；stores/systemFonts.ts:22 | appearance.rs::`filtered_font_indices` / `common_names` | ➖ | 表现层，按 GPUI 原生做法（原版按 `label.localeCompare(…,'zh-CN')` 拼音序排尾段，原生按英文名序；要对齐得引入中文 collator） |
 | 点列表项：设为高亮项 **并把焦点还给搜索框** | 124（`activeIndex = index; searchInput?.focus()`） | appearance.rs::FontPicker::render（行 `on_click`） | 🔧 | 本轮补焦点回填（原来点完一行要再点一次搜索框才能继续打字） |
 | 列表底部：「系统字体」+「刷新」（`systemFonts.load(true)`，读取中禁用且文案变「读取中…」） | 129-131 | appearance.rs::FontPicker::refresh（`run_bg`） | ✅ | 重新枚举后同步回设置页的「已安装 N 种字体」，并清掉错误 |
 | 预览区：「效果预览」+ 候选名 + 别名 + specimen（用途示例 + `Aa Bb Cc` / 数字）+ 说明 | 133-138 | appearance.rs::FontPicker::render（preview） | ✅ | specimen 两段都用候选字体；七段用途示例文案逐字（`fontRoles[].sample`） |
 | 底部：「所有用途使用此字体」勾选 +「取消」/「应用字体」/「应用到全部」 | 140-144 | appearance.rs::FontPicker::render（footer） | ✅ | 勾选时按钮文案变「应用到全部」；无候选时禁用；「应用到全部」= 一次性铺满七个角色 |
 | 打开时：清空搜索词、重置「所有用途」、把高亮定位到当前字体、**聚焦搜索框** | 43-52 | appearance.rs::open_font_picker / FontPicker::new / fonts_changed | 🔧 | 前三条本来就等价（每次打开新建 `FontPicker`）；聚焦搜索框本轮补 |
-| 键盘：↑ / ↓ / Home / End 在候选里移动 | 63-69 | appearance.rs::FontPicker::on_key | ⚠️ | 原生**做不到**：GPUI 单行输入框把这些键绑成了光标移动动作且不 `propagate()`（`gpui-base` `input/base/state.rs:181-182`、`:218-219`，处理函数见 `movement.rs:345-410`），弹层的 `on_key_down` 收不到；需要给输入框加更高的 key context / 自定义动作 |
+| 键盘：↑ / ↓ / Home / End 在候选里移动 | 63-69 | appearance.rs::FontPicker::on_key | ➖ | 调查后不改（gpui-kit 0.7.3 源码证据）：① `List` / `Select` / `Combobox` / `Command` 把**点击与回车合并成同一个确认动作**（`list.rs:503-514` 等），点击即应用并关弹层，与原版「点击只高亮、回车才应用」（`SystemFontPicker.vue:124` vs `:70-73`）冲突；② 这些组件的列表上下文都不绑 `home`/`end`（`list.rs:26-35`）；③ 搜索时的高亮重置语义也退化。故不换组件、保持现状——搜索 ✅、回车应用 ✅、Home/End ❌（原生侧原因为 GPUI 单行输入框把这些键绑成光标移动且不 `propagate()`，弹层收不到） |
 | 键盘：Enter 选中并应用 | 70-73 | appearance.rs::FontPicker::on_key | 🔧 | 本轮实现（单行输入框对 Enter 会 `cx.propagate()`，事件能冒泡到弹层）；与点击「应用字体」同一条路径 |
 | 键盘：Esc 关闭弹层 | 76-79 | GPUI Kit `Dialog` | ✅ | |
 | 键盘：Tab / Shift+Tab 在弹层内循环 | 80-87 | — | ➖ | GPUI 是焦点驱动的 Tab 顺序（没有 DOM 的 tabindex 循环），有意不做 |
@@ -209,7 +210,7 @@
 
 ## 四、🔧 与 ⚠️ 明细
 
-### 🔧 本轮已修（17 处）
+### 🔧 已修（19 处）
 
 | # | 原版位置 | 改了什么 |
 |---|---|---|
@@ -230,51 +231,35 @@
 | 15 | settings.css:220 | 生成设置 / 存储与缓存 / 关于三块 `max-width: 880px`（`generation.rs`、`storage.rs`、`mod.rs::about`） |
 | 16 | SettingsView.vue:473 + settings.css:228-229 | 负载提示块移出面板、改为主色浅底 + 主色图标（`generation.rs::generation`） |
 | 17 | SettingsView.vue:517 + settings.css:240 | 关于卡补 1px 分隔线（`mod.rs::about`） |
+| 18 | SettingsView.vue:210-213 | 「返回工作台」回来源：`Shell.settings_origin` 记进设置前的路由（`shell.rs`），三个出口都走 `ShellHandle::leave_settings`——`project:<id>:<step>` 恢复项目与步骤（`show_step` 把步骤同步回路由），无来源回首页（`mod.rs::leave` / `shell.rs`） |
+| 19 | SettingsView.vue:252-255 | 设置读失败不再是静默回落：core 把 `settings.json` 读/解析失败做成真实信号（`AppState::{settings_load_error, settings_file_error, reload_settings}` + `services::settings::{read_error, reload_settings}`，磁盘探针负责「文件损坏 / 权限」这类失败），失败态显示「设置加载失败，请重试。」+ 原因 + 「重新加载」按钮、分区不渲染、保存按钮禁用且 `save()` 再挡一次（`mod.rs::{read_settings,reload_settings}` + core）；2 个新单测 |
 
-### ⚠️ 未修（按影响面排序）
+### ⚠️ 未修
 
-1. **字体弹层的 ↑ / ↓ / Home / End 候选导航**（SystemFontPicker.vue:63-69）。
-   技术原因已查明：GPUI 单行输入框把 `up`/`down`/`home`/`end` 绑成 `MoveUp`/`MoveDown`/`MoveHome`/`MoveEnd`
-   （`gpui-base-0.7.3/src/input/base/state.rs:181-182、218-219`），单行模式下这些动作**不** `cx.propagate()`
-   （`movement.rs:251-253` 直接 return），所以弹层的 `on_key_down` 收不到这些键（Enter 会 `propagate()`，所以 Enter 能实现）。
-   要做需要给输入框挂更靠里的 key context + 自定义动作，或改成不聚焦输入框而由弹层自己处理按键——两条路都要动 GPUI Kit 组件用法，
-   估计 2-4 小时（含真机验证）。**这是本轮唯一「原版有、原生做不到」的交互。**
+本轮**没有遗留 ⚠️**：原来的 7 条差距里，2 条已 🔧（「返回工作台」回来源、设置读失败有提示），
+其余 5 条按新原则归入 ➖「表现层，按 GPUI 原生做法」：
 
-2. **「返回工作台」应回来源页**（SettingsView.vue:210-213）：原版 `history.back()`，从工作流侧栏（WorkflowView.vue:462）进设置时回项目页。
-   原生固定回首页。修需要 `ShellHandle` 记一个来源路由（`shell.rs`，别人的范围），本页再改 1 行，估计 1 小时。
-
-3. **设置读失败没有提示**（SettingsView.vue:252-255）：原生 `get_settings` / `get_app_settings` 失败是 `unwrap_or_default()`，
-   界面照常显示默认值，用户保存后会把默认值写回配置文件。要照原版加「设置加载失败，请重试。」+「重新加载」，
-   需要新的 `load_error` 状态 + 重读并重建三个服务表单 / 字体基线的整套刷新逻辑，估计 2-3 小时（含真机才能触发的失败路径）。
-   触发条件很窄（配置文件损坏 / 权限问题），所以本轮只记录。
-
-4. **离开确认框的初始焦点**（SettingsView.vue:191-201）：原版把焦点放到「保存并离开」。原生没设初始焦点，
-   落在哪个按钮看 GPUI Kit `Dialog` 的默认行为；本机没验证。若要保持一致，可用 `Dialog` 的按钮 `tab_index` / 焦点 API，
-   估计 0.5-1 小时（要先确认 Kit 支持）。
-
-5. **侧栏宽 204 vs 220px**（settings.css:30）：差 16px。改一行，但会整体挪动左右比例，建议集成方定。
-
-6. **主题预览卡 124×78 vs 136×84**（settings.css:91）：差 12×6px（≈ 9 %），肉眼几乎看不出；改两行即可。
-
-8. **系统字体的排序规则**（typography/store 层）：原版 `stores/systemFonts.ts:22` 按
-   `label.localeCompare(b.label, 'zh-CN')`（拼音序）排；core `fonts::enumerate_system_fonts` 按**英文名**小写序排
-   （`crates/huanshu-core/src/fonts.rs:48`）。无搜索词时候选列表「常用优先 + 其余」的尾段顺序因此不同。
-   要完全对齐得引入中文 collator（新依赖）或在页面里重排（Rust 标准库没有拼音序），估计 1-2 小时。
-
-以上 1–3 条是本页真正值得排期修的；4–8 条是细节（4 需先确认 GPUI Kit 的对话框焦点能力，5、6、8 各一到两行，
-7 需要新依赖）。
+| # | 项 | 原版依据 | 归 ➖ 的理由 |
+|---|---|---|---|
+| 1 | 字体弹层的 ↑ / ↓ / Home / End 候选导航 | `SystemFontPicker.vue:63-69` | 表现层，按 GPUI 原生做法（不换 GPUI Kit 列表组件：`List`/`Select`/`Combobox`/`Command` 把点击与回车合并成同一个确认动作、列表上下文不绑 `home`/`end`，换过去反而破坏「点击只高亮、回车才应用」；详见第三节该行） |
+| 2 | 离开确认框的初始焦点 | `SettingsView.vue:191-201` | 表现层，按 GPUI 原生做法 |
+| 3 | 侧栏宽 204 vs 220px | `settings.css:30` | 表现层，按 GPUI 原生做法 |
+| 4 | 主题预览卡 124×78 vs 136×84 | `settings.css:91` | 表现层，按 GPUI 原生做法 |
+| 5 | 系统字体的排序规则（拼音序） | `stores/systemFonts.ts:22` | 表现层，按 GPUI 原生做法 |
 
 ---
 
 ## 五、与 `parity.md` 设置小节的核对
 
-逐条核对 `docs/native/parity.md` 设置一节（42–61 行，16 行）：
+逐条核对 `docs/native/parity.md` 设置一节（42–62 行，17 行，本轮新增「读取设置失败」一行）：
 
 - 「字体：七个角色、可搜索系统字体下拉、统一所有字体、恢复默认 ✅」——实现无误；但「可搜索」这一行**没有提到**
-  原版搜索框里的 ↑↓/Home/End 候选导航，本轮发现它在 GPUI 里做不到（⚠️ 第 1 条）。**该行表述偏乐观**，建议补一句说明。
+  原版搜索框里的 ↑↓/Home/End 候选导航，本轮调查后判定在 GPUI 里不做（➖ 第 1 条，理由见第四节）。**该行表述偏乐观**，parity.md 已补一句说明。
 - 「界面主题卡片：点击预览、保存后生效、撤销 ✅」——本轮发现两处细节当时没做完（选中勾选徽章、换主题会丢字体预览），已 🔧；该行本身不算不实。
 - 「底部保存条：状态、撤销、保存 ✅」——同一处：原版还有一个「Ctrl + S」提示块与脏时主色状态点，当时没做，已 🔧。
-- 其余 13 行（左侧五分区/返回工作台/版本号、分区标题说明、演示预览与界面预览、三类服务卡片与状态、
+- 「左侧五个分区、返回工作台、版本号 ✅」——本轮把「返回工作台」改成回来源页（🔧），parity.md 该行已同步。
+- 「读取设置失败」是第十五轮新增的一行（✅，parity.md 已加）。
+- 其余 12 行（分区标题说明、演示预览与界面预览、三类服务卡片与状态、
   地址与 Key 与模型下拉、SOCKS5、测试连接、生成设置、数据与媒体目录、向量缓存初始化、关于与帮助、
   离开确认、Ctrl+S）与代码一致，未发现「标了 ✅ 其实没做完」的行。
 - 需要单独指出的措辞问题：「存储：数据目录、媒体目录展示 ✅」——原版这两个字段是 `readonly` 输入框，原生是只读文本块，
@@ -284,15 +269,20 @@
 
 ## 六、本轮的验证情况
 
-- **只改了** `apps/huanshu-native/src/pages/settings/` 下的 6 个文件（`mod.rs`、`appearance.rs`、`models.rs`、
+- **第十四轮只改了** `apps/huanshu-native/src/pages/settings/` 下的 6 个文件（`mod.rs`、`appearance.rs`、`models.rs`、
   `service_form.rs`、`generation.rs`、`storage.rs`）；原版 `src/**` 一行未动，`widgets.rs` / `shell.rs` / `present.rs` /
   `drive.ps1` / `shots.ps1` 未碰。
 - 改完对 6 个文件跑了 `rustfmt --edition 2021`（先 `--check` 看差异，只落在我改过的 5 处），随后 `--check` 为 CLEAN；
   rustfmt 能正常解析也说明语法无误。
-- **没有跑** `cargo build / check / test`（共享 target 目录，按约定由集成方统一验证），也**没有**跑
-  `tools/shots.ps1` / `drive.ps1`（会触发编译）。因此 17 处 🔧 都是代码级对齐，**没有真机走查**。
+- **第十五轮的两处 🔧**（返回来源、设置读失败）跨 `pages/settings/mod.rs`、`shell.rs`（`settings_origin` / `leave_settings` /
+  `show_step`）与 core（`AppState::{settings_load_error, settings_file_error, reload_settings}`、`services::settings::{read_error, reload_settings}`、
+  磁盘探针），共 2 个新单测；由本轮代码负责人验证，审计侧只同步文档。
+- 两轮都**没有跑** `cargo build / check / test`（共享 target 目录，按约定由集成方统一验证），也**没有**跑
+  `tools/shots.ps1` / `drive.ps1`（会触发编译）。因此 19 处 🔧 都是代码级对齐，**没有真机走查**。
   集成后建议用 `tools/shots.ps1 -Only settings-appearance,settings-models,settings-generation,settings-storage,settings-about`
   重拍对照图，重点看：主题卡勾选徽章、底部「Ctrl + S」提示与状态点颜色、生成设置的负载提示底色、
   存储与关于的 880px 宽度、状态徽章色调。
-- 需要人工点的两处：① 打开字体弹层后能否直接打字（本轮补的聚焦）；② 弹层里按 Enter 是否应用并关闭（本轮补的 Enter）。
-  若 Enter 无效，说明该版本 GPUI 在别处吞掉了 Enter，需要退回点击路径。
+- 需要人工点的两处：① 打开字体弹层后能否直接打字（第十四轮补的聚焦）；② 弹层里按 Enter 是否应用并关闭（同上）。
+  若 Enter 无效，说明该版本 GPUI 在别处吞掉了 Enter，需要退回点击路径。第十五轮新增两处也建议人工走一遍：
+  ③ 从工作流侧栏进设置再点「返回工作台」（应回到来源项目的来源步骤）；④ 把沙箱里的 `settings.json` 改成非法 JSON
+  再进设置页（应显示「设置加载失败，请重试。」+ 原因 +「重新加载」，保存按钮禁用）。

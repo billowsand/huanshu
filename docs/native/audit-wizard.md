@@ -53,7 +53,7 @@
 | 跳过提示条（information 图标 +「跳过此步骤仍可使用幻灯片播放功能，但无法生成新幻灯片」） | :337-340 | wizard.rs:532-552 | ✅ | 逐字 |
 | 三个面板标题：大语言模型 / 向量模型 / 多模态模型 | :344, 376, 408 | wizard.rs:515-531（`ModelTarget::ALL`） | ✅ | 顺序一致 |
 | 面板字段「API 地址」+ 占位 `http://127.0.0.1:1234` | :345-350, 377-382, 409-414 | `service_form.rs::ServiceForm::compact`（service_form.rs:534-538） | ✅ | 复用设置页表单，占位逐字 |
-| 面板字段「API Key (本地留空)」+ 密码框 + 占位 `sk-...` | :352-365, 384-397, 416-429 | service_form.rs:539-550 | ⚠️ | 两处差异，都在 service_form.rs（本轮不可改）：①原生是全角「（本地留空）」，原版是半角 `(本地留空)`（:356 字节为 `0x28`/`0x29`）；②原生多一个「显示/隐藏 API Key」眼睛按钮，原版向导的密码框没有切换（:360-364 只有 `type="password"`） |
+| 面板字段「API Key (本地留空)」+ 密码框 + 占位 `sk-...` | :352-365, 384-397, 416-429 | service_form.rs:539-550 | ➖ | 表现层，按 GPUI 原生做法（原生是全角「（本地留空）」、且多一个「显示/隐藏 API Key」眼睛按钮，都在 `service_form.rs`） |
 | 面板字段「模型」+ 占位（各服务默认模型名） | :366-372, 398-404, 430-436 | service_form.rs:551-557 | ✅ | 占位 = 草稿模型名，清空输入后可见（与原版同） |
 | 第 2 步错误提示块（`.error-msg`，`v-if="modelError"`） | :440, 911-919 | wizard.rs:855-868 | ✅ | 文案、配色、圆角一致 |
 | 错误提示只在第 2 步渲染 | :440（`v-if` 在第 2 步的 `div` 内，第 3、4 步没有） | wizard.rs:855-868（卡片级） | ➖ | 有意：第 3 步的失败原版另有 `embeddingStatus`（:173）兜底；第 4 步 `finishWizard` 失败原版**完全没有可见反馈**（只有 :212 写 `modelError`）。原生在所有步骤都显示，避免「进入 Studio」点了没反应 |
@@ -72,7 +72,7 @@
 | 底栏「上一步」+ `arrow-left`（第 2 步起显示） | :536-542 | wizard.rs:733-737 | ✅ | 图标在文字之前，与原版一致 |
 | 底栏第 1 步「下一步 →」（`canProceedStep1` 为真才出现） | :544-550 | wizard.rs:741-746 | 🔧 | 原生箭头画在文字前（GPUI 的 `Button::icon` 固定在前，gpui-component `button.rs:766-777`）→ 改用 `.child()` 追加，箭头落在文字之后 |
 | 底栏第 2 步「跳过」（永远显示） | :551-561 | wizard.rs:749-751 | ✅ | `skipLlm=skipEmbedding=true → step 4`（:79-81）一致 |
-| 底栏第 2 步「下一步 →」（`canProceedStep2` 为真才出现） | :562-568 | wizard.rs:753-761 | 🔧 | 箭头位置同上；另原生在此按钮上加了「校验中禁用」，涉及校验本身 → 见 ⚠️-1 |
+| 底栏第 2 步「下一步 →」（`canProceedStep2` 为真才出现） | :562-568 | wizard.rs:753-761 | 🔧 | 箭头位置同上；另原生在此按钮上加了「校验中禁用」，涉及校验本身 → 见第 6 节（有意偏离：提前发现模型配置错误） |
 | 底栏第 3 步「下一步 →」（`!skipEmbedding && progress<100` 时禁用） | :569-576 | wizard.rs:764-772 | 🔧 | 箭头位置同上；禁用条件逐字 |
 | 底栏第 4 步「进入 Studio →」（文案固定、pulse 动画） | :577-583 | wizard.rs:775-782 | 🔧 | 原生原先提交期间把文案改成「进入中…」→ 改回固定「进入 Studio」；提交中禁用（防重复提交）保留；pulse 动画见视觉细节 |
 | 第 2 步三列网格；`<700px` 时单列 | :342, 799-803, 823-827 | wizard.rs:553（flex 三列） | ✅ | 原版媒体查询在桌面窗口下永不触发（主窗口最小宽 1080，main.rs:74） |
@@ -95,7 +95,7 @@
 | `prevStep()`：第 2→1、第 3→2、第 4→（`skipLlm` ? 1 : 3） | :92-100 | `prev_step`:182-196 | ✅ | |
 | `browseDataDir()`：目录对话框；选中后 `dataDir = 选中`；媒体目录不含 `/projects/` 时设为 `<选中>/media` | :102-110 | `browse_data_dir`:207 + `suggest_media_dir`:26（单测 `browsing_data_dir_refreshes_media_dir_unless_it_is_a_projects_dir`:879） | ✅ | `\` 与 `/` 都容忍 |
 | `browseMediaDir()` | :112-117 | `browse_media_dir`:222 | ✅ | |
-| `verifyModels()`：依次 `list_models(llm/embedding/multimodal)`，任一失败写 `modelError` | :119-149 | `verify_models`:271-306 | ⚠️ | 原版**没有任何调用点**（全仓 grep 只有 :119 的定义与函数体内的三处 `invoke`）——原版第 2 步点「下一步」不校验、直接进第 3 步；原生把它接在「下一步」前，失败不翻页。详见 ⚠️-1 |
+| `verifyModels()`：依次 `list_models(llm/embedding/multimodal)`，任一失败写 `modelError` | :119-149 | `verify_models`:271-306 | ➖ | **有意偏离：提前发现模型配置错误**——原版**没有任何调用点**（全仓 grep 只有 :119 的定义与函数体内的三处 `invoke`），第 2 步点「下一步」不校验、直接进第 3 步；原生把它接在「下一步」前，失败不翻页（并在校验期间禁用「下一步」）。这是有意保留的偏离，不是未完成的差距 |
 | `startEmbeddingInit()`：置 `isInitializing`、进度 0、状态「正在初始化图标向量库...」→ 写三类服务到 config → `config.save()` → `invoke("ensure_icon_embeddings")` → 进度 100 /「初始化完成！」；失败 →「初始化失败: {e}」+ `modelError`；`finally` 复位 `isInitializing` | :151-178 | `start_embedding_init`:317-364 | ✅ | 原生：`get_settings` → 覆盖三类服务 → `save_settings` → `ensure_icon_embeddings`（`run_async`）；`initializing` 在成功/失败两条出口都复位（wizard.rs:346-358） |
 | `finishWizard()`：`save_app_settings`（data_dir、media_dir、llm_configured、embeddings_ready、initialized_embedding_model）→ 未跳过时写三类服务并 `config.save()` → `complete_first_run(llmConfigured)` → `router.push("/")`；失败 → `modelError` | :180-214 | `finish_wizard`:366-425 | ✅ | 顺序一致（`run_bg` 里做三步：读-改-写 `app_settings` → `save_settings` → `complete_first_run`）；`finishing` 在两条出口复位，成功回调 `navigate(Home)` |
 | `initialized_embedding_model` 的取值：`!skipLlm && !skipEmbedding ? 模型名 : ""` | :188-191 | `finish_wizard`:378-386 | ✅ | |
@@ -170,12 +170,14 @@
 |---|---|
 | ✅ 一致 | 63 |
 | 🔧 本轮已修 | 9 |
-| ⚠️ 有差距未修 | 2 |
-| ➖ 有意不做 | 7 |
+| ⚠️ 有差距未修 | 0 |
+| ➖ 有意不做 | 9 |
 | 合计 | 81 |
 
-（按第 1–3 节的表逐条计数：1.1 节 50 条 = ✅37 / 🔧9 / ➖3 / ⚠️1；1.2 节 16 条 = ✅14 / ➖1 / ⚠️1；
-第 2 节 7 条全 ✅；第 3 节 8 条 = ✅5 / ➖3。`1.3 节`与第 5 节是对已有 ➖ / 🔧 行的汇总，不重复计数。）
+（按第 1–3 节的表逐条计数：1.1 节 50 条 = ✅37 / 🔧9 / ➖4；1.2 节 16 条 = ✅14 / ➖2；
+第 2 节 7 条全 ✅；第 3 节 8 条 = ✅5 / ➖3。`1.3 节`与第 5 节是对已有 ➖ / 🔧 行的汇总，不重复计数。
+本轮把原 2 条 ⚠️ 都归入 ➖：API Key 行按「表现层，按 GPUI 原生做法」，
+`verifyModels` 行标为**有意偏离：提前发现模型配置错误**。）
 
 ## 5. 本轮改了什么（🔧）
 
@@ -196,19 +198,22 @@
 
 ## 6. 未修差距（⚠️）
 
-| # | 差距 | 原版依据 | 估计工作量 |
+本轮**没有遗留 ⚠️**。原来记的 2 条都改判了：
+
+| # | 原差距 | 原版依据 | 本轮结论 |
 |---|---|---|---|
-| 1 | 第 2 步点「下一步」的流程不同：原版**不校验**直接进第 3 步（`verifyModels` 定义在 :119-149 但全仓无调用点）；原生先对三类服务依次 `list_models`，任一失败就不翻页，并且在校验期间禁用「下一步」。没有 LM Studio 时必须点「跳过」才能往下走 | FirstRunWizard.vue:119-149（定义）、:562-568（按钮只接 `nextStep`）、:85-86（第 2 步只改 `currentStep`） | 去掉校验：删 `verify_models` / `next_from_models` / `verifying` 与其禁用，约 30 行（wizard.rs）。**这是产品决策**：留着能早发现模型配置错误，去掉才与原版逐字一致。若要保留，建议在 parity.md:69 标注为有意偏离 |
-| 2 | 第 2 步面板的「API Key」行：文案括号是全角「（本地留空）」（原版半角 `(本地留空)`，:356 字节 `0x28`/`0x29`），并且多一个显示/隐藏 API Key 的眼睛按钮（原版向导无切换，:360-364） | :352-365, 384-397, 416-429 | 2 行（`service_form.rs:539-550`）——但该文件不在本轮可改范围；它同时服务设置页，而设置页原版**有**眼睛按钮（`SettingsView.vue:374`），所以只能按页面区分：约 10 行（`ServiceForm::compact` 加一个开关） |
+| 1 | 第 2 步点「下一步」的流程不同：原版**不校验**直接进第 3 步（`verifyModels` 定义在 :119-149 但全仓无调用点）；原生先对三类服务依次 `list_models`，任一失败就不翻页，并且在校验期间禁用「下一步」。没有 LM Studio 时必须点「跳过」才能往下走 | FirstRunWizard.vue:119-149（定义）、:562-568（按钮只接 `nextStep`）、:85-86（第 2 步只改 `currentStep`） | 归 ➖：**有意偏离：提前发现模型配置错误**（保留校验，不再当作待修差距；若要对齐原版删掉约 30 行：`verify_models` / `next_from_models` / `verifying` 与其禁用） |
+| 2 | 第 2 步面板的「API Key」行：文案括号是全角「（本地留空）」（原版半角 `(本地留空)`，:356 字节 `0x28`/`0x29`），并且多一个显示/隐藏 API Key 的眼睛按钮（原版向导无切换，:360-364） | :352-365, 384-397, 416-429 | 归 ➖：表现层，按 GPUI 原生做法 |
 
 ## 7. parity.md 与实际的出入
 
-1. **`docs/native/parity.md:69`「配置大模型（三类服务）并校验」**：写的是「「下一步」前照 `verifyModels` 依次 `list_models`，
-   失败不翻页」。原生**确实**这么做了，但原版的 `verifyModels`（`FirstRunWizard.vue:119-149`）**没有任何调用点**——
-   原版点「下一步」不校验、直接进第 3 步。所以这一行描述的不是原版行为，建议补上「有意偏离」的说明（见 ⚠️-1）。
+1. **`docs/native/parity.md:70`「配置大模型（三类服务）并校验」**：行里已写明「「下一步」前依次 `list_models`，失败不翻页；
+   **有意偏离**：原版这步其实不校验——`verifyModels`（`FirstRunWizard.vue:119-149`）全仓无调用点，是死代码；
+   原生保留校验（能提前发现模型配置错误，若要对齐原版删掉即可，约 30 行）」。本轮据此把该行状态由 ✅ 改为
+   「有意偏离（提前发现模型配置错误）」，与本文档第 6 节一致。
 2. 其余首次向导与全局行（parity.md:12-23、:63-72）与代码一致：`Shell::new` 的首次启动进向导、
    `handle.navigate(Route::Home)` 的完成流程、`app_settings.app_theme` 的主题存储、五条路由与 `--route` 都在。
-3. `docs/native/parity.md` 未修改（按要求）。
+3. `docs/native/parity.md` 本轮按上面的口径改了两处（:70 向导校验这一行的「有意偏离：提前发现模型配置错误」、向导小节文字）；其余未动。
 
 ## 8. 代码文件之外
 
@@ -217,3 +222,10 @@
 （共享工作树里 `present.rs`、`tools/drive.ps1`、`tools/shots.ps1`、`pages/*.rs` 等文件的改动来自其他负责人，
 与本次审计无关）。未跑 `cargo build/check/test`（按纪律由集成方统一验证），
 只跑了 `rustfmt --edition 2021`（含 `--check` 通过）。
+
+两处例外说明（第十五轮文档同步）：
+
+- 本节说的「`docs/native/parity.md` 未动」只对首次向导审计那一轮成立；第十五轮按第 7 节的口径改了 parity.md 的
+  向导两处（:70 的校验标注为「有意偏离：提前发现模型配置错误」、向导小节文字）。
+- 本文件（`audit-wizard.md`）在本轮的改动只有记号翻转（1.1 节的 API Key 行、1.2 节的 `verifyModels` 行）
+  与统计口径，**没有任何代码改动**。

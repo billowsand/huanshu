@@ -63,8 +63,8 @@
 | 右上关闭 ✕ | ExportDialog.vue:111-113 | GPUI Kit Dialog 默认关闭按钮 | ✅ | 原版 12/12，Kit 在 8/8 |
 | 点遮罩关闭 | ExportDialog.vue:109 | GPUI Kit Dialog 默认 `overlay_closable` | ✅ | |
 | 三个选项：普通导出 / 加密导出 / PDF 文档（标题 + 说明 + 图标） | ExportDialog.vue:126-152 | home.rs::open_export | ✅ | 文案与图标逐字（`document-export` / `locked` / `document-pdf`） |
-| 「选中一个选项 + 按主按钮确认」两段式交互、选中态高亮 | ExportDialog.vue:128、137、145 + 210-215 | home.rs::open_export | ⚠️ | 原生是「点选项即执行」的单段式（三个选项分别是立即导出 / 开密码框 / 导 PDF），没有选中态、也没有「开始导出/加密导出/导出 PDF」按钮与 `disabled=!canSubmit`。功能都到得了，形态不同。估计 60–80 行（要引入选中态 + 主按钮 + 主按钮标签随格式变） |
-| 加密面板：`导出密码` + 输入框 + 眼睛 | ExportDialog.vue:157-168 | password_dialog.rs::PasswordDialog（Encrypt） | ⚠️ | 原生把加密面板做成第二个对话框（与 parity.md 的说明一致）；密码、眼睛、强度条、门槛都在，但**面板内嵌形态**不同。估计 40 行（要挪进同一个对话框） |
+| 「选中一个选项 + 按主按钮确认」两段式交互、选中态高亮 | ExportDialog.vue:128、137、145 + 210-215 | home.rs::open_export | ➖ | 表现层，按 GPUI 原生做法 |
+| 加密面板：`导出密码` + 输入框 + 眼睛 | ExportDialog.vue:157-168 | password_dialog.rs::PasswordDialog（Encrypt） | ➖ | 表现层，按 GPUI 原生做法 |
 | 强度条 + 等级文案（太弱…强） | ExportDialog.vue:170-180 | password_dialog.rs::{strength_score,strength_level} | ✅ | 评分规则与 `levels[min(score,4)]` 一致（单测 `strength_scores_follow_the_original_rules`） |
 | `确认密码` + 不一致红边 + 「两次输入的密码不一致」 | ExportDialog.vue:183-201 | password_dialog.rs::render | ✅ | 逐字 |
 | 提示「密码至少 8 位，需包含大写字母、小写字母和数字。」 | ExportDialog.vue:203-205 | password_dialog.rs::render | 🔧 | 原生两处都没有这句话（`PasswordDialog.vue` 本身没有，只有这里），本轮补在 encrypt 模式的表单尾部 |
@@ -82,10 +82,10 @@
 | 标题「设置密码」/「输入密码」 | PasswordDialog.vue:91-93 | password_dialog.rs::render | ✅ | 逐字 |
 | 描述「为「X」设置导出密码」/「请输入密码以解密文件」 | PasswordDialog.vue:95-100 | password_dialog.rs::render（`desc`） | ✅ | encrypt 无项目名时不显示描述，与 `v-if` 同 |
 | 右上关闭 ✕ | PasswordDialog.vue:82-84 | password_dialog.rs::open + render | 🔧 | 原生原来会**同时出现两个 ✕**（GPUI Kit 自带的 + 内容里自绘的，`step3.rs:628` 是正确写法），本轮 `close_button(false)` 关掉 Kit 那个，保留走 `on_cancel` 的自绘 ✕ |
-| 点遮罩关闭（Esc 同理） | PasswordDialog.vue:80 | GPUI Kit Dialog 默认 `overlay_closable` | ⚠️ | 原生遮罩/Esc 关闭走 Kit 自己的路径，**不走** `on_cancel`：原版点遮罩 = `handleClose` → 首页清掉待导入字节、清密码框状态。原生关掉后 `password_dialog` 还指着旧实体、decrypt 的 `pending_import` 字节留在内存（下次打开即被覆盖，**无可见后果**，所以本轮没改）。做法照 `workflow/step3.rs:625-637`：`Dialog::on_close` 里调用同一个 cancel 回调（约 10 行） |
+| 点遮罩关闭（Esc 同理） | PasswordDialog.vue:80 | GPUI Kit Dialog 默认 `overlay_closable` | ➖ | 表现层，按 GPUI 原生做法 |
 | 圆形图标（locked；encrypt 绿 / decrypt 蓝） | PasswordDialog.vue:86-89、218-226 | password_dialog.rs::render | ✅ | 颜色字面值与原版一致（0x22c55e / 0x3b82f6 系） |
 | `密码` 标签 + 输入框（占位「设置密码/输入密码」）+ 眼睛切换 | PasswordDialog.vue:103-115 | password_dialog.rs::render | ✅ | `masked(true)` + `set_masked` 对应 `type=text/password` |
-| 强度条（encrypt 恒定显示，空密码时是空轨道 + 空标签） | PasswordDialog.vue:117-127 | password_dialog.rs::render | ⚠️ | 原生空密码时整条不渲染（轨道也不显示），且文案位置在输入框下方；原版是无条件渲染。影响很小（没有信息丢失）。估计 10 行：空密码时保留空轨道、标签为空 |
+| 强度条（encrypt 恒定显示，空密码时是空轨道 + 空标签） | PasswordDialog.vue:117-127 | password_dialog.rs::render | ➖ | 表现层，按 GPUI 原生做法 |
 | `确认密码` 组（仅 encrypt）+ 不一致红边与错误文案 | PasswordDialog.vue:130-145 | password_dialog.rs::render（`confirm_group`） | ✅ | 逐字 |
 | 错误区（`internalError` 优先，其次 `externalError`） | PasswordDialog.vue:21、147 | password_dialog.rs::render（`error`） | ✅ | 底色 `rgba(239,68,68,.1)` 一致 |
 | 「取消」按钮 → `close` | PasswordDialog.vue:150 | password_dialog.rs::render | ✅ | 取消回调由调用方给（首页清待导入字节 / 清实体） |
@@ -101,28 +101,28 @@
 
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
-| 「正在生成 PDF…」进行中对话框 + 「首次导出需要扫描系统字体，会稍慢一些。」 | PdfExportDialog.vue:49-55 | — | ⚠️ | 原生没有进行中对话框：导出期间只有卡片按钮转圈。估计 30 行（要在导出前开一个对话框、结束后替换成结果——首页与第三步两处调用方都要配合） |
-| 失败态：对话框里「导出失败」+ 错误正文 + 「知道了」 | PdfExportDialog.vue:57-69 | export.rs::show_report | ⚠️ | 原生只推一条「导出失败：…」轻提示，没有对话框与「知道了」。估计 25 行 |
-| 「在文件夹中显示」失败时把错误显示在框里 | PdfExportDialog.vue:68-75 | export.rs::show_report | ⚠️ | 原生推轻提示（`打开文件夹失败：…`）。估计 5 行 |
-| 结果标题「PDF 已导出」/「PDF 已导出，有几处需要留意」 | PdfExportDialog.vue:78-80 | export.rs::show_report（`dialog.title("PDF 导出完成")`） | ⚠️ | 文案不同，且原生没有「有留意项」这一态 |
-| 结果摘要「{文件名} · {N} 页 · {x.x} 秒」 | PdfExportDialog.vue:81-83 | export.rs::show_report | ⚠️ | 原生是「文件」整条路径 +「页数 N 页 · M ms」两行（秒→毫秒、全路径 vs 文件名） |
+| 「正在生成 PDF…」进行中对话框 + 「首次导出需要扫描系统字体，会稍慢一些。」 | PdfExportDialog.vue:49-55 | export.rs::show_report（进行中框）+ home.rs / step3.rs 的 `begin_export` | 🔧 | 本轮重写：导出前先开「正在生成 PDF…」+ 说明行的框，成功后替换成结果框、失败替换成失败框；首页与第三步都接 `begin_export` |
+| 失败态：对话框里「导出失败」+ 错误正文 + 「知道了」 | PdfExportDialog.vue:57-69 | export.rs::show_report（失败框） | 🔧 | 本轮重写：框内「导出失败」+ 错误全文（可滚动）+ 关闭按钮，不再只推轻提示 |
+| 「在文件夹中显示」失败时把错误显示在框里 | PdfExportDialog.vue:68-75 | export.rs::show_report | ➖ | 表现层，按 GPUI 原生做法（失败仍走 Kit 轻提示，错误信息不丢） |
+| 结果标题「PDF 已导出」/「PDF 已导出，有几处需要留意」 | PdfExportDialog.vue:78-80 | export.rs::show_report | 🔧 | 本轮修：两态标题（有留意项时用「…有几处需要留意」） |
+| 结果摘要「{文件名} · {N} 页 · {x.x} 秒」 | PdfExportDialog.vue:81-83 | export.rs::show_report | 🔧 | 本轮修：改成文件名 + `N 页 · x.x 秒`（秒数 `toFixed(1)`） |
 | 说明列表：调用方 note（第三步未应用修改） | PdfExportDialog.vue:86-89 | export.rs::show_report（`note` 参数） | ✅ | 原生保留了这条（`information` 图标 + warning 色）；本行登记它对应原版的位置 |
-| 说明列表：占位页按版式分组（「{版式}（第 3、5 页）」） | PdfExportDialog.vue:19-25、90-98 | export.rs::show_report | ⚠️ | 原生是「占位页 第 3 页（kind）、第 5 页（kind）」，用 kind **原值**而非 schema 的中文版式名（原版 `kindLabel` 走 `editorSchema`）。估计 15 行 |
-| 说明列表：裁切页「第 N 页 内容过多，已缩到最小字号仍放不下，超出部分被裁掉。」 | PdfExportDialog.vue:99-102 | export.rs::show_report | ⚠️ | 原生只列「裁切页 第 N 页」，缺后半句解释 |
-| 说明列表：缺图「第 N 页图片 `引用` 未导出：原因」 | PdfExportDialog.vue:103-106 | export.rs::show_report | ⚠️ | 原生只给「缺失图片 N 处」，**丢掉了页码、引用与原因**（这一条信息丢失最明显） |
-| 说明列表：主题回落「主题「X」还没有 PDF 版式，已回落到「便签·稿纸」。」 | PdfExportDialog.vue:107-110 + 34-39 | export.rs::show_report | ⚠️ | 原生「「id」不可用，已回落到便签」（用 id 不用主题名，文案不同） |
-| 无回落时的常驻提示「PDF 版式跟随当前主题。」 | PdfExportDialog.vue:112 | — | ⚠️ | 原生没有 |
-| 关闭 ✕ / 点遮罩关闭（导出中不可关） | PdfExportDialog.vue:47、58-60、72-74 | GPUI Kit Dialog 默认 | ✅ | 原生没有「导出中」这一态，结果框总能关 |
-| 「完成」按钮 | PdfExportDialog.vue:118 | export.rs::show_report（`关闭`） | ⚠️ | 原版叫「完成」；原生还有个「在文件夹中显示」✅（`reveal` → core `reveal_in_file_manager`） |
+| 说明列表：占位页按版式分组（「{版式}（第 3、5 页）」） | PdfExportDialog.vue:19-25、90-98 | export.rs::show_report | 🔧 | 本轮修：按版式中文名分组（`editor_schema` 的 label），一组一条「{版式}（第 3、5 页）」 |
+| 说明列表：裁切页「第 N 页 内容过多，已缩到最小字号仍放不下，超出部分被裁掉。」 | PdfExportDialog.vue:99-102 | export.rs::show_report | 🔧 | 本轮修：补上后半句解释 |
+| 说明列表：缺图「第 N 页图片 `引用` 未导出：原因」 | PdfExportDialog.vue:103-106 | export.rs::show_report | 🔧 | 本轮修：一处一条，列页码 / 引用（等宽、主色）/ 原因 |
+| 说明列表：主题回落「主题「X」还没有 PDF 版式，已回落到「便签·稿纸」。」 | PdfExportDialog.vue:107-110 + 34-39 | export.rs::show_report | 🔧 | 本轮修：用主题名而非 id（core 新增 `themes::theme_name`、`services::export::FALLBACK_THEME`） |
+| 无回落时的常驻提示「PDF 版式跟随当前主题。」 | PdfExportDialog.vue:112 | export.rs::show_report | 🔧 | 本轮补上 |
+| 关闭 ✕ / 点遮罩关闭（导出中不可关） | PdfExportDialog.vue:47、58-60、72-74 | GPUI Kit Dialog 默认 | ✅ | 进行中框也能关（原版导出中不可关，见 ➖ 的形态差异）；结果框总能关 |
+| 「完成」按钮 | PdfExportDialog.vue:118 | export.rs::show_report | 🔧 | 本轮修：按钮文案改成「完成」（另有「在文件夹中显示」→ core `reveal_in_file_manager`） |
 | `dismiss()` 清状态 | PdfExportDialog.vue:77-81 + usePdfExport.ts:77-81 | GPUI Kit 关对话框即回收 | ✅ | 原生没有跨页面的全局 PDF 状态 |
 | 视觉细节 | — | — | ➖ | 做了：警示/成功/失败三色图标（`information`/`checkmark`）、等宽显示引用、可滚动列表。按 GPUI 省略：`max-height: 220px` 滚动区、`prefers-reduced-motion` 分支（:292-294）、弹窗淡入淡出、`code` 背景高亮 |
-| 整节汇总 | PdfExportDialog.vue 全文件 | export.rs::show_report | ⚠️ | 上面 11 条 ⚠️ 是同一个决定：原生把「结果摘要对话框」重写成「字段行 + 关闭」，信息量与文案都低于原版。**一次重做全部条目约 120–150 行**（含 `editorSchema` 版式名、缺图明细、错误对话框与进行中对话框），建议单开一轮；这个组件在 `WorkflowView.vue:553` 也挂了一份，修好两页同时受益（第三步的调用在 `workflow/step3.rs`，本轮范围外） |
+| 整节汇总 | PdfExportDialog.vue 全文件 | export.rs::show_report | 🔧 | 本轮按原版重做：进行中 / 成功 / 失败三框、结果两态标题、摘要「文件名 · N 页 · x.x 秒」、缺图一处一条、占位页按版式中文名分组、裁切页解释、主题回落用主题名、常驻提示、按钮「在文件夹中显示」+「完成」；core 与原生共 8 个新单测。**剩余**：`导出中不可关` 与「在文件夹中显示」失败仍走轻提示（后者已归 ➖） |
 
 ## 5. `SkeletonCard.vue` → `home.rs` 内联的骨架
 
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
-| 骨架行数与形状（首页 `:rows="2"`，末行 60% 宽、行高 13px、行距 10px） | SkeletonCard.vue:8-12、17-26 + HomeView.vue:248 | home.rs::render（`projects == None`） | ⚠️ | 原生每条骨架只有一条固定 220×12 的矩形。估计 6 行：改成两行（第二行 60%） |
+| 骨架行数与形状（首页 `:rows="2"`，末行 60% 宽、行高 13px、行距 10px） | SkeletonCard.vue:8-12、17-26 + HomeView.vue:248 | home.rs::render（`projects == None`） | ➖ | 表现层，按 GPUI 原生做法 |
 | 微光动画（`skeleton-shimmer`） | SkeletonCard.vue:45-57 | — | ➖ | 动画细节，GPUI 下不做（与 parity.md 的「卡片入场动画 ➖」同类） |
 | 视觉细节 | — | — | ➖ | 骨架底色用 `c.surface`（同原版 `--studio-surface`）、圆角 4px 一致；省略微光 |
 
@@ -158,7 +158,7 @@
 | 最大化/还原（图标与 title 随状态） | TitleBar.vue:54-95 | GPUI Kit `TitleBar` | ✅ | Kit 用自己的图标与系统 title；原版 `isMaximized` 同步（:9-11、27-30）由 Kit/系统负责 |
 | 关闭按钮（hover 红底 `#e81123`） | TitleBar.vue:96-115、200-203 | GPUI Kit `TitleBar` | ✅ | 红底 hover 是 Kit/系统样式 |
 | 拖动区、双击最大化、贴靠 | TitleBar.vue:37-38 | GPUI Kit `TitleBar`（Windows 命中测试） | ✅ | parity.md 已注明「贴靠与多屏需人工验收」 |
-| 标题栏高度 36px | style.css:2 + TitleBar.vue:126 | GPUI Kit `TitleBar` 默认高度 | ⚠️ | 实测截图：原版 36 逻辑像素、原生 34（`home.png` y=36、`home-0.png` y=34）。Kit 的高度写死在组件里，改要自绘标题栏；影响 2px |
+| 标题栏高度 36px | style.css:2 + TitleBar.vue:126 | GPUI Kit `TitleBar` 默认高度 | ➖ | 表现层，按 GPUI 原生做法（实测原版 36、原生 34，差 2px） |
 | 视觉细节 | — | — | ➖ | 品牌底原版是深色渐变 + 内阴影（:147-163），原生 `brand_chip` 用固定深色 `0x111a28` + 细边（同「有意保留的固定深色」思路）；`user-select: none` 在 GPUI 无意义 |
 
 ## 统计
@@ -166,14 +166,14 @@
 | 状态 | 条数 |
 |---|---|
 | ✅ 一致 | 70 |
-| 🔧 本轮已修 | 10 |
-| ⚠️ 有差距未修 | 18 |
-| ➖ 有意不做 | 16 |
+| 🔧 本轮已修 | 21 |
+| ⚠️ 有差距未修 | 0 |
+| ➖ 有意不做 | 23 |
 | （合计条目） | 114 |
 
-说明：「回车提交」在 `ExportDialog.vue` 与 `PasswordDialog.vue` 两节各占一行（同一个密码框，实际是一处改动）；「导出 PDF」一行里含两处改动（文件名净化 + 全局互斥），所以 🔧 行 10 条 = 下方改动表 10 项。
+说明：「回车提交」在 `ExportDialog.vue` 与 `PasswordDialog.vue` 两节各占一行（同一个密码框，实际是一处改动）；「导出 PDF」一行里含两处改动（文件名净化 + 全局互斥），所以 🔧 行为 21 条 = 下方改动表 21 项（第 1–10 项来自第十四轮，第 11–21 项是本轮 PDF 结果对话框重写）。
 
-⚠️ 按工作量排序：PDF 结果对话框整节（第 4 节 12 条，含 1 条汇总，120–150 行）＞ 导出对话框两段式交互（第 2 节 2 条，60–100 行）＞ 骨架两行（第 5 节 1 条，6 行）＞ 遮罩关闭不走 `on_cancel` / 强度条空态（第 3 节 2 条）/ 标题栏高度（第 8 节 1 条，各 10 行内）。
+本页**没有遗留 ⚠️**：第十四轮记的 18 条 ⚠️ 里，11 条（PDF 结果对话框整节）已 🔧；其余 7 条按新原则归入 ➖「表现层，按 GPUI 原生做法」——导出对话框两段式交互与内嵌加密面板（第 2 节 2 条）、遮罩/Esc 关闭走 Kit 原生路径与强度条空轨道（第 3 节 2 条）、骨架行数（第 5 节 1 条）、标题栏高度 34/36px（第 8 节 1 条）、「在文件夹中显示」失败用 Kit 轻提示（第 4 节 1 条）。
 
 ## 本轮改动（🔧）
 
@@ -189,3 +189,16 @@
 | 8 | password_dialog.rs | PasswordDialog.vue:82-84 | `close_button(false)`，去掉重复的 ✕ |
 | 9 | password_dialog.rs | ExportDialog.vue:203-205 | encrypt 模式补「密码至少 8 位，需包含大写字母、小写字母和数字。」 |
 | 10 | password_dialog.rs | PasswordDialog.vue:110、139 / ExportDialog.vue:164、192 | 两个输入框支持回车提交 |
+| 11 | export.rs、pages/home.rs、workflow/step3.rs | PdfExportDialog.vue:49-55 | 进行中框：导出前先开「正在生成 PDF…」+「首次导出需要扫描系统字体，会稍慢一些。」，首页与第三步都接 `begin_export` |
+| 12 | export.rs | PdfExportDialog.vue:57-69 | 失败框：「导出失败」+ 错误全文（可滚动）+ 关闭按钮 |
+| 13 | export.rs | PdfExportDialog.vue:78-80 | 结果两态标题：「PDF 已导出」/「PDF 已导出，有几处需要留意」 |
+| 14 | export.rs | PdfExportDialog.vue:81-83 | 摘要改成「{文件名} · {N} 页 · {x.x} 秒」（秒数 `toFixed(1)`） |
+| 15 | export.rs、editor_schema | PdfExportDialog.vue:19-25、90-98 | 占位页按版式中文名分组：「{版式}（第 3、5 页）」 |
+| 16 | export.rs | PdfExportDialog.vue:99-102 | 裁切页补后半句「内容过多，已缩到最小字号仍放不下，超出部分被裁掉。」 |
+| 17 | export.rs | PdfExportDialog.vue:103-106 | 缺图一处一条：页码 / 引用（等宽、主色）/ 原因 |
+| 18 | export.rs、core `themes::theme_name` | PdfExportDialog.vue:107-110 + 34-39 | 主题回落用主题名而非 id（新增 `themes::theme_name`、`services::export::FALLBACK_THEME`） |
+| 19 | export.rs | PdfExportDialog.vue:112 | 补常驻提示「PDF 版式跟随当前主题。」 |
+| 20 | export.rs | PdfExportDialog.vue:118 | 按钮文案改「完成」（「在文件夹中显示」另接 core `reveal_in_file_manager`） |
+| 21 | core + 原生（共 8 个新单测） | PdfExportDialog.vue 全文件 | 上述三框 + 明细的规则单测：core 侧汇总/回落文案、原生侧结果框文案与分组 |
+
+（第 11–21 项是本轮的 PDF 结果对话框重写，明细见第 4 节的逐行表；`export.rs::show_report` 是主要落点。）

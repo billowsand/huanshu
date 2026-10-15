@@ -2,7 +2,7 @@
 
 对照对象：原版 `src/views/steps/Step2Generate.vue`、`src/components/RetryLayoutDialog.vue`、
 `src/stores/generation.ts`（行为契约）；原生 `apps/huanshu-native/src/pages/workflow/step2.rs`、
-`apps/huanshu-native/src/generation.rs`（只读参考，负责者是另一个代理）。
+`apps/huanshu-native/src/generation.rs`（第十四轮为只读参考；第十五轮的静态状态改动落在它上面）。
 规则侧核对过 `crates/huanshu-core/src/generation_progress.rs`（看板条目、逐页状态、整体进度、四张文案表），
 本页没有在自己的代码里写规则。
 
@@ -10,11 +10,11 @@
 原生位置一栏写「文件::函数（标识）」；`step2.rs` 即 `apps/huanshu-native/src/pages/workflow/step2.rs`，
 `generation.rs` 即 `apps/huanshu-native/src/generation.rs`。
 
-**条目统计（120 行）**：✅ 107 / 🔧 3 / ⚠️ 3 / ➖ 7。
-分文件：`Step2Generate.vue` ✅ 60 / 🔧 2 / ⚠️ 2 / ➖ 2；`RetryLayoutDialog.vue` ✅ 19 / 🔧 1 / ➖ 1；
-`stores/generation.ts` ✅ 28 / ⚠️ 1 / ➖ 4。
-🔧 与 ⚠️ 的明细在第四节。
-🔧 与 ⚠️ 的明细在第四节。
+**条目统计（126 行）**：✅ 112 / 🔧 6 / ⚠️ 0 / ➖ 8。
+分文件：`Step2Generate.vue` ✅ 64 / 🔧 4 / ➖ 3（71 行）；`RetryLayoutDialog.vue` ✅ 19 / 🔧 1 / ➖ 1（21 行）；
+`stores/generation.ts` ✅ 29 / 🔧 1 / ➖ 4（34 行）。
+（原表把第一节记成 66 行、✅ 107 是笔误，本轮按逐行重数更正。）
+🔧 与 ➖ 的明细在第四节。
 
 主题相关的纯视觉细节（阴影、渐变、毛玻璃、过渡/关键帧动画、字重被 `#app *` 拍平后的差异）不逐条列，
 每个文件末尾一行「视觉细节」；`aria-*` / `role` / `sr-only` 一并在那里说明。
@@ -59,7 +59,7 @@
 | 生成中的实时点（error 色闪烁） | 481 | step2.rs::live_dot | ✅ | 1.2s 闪烁照原版 |
 | 看板空状态（图标 + 文案） | 485-488 | step2.rs::empty_state | ✅ | 逐字 |
 | 卡片整卡可点选 + 选中态 | 491-501 | step2.rs::board_card | ✅ | 选中态 = 主色边框 ✓；原版另有 `box-shadow` 光晕与 hover 上浮（视觉细节） |
-| 卡片键盘可达（Tab 聚焦 + Enter/Space 选中） | 491（`<button>`）、500（`@click`） | step2.rs::board_card | ⚠️ | 原版是 `<button>`，键盘可聚焦并回车选中；原生是可点 `div`（没有焦点）。见第四节 ⚠️ 1 |
+| 卡片键盘可达（Tab 聚焦 + Enter/Space 选中） | 491（`<button>`）、500（`@click`） | step2.rs::board_card | ➖ | 表现层，按 GPUI 原生做法 |
 | 卡片序号 `#n`、标题（`pagePlan?.page_title \|\| layoutPlan?.title \|\| blueprint?.title \|\| 第 n 张`） | 502-505 | step2.rs::board_card + card_title | ✅ | |
 | 卡片状态徽章（`spc-status--{tone}`） | 507 | step2.rs::board_card + widgets::chip(tone_of) | ✅ | 四态文案与配色（done 绿 / active 蓝 / pending 灰 / error 红）照 `slide_status` |
 | 卡片五阶段标签（规划/布局/内容/规范/校验，三态配色） | 510-516 | step2.rs::board_card + STEP_LABELS | ✅ | 状态走 core `page_step_state`，running 参数 = `running \|\| retryingPages.size > 0` |
@@ -119,7 +119,7 @@
 | 详情缩略图请求（只请求选中页、`maxCached: 4`） | 374-380 | step2.rs::detail | ✅ | 换页靠 `set_wanted`，不清图（原版靠键比对） |
 | 选中下标归位（`watch(slideItems.length, blueprints.length, selectedSlideIndex)` → 越界/null 就取 `preferredSlideIndex`） | 245-254 | step2.rs::Render::render（`selected`） | ✅ | 每帧归位，语义同 watch |
 | `selectSlide` / `moveSelectedSlide` | 263-274 | step2.rs::Step2::select / on_key | ✅ | |
-| 选中下标跨步骤保留 | WorkflowView.vue:500、505（`selectedSlideIndex` 在 WorkflowView 上，本组件只 emit 更新） | step2.rs::Step2::selected | ⚠️ | 原生把下标存在 `Step2` 实体上，而 `show_step` 每次重建它（pages/workflow/mod.rs:929），进第 3 步再回来会跳回最后一个有结果的页。见第四节 ⚠️ 2 |
+| 选中下标跨步骤保留 | WorkflowView.vue:500、505（`selectedSlideIndex` 在 WorkflowView 上，本组件只 emit 更新） | `ProjectModel::selected_slide`（`mod.rs`）+ step2.rs::Step2::select / Render::render（`resolve_selected`） | 🔧 | 本轮修：下标移到 `ProjectModel::selected_slide`（`Option<usize>`，照原版 `selectedSlideIndex` 的 null 语义）：`Step2::select` 写、渲染归位（越界/未选回落 `preferred_slide_index`）、`WorkflowPage::start_generation` 整次重新生成前清空；4 个新单测（`resolve_selected`） |
 | 发出的事件：`update:selectedSlideIndex` / `go-to-step-3` / `go-to-step-1` / `retry` / `retry-page` | 59-65、251、500、592、668-676 | step2.rs::Render::render / show_retry_dialog | ✅ | 全部落地 |
 | 本文件自身不发命令、不写存储 | 1-403（无 `invoke` / `localStorage` / `sessionStorage`） | — | ✅ | 生成相关的命令都在 store（gen 事件由 `tasks::listen_events` 送进 `GenerationStore`） |
 | 视觉细节（卡片 `hover` 上浮 + 四态径向渐变、`is-active` 光晕、面板渐变底、`gpo-bar-fill` 宽度过渡、`.gpo-toggle:hover`、`spc-*`/`sdp-*` 的精确间距，`@media 1050px/720px` 两条断点，以及全部 `aria-*`/`role`/`sr-only`：437、448、454、457、461、469-470、714） | 682-1154 | step2.rs 各处（间距已按 CSS 逻辑像素抄） | ✅ | 视觉差异：渐变/阴影/过渡/动画省略；`aria-*` 与 `.sr-only`（461、714）在 GPUI 下没有对应物——无无障碍树，且 `.sr-only` 本身是给屏幕阅读器的隐藏文本；`@media 1050px`（715）与 `720px`（1139-1154）两条断点在原生窗口最小宽 1080px（main.rs:74）下不可达，未实现 |
@@ -157,7 +157,7 @@
 ## 三、`src/stores/generation.ts`（行为契约 → `generation.rs`）
 
 原版这个 store 是应用级 pinia store；原生是应用级的 `GenerationStore`（Shell 创建、`ShellHandle::generation()` 下发）。
-`generation.rs` 不在本轮修改范围，本节的「原生位置」只做对照，问题记 ⚠️。
+第十四轮 `generation.rs` 不在修改范围（本节只做对照、问题记 ⚠️）；第十五轮的静态缓存改动就落在 `generation.rs`（`StaticCache` / `snapshot_for` 静态分支），本节已同步为 🔧。
 
 | 项 | 原版位置（文件:行） | 原生位置（文件:函数） | 状态 | 备注 |
 |---|---|---|---|---|
@@ -192,7 +192,7 @@
 | `activeProjectId`（这份状态描述哪个项目） | 100、248、269、279、403 | generation.rs::project_id + live_for | ✅ | 原生界面据此区分「store 正持有本项目（实时）/ 用库里的静态状态」 |
 | `completedSlides` | 95、176、188、271、314 | — | ➖ | 原版没有任何界面消费（`grep -rn "completedSlides" src/` 只有 store 内部读写），原生不存（generation.rs 模块文档第 3 条） |
 | store 的 `progress` 字段 | 93、131-133 | generation.rs::GenState::progress | ✅ | 第二步模板不读它（原版也不读），侧栏/其他页面用 |
-| **静态状态**（store 不持有本项目时的看板/详情） | 401-435（原版总会 `loadLatestRun` + `loadFromJson`，日志与逐页状态一定在） | generation.rs::snapshot_for 的 `None` 分支 | ⚠️ | 见下面 ⚠️ 3 |
+| **静态状态**（store 不持有本项目时的看板/详情） | 401-435（原版总会 `loadLatestRun` + `loadFromJson`，日志与逐页状态一定在） | generation.rs::snapshot_for 的静态分支 + `StaticCache`（`:352-372`） | 🔧 | 本轮修：`GenerationStore` 新增静态缓存（`StaticCache` 单槽，打开项目时经 `run_bg` 读最近运行 + 日志一次，运行变了才失效，`snapshot_for` 每帧只读缓存）；静态分支用 `progress::statuses_from_logs` 恢复失败页、关键事件 / 生成记录统计、最近 10 条日志、看板条目。**失败段与「重试这一页」也出现，但按全局规则禁用**：静态分支下 store 的重试会排到别的项目的运行上，故 `!live` 即禁用（「重新生成全部」仅 `busy_elsewhere` 禁用）；6 个新单测（`generation.rs::tests`） |
 | 有意偏离：库里停在 `running` 的旧运行按「已中断」显示 | 421-424（原版见到 running 就 `running=true` 等事件） | generation.rs::apply_run | ➖ | 进程崩过时原版会一直转圈；原生保留阶段文案但 `running=false`，且不改库（generation.rs 模块文档第 2 条） |
 | 有意偏离：切到别的项目不 reset / 不 `loadFromJson` | 213-224、380-382（原版会把另一个项目在跑的生成从 store 里抹掉） | generation.rs::open_project | ➖ | store 正为别的项目跑时不碰 store，那个项目按库里的数据显示（generation.rs 模块文档第 1 条） |
 
@@ -200,21 +200,20 @@
 
 ## 四、本轮的修改（🔧）与遗留（⚠️）
 
-### 🔧 已修（全部在 `apps/huanshu-native/src/pages/workflow/step2.rs`）
+### 🔧 已修
 
 | 原版位置 | 改了什么 |
 |---|---|
-| Step2Generate.vue:555 | 详情标题的兜底文案：抽出 `plan_title`，`card_title` 兜底「第 N 张」、新增 `detail_title` 兜底「待生成幻灯片」（改前详情也显示「第 N 张」） |
-| Step2Generate.vue:557 + CSS 852-872 | 详情头状态 chip 改回中性色：原版 `.sdp-chip` 没有色调类，改前按 `slide_status` 的 tone 上了绿/蓝/红（与版式 chip 的 `--accent` 抢重） |
-| Step2Generate.vue:1129-1137 | 窄窗口单列：新增 `NARROW_MAX_W = 1200.0`，窗口宽 ≤1200px 时工作区改用 `flex_col`（详情整宽排在看板下方、两者 `flex_1` 平分高度），宽窗口仍是 1.5fr / 0.9fr 两栏 |
-| RetryLayoutDialog.vue:70 | 下拉 `autofocus`：候选装载完成后聚焦下拉——`let focus = select.read(cx).focus_handle(cx); window.focus(&focus, cx);`（`SelectState` 实现了 `Focusable`，见 gpui-component 的 `impl Focusable for SelectState`） |
+| Step2Generate.vue:555 | 详情标题的兜底文案：抽出 `plan_title`，`card_title` 兜底「第 N 张」、新增 `detail_title` 兜底「待生成幻灯片」（改前详情也显示「第 N 张」）（`step2.rs`） |
+| Step2Generate.vue:557 + CSS 852-872 | 详情头状态 chip 改回中性色：原版 `.sdp-chip` 没有色调类，改前按 `slide_status` 的 tone 上了绿/蓝/红（与版式 chip 的 `--accent` 抢重）（`step2.rs`） |
+| Step2Generate.vue:1129-1137 | 窄窗口单列：新增 `NARROW_MAX_W = 1200.0`，窗口宽 ≤1200px 时工作区改用 `flex_col`（详情整宽排在看板下方、两者 `flex_1` 平分高度），宽窗口仍是 1.5fr / 0.9fr 两栏（`step2.rs`） |
+| RetryLayoutDialog.vue:70 | 下拉 `autofocus`：候选装载完成后聚焦下拉——`let focus = select.read(cx).focus_handle(cx); window.focus(&focus, cx);`（`SelectState` 实现了 `Focusable`，见 gpui-component 的 `impl Focusable for SelectState`）（`step2.rs`） |
+| WorkflowView.vue:500、505 | 选中下标跨步骤保留：下标移到 `ProjectModel::selected_slide`（`Option<usize>`），`Step2::select` 写、渲染归位（越界/未选回落 `preferred_slide_index`）、`WorkflowPage::start_generation` 整次重新生成前清空；4 个新单测（`resolve_selected`）（`mod.rs` / `step2.rs`） |
+| stores/generation.ts:401-435 | store 不持有本项目时的静态状态：`GenerationStore` 新增静态缓存（`StaticCache` 单槽，打开项目时经 `run_bg` 读最近运行 + 日志一次，运行变了才失效，`snapshot_for` 每帧只读缓存）；静态分支用 `progress::statuses_from_logs` 恢复失败页、关键事件 / 生成记录统计、最近 10 条日志、看板条目；失败段与「重试这一页」出现但按全局规则禁用（`!live` 即禁用，因为静态分支下 store 的重试会排到别的项目的运行上；「重新生成全部」仅 `busy_elsewhere` 禁用）；6 个新单测（`generation.rs::tests`）（`generation.rs` / `step2.rs`） |
 
-### ⚠️ 未修（按影响面排序）
+### ⚠️ 未修
 
-1. **卡片不能键盘选（Tab + Enter/Space）** — 原版卡片是 `<button class="slide-progress-card" @click="selectSlide(item.index)">`（Step2Generate.vue:491、500），键盘可达；原生 `board_card` 是可点 `div`（`cursor_pointer` + `on_click`），没有焦点。工作量大半在「给虚拟列表的卡片加 tab stop 后不能抢走页面的 ↑/↓」，估计 2-4 小时。
-2. **选中页在换步骤后不保留** — 原版 `selectedSlideIndex` 在 `WorkflowView.vue`（500、505），进第 3 步再回来仍是同一页；原生 `Step2` 实体每次 `show_step` 重建（`pages/workflow/mod.rs::show_step`，929），回来后按 `preferred_slide_index` 跳到最后一个有结果的页。修需要把下标放到 `ProjectModel`/`WorkflowPage`（mod.rs 是别人的范围），估计 1-2 小时。
-3. **store 不持有本项目时，第二步看不到日志与逐页状态** — `GenerationStore::snapshot_for` 的静态分支（`generation.rs:352-372`）没有日志：版式标签全是「等待布局排版结果」、「关键事件 / 生成记录」是 0、没有「查看最近日志」、**没有失败段与「重试这一页」**；原版总会 `loadLatestRun` + `loadFromJson`（generation.ts:401-435、380-399）把日志和 `page_error` 状态装进 store。触发条件是「本项目不是 store 当前描述的项目」——即**用户先给项目 A 起了生成、过程中打开了项目 B**（B 有历史运行）。修在 `generation.rs`（别人的范围）：静态分支要读该项目的最近运行 + 日志，并处理缓存与失效，估计 2-4 小时。
-4. **上一条的连带（同因）**：上述情形下详情里 `run_id` 取库里的运行 id，单页重试按钮不显示（因为失败段本身不显示），所以点了也走不到「缺少生成记录」的错误分支；guard 本身（Step2Generate.vue:592 的禁用条件、RetryLayoutDialog 的 `!runId`）实现是无误的。
+本轮**没有遗留 ⚠️**：原来的 3 条 ⚠️ 中，「选中页跨步骤保留」与「store 不持有本项目时的静态状态（含连带的重试按钮）」已 🔧；「卡片 Tab 键盘可达」按新原则归入 ➖（表现层，按 GPUI 原生做法）。
 
 ### 与 parity.md 第二步小节的核对
 
@@ -224,14 +223,16 @@
 - 「顶部状态与统计」行写「数字用主色」，实际只有「生成记录」一个数字用主色（另两个是文字色，Step2Generate.vue:422-433 + CSS WorkflowView.vue:1386-1394）。
 - 「详情：大图、标题、状态、版式」行在本轮修复前，兜底标题与状态 chip 配色与原版有差距（已 🔧），该行当时未记这两个差距。
 
+第十五轮同步（`parity.md` 第二步小节）：①「生成状态是应用级 store」那行的**已知偏差**（其他项目的第二步只有静态快照、缺日志 / 逐页状态 / 失败段）已修，该行改为 ✅；② 新增一行「选中页下标跨步骤保留」（`ProjectModel::selected_slide`）。
+
 ### 附带发现（不在我负责范围，供参考）
 
 - `docs/native/reference/project-step2.png` 与 `project-step1.png` **字节完全相同**（都是第 1 步「准备素材」的画面）；第二步的原版对照图实际是 `step2-board.png` / `step2-detail.png`。原生侧 `docs/native/shell/project-step2-0.png`（正常态）与 `project-step2-error-0.png`（失败态）是对的。
 
 ### 本轮的验证情况
 
-- 只改了 `apps/huanshu-native/src/pages/workflow/step2.rs`；改完 `rustfmt --edition 2021`（解析通过、无格式差异），并补上了 `Focusable as _` 的导入（原文件没有这个 trait，`focus_handle` 需要它）。
-- **没有跑** `cargo check / build / test`（共享 target 目录，按约定由集成方统一验证），也**没有**跑 `tools/shots.ps1` / `drive.ps1`（会触发编译）。因此四处的 🔧 都还只是代码级对齐，未做真机走查；需要集成时用
-  `tools/drive.ps1 -Route project:1:2` 走一遍：详情标题（选一张还没规划结果的页应显示「待生成幻灯片」）、详情头状态 chip 是中性色、窗口拉窄到 1200px 及以下时两栏变一栏、「重试这一页」对话框打开后焦点在下拉上。
+- 第十四轮只改了 `apps/huanshu-native/src/pages/workflow/step2.rs`；改完 `rustfmt --edition 2021`（解析通过、无格式差异），并补上了 `Focusable as _` 的导入（原文件没有这个 trait，`focus_handle` 需要它）。
+- 第十五轮的三处 🔧 跨 `pages/workflow/mod.rs`（`selected_slide` / `start_generation` 清空 / `show_step`）、`pages/workflow/step2.rs`（`resolve_selected`、静态快照的失败段禁用）与 `generation.rs`（`StaticCache`）三个文件，共 10 个新单测（`resolve_selected` 4 个、`generation.rs::tests` 6 个）；这些改动由本轮负责人验证（`cargo test` 见其汇报），审计侧只同步文档。
+- 两轮都**没有跑** `cargo check / build / test`（共享 target 目录，按约定由集成方统一验证），也**没有**跑 `tools/shots.ps1` / `drive.ps1`（会触发编译）；审计侧不改代码。第十四轮改动建议集成后用 `tools/drive.ps1 -Route project:1:2` 走一遍：详情标题（选一张还没规划结果的页应显示「待生成幻灯片」）、详情头状态 chip 是中性色、窗口拉窄到 1200px 及以下时两栏变一栏、「重试这一页」对话框打开后焦点在下拉上。
 - 纯逻辑部分（看板条目、逐页状态、整体进度、四张文案表）不在本文件里，由 core 的 `tests/generation_progress.rs` 快照守护。
 

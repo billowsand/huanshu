@@ -27,10 +27,11 @@
 状态：✅ 一致 · 🔧 本轮已修 · ⚠️ 有差距未修 · ➖ 有意不做（附原版依据）。
 主题相关的纯视觉细节（阴影、渐变、毛玻璃、动画）每个文件归一行「视觉细节」。
 
-**条目统计（105 行）**：✅ 90 / 🔧 4 / ⚠️ 5 / ➖ 6。
-分节：`Step3Editor.vue` 模板 ✅ 45 / 🔧 4 / ⚠️ 5 / ➖ 5；`Step3Editor.vue` script ✅ 26；
+**条目统计（105 行）**：✅ 90 / 🔧 5 / ⚠️ 0 / ➖ 10。
+分节：`Step3Editor.vue` 模板 ✅ 45 / 🔧 5 / ➖ 9（59 行）；`Step3Editor.vue` script ✅ 26；
 `useSlideEditor.ts` ✅ 14 / ➖ 1；`SlideFrame.vue` ✅ 5。
-🔧 与 ⚠️ 的明细在第六、七节。
+🔧 的明细在第六节；本轮把原 4 条 ⚠️（添加按钮宽度、行号标红、素材小卡悬停底色、左栏行悬停底色）
+按新原则归入 ➖「表现层，按 GPUI 原生做法」，另 1 条（应用更改不吸底）已 🔧（见第八节）。
 
 ---
 
@@ -43,7 +44,7 @@
 | 左栏列表行：序号 / 标题 / 版式中文名（缺省回落 kind）/ 选中态 | Step3Editor.vue:571-588 | step3.rs:slide_row(2328) | ✅ | 版式名回落逻辑同（587） |
 | 行点击选中 | Step3Editor.vue:580 | step3.rs:select(409) | ✅ | 换页丢掉未应用的修改（原版 `initEditorSlide` 如此，无确认框） |
 | 行键盘 Enter / Space 选中（`tabindex="0"` + `role="button"`） | Step3Editor.vue:577-582 | — | ➖ | GPUI 列表行没有 Tab 焦点链，行不可聚焦；换页由 ↑/↓（`on_key`）与点击承担。属可达性，不是功能缺失 |
-| 行尾垃圾桶：`title="删除"`、只在悬停该行时显示、只剩一页时 disabled + 透明 | Step3Editor.vue:589 + WorkflowView.vue:1931-1948 | step3.rs:slide_row（`group`/`group_hover`、`count<=1` 时 opacity 0） | ✅ | 悬停变红（WorkflowView.vue:1947）是 kit 按钮悬停色改不掉，见「视觉细节」；行本身的悬停底色见 ⚠️ 5 |
+| 行尾垃圾桶：`title="删除"`、只在悬停该行时显示、只剩一页时 disabled + 透明 | Step3Editor.vue:589 + WorkflowView.vue:1931-1948 | step3.rs:slide_row（`group`/`group_hover`、`count<=1` 时 opacity 0） | ✅ | 悬停变红（WorkflowView.vue:1947）是 kit 按钮悬停色改不掉，见「视觉细节」；行本身的悬停底色归 ➖「表现层，按 GPUI 原生做法」 |
 | 「新建幻灯片」（`.edit-add-btn` 满宽）→ KindPicker(add) | Step3Editor.vue:594-598 | step3.rs:render + `open_kind_picker(600)` | ✅ | 满宽靠 flex 列的 stretch（原版是 `.edit-add-btn { width: 100% }`）；若实测不成立，加 `.w_full()` 即可 |
 | 中栏栏头「实时预览」 | Step3Editor.vue:603-604 | step3.rs:render（`col_head`） | ✅ | |
 | 「● 未保存」 | Step3Editor.vue:605 | step3.rs:render（`has_unsaved`） | ✅ | 原版 `.edit-unsaved` 在任何 CSS 里都没有规则（全局 grep 0 命中）→ 继承栏头的 muted 色，原生同 |
@@ -55,7 +56,7 @@
 | 舞台里的加载 / 失败重试（`SlideFrame`） | Step3Editor.vue:638-644 | slides.rs:slide_frame(213) | ✅ | 300ms 延迟「渲染中…」、有旧图时角上「渲染失败 · 重试」都在 `SlideFrame.vue:32-56,73-89` 对照下逐条一致 |
 | 裁切提示（`warning-alt` + 文案） | Step3Editor.vue:647-650 | step3.rs:render（`preview.overflow(0)`） | ✅ | 原版颜色是硬编码 `#b45309`（WorkflowView.vue:2018-2020），原生用主题 `warning`，见「视觉细节」 |
 | 右栏栏头「编辑 第 N 张」 | Step3Editor.vue:654-656 | step3.rs:render（`col_head`） | ✅ | |
-| 栏头上移 / 下移 / 删除（禁用条件） | Step3Editor.vue:657-667 | step3.rs:render（`slide-up/down/del`） | ✅ | 删除另加 `locked`（原版没有生成中只读，见 parity.md:141 的有意偏离） |
+| 栏头上移 / 下移 / 删除（禁用条件） | Step3Editor.vue:657-667 | step3.rs:render（`slide-up/down/del`） | ✅ | 删除另加 `locked`（原版没有生成中只读，见 parity.md:144 的有意偏离） |
 | 删除按钮是 error 色 | WorkflowView.vue:2048 | step3.rs:render（`carbon("trash-can").text_color(c.error)`） | 🔧 | **本轮修**：原来用通用 `widgets::icon_button`（默认色），现在贴 `.edit-del-btn { color: var(--studio-error) }` |
 | 版式表未就绪两态：「读取版式信息失败：…」/「正在读取版式信息…」 | Step3Editor.vue:670-677 | — | ➖ | 原生 schema 是同步取（step3.rs:244 `editor_schema::editor_schema()`），不存在这两个状态；失败即 panic，不可能出现 |
 | 幻灯片类型行：图标 + 中文名 + `kind` + 「更换」 | Step3Editor.vue:680-690 | step3.rs:render_form(1856) | ✅ | 「更换」在 `locked` 时禁用（原版没有锁） |
@@ -72,20 +73,20 @@
 | `issue_stack` 的 `cards` 区提示（按张数二选一） | Step3Editor.vue:826-830 | step3.rs:issue_stack_hint(2462) | ✅ | 两句逐字一致 |
 | 卡片字段网格（textarea 占整行 / select / boolean 自带标签 / text） | Step3Editor.vue:848-887 | step3.rs:fields_grid + field_card | ✅ | 快照里 `boolean` 只出现在列表区与对象区子列表（`focus_example.ranking.muted`、`compare.*.items.highlight`），简单字段里没有——所以原版「简单字段只有 text/textarea/select」这条推断成立 |
 | 图标助手（`iconQueryKeys` 有值才有）：按钮「AI 推荐图标 / 推荐中…」+ 候选小片 | Step3Editor.vue:889-912 | step3.rs:icon_box(959) | ✅ | 候选小片 = 图标预览 + 去掉 `i-carbon:` 的名字（1015-1018） |
-| 卡片里的字符串列表（每个 stringList 一行标签 + 「添加」+ 每项输入框 + 删除） | Step3Editor.vue:914-937 | step3.rs:string_list（有 label → 标签行） | ✅ | 标签行「添加」的宽度差异见 ⚠️ |
+| 卡片里的字符串列表（每个 stringList 一行标签 + 「添加」+ 每项输入框 + 删除） | Step3Editor.vue:914-937 | step3.rs:string_list（有 label → 标签行） | ✅ | 标签行「添加」的宽度差异归 ➖「表现层，按 GPUI 原生做法」 |
 | 嵌套列表（`nestedLists`）：卡片标题 + 删除（**没有**上移/下移）+ 字段 | Step3Editor.vue:939-981 | step3.rs:nested_block(1737) | ✅ | 原版嵌套字段只有 text / textarea（`process.steps`），原生用通用 field_card，多支持的类型用不到 |
 | 对象区（`objectSections`）：区标题（无添加按钮）+ 字段网格 + 子列表区 | Step3Editor.vue:985-1149 | step3.rs:object_block(1817) | ✅ | 对象区各 def 的 `stringLists` 在快照里都是空（原生多渲染了一轮，无副作用）；boolean 不显示上方小标签也一致（992-1016） |
 | 子列表区：区标题 + 添加 + emptyText + 卡片（上移/下移/删除 + 字段 + 图标助手 + 字符串列表） | Step3Editor.vue:1030-1148 | step3.rs:list_block + list_card | ✅ | |
 | 图表数据（JSON）框：标签 + hint 两态（「正在校验…」/「type / data / encoding / series，校验通过才会应用到预览」） | Step3Editor.vue:1151-1158 | step3.rs:render_form ⑧ | ✅ | |
 | 图表 JSON 框本体：`rows="12"`、`spellcheck="false"`、占位 JSON、错误时整框变红 + 「JSON 语法错误：…」/「问题；问题」 | Step3Editor.vue:1159-1174 | step3.rs:render_form ⑧ + `TextareaState::rows(12)` + `error_row` | ✅ | 等宽字体（`.ej-chart-json` 的 `--font-code`）与 12.8px 字号都对上了（WorkflowView.vue:2181-2187） |
 | 高级 Blueprint JSON：标签 + 「保留给高级用户和特殊字段」+ 「格式化」 | Step3Editor.vue:1177-1184 | step3.rs:render_form ⑨ + `format_json(1220)` | ✅ | |
-| 高级 JSON 编辑框：行号栏 + 「第 N 行：{原因}」+ 语义错误块（`warning` 图标 + 每条一行） | Step3Editor.vue:1185-1217 | step3.rs:render_form ⑨ + `json_error_text(2535)` + `semantic_errors_block(2496)` | ✅ | 原版行号栏会把出错的那一行标红，见 ⚠️ |
+| 高级 JSON 编辑框：行号栏 + 「第 N 行：{原因}」+ 语义错误块（`warning` 图标 + 每条一行） | Step3Editor.vue:1185-1217 | step3.rs:render_form ⑨ + `json_error_text(2535)` + `semantic_errors_block(2496)` | ✅ | 原版行号栏会把出错的那一行标红（已归 ➖「表现层」） |
 | 「应用更改」三态（保存中… / 应用更改 (Ctrl+S) / 已保存）+ 禁用条件 | Step3Editor.vue:1220-1229 | step3.rs:render_form ⑩ | ✅ | 禁用语一致：`jsonError \|\| !hasUnsavedChanges \|\| editorSaving`（原生另加 `locked`） |
-| 「应用更改」按钮不吸底（长表单要滚到底才能点） | WorkflowView.vue:2061-2065 | step3.rs:render_form ⑩（列尾普通元素） | ⚠️ | `.ej-save-btn { position: sticky; bottom: 0 }`；GPUI 没有 sticky，见第七节 ⚠️ 1 |
-| 标签行里的「添加」按钮宽度 | WorkflowView.vue:1956-1959 | step3.rs:string_list / list_block / nested_block（紧凑靠右） | ⚠️ | 原版 `.edit-add-btn { width: 100% }` 会占满标签右侧剩余宽度；见 ⚠️ 2 |
-| 高级 JSON 出错行的行号标红 | WorkflowView.vue:2352-2356 | — | ⚠️ | GPUI Kit 的 Editor 行号栏不可着色；见 ⚠️ 3 |
-| 图片素材小卡悬停底色 | WorkflowView.vue:2538-2540 | step3.rs:render_form ⑤（`widgets::media_tile`） | ⚠️ | 需要 `widgets.rs` 支持；见 ⚠️ 4 |
-| 左栏行悬停底色（仅 notes 主题下原版有） | WorkflowView.vue:1895 + src/themes/notes.css:83 | step3.rs:slide_row | ⚠️ | 需要 `StudioColors` 加 hover token；见 ⚠️ 5 |
+| 「应用更改」按钮不吸底（长表单要滚到底才能点） | WorkflowView.vue:2061-2065 | step3.rs:render（`render_actions`：滚动表单区 + 固定底操作区） | 🔧 | **本轮修**：右栏拆成「滚动表单区 + 固定底操作区」（应用更改三态按钮 + locked 提示 + 保存错误行），不模拟 `.ej-save-btn { position: sticky }`；短表单时操作区自然落栏底 |
+| 标签行里的「添加」按钮宽度 | WorkflowView.vue:1956-1959 | step3.rs:string_list / list_block / nested_block（紧凑靠右） | ➖ | 表现层，按 GPUI 原生做法 |
+| 高级 JSON 出错行的行号标红 | WorkflowView.vue:2352-2356 | — | ➖ | 表现层，按 GPUI 原生做法 |
+| 图片素材小卡悬停底色 | WorkflowView.vue:2538-2540 | step3.rs:render_form ⑤（`widgets::media_tile`） | ➖ | 表现层，按 GPUI 原生做法 |
+| 左栏行悬停底色（仅 notes 主题下原版有） | WorkflowView.vue:1895 + src/themes/notes.css:83 | step3.rs:slide_row | ➖ | 表现层，按 GPUI 原生做法 |
 | 保存失败时按钮下方的错误行 | useSlideEditor.ts:175-176（`jsonError = String(e)`） | step3.rs:render_form ⑩（`deck_save_error`） | ✅ | 原版只在**展开高级 JSON**时才看得见这个错误（模板里 `v-if="jsonError"` 在 1206，属于高级段），原生常显；功能不丢，算改进 |
 | KindPicker 头部：模式图标（`add-alt` / `arrows-horizontal`）+ 标题 + 关闭按钮 | Step3Editor.vue:1238-1244 | step3.rs:kind_picker_body(2644) | ✅ | 标题两种模式逐字一致 |
 | KindPicker 副标题：add →「新幻灯片将插入到第 N 张之后」/ change →「选择新类型后将自动保留可迁移的公共字段」 | Step3Editor.vue:1245-1248 | step3.rs:kind_picker_body（`after = active + 1`） | ✅ | |
@@ -124,7 +125,7 @@
 | `useTypstThumbnails`：只发当前页、`serial` + `progressive`、`debounceMs: 120`、`resetKey: activeSlide`、宽度 = 舞台宽 × dpr、`overflow[0]` | Step3Editor.vue:470-509（命令是 `invoke('render_slide_thumbnails')`） | step3.rs:`SlideImages`（`new` 里 `max_cached: Some(4)`、`set_wanted(&[0])`、`schedule_preview` 的 120ms、`init_draft` 里的 `reset`）→ `app::render_pages`（`crate::tasks::run_bg`） | ✅ | `PreviewOptions::default()` 的 serial/progressive 都是 true（core `preview.rs:35-44`）；失败不自动重试（只给「重试」按钮） |
 | `renderBusy`：`pending` 持续 150ms 才置真 | Step3Editor.vue:488-504 | step3.rs:sync_render_busy(751) | ✅ | |
 | `handleEditorArrowKeydown`：window 级；KindPicker 开着不处理；带修饰键不处理；焦点在 INPUT/TEXTAREA/SELECT/contentEditable 里不处理 | Step3Editor.vue:511-535 | step3.rs:on_key(701) | ✅ | 原生按 README 规矩 6 用 `track_focus` + `on_key_down`，判据换成「根节点自己有焦点」——等价于原版「焦点不在表单里」 |
-| `handleTextareaKeydown`：JSON 框里 Ctrl/⌘+S → 应用；其余转发 | Step3Editor.vue:537-544 | step3.rs:on_key（Ctrl/⌘+S 在**第三步任何位置**都生效） | ✅ | 有意改进（README 与 parity.md:140 已记） |
+| `handleTextareaKeydown`：JSON 框里 Ctrl/⌘+S → 应用；其余转发 | Step3Editor.vue:537-544 | step3.rs:on_key（Ctrl/⌘+S 在**第三步任何位置**都生效） | ✅ | 有意改进（README 与 parity.md:143 已记） |
 | JSON 框的 Tab → 插两个空格 | useSlideEditor.ts:147-155 | GPUI Kit `EditorState` 默认 `tab_size = 2`（`gpui-base/src/input/editor/indent.rs:23`，`tab` 绑到 `IndentInline`） | ✅ | |
 | `onMounted` / `onBeforeUnmount`：注册、注销 window 监听 + 清 `renderBusyTimer` | Step3Editor.vue:546-556 | step3.rs:render 的 `.track_focus` + `release`(337) | ✅ | |
 | 若干 `emit`（`update:activeSlide`、`replace-draft`、`apply-changes`、`delete-slide`、`move-slide`、`go-to-step-1` …） | Step3Editor.vue:47-64, 533-544 | step3.rs 直接调同名方法，经 `WorkflowPage::commit_deck` 落库 | ✅ | |
@@ -146,7 +147,7 @@
 | `openKindPicker` / `onKindPicked`：change → `createKindBlueprint(kind, liveSlide)`（**只改草稿**）；add → 插到当前页之后、章节号继承上一页（cover/overview/closing 不继承）、只改内存不落库 | useSlideEditor.ts:182-207 | step3.rs:open_kind_picker(600) + pick_kind(651) + `slide_edit::insert_new_slide`（slide_edit.rs:427） | ✅ | 章节号继承规则在 core，有单测 |
 | `deleteEditorSlide`：只剩一页不动；删完当前页落到 `min(idx, len-1)`；**立即落库** | useSlideEditor.ts:209-214 | step3.rs:delete_slide(562) + `slide_edit::delete_slide`（slide_edit.rs:453） | ✅ | |
 | `moveEditorSlide`：与相邻页交换、当前页跟过去、越界不动、**立即落库** | useSlideEditor.ts:216-223 | step3.rs:move_slide(576) + `slide_edit::move_slide`（slide_edit.rs:467） | ✅ | |
-| `insertMediaUrl`：往 JSON 里插引用，没有 textarea 时退化成写剪贴板 | useSlideEditor.ts:225-237 | — | ➖ | 原版模板里**没有**任何触发入口（`grep -n insert-media-url src/views/WorkflowView.vue` 只在 543 行接了个空事件，模板里没有 `$emit('insert-media-url')`），parity.md:139 已记「未做」；原生也没有入口 |
+| `insertMediaUrl`：往 JSON 里插引用，没有 textarea 时退化成写剪贴板 | useSlideEditor.ts:225-237 | — | ➖ | 原版模板里**没有**任何触发入口（`grep -n insert-media-url src/views/WorkflowView.vue` 只在 543 行接了个空事件，模板里没有 `$emit('insert-media-url')`），parity.md:142 已记「未做」；原生也没有入口 |
 | `editorKind` / `editorPreviewSlide` / `currentSlideDims` / `editorStageW/H` | useSlideEditor.ts:239-251 | step3.rs:`draft` + render 里的 `aspect`/`stage_w/h` | ✅ | |
 
 ## 四、`src/components/SlideFrame.vue`
@@ -166,12 +167,13 @@
 | 状态 | 条数 |
 |---|---|
 | ✅ 一致 | 90 |
-| 🔧 本轮已修 | 4 |
-| ⚠️ 有差距未修 | 5 |
-| ➖ 有意不做 | 6 |
+| 🔧 本轮已修 | 5 |
+| ⚠️ 有差距未修 | 0 |
+| ➖ 有意不做 | 10 |
 | 合计 | 105 |
 
-（统计口径：第一至第四节四张表里的数据行；「视觉细节」行也计入 ✅。⚠️ 的 5 条在表里各占一行，明细见第七节。）
+（统计口径：第一至第四节四张表里的数据行；「视觉细节」行也计入 ✅。本轮没有遗留 ⚠️：1 条已 🔧（见第六节第 5 条），
+另 4 条归 ➖「表现层，按 GPUI 原生做法」（见第八节）。）
 
 ## 六、本轮已修（🔧，全部在 `apps/huanshu-native/src/pages/workflow/step3.rs`）
 
@@ -189,18 +191,23 @@
 4. **右栏栏头的删除按钮不是红色**
    原版 `WorkflowView.vue:2048`：`.edit-del-btn { color: var(--studio-error) }`（同栏头另外两个按钮是默认色，卡片里的删除按钮也不是红的）。
    改法：这一处不再用通用 `widgets::icon_button`，直接 `Button::new("slide-del").ghost().icon(carbon("trash-can").text_color(c.error)).tooltip("删除")`（新引入 `ButtonVariants as _`、`Size` 两个 import）。
-
-改动量：`git diff --stat` = 29 行新增 / 11 行删除（含注释），已 `rustfmt`。未跑任何 `cargo` 命令（按纪律交给集成方）。
+5. **「应用更改」按钮不吸底**（第十五轮修）
+   原版 `WorkflowView.vue:2061-2065` 用 `.ej-save-btn { position: sticky; bottom: 0 }` 把按钮吸在右栏底；GPUI 没有 sticky。
+   改法：右栏拆成「滚动表单区 + 固定底操作区」（`render_actions`：应用更改三态按钮 + locked 提示 + 保存错误行），
+   长表单下按钮始终可见；**有意偏离**：短表单时操作区落在栏底（原版按钮紧跟内容之后），与参考截图不同。
+   （前 4 条是第十四轮；改动量 `git diff --stat` = 29 行新增 / 11 行删除（含注释），已 `rustfmt`。未跑任何 `cargo` 命令，按纪律交给集成方验证。）
 
 ## 七、有差距未修（⚠️）
 
-| # | 差距 | 原版依据 | 估计工作量 |
-|---|---|---|---|
-| 1 | 「应用更改」按钮不吸底：长表单时要滚到底才能点，原版随时可见 | `WorkflowView.vue:2061-2065` `.ej-save-btn { position: sticky; bottom: 0 }`（模板 `Step3Editor.vue:1220`，右栏滚动容器 `.edit-json-inner` 内） | GPUI 没有 sticky 定位（`grep "fn sticky" gpui-base` 0 命中）。二选一：① 等 GPUI 支持 sticky；② 把右栏拆成「滚动区 + 固定底栏」，但**短表单时按钮会贴到栏底**，与参考截图（按钮紧跟内容）不符，需要先拿一张长表单的原版截图确认取舍。约 0.5 天含目检 |
-| 2 | 标签行里的「添加」按钮宽度：原版占满「标签右侧的剩余宽度、文字居中」，原生是紧凑按钮靠右（列表区 / 嵌套列表 / 卡片字符串列表 / 图标助手行，共 4 处） | `WorkflowView.vue:1956-1959` `.edit-add-btn { width: 100%; justify-content: center }` + 模板里的 `.ej-label-row`（如 `Step3Editor.vue:820-825`、`889-899`、`914-919`、`939-945`） | 已用 Edge headless 复现原版渲染（`target/audit-flex/probe.html` + `probe.png`，CSS 与 DOM 逐条抄自原版）：按钮确实被压成剩余宽度、文字居中，但**同时把同行的标签挤成竖排两行**（`.ej-label` 没有 `nowrap`，CJK 的 min-content 是一字宽）。原生要做出宽按钮得包一层 `flex_1` + `w_full()`，仍然复现不了那个折行——两条路都要求先拿原版截图定标准。约 2 小时 + 目检 |
-| 3 | 高级 JSON 出错时，原版行号栏会把出错那一行的行号标红 | `WorkflowView.vue:2352-2356` `.ej-line-num--error { color: error; background: error-bg }`，模板 `Step3Editor.vue:1188-1193` | GPUI Kit 的 `Editor` 行号栏没有「某一行着色」的接口（组件内部），要么等 kit 支持，要么放弃这个提示（错误文案里的「第 N 行：」仍在）。≈1 天（含读 kit 源码） |
-| 4 | 图片素材小卡没有悬停底色 | `WorkflowView.vue:2538-2540` `.ej-media-item:hover { background: var(--studio-primary-bg) }` | 卡片现在画在 `widgets.rs::media_tile`（**别人的范围**）：需要给它加一个 hover 参数或内部加 `.hover(...)`。≈5 行 + 目检 |
-| 5 | 左栏幻灯片行缺悬停底色（notes 主题下原版有） | `WorkflowView.vue:1895` `.edit-slide-row:hover { background: var(--studio-hover) }`；而 `--studio-hover` **只在** `src/themes/notes.css:83` 定义，其余五个主题下这条声明无效（悬停本来就没有底色） | 要给 `theme/StudioColors` 加一个 hover token（**别人的文件**）才做得出来；不改 theme 就只能在 notes 主题下少一个悬停底色。≈0.5 小时 + 六主题目检 |
+本轮**没有遗留 ⚠️**。原 5 条的处理：
+
+| # | 原差距 | 处理 |
+|---|---|---|
+| 1 | 「应用更改」按钮不吸底（原版 `.ej-save-btn { position: sticky; bottom: 0 }`，`WorkflowView.vue:2061-2065`） | 已 🔧：右栏拆成「滚动表单区 + 固定底操作区」（见第六节第 5 条） |
+| 2 | 标签行里的「添加」按钮宽度（原版 `.edit-add-btn { width: 100% }` 占满标签右侧剩余宽度；`WorkflowView.vue:1956-1959`） | ➖：表现层，按 GPUI 原生做法（曾经的探针证据 `target/audit-flex/probe.html`） |
+| 3 | 高级 JSON 出错行的行号标红（`WorkflowView.vue:2352-2356`） | ➖：表现层，按 GPUI 原生做法（错误文案里的「第 N 行：」仍在） |
+| 4 | 图片素材小卡悬停底色（`WorkflowView.vue:2538-2540`） | ➖：表现层，按 GPUI 原生做法 |
+| 5 | 左栏幻灯片行悬停底色（`WorkflowView.vue:1895`；`--studio-hover` 只在 notes 主题定义） | ➖：表现层，按 GPUI 原生做法 |
 
 ## 八、有意不做（➖，逐条附原版依据）
 
@@ -209,20 +216,24 @@
 2. **版式表未就绪两态**（`Step3Editor.vue:670-677` 的「读取版式信息失败：」/「正在读取版式信息…」）：
    原生 schema 是同步取（`step3.rs:244`），不存在「正在读取」，也没有可失败的命令调用。
 3. **`insertMediaUrl` 与它的剪贴板回退**（`useSlideEditor.ts:225-237`）：
-   原版模板里没有任何触发入口（`WorkflowView.vue:543` 接了个空事件，模板里找不到 `insert-media-url` 的发出点），parity.md:139 已记「原版没有触发入口，未做」。
-4. **图表校验的「校验失败：…」出口**（`Step3Editor.vue:313-317`）：原版经 `invoke('chart_problems')`，命令可能失败；原生直接调 core 的纯函数（step3.rs:1160），没有失败这条路径。
-5. **`aria-*` / `role="button"` / `role="status"`**（模板多处，如 606、647、826）：GPUI 的可访问性树由框架生成，页面不写这些属性。
-6. **`#app * { font-weight: normal !important }` 之外的字重**：原版 KindPicker 被 `Teleport to="body"` 挪出 `#app`，它的标题/卡片名仍是 700/600（`WorkflowView.vue:2608-2613, 2653-2657`）；原生按 README 规矩 12 一律常规体，这一条 README 已声明为有意偏离。
+   原版模板里没有任何触发入口（`WorkflowView.vue:543` 接了个空事件，模板里找不到 `insert-media-url` 的发出点），parity.md:142 已记「原版没有触发入口，未做」。
+4. **标签行「添加」按钮宽度**（`WorkflowView.vue:1956-1959`）：表现层，按 GPUI 原生做法。
+5. **高级 JSON 出错行的行号标红**（`WorkflowView.vue:2352-2356`）：表现层，按 GPUI 原生做法。
+6. **图片素材小卡悬停底色**（`WorkflowView.vue:2538-2540`）：表现层，按 GPUI 原生做法。
+7. **左栏行悬停底色**（`WorkflowView.vue:1895`，仅 notes 主题下原版有效）：表现层，按 GPUI 原生做法。
+8. **图表校验的「校验失败：…」出口**（`Step3Editor.vue:313-317`）：原版经 `invoke('chart_problems')`，命令可能失败；原生直接调 core 的纯函数（step3.rs:1160），没有失败这条路径。
+9. **`aria-*` / `role="button"` / `role="status"`**（模板多处，如 606、647、826）：GPUI 的可访问性树由框架生成，页面不写这些属性。
+10. **`#app * { font-weight: normal !important }` 之外的字重**：原版 KindPicker 被 `Teleport to="body"` 挪出 `#app`，它的标题/卡片名仍是 700/600（`WorkflowView.vue:2608-2613, 2653-2657`）；原生按 README 规矩 12 一律常规体，这一条 README 已声明为有意偏离。
 
-## 九、`parity.md` 第三步复查（不改 parity.md，只报告）
+## 九、`parity.md` 第三步复查
 
-逐行核对 `docs/native/parity.md:124-141` 的 16 行，**都做完了**，没有发现「写了没做」的行。几点补充：
+逐行核对 `docs/native/parity.md` 第三步小节的 16 行（第十四轮为 124-141 行，第十五轮插入/改写了几行后行号右移），**都做完了**，没有发现「写了没做」的行。几点补充：
 
-- parity.md:127 写「行尾垃圾桶只在**悬停该行时**显示」——✅ 代码属实（`group_hover`），但原版在只剩一页时是 `opacity: 0 !important`（`WorkflowView.vue:1948`），原生两条 `.when` 都写了，属实。
-- parity.md:135 写「（`tools/drive.ps1` 逐页截图 + 联系表；联系表是未提交的临时产物）+ compare / swot / process 全分辨率逐项核对」——截图现在还在 `target/drive/`（129 个文件，`target/` 被 gitignore，随时可能被清掉），建议把关键几张（compare / swot / process 的逐项、issue_stack 的两种提示）收进 `docs/native/shell/`，否则这行以后没法复核。**这条不影响功能结论。**
-- parity.md:130 写「`serial` / `progressive` 取 `PreviewOptions::default()`（都是真）」——✅ 属实（`crates/huanshu-core/src/preview.rs:35-44`）。
-- parity.md:126 写「左 `layers` +「幻灯片」+ 数量徽章 + `reset` 图标（回第 1 步）」——✅ 代码属实；**参考截图里看不到这个 `reset` 按钮**（见第十节）。
-- 本轮另有两处「parity.md 没提、但确实与原版有差距」的地方，已记在 ⚠️ 1（保存按钮 sticky 吸底）与 ⚠️ 2（标签行「添加」按钮宽度）；parity.md 里没有任何一行声称这两处已完成，所以不算「写了没做」。
+- parity.md 写「行尾垃圾桶只在**悬停该行时**显示」——✅ 代码属实（`group_hover`），但原版在只剩一页时是 `opacity: 0 !important`（`WorkflowView.vue:1948`），原生两条 `.when` 都写了，属实。
+- parity.md 写「（`tools/drive.ps1` 逐页截图 + 联系表；联系表是未提交的临时产物）+ compare / swot / process 全分辨率逐项核对」——截图现在还在 `target/drive/`（129 个文件，`target/` 被 gitignore，随时可能被清掉），建议把关键几张（compare / swot / process 的逐项、issue_stack 的两种提示）收进 `docs/native/shell/`，否则这行以后没法复核。**这条不影响功能结论。**
+- parity.md 写「`serial` / `progressive` 取 `PreviewOptions::default()`（都是真）」——✅ 属实（`crates/huanshu-core/src/preview.rs:35-44`）。
+- parity.md 写「左 `layers` +「幻灯片」+ 数量徽章 + `reset` 图标（回第 1 步）」——✅ 代码属实；**参考截图里看不到这个 `reset` 按钮**（见第十节）。
+- 第十五轮改动：parity.md 第三步「应用更改」那行的**已知偏差（原版 sticky 吸底）已删掉**，改为「固定底操作区」的做法说明（另有短表单时操作区落栏底的**有意偏离**）；其它 ⚠️（「添加」按钮宽度、行号标红、素材小卡悬停底色、左栏行悬停底色）在本文件第八节归 ➖「表现层，按 GPUI 原生做法」，parity.md 里本来就没有任何一行声称它们已完成，所以不算「写了没做」。
 
 ## 十、参考截图与当前原版 CSS 冲突的地方（供复核，不要据此改代码）
 
@@ -233,9 +244,10 @@
 
 ## 十一、改动文件
 
-只改了一个文件，没有碰任何负责范围外的文件：
+第十四轮只改了一个文件，没有碰任何负责范围外的文件：
 
 - `apps/huanshu-native/src/pages/workflow/step3.rs`（🔧 4 处 + 1 段已知差异注释；`rustfmt` 过）
 - 新增证据文件（`target/` 下，不入库）：`target/audit-flex/probe.html`、`target/audit-flex/probe.png`、`target/audit-n-*.png`、`target/audit-r-*.png`、`target/kp-*.png`、`target/ref-head-icons*.png`
 
-未做的事：没有 `git commit`、没有跑 `cargo build/check/test`、没有改原版 `src/`、没有改 `widgets.rs` / `shell.rs` / `present.rs` / `mod.rs` / `step1.rs` / `step2.rs` / `drive.ps1` / `shots.ps1`、没有改 `docs/native/parity.md`。
+未做的事：没有 `git commit`、没有跑 `cargo build/check/test`、没有改原版 `src/`、没有改 `widgets.rs` / `shell.rs` / `present.rs` / `mod.rs` / `step1.rs` / `step2.rs` / `drive.ps1` / `shots.ps1`。
+（`docs/native/parity.md` 在第十四轮未改；第十五轮按本轮口径更新了第三步「应用更改」那一行与向导/设置/首页/第二步的相关行。）

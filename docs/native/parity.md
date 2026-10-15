@@ -33,7 +33,7 @@
 | 点卡片进项目 | ✅ | |
 | 删除确认（文案一致）并删除 | ✅ | `AlertDialog` → `services::projects::delete_project` |
 | 导出对话框：普通 `.keynn` | ✅ | `services::storage::export_project` + 保存对话框 |
-| 导出对话框：PDF 文档 + 结果对话框 | 🟡 | `export::show_report` 只有「字段行 + 关闭」：缺进行中的「正在生成 PDF…（首次导出需要扫描系统字体）」与失败对话框（原版 `PdfExportDialog.vue`，`WorkflowView.vue:553` 也挂一份）、缺图明细只有「缺失图片 N 处」（原版给页码/引用/原因）、占位页未按版式分组、无「PDF 版式跟随当前主题。」常驻提示、结果摘要用全路径+ms（原版「文件名 · N 页 · x.x 秒」）；重做约 120–150 行，见 `audit-home.md` 第 4 节 |
+| 导出对话框：PDF 文档 + 结果对话框 | ✅ | `export::show_report` 现在是**三框**（进行中 / 成功 / 失败）：导出前开「正在生成 PDF…」+「首次导出需要扫描系统字体，会稍慢一些。」（首页与第三步都经 `begin_export`），成功后换成结果框（两态标题「PDF 已导出」/「…有几处需要留意」、摘要「文件名 · N 页 · x.x 秒」、占位页按版式中文名分组、裁切页解释、缺图一处一条列页码/引用/原因、主题回落用主题名、无回落时的常驻提示「PDF 版式跟随当前主题。」、按钮「在文件夹中显示」+「完成」），失败换成失败框（错误全文可滚动）；core 与原生共 8 个新单测；剩余差异：`导出中不可关` 与「在文件夹中显示」失败仍用 Kit 轻提示（后者记 ➖）；见 `audit-home.md` 第 4 节 |
 | 导出对话框：加密导出（密码 + 强度提示） | ✅ | `password_dialog.rs::PasswordDialog`（encrypt 模式，强度条/确认密码/门槛照原版）、`export_project(encrypted, password)`；单测 `encrypt_gate_agrees_with_core_password_validation` 等；审计补齐：面板补「密码至少 8 位，需包含大写字母、小写字母和数字。」提示、两个输入框回车提交、Kit 自带 ✕ 去重 |
 | 导入未加密 `.keynn` | ✅ | `services::storage::import_project` |
 | 导入加密 `.keynn`（输入密码、错误重试） | ✅ | `PasswordDialog`（decrypt 模式）：`is_encrypted_file` 为真弹密码框，密码错误不关闭、`set_external_error` 重试 |
@@ -43,10 +43,11 @@
 
 | 功能 | 状态 | 说明 / 依据 |
 |---|---|---|
-| 左侧五个分区、返回工作台、版本号 | ✅ | **已知偏差**：「返回工作台」原版用 `history.back()` 回来源页（从工作流侧栏进设置时回项目页，`SettingsView.vue:210-213`），原生固定回首页（需 `ShellHandle` 记来源路由，见 audit-settings.md ⚠️2） |
+| 左侧五个分区、返回工作台、版本号 | ✅ | 「返回工作台」照原版 `goBack()` 回来源页（`SettingsView.vue:210-213`）：外壳记下进设置之前的路由（`shell.rs` 的 `Shell.settings_origin` + `ShellHandle::leave_settings`），从工作流侧栏进来就回**那个项目的那个步骤**（`WorkflowPage::show_step` 把步骤同步回路由），没有来源时回首页 |
+| 读取设置失败：提示 + 重新加载，不许保存 | ✅ | 原版 252-255（`!ready` 时工作区整块禁用）：`mod.rs::read_settings` / `reload_settings` / `load_error`（失败态只画提示，保存按钮禁用 + `save()` 再挡一次）；core 记失败原因并支持重读（`AppState::{settings_load_error, settings_file_error, reload_settings}`、`services::settings::{read_error, reload_settings}`） |
 | 分区标题与说明 | ✅ | |
 | 界面主题卡片：点击预览、保存后生效、撤销 | ✅ | `shell/settings-appearance-0.png` |
-| 字体：七个角色、可搜索系统字体下拉、统一所有字体、恢复默认 | ✅ | `pages/settings/appearance.rs`（FontPicker 弹层照 `SystemFontPicker.vue`；`fonts::enumerate_system_fonts` 走 `run_bg`）；单测 `set_font_under_unified_fills_every_role` 等；审计补齐：弹层 Enter 应用高亮项、打开自动聚焦搜索框、字体枚举失败/空列表有提示；**已知偏差**：弹层里 ↑/↓/Home/End 候选导航 GPUI 做不到（单行输入框把这些键绑成移动且不外传按键事件，gpui-base `state.rs:181-219`），只能鼠标点 |
+| 字体：七个角色、可搜索系统字体下拉、统一所有字体、恢复默认 | ✅ | `pages/settings/appearance.rs`（FontPicker 弹层照 `SystemFontPicker.vue`；`fonts::enumerate_system_fonts` 走 `run_bg`）；单测 `set_font_under_unified_fills_every_role` 等；审计补齐：弹层 Enter 应用高亮项、打开自动聚焦搜索框、字体枚举失败/空列表有提示；**弹层的 ↑/↓/Home/End 候选导航 ➖**：表现层，按 GPUI 原生做法——不换 GPUI Kit 的列表组件，因为 `List`/`Select`/`Combobox`/`Command` 把点击与回车合并成同一个确认动作（`list.rs:503-514` 等）、列表上下文不绑 `home`/`end`（`list.rs:26-35`），换过去会破坏原版「点击只高亮、回车才应用」；现状：搜索 ✅、回车应用 ✅、Home/End ❌ |
 | 字体：演示预览 / 界面预览 | ✅ | `appearance.rs::font_preview_card`；界面字体随改随 `theme::apply` |
 | 模型服务：三类服务卡片与状态 | ✅ | `service_form.rs::service_state`（签名比对照原版）；单测 `testing_wins_over_everything` 等 |
 | 模型服务：地址、Key、模型下拉 / 手动输入 | ✅ | `service_form.rs::ServiceForm`（GPUI Kit Select；`services::settings::{get_settings, save_settings}`） |
@@ -57,7 +58,7 @@
 | 存储：图标向量缓存初始化 | ✅ | `storage.rs::init_embeddings` → `services::generation::ensure_icon_embeddings`（async）；状态逻辑照原版 `embeddingReady` |
 | 关于与帮助 | ✅ | |
 | 底部保存条：状态、撤销、保存 | ✅ | 统一草稿（主题 + 字体 + 模型 + 生成参数）；保存后界面字体立即生效；单测 `config_dirty_tracks_any_component_change` |
-| 离开时「有未保存的更改」确认（保存并离开 / 放弃 / 继续编辑） | ✅ | `mod.rs::leave`（Dialog 三按钮，文案逐字；放弃 = 恢复上次保存的主题与字体）；**已知偏差**：原版初始焦点在「保存并离开」（`SettingsView.vue:191-201`），原生未设 |
+| 离开时「有未保存的更改」确认（保存并离开 / 放弃 / 继续编辑） | ✅ | `mod.rs::leave`（Dialog 三按钮，文案逐字；放弃 = 恢复上次保存的主题与字体）；原版初始焦点在「保存并离开」（`SettingsView.vue:191-201`）归 ➖「表现层，按 GPUI 原生做法」 |
 | `Ctrl+S` 保存 | ✅ | `track_focus` + `on_key_down`（页面根，`mod.rs`） |
 
 ## 首次向导 `FirstRunWizard.vue` → `pages/wizard.rs`
@@ -66,7 +67,7 @@
 |---|---|---|
 | 品牌头、四步指示（含 skipped / 连线 done 态）、上一步 / 下一步 / 跳过 | ✅ | 显隐逻辑照原版 `wizard-footer` |
 | 存储目录（默认值来自 core，尊重沙箱） | ✅ | 可编辑 + `rfd::FileDialog::pick_folder`；联动规则照原版（媒体目录非 `/projects/` 时设为 `<选中>/media`，`\`/`/` 都容忍）；单测 `browsing_data_dir_refreshes_media_dir_unless_it_is_a_projects_dir` |
-| 配置大模型（三类服务）并校验 | ✅ | 复用 `settings/service_form.rs::ServiceForm::compact`；「下一步」前依次 `list_models`，失败不翻页；**有意偏离**：原版这步其实不校验——`verifyModels`（`FirstRunWizard.vue:119-149`）全仓无调用点，是死代码；原生保留校验（审计认定属于改进，若要对齐原版删掉即可，约 30 行） |
+| 配置大模型（三类服务）并校验 | ✅ | 复用 `settings/service_form.rs::ServiceForm::compact`；「下一步」前依次 `list_models`，失败不翻页；**有意偏离：提前发现模型配置错误**——原版这步其实不校验：`verifyModels`（`FirstRunWizard.vue:119-149`）全仓无调用点，是死代码；原生保留校验（若要对齐原版删掉即可，约 30 行） |
 | 初始化向量库 | ✅ | `startEmbeddingInit`：先 `save_settings` 再 `ensure_icon_embeddings`（`run_async`），进度/状态文案逐字 |
 | 完成页摘要、进入 Studio | ✅ | 摘要六行 + `dataDirChanged` 重启警告；`finishWizard` 顺序 `save_app_settings` → `save_settings` → `complete_first_run` |
 
@@ -76,7 +77,9 @@
 |---|---|---|
 | 加载中 / 加载失败（返回首页） | ✅ | |
 | 侧栏：返回、项目名、三步（状态、说明、连线）、主题、设置 | ✅ | 第 2 步说明按 `gen` 四态（出错 / 生成中 `stageLabel` / 已生成 N 张 / 等待开始），生成中圆点里是转圈（`Spinner`）；审计补齐：done 态圆点/连线改成功绿（照 `WorkflowView.vue:703-759`）、可点步骤悬停变亮、说明 truncate、项目名 tooltip |
-| 生成状态是应用级 store（离开项目 / 回首页再进，进度接着走） | ✅ | `src/generation.rs::GenerationStore`：`Shell` 创建、`ShellHandle` 发给页面，事件接收常驻在它身上（`tasks::listen_events_in`）；页面来去不影响在跑的生成（原版 pinia store 同）；`ProjectModel` 不再存生成字段；**生成中开别的项目曾崩溃（实体租约重入）已修**：`open_project` 的「store 正为别的项目跑」早退分支改 `defer` + WeakEntity（`f-b1-*` 5 次不崩）；**已知偏差（audit ⚠️）**：store 只实时持有「发起生成的那个项目」，其他项目的第二步用库里静态快照——`snapshot_for` 的 None 分支缺日志 / 逐页状态 / 失败段与「重试这一页」（原版总会 `loadLatestRun`+`loadFromJson`，`generation.ts:380-435`）；触发条件：A 生成中打开 B 看 B 的第二步。修约 2–4 h（见 audit-step2.md） |
+| 生成状态是应用级 store（离开项目 / 回首页再进，进度接着走） | ✅ | `src/generation.rs::GenerationStore`：`Shell` 创建、`ShellHandle` 发给页面，事件接收常驻在它身上（`tasks::listen_events_in`）；页面来去不影响在跑的生成（原版 pinia store 同）；`ProjectModel` 不再存生成字段；**生成中开别的项目曾崩溃（实体租约重入）已修**：`open_project` 的「store 正为别的项目跑」早退分支改 `defer` + WeakEntity（`f-b1-*` 5 次不崩） |
+| 静态状态（别的项目在生成时的本项目） | ✅ | store 只实时持有「发起生成的那个项目」，其他项目的第二步用库里的静态快照：`snapshot_for` 的静态分支用 `StaticCache`（打开项目时经 `run_bg` 读该项目的最近运行 + 日志一次，运行变了才失效，每帧只读缓存）恢复失败页（`progress::statuses_from_logs`）、关键事件 / 生成记录统计、最近 10 条日志、看板条目；失败段与「重试这一页」会出现但按全局规则禁用（`!live` 即禁用，因为静态分支下 store 的重试会排到别的项目的运行上；「重新生成全部」只在 `busy_elsewhere` 时禁用）；6 个新单测（`generation.rs::tests`）；原版对应 `loadLatestRun`+`loadFromJson`（`generation.ts:380-435`） |
+| 第二步选中的页码跨步骤保留 | ✅ | 下标存在 `ProjectModel::selected_slide`（`Option<usize>`，照原版 `selectedSlideIndex` 的 null 语义）：`Step2::select` 写、渲染归位（越界/未选回落 `preferred_slide_index`）、整次重新生成前清空；4 个新单测（`resolve_selected`）；原版在 `WorkflowView.vue:500,505` |
 | 初始步骤（生成中→2，有蓝图→3，否则→1）与可点击规则 | ✅ | `finish_open`（原版 `onMounted` 顺序在 `GenerationStore::open_project` 里）；第 3 步点击含「没有页在重试」 |
 | 项目改名（点名字编辑，回车/失焦保存，Esc 取消） | ✅ | `mod.rs::start_rename` / `save_name`（空名不保存、保持编辑态，照原版）；待截图对比 |
 | 新建项目的草稿（名称、文稿、粒度、比例）保存与恢复 | ✅ | 800ms 防抖自动保存（`WorkflowPage::schedule_autosave` / `persist_draft`，新建落库后 `retarget_route` 对准路由）；meta 存 `app_settings` 的 `project_meta:<id>`（`services::projects::Step1ProjectMeta`，单测 `step1_meta_*`）；待截图对比 |
@@ -91,7 +94,7 @@
 | 名称输入（原版占位文案）、字数（UTF-16 码元数，与原版 `mdContent.length` 一致） | ✅ | `ProjectModel::md_len`；待截图对比 |
 | 草稿保存状态（保存中… / 已保存 / 失败） | ✅ | `WorkflowPage` 800ms 防抖自动保存置位（`DraftSaveState`）；失败原因显示在格式工具行（原版 `draftSaveError`）；待截图对比 |
 | Markdown 编辑器（高亮、行号） | ✅ | GPUI Kit `Editor`（tree-sitter markdown） |
-| Markdown 预览按页卡片（P1/P2…，`TextView::markdown`） | ✅ | `markdown_tools::split_preview_pages`（auto 先 `detect_granularity`）；空态「预览区将实时显示 Markdown 渲染效果」；**已知偏差**：数学公式不渲染（原版 `markdown-it-katex`）；渲染语义差异（原版 `breaks/linkify/typographer/html:false`，GPUI 是标准 CommonMark 且会解析内联 HTML）；待截图对比 |
+| Markdown 预览按页卡片（P1/P2…，`TextView::markdown`） | ✅ | `markdown_tools::split_preview_pages`（auto 先 `detect_granularity`）；空态「预览区将实时显示 Markdown 渲染效果」；**已知偏差**：数学公式不渲染（原版 `markdown-it-katex`）——**另起一轮**（需 KaTeX 等价排版/位图管线）；渲染语义差异（原版 `breaks/linkify/typographer/html:false`，GPUI 是标准 CommonMark 且会解析内联 HTML）归 ➖「表现层，按 GPUI 原生做法」；待截图对比 |
 | 编辑区 ↔ 预览区滚动同步（按比例） | 🟡 | 仅滚轮双向同步（预览 `ScrollHandle` 精确 ↔ 编辑器 `scroll_offset`/`set_scroll_offset`，均有回声守卫）。**已知偏差（2026-10 审计查证）**：① 编辑器真实最大滚动量无公开 API——`text_bounds()` 是视口矩形不是内容边界（gpui-base `state.rs:644`/`element.rs:3311`），真值在私有 `scroll_size`/`display_map`，只能按「行数 × 行高 − 视口」估计，soft-wrap 折行时中段比例有偏差；「越界探针」能读真值但会让编辑器可见地闪一帧，不采用；② 编辑器内建滚动条拖拽不触发同步（拖拽只调 `ScrollHandle::set_offset` 不通知实体，`state.rs:2616-2624` 只在偏移被夹时才 notify）；③ 预览侧框架根本不画滚动条（gpui-pre `div.rs` 无滚动条代码），无拖拽可挂 |
 | 上传文件（rfd `.md`/`.txt`，H1 取名） | ✅ | `open_file` / `load_markdown`；待截图对比 |
 | 拖入 .md / .txt（`on_drop` + `ExternalPaths`，释放以加载 Markdown 文件） | ✅ | 拖入加载可用；**已知偏差**：框架无文件拖入悬停钩子（只有 `on_file_drop_exit`/`on_drop`），拖动中的覆盖层高亮显示不出来；扩展名原生收紧为只认 `.md`/`.txt`（原版 `onDrop` 不校验，`Step1Prepare.vue:222-234`，记 ➖）；待截图对比 |
@@ -136,8 +139,8 @@
 | 图标推荐 | ✅ | 查询词 = 卡片 `icon_query_keys` 各字段值 trim 后空格连接（空不发）；`recommend_icons_for_query(query, 6)`，第一个候选直接写进 `{卡片路径}.icon`，候选小片（预览 + 名字）点击可换；「推荐中…」按钮禁用，按页 + 表单代次 + seq 作废迟到结果；实测（project:2，`target/drive/icon01~icon06`）：候选出现、预览图标随草稿变、未应用不落库；无向量库时走 core 本地关键词兜底（与原版同一份兜底，不会失败卡住）；向量库已初始化时走语义检索（LM Studio embedding，6 候选，`target/drive/f-b3k-recommended-0.png`）；候选小片点击路径 bug（写成 `cards[0].icon.icon`）已修并实测可换（`f-b3k-chip-applied-0.png`）；「推荐中…」文案因请求 1–2s 内返回未截到图 |
 | 素材插图（主图、图集） | ✅ | 显示条件照原版（kind 的 fields 含 `images` 或当前页 `image` 非空）；素材条 = 项目 `image` 素材小卡（缩略图同 step1 `media_thumb`、名字、**「设为主图」→ `image`**、**「加入图集」→ 追加 `images` 且去重**）；实测（project:1，`target/drive/g1~g5`）：重复加入不重复、设为主图预览更新、应用后 sqlite 只读核对 `image`/`images` 正确 |
 | 图表 JSON 框（防抖校验、失焦立即校验、只写回通过的） | ✅ | 框 = 草稿 `chart` 两空格缩进 JSON，有焦点不被草稿覆盖、换页/换版式重置；语法错立即「JSON 语法错误：{原因}」，合法 150ms 防抖 `chart_problems_json` + `message_zh`（「；」连接多条），**只写回通过校验的 JSON**（未通过预览保持上一次合法图表）；失焦立即校验还在等待的输入；等待时「正在校验…」，否则「type / data / encoding / series，校验通过才会应用到预览」；实测 a–d 全过（project:5，`target/drive/j01~j05`，含粘贴后立即失焦仍生效） |
-| 高级 JSON 模式（格式化、语义错误） | ✅ | 「高级 Blueprint JSON」段：`json_text` 随表单改动/换页/换版式/应用刷新（`filter_slide_json` 两空格缩进）；框内输入解析成功 → 草稿=解析结果**不过滤**、重建表单，失败 → 「第 N 行：{原因}」、草稿不动；**应用写回 `json_text` 解析出来的那一页**（手加字段应用后仍在，sqlite 实测）；有语法错应用禁用、Ctrl+S 无效；「格式化」能解析才规整；行号代码编辑器、Tab 插两个空格；语义错误（无语法错时显示，`warning` 图标）= core `slide_edit::semantic_errors`，图表语义错误 150ms 防抖只认最新；原版「插入素材引用」模板里没有触发入口，未做；实测 a–f 全过（project:2，`target/drive/adv02~adv12`）；**已知偏差**：原版出错行号标红（`.ej-line-num--error`），GPUI Kit Editor 行号栏无接口，未做 |
-| 应用更改（`Ctrl+S`）与未保存标记 | ✅ | 三态逐字：`保存中…`（`renew`）/ `应用更改 (Ctrl+S)`（`save`）/ `已保存`（`checkmark`），保存失败时按钮下方是 `.ej-error` 样式的错误行；**Ctrl+S 在第三步任何位置都生效**（有意改进：原版只在高级 JSON 框里）；实测 sqlite 前后：`Auto Slidev Layout Blueprint Test Deck` → `… LOOP4`，杀进程重进项目仍是新值；`filter_slide_json` 的有意修改保住 `aspect_ratio`（32:9 项目改封面并应用后该页仍是 `ratio_32x9`，第 2 步看板卡片仍是 32:9）；**已知偏差**：原版「应用更改」按钮 `position:sticky` 吸底（长表单随时可点），GPUI 无 sticky，未做（见 audit-step3.md ⚠️1） |
+| 高级 JSON 模式（格式化、语义错误） | ✅ | 「高级 Blueprint JSON」段：`json_text` 随表单改动/换页/换版式/应用刷新（`filter_slide_json` 两空格缩进）；框内输入解析成功 → 草稿=解析结果**不过滤**、重建表单，失败 → 「第 N 行：{原因}」、草稿不动；**应用写回 `json_text` 解析出来的那一页**（手加字段应用后仍在，sqlite 实测）；有语法错应用禁用、Ctrl+S 无效；「格式化」能解析才规整；行号代码编辑器、Tab 插两个空格；语义错误（无语法错时显示，`warning` 图标）= core `slide_edit::semantic_errors`，图表语义错误 150ms 防抖只认最新；原版「插入素材引用」模板里没有触发入口，未做；实测 a–f 全过（project:2，`target/drive/adv02~adv12`）；原版出错行号标红（`.ej-line-num--error`）归 ➖「表现层，按 GPUI 原生做法」（GPUI Kit Editor 行号栏无接口，错误文案里的「第 N 行：」仍在） |
+| 应用更改（`Ctrl+S`）与未保存标记 | ✅ | 三态逐字：`保存中…`（`renew`）/ `应用更改 (Ctrl+S)`（`save`）/ `已保存`（`checkmark`），保存失败时按钮下方是 `.ej-error` 样式的错误行；**Ctrl+S 在第三步任何位置都生效**（有意改进：原版只在高级 JSON 框里）；实测 sqlite 前后：`Auto Slidev Layout Blueprint Test Deck` → `… LOOP4`，杀进程重进项目仍是新值；`filter_slide_json` 的有意修改保住 `aspect_ratio`（32:9 项目改封面并应用后该页仍是 `ratio_32x9`，第 2 步看板卡片仍是 32:9）；吸底：原版按钮靠 `position:sticky`（`WorkflowView.vue:2061-2065`）吸在右栏底，GPUI 没有 sticky，改成**右栏拆两段**——可滚动的表单区 `#editor-panel` + 固定在栏底的操作区（`step3.rs::render_actions`，含按钮 / 生成中提示 / 保存失败行），长表单下按钮始终可见；**有意偏离**：短表单时操作区落在栏底（原版按钮紧跟内容之后） |
 | 生成中只读 | ✅ | **有意偏离**：`WorkflowPage::editing_locked` 只在**本项目**正在生成/重试（store 正持有本项目且 `busy()`）时为真——应用/新建/删除/移动/换版式与全部输入框禁用、保存按钮旁显示「生成进行中，完成后可编辑」（原版没挡）；**别的项目**在生成时本项目第三步照常可编辑（`set_deck` 写不进时模型是唯一状态，`commit_deck` 落库写本项目自己的行，不碰生成中的项目）；core 侧生成已按运行所属项目解耦（`get_generation_deck`，见 CLAUDE.md），跨项目生成不失败、不写错牌组；**已真机验证**（LM Studio：A 生成中 A 第三步只读、B 第三步可编辑且改动落库不被覆盖，sqlite 核对，`target/drive/f-d3-*`、`d3-*`） |
 
 ## 演示 `PresentationOverlay.vue` → `present.rs`

@@ -15,7 +15,9 @@
 主题相关的纯视觉细节（阴影、渐变、毛玻璃、动画、字号/宽度的细微差）不逐条列，每个文件一行「视觉细节」。
 对照截图：`docs/native/reference/project-step1.png` / `new-step1.png` ↔ `docs/native/shell/project-step1-0.png` / `new-step1-0.png`（同一份沙箱数据、同一主题，肉眼已对齐）。
 
-本轮累计（正文第 1–5 节的逐项表，共 123 行）：**✅ 94 / 🔧 11 / ⚠️ 4 / ➖ 14**（另见 B 节两个调查项；统计明细见文末）。
+本轮累计（正文第 1–5 节的逐项表，共 123 行）：**✅ 94 / 🔧 11 / ⚠️ 3 / ➖ 15**（另见 B 节两个调查项；统计明细见文末）。
+第十五轮只做记号归并：原「预览渲染语义差异（breaks/linkify/html）」的 ⚠️ 按新原则归入 ➖「表现层，按 GPUI 原生做法」；
+KaTeX 公式保持 ⚠️（另起一轮，需 KaTeX 等价排版/位图管线）。
 
 ---
 
@@ -56,7 +58,7 @@
 | 草稿兜底名：名称 → 去扩展名文件名 → 「未命名演示」 | `WorkflowView.vue:229-233`、`:243`、`:263` | `mod.rs::draft_project_name`（`:200-210`） | ✅ | |
 | 「开始 AI 生成」：校验 → 取消防抖 → 立即保存 → 清选中页 → 切第 2 步 → `gen.generate(...)` | `WorkflowView.vue:291-310` | `mod.rs::start_generation`（`:758-794`） | ✅ | 生成的牌组由 core 落库，页面不再二次存（原版注释 `:308-309`） |
 | 「开始 AI 生成」可用条件：文稿非空 + 名称非空 + 没有生成/重试在跑 | `WorkflowView.vue:359-363` | `mod.rs::can_generate_local`（`:133-135`）+ `generation.rs::busy`（`:263-265`） | ✅ | 全应用同一时刻只有一次生成 → parity.md 第 103 行 |
-| 第三步 Ctrl+S / Esc（window 级 keydown） | `WorkflowView.vue:377-391` | 第三步自己的 `track_focus` + `on_key_down` | ➖ | 本轮范围外（`step3.rs` 审计）；原版是**全局** window 监听（`:389-391`），原生改成页面焦点内（有意改进）→ parity.md 第 140 行 |
+| 第三步 Ctrl+S / Esc（window 级 keydown） | `WorkflowView.vue:377-391` | 第三步自己的 `track_focus` + `on_key_down` | ➖ | 本轮范围外（`step3.rs` 审计）；原版是**全局** window 监听（`:389-391`），原生改成页面焦点内（有意改进）→ parity.md 第 143 行 |
 | 演示覆盖层 `<PresentationOverlay>` | `WorkflowView.vue:553-562` | `present.rs` | ➖ | 别人的负责范围（parity.md「演示」一节） |
 | `PdfExportDialog` / `exportPdf()` | `WorkflowView.vue:553`、`:78-90` | `export.rs` + 第三步栏头 | ➖ | 别人的负责范围 |
 | 确认对话框 / 轻提示 | 原版工作流页：**没有**（那四个文件里既没有 `window.confirm`，也没有 `alert` 或 toast 调用） | 原生同样没有 | ➖ | 依据：对 `WorkflowView.vue`、`Step1Prepare.vue`、`MarkdownWorkbench.vue`、`useMediaLibrary.ts` 检索 confirm / alert / toast → 0 命中 |
@@ -121,8 +123,8 @@
 | 预览：每页一张卡片 + 右上角 `P{n}` 页码徽章 | `MarkdownWorkbench.vue:337-347`（`:344`）、样式 `:442-474` | `step1.rs::render` preview_card（`:795-829`，`P{index+1}` `:815`） | ✅ | |
 | 预览分页规则（`splitSlides`：H2/H3 切页；`$$` 显示公式块内不切） | `MarkdownWorkbench.vue:64-115` | core `markdown_tools::split_preview_pages`（快照单测 `tests/markdown_tools.rs`） | ✅ | 注释互相指认（`MarkdownWorkbench.vue:61-63`） |
 | 预览空态：「预览区将实时显示 Markdown 渲染效果」（空文稿也是一张 P1 卡） | `MarkdownWorkbench.vue:54-59`、`:101-104` | `step1.rs::render`（`:826`、空文稿分支 `:830-831`） | ✅ | |
-| 预览渲染：**数学公式（KaTeX）** | `MarkdownWorkbench.vue:4`（`@vscode/markdown-it-katex`）、`:47`（`md.use(markdownItKatex)`） | `TextView::markdown`（`step1.rs:820`） | ⚠️ | **公式不渲染**：gpui 的 markdown 对未被插件认领的公式回落成原文（`gpui-base-0.7.3/src/text/format/markdown.rs:869-880`），块级公式当代码块（`:1056-1060`）。工作量：**大**（要接一个 KaTeX 等价的排版/位图管线；框架只给了 inline plugin 钩子，见 `src/text/text_view.rs:1179` 的测试） |
-| 预览渲染：软换行 `breaks: true` / `linkify` / `typographer` / `html: false` | `MarkdownWorkbench.vue:41-46` | `TextView::markdown`（标准 CommonMark） | ⚠️ | 原版单换行成 `<br>`、裸链接自动成链、`html:false` 让 HTML 当纯文本；gpui 侧：软换行按空格合并、`Node::Html` 会被**解析渲染**（`gpui-base-0.7.3/src/text/format/markdown.rs:1063-1068`）。工作量：中（要写 soft-break / html 的 inline·block plugin，并改用 `TextView::markdown_extensions`） |
+| 预览渲染：**数学公式（KaTeX）** | `MarkdownWorkbench.vue:4`（`@vscode/markdown-it-katex`）、`:47`（`md.use(markdownItKatex)`） | `TextView::markdown`（`step1.rs:820`） | ⚠️ | **公式不渲染**：gpui 的 markdown 对未被插件认领的公式回落成原文（`gpui-base-0.7.3/src/text/format/markdown.rs:869-880`），块级公式当代码块（`:1056-1060`）。工作量：**大**（要接一个 KaTeX 等价的排版/位图管线；框架只给了 inline plugin 钩子，见 `src/text/text_view.rs:1179` 的测试）——**另起一轮**（需 KaTeX 等价排版/位图管线），本轮不动 |
+| 预览渲染：软换行 `breaks: true` / `linkify` / `typographer` / `html: false` | `MarkdownWorkbench.vue:41-46` | `TextView::markdown`（标准 CommonMark） | ➖ | 表现层，按 GPUI 原生做法（原版单换行成 `<br>`、裸链接自动成链、`html:false` 让 HTML 当纯文本；gpui 侧软换行按空格合并、`Node::Html` 会被解析渲染——`TextView` 自带的 CommonMark 行为即可） |
 | 编辑区 ↔ 预览区滚动同步（按比例、80ms 回声守卫） | `MarkdownWorkbench.vue:219-262` | `step1.rs::sync_editor_to_preview`（`:563-570`）、`sync_preview_wheel`（`:592-620`）、`editor_est_max_scroll`（`:523-549`） | ⚠️ | 详情见 B-2：编辑器真实最大滚动量不可得（估计值）、滚动条拖拽挂不上。parity.md 第 95 行 🟡 |
 | 文稿变化 → 编辑器整体替换后同步一次预览 | `MarkdownWorkbench.vue:275-289`（`nextTick` + `syncEditorToPreview`） | `step1.rs` 订阅编辑器 observe（`:155-165`，每次状态通知都同步一次） | ✅ | 原生同步更频繁（打字也触发），有回声守卫，行为等价 |
 | 窄屏（≤980px）编辑 / 预览 tab 切换 + 单栏 | `MarkdownWorkbench.vue:303-320`、`:575-587` | 未做 | ➖ | 原生窗口最小 1080×680（`apps/huanshu-native/src/main.rs:74`），980px 断点**不可达**；1100px 断点（`WorkflowView.vue:1291-1297` 侧栏下移）只在 1080–1100 的窄带内可达，桌面版不做响应式栈叠 |
@@ -182,7 +184,7 @@
 ### B-1 图表围栏（```chart）的校验提示
 
 **结论：原版第一步没有任何围栏校验 UI；围栏错误只在「开始 AI 生成」后由 core 抛出，显示在第二步的头部消息里。**
-parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报错」把这件事挂在第一步，**不是一个未做项**（该行不实，本轮不改 parity.md，汇报里单独说明）。
+parity.md 第 107 行（现已改成「图表围栏的校验提示 ✅ · 原版无单独提示」并记为已真机验证）与本文档结论一致；第十四轮曾把它记成「⬜ `input.rs` 的解析报错」挂在第一步，那行当时不实，本轮确认已经修正。
 
 查证过程与依据：
 
@@ -250,8 +252,8 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 |---|---|---|
 | ✅ 一致 | 94 | 28 / 28 / 10 / 24 / 4 |
 | 🔧 本轮已修 | 11 | 5 / 5 / 0 / 0 / 1。见下表 |
-| ⚠️ 有差距未修 | 4 | 0 / 1 / 3 / 0 / 0。见下表 |
-| ➖ 有意不做 | 14 | 5 / 3 / 2 / 3 / 1。见下表（含 5 条「视觉细节」行） |
+| ⚠️ 有差距未修 | 3 | 0 / 1 / 2 / 0 / 0。见下表 |
+| ➖ 有意不做 | 15 | 5 / 3 / 3 / 3 / 1。见下表（含 5 条「视觉细节」行） |
 
 ### 本轮 🔧 清单
 
@@ -271,14 +273,13 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 
 ### 本轮 ⚠️ 清单（附估计工作量）
 
-（与上面正文的 4 条 ⚠️ 行一一对应；第 2 条在正文里是一行，实际含两个子问题。）
+（与上面正文的 3 条 ⚠️ 行一一对应；第 2 条在正文里是一行，实际含两个子问题。）
 
 | # | 差距 | 位置 | 工作量 |
 |---|---|---|---|
 | 1 | 文稿/素材拖入的**悬停**高亮与覆盖层显示不出来（框架无 drag-enter 钩子，只能收到 drop 与 exit） | 原版 `Step1Prepare.vue:213-220,236-243,474-484`；原生 `step1.rs:105,107`（两个标志位）、`:864-877`、`:1220-1226` | 大（要上游 gpui-kit 支持拖入悬停事件） |
 | 2 | 编辑区↔预览区滚动同步（正文一行，含两件事）：(a) 编辑器最大滚动量只能估计（soft-wrap 下中段有偏差）；(b) 双向的**滚动条拖拽**同步（编辑器内建滚动条拖拽不通知实体；预览侧干脆没有滚动条元素） | 原版 `MarkdownWorkbench.vue:219-262`；原生 `step1.rs:523-549`（估计）、`:592-620`（滚轮回调） | (a) 中（见 B-2：唯一办法是越界探针，会闪一帧，不建议；除非上游公开 `scroll_size`）；(b) 中-大（要自建 `Scrollbar` 元素 + 包装 `ScrollbarHandle`，约 40-60 行） |
-| 3 | 预览**不渲染数学公式**（原版 KaTeX；gpui 对未认领公式回落原文、块级公式当代码块） | 原版 `MarkdownWorkbench.vue:4,47`；gpui `text/format/markdown.rs:869-880,1056-1060` | 大（需要 KaTeX 等价排版；框架只给了 inline plugin 钩子） |
-| 4 | 预览**渲染语义差异**：原版 `breaks:true`（单换行成 `<br>`）/`linkify`/`typographer`/`html:false`，gpui 是标准 CommonMark 且会渲染内联 HTML | 原版 `MarkdownWorkbench.vue:41-46`；gpui `text/format/markdown.rs:1063-1068` | 中（写 soft-break / html 的 plugin，改用 `TextView::markdown_extensions`） |
+| 3 | 预览**不渲染数学公式**（原版 KaTeX；gpui 对未认领公式回落原文、块级公式当代码块） | 原版 `MarkdownWorkbench.vue:4,47`；gpui `text/format/markdown.rs:869-880,1056-1060` | 大（需要 KaTeX 等价排版；框架只给了 inline plugin 钩子）。**另起一轮**（需 KaTeX 等价排版/位图管线），本轮不动 |
 
 > 另有两条**归入 ➖ 的「视觉细节」行**、未计入 ⚠️：预览标题配色未逐字对齐原版硬编码色（h2 `#f5d76e` / h3 `#8fd6ff` / h4 `#b9c5dd`，`MarkdownWorkbench.vue:503-519`，跟随 GPUI Kit 主题）；第一步预览区没有可见滚动条滑块（原版 WebView 的 `overflow-y: auto`）。
 
@@ -286,7 +287,7 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 
 | # | 项 | 依据 / 原因 |
 |---|---|---|
-| 1 | 第三步 Ctrl+S / Esc（WorkflowView 的 window 级 keydown） | `WorkflowView.vue:377-391`：原版是全局 window 监听；原生按 README 规矩 6 用页面 `track_focus`（parity.md 第 140 行已记为有意改进），属第三步审计 |
+| 1 | 第三步 Ctrl+S / Esc（WorkflowView 的 window 级 keydown） | `WorkflowView.vue:377-391`：原版是全局 window 监听；原生按 README 规矩 6 用页面 `track_focus`（parity.md 第 143 行已记为有意改进），属第三步审计 |
 | 2 | 演示覆盖层 / PDF 导出对话框 | `WorkflowView.vue:553-562`、`:78-90`；present.rs / export.rs 是别人的范围 |
 | 3 | 工作流页的确认对话框 / 轻提示 | 那四个文件里既没有 `window.confirm`，也没有 `alert` 或 toast 调用（候选 0 命中） |
 | 4 | 拖入文稿的扩展名过滤（原生比原版**严**） | 原版 `Step1Prepare.vue:222-234` 不校验扩展名（任何文件当文本读）；原生 `step1.rs:67-69,865-870` 只认 `.md`/`.txt`——有意收紧，避免二进制进编辑器 |
@@ -294,7 +295,8 @@ parity.md 第 104 行「图表围栏的校验提示 ⬜ `input.rs` 的解析报�
 | 6 | `repairSlide` | `stores/generation.ts:356-360`；全仓库无调用方（检索 `repairSlide` 只命中定义本身） |
 | 7 | `completedSlides` | `stores/generation.ts:95,175,192,245,271,288,314,369,390`；界面无消费者（只有 store 内部读写） |
 | 8 | `progress` / `lastError` 的界面消费 | `stores/generation.ts:93,97`；检索 `gen.progress` / `lastError` 在界面侧 0 命中 |
-| 9 | 各节末尾的「视觉细节」行 | 共 5 行：框架（`WorkflowView.vue:598-606,689-759` 等）、第一步（`Step1Prepare.vue` 顶栏/工具行/素材卡样式）、编辑器预览（`MarkdownWorkbench.vue:449-519,117-179`）、store 无、media composable 无 | 阴影/渐变/动画/字号/宽度，逐条对齐无意义 |
+| 9 | 预览**渲染语义差异**：原版 `breaks:true`（单换行成 `<br>`）/`linkify`/`typographer`/`html:false`，gpui 是标准 CommonMark 且会渲染内联 HTML | 表现层，按 GPUI 原生做法（原版 `MarkdownWorkbench.vue:41-46`；gpui `text/format/markdown.rs:1063-1068`；`TextView` 自带 CommonMark 行为即可）。第十五轮由 ⚠️ 改判 |
+| 10 | 各节末尾的「视觉细节」行 | 共 5 行：框架（`WorkflowView.vue:598-606,689-759` 等）、第一步（`Step1Prepare.vue` 顶栏/工具行/素材卡样式）、编辑器预览（`MarkdownWorkbench.vue:449-519,117-179`）、store 无、media composable 无 | 阴影/渐变/动画/字号/宽度，逐条对齐无意义 |
 
 ---
 
