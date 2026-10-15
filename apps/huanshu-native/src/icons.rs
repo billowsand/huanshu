@@ -13,6 +13,9 @@ use gpui_kit::{AssetSource, SharedString};
 
 /// 原版 `BrandMark.vue` 的 SVG（同一份路径与渐变）。`widgets::brand_mark` 用 `img("brand/mark.svg")` 显示。
 static BRAND_MARK: &[u8] = include_bytes!("../assets/brand-mark.svg");
+/// 便签主题的木纹（原版 `src/themes/notes-wood.svg` 的副本，`--notes-grain`）：半透明的竖向纤维，
+/// 铺在 `--notes-backing` 底色上。`widgets::wood_grain` 用 `img("notes/wood.svg")` 显示。
+static NOTES_WOOD: &[u8] = include_bytes!("../assets/notes-wood.svg");
 
 /// 应用的资源源：`carbon/<name>.svg` 现生成，其余交给 GPUI Kit 的完整图标包。
 pub struct NativeAssets;
@@ -29,6 +32,9 @@ impl AssetSource for NativeAssets {
         }
         if path == "brand/mark.svg" {
             return Ok(Some(Cow::Borrowed(BRAND_MARK)));
+        }
+        if path == "notes/wood.svg" {
+            return Ok(Some(Cow::Borrowed(NOTES_WOOD)));
         }
         AllAssets.load(path)
     }

@@ -10,12 +10,13 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{Sizable as _, TitleBar};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    div, img, px, AnyElement, App, ClickEvent, Div, ElementId, Hsla, SharedString, Stateful, Window,
+    div, img, linear_color_stop, linear_gradient, point, px, AnyElement, App, Background,
+    BoxShadow, ClickEvent, Div, ElementId, Hsla, ObjectFit, SharedString, Stateful, Window,
 };
 use huanshu_core::themes::{self, Tone};
 
 use crate::icons::carbon;
-use crate::theme::{tokens, StudioExt as _};
+use crate::theme::{tokens, PaperLook, StudioExt as _};
 
 /// 原版 `BrandMark.vue`（同一份 SVG，见 `assets/brand-mark.svg`）。
 pub fn brand_mark(size: f32) -> impl IntoElement {
@@ -146,6 +147,52 @@ pub fn panel(cx: &App) -> Div {
         .border_1()
         .border_color(c.border)
         .rounded(px(10.0))
+}
+
+/// 便签主题的木纹桌面（原版 `--notes-grain, --notes-backing`）：铺满父元素（父元素要 `relative`），
+/// 放在最底层，上面的内容自己透明。
+pub fn wood_grain(paper: &PaperLook) -> Div {
+    div()
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
+        .overflow_hidden()
+        .bg(paper.backing)
+        .child(
+            img("notes/wood.svg")
+                .size_full()
+                .object_fit(ObjectFit::Cover),
+        )
+}
+
+/// 纸张阴影（原版 `--notes-paper-shadow: 0 1px 2px …, 0 4px 8px -5px …`）。
+pub fn paper_shadow(paper: &PaperLook) -> Vec<BoxShadow> {
+    vec![
+        BoxShadow {
+            color: paper.shadow_near,
+            offset: point(px(0.0), px(1.0)),
+            blur_radius: px(2.0),
+            spread_radius: px(0.0),
+            inset: false,
+        },
+        BoxShadow {
+            color: paper.shadow_far,
+            offset: point(px(0.0), px(4.0)),
+            blur_radius: px(8.0),
+            spread_radius: px(-5.0),
+            inset: false,
+        },
+    ]
+}
+
+/// 稿纸上的表头条（原版便签主题 `.prepare-tools` / `.prepare-topbar` 的纸色渐变）。
+pub fn paper_bar(paper: &PaperLook) -> Background {
+    linear_gradient(
+        180.0,
+        linear_color_stop(paper.bar_top, 0.0),
+        linear_color_stop(paper.bar_bottom, 1.0),
+    )
 }
 
 /// 小节标题（原版各处的 `.section-label` / `.sdp-label`：小号、弱化色）。

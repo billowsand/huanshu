@@ -7,7 +7,10 @@
 //! 同时把 token 写进 GPUI Kit 的 `Theme`，这样它自带的组件（按钮、输入框、对话框、
 //! 滚动条、轻提示）也是同一套颜色，不会出现「组件一套、页面一套」。
 
+pub mod editor;
 pub mod tokens;
+
+pub use editor::{EditorLook, PaperLook};
 
 use gpui_kit::component::{Theme, ThemeMode};
 use gpui_kit::{px, rgba, App, Global, Hsla, SharedString, Window};
@@ -75,6 +78,10 @@ pub struct Studio {
     pub colors: StudioColors,
     /// 「设置 → 外观与字体」的「界面」字体（原版 `--font-interface`）。
     pub interface_font: SharedString,
+    /// 第一步 Markdown 编辑器的字体、行高与稿纸横线（`editor.rs`）。
+    pub editor: EditorLook,
+    /// 稿纸主题的纸张与木纹桌面（只有便签主题有，对应原版 `notes*.css` 与 Typst 的 `deco` 开关）。
+    pub paper: Option<PaperLook>,
 }
 
 impl Global for Studio {}
@@ -132,7 +139,8 @@ pub fn apply(
     k.input = colors.border;
     k.ring = colors.primary_border;
     k.caret = colors.primary;
-    k.selection = colors.primary_bg;
+    // 选区单独配（原版 `.cm-selectionBackground`）：`primary_bg` 在纸色上几乎看不出来。
+    k.selection = editor::selection(theme.id);
     k.muted = colors.surface;
     k.muted_foreground = colors.muted;
     k.accent = colors.surface;
@@ -184,10 +192,16 @@ pub fn apply(
     // 组件实际读的是由颜色派生的 `tokens`（按钮、输入框的语义色），改完颜色要重新派生一次，
     // 否则主按钮还是 GPUI Kit 默认的白底。
     kit.tokens = gpui_kit::component::ThemeTokens::from(&kit.colors);
+    // 编辑器的底色、当前行、行号栏与语法高亮：不设就是 GPUI Kit 的默认主题（白底蓝标题）。
+    // 必须在 `Theme::change` 之后写，它会把高亮主题重置成默认的明 / 暗。
+    kit.highlight_theme = editor::highlight_theme(theme.id, theme.tone.is_dark());
 
+    let (editor, paper) = editor::look(theme.id, cx);
     cx.set_global(Studio {
         theme,
         colors,
         interface_font: font,
+        editor,
+        paper,
     });
 }

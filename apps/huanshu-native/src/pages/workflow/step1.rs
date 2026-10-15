@@ -12,8 +12,8 @@ use gpui_kit::component::text::TextView;
 use gpui_kit::component::Disableable as _;
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    div, img, point, px, Context, Entity, ExternalPaths, Render, ScrollHandle, SharedString,
-    Subscription, WeakEntity, Window,
+    canvas, div, fill, img, point, px, size, Bounds, Context, Entity, ExternalPaths, Hsla, Render,
+    ScrollHandle, SharedString, Subscription, WeakEntity, Window,
 };
 use huanshu_core::markdown_tools::{self, Granularity, HeadingNumberStyle};
 use huanshu_core::services::projects::Step1ProjectMeta;
@@ -629,6 +629,50 @@ impl Step1 {
     }
 }
 
+/// 稿纸横线（便签主题，锤子便签式）：盖在编辑器上面、贯通全宽（含行号栏），每个显示行的底边一条。
+///
+/// 画在编辑器**之后**：编辑器在自己的 paint 里才落定本帧的滚动偏移（光标自动滚动），先画会慢一帧。
+/// `input_bounds` 是去掉内边距后的文字区（窗口坐标），第一行的顶 = 它的顶 + 滚动偏移；
+/// soft-wrap 的折行也是一行一个行高，所以按行高等距画就与文字行对齐。canvas 不注册命中区域，
+/// 点击、滚轮照常落到编辑器上。
+fn ruled_lines(editor: Entity<EditorState>, rule: Hsla) -> impl IntoElement {
+    canvas(
+        |_, _, _| (),
+        move |bounds, _, window, cx| {
+            let state = editor.read(cx);
+            let Some(line_height) = state.line_height() else {
+                return;
+            };
+            let input = state.input_bounds();
+            if line_height <= px(4.0) || input.size.height <= px(0.0) {
+                return;
+            }
+            let first_row_top = input.origin.y + state.scroll_offset().y;
+            // 从视口上方最近的一条线开始，免得长文稿滚到底时从第一行一路数下来。
+            let skipped = ((bounds.top() - first_row_top) / line_height)
+                .floor()
+                .max(0.0);
+            let mut y = first_row_top + line_height * (skipped + 1.0);
+            while y < bounds.bottom() {
+                if y > bounds.top() {
+                    window.paint_quad(fill(
+                        Bounds::new(
+                            point(bounds.left(), y - px(1.0)),
+                            size(bounds.size.width, px(1.0)),
+                        ),
+                        rule,
+                    ));
+                }
+                y += line_height;
+            }
+        },
+    )
+    .absolute()
+    .top_0()
+    .left_0()
+    .size_full()
+}
+
 impl Render for Step1 {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // 观察器攒下的名称回填：模型名与输入框不同步时用 `set_value` 对齐
@@ -642,6 +686,13 @@ impl Render for Step1 {
             }
         }
         let c = cx.studio().colors;
+        // 编辑器外观与稿纸（便签主题才有 `paper`），见 `theme/editor.rs`。
+        let look = cx.studio().editor.clone();
+        let paper = cx.studio().paper;
+        let editor_font = look
+            .font
+            .clone()
+            .unwrap_or_else(|| widgets::code_font(&self.handle));
         let model = self.model.read(cx);
         let md = model.md_content.clone();
         let chars = model.md_len();
@@ -694,6 +745,7 @@ impl Render for Step1 {
             .items_center()
             .gap(px(14.0))
             .bg(c.panel)
+            .when_some(paper, |bar, p| bar.bg(widgets::paper_bar(&p)))
             .border_b_1()
             .border_color(c.border)
             .child(
@@ -760,6 +812,7 @@ impl Render for Step1 {
             .flex_row()
             .items_center()
             .gap(px(4.0))
+            .when_some(paper, |row, p| row.bg(widgets::paper_bar(&p)))
             .border_b_1()
             .border_color(c.border)
             .child(
@@ -805,6 +858,8 @@ impl Render for Step1 {
                 .gap(px(6.0))
                 .text_size(px(12.5))
                 .text_color(c.muted)
+                // 便签主题：原版 `.md-pane-label { background: var(--studio-panel-2) }`。
+                .when(paper.is_some(), |head| head.bg(c.panel_2))
                 .border_b_1()
                 .border_color(c.border)
                 .child(carbon(icon))
@@ -814,7 +869,70 @@ impl Render for Step1 {
         // 预览页卡片（原版 `MarkdownWorkbench.vue` 的 `md-preview-slide`）：
         // 空文稿也是一张「P1」卡片 + 空态文案；否则按粒度切页，每页 `TextView::markdown`
         // （挂上公式扩展：`$…$` / `$$…$$` 由 `formulas.rs` 出图）。
+        let preview_body = |index: usize, content: Option<String>| match content {
+            Some(chunk) => div()
+                .p(px(18.0))
+                .child(
+                    TextView::markdown(("md-preview", index), chunk)
+                        .markdown_extensions(md_extensions.clone()),
+                )
+                .into_any_element(),
+            None => div()
+                .p(px(18.0))
+                .text_size(px(13.0))
+                .text_color(c.muted)
+                .child("预览区将实时显示 Markdown 渲染效果")
+                .into_any_element(),
+        };
+        // 便签主题：锤子便签列表里的一张便签——卡片纸、细纸边、纸张阴影、左侧页边色带，
+        // 页码放在顶上的信息行（便签的日期行），下面一条细线再接正文。
+        const NOTE_MARGIN: f32 = 26.0;
+        let note_card = |p: crate::theme::PaperLook, index: usize, content: Option<String>| {
+            div()
+                .relative()
+                .flex_none()
+                .rounded(px(2.0))
+                .border_1()
+                .border_color(p.edge)
+                .bg(p.card)
+                .shadow(widgets::paper_shadow(&p))
+                .overflow_hidden()
+                .child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .bottom_0()
+                        .w(px(NOTE_MARGIN))
+                        .bg(p.margin)
+                        .border_r_1()
+                        .border_color(p.margin_line),
+                )
+                .child(
+                    div()
+                        .ml(px(NOTE_MARGIN))
+                        .h(px(30.0))
+                        .px(px(14.0))
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .border_b_1()
+                        .border_color(p.edge)
+                        .text_size(px(12.0))
+                        .text_color(c.muted)
+                        .child(format!("P{}", index + 1)),
+                )
+                .child(
+                    div()
+                        .ml(px(NOTE_MARGIN))
+                        .text_color(p.ink)
+                        .child(preview_body(index, content)),
+                )
+        };
         let preview_card = |index: usize, content: Option<String>| {
+            if let Some(p) = paper {
+                return note_card(p, index, content).into_any_element();
+            }
             div()
                 .relative()
                 .rounded(px(14.0))
@@ -836,24 +954,11 @@ impl Render for Step1 {
                         .text_color(c.muted)
                         .child(format!("P{}", index + 1)),
                 )
-                .child(match content {
-                    Some(chunk) => div()
-                        .p(px(18.0))
-                        .child(
-                            TextView::markdown(("md-preview", index), chunk)
-                                .markdown_extensions(md_extensions.clone()),
-                        )
-                        .into_any_element(),
-                    None => div()
-                        .p(px(18.0))
-                        .text_size(px(13.0))
-                        .text_color(c.muted)
-                        .child("预览区将实时显示 Markdown 渲染效果")
-                        .into_any_element(),
-                })
+                .child(preview_body(index, content))
+                .into_any_element()
         };
         let preview_cards: Vec<gpui_kit::AnyElement> = if !has_md {
-            vec![preview_card(0, None).into_any_element()]
+            vec![preview_card(0, None)]
         } else {
             let resolved = match granularity {
                 Granularity::Auto => detected,
@@ -862,7 +967,7 @@ impl Render for Step1 {
             markdown_tools::split_preview_pages(md.trim(), resolved)
                 .into_iter()
                 .enumerate()
-                .map(|(i, chunk)| preview_card(i, Some(chunk)).into_any_element())
+                .map(|(i, chunk)| preview_card(i, Some(chunk)))
                 .collect()
         };
 
@@ -900,11 +1005,25 @@ impl Render for Step1 {
                         cx.notify();
                     }))
                     .child(pane_header("edit", "编辑"))
+                    // 编辑器不画自己的边框（原版 CodeMirror 铺满窗格）；字体、字号、行高随主题
+                    // （便签主题是宋体 15px、32px 稿纸行，其余是「代码」字体 13px、行高 1.8）。
                     .child(
                         div()
+                            .relative()
                             .flex_1()
                             .min_h_0()
-                            .child(Editor::new(&self.editor).size_full()),
+                            .when_some(look.background, |area, bg| area.bg(bg))
+                            .child(
+                                Editor::new(&self.editor)
+                                    .bordered(false)
+                                    .size_full()
+                                    .font_family(editor_font)
+                                    .text_size(px(look.text_size))
+                                    .line_height(px(look.line_height)),
+                            )
+                            .when_some(look.rule, |area, rule| {
+                                area.child(ruled_lines(self.editor.clone(), rule))
+                            }),
                     )
                     // 原版拖放悬停时的覆盖层：「释放以加载 Markdown 文件」。
                     // GPUI Kit 没有文件拖入悬停钩子，`drag_over` 恒为 false，此层暂不可达。
@@ -935,8 +1054,11 @@ impl Render for Step1 {
                     .flex_shrink(1.0)
                     .flex_basis(px(0.0))
                     .min_w(px(260.0))
+                    .relative()
                     .flex()
                     .flex_col()
+                    // 便签主题：卡片之间露出木纹桌面（原版 `--notes-grain, --notes-backing`）。
+                    .when_some(paper, |col, p| col.child(widgets::wood_grain(&p)))
                     .child(pane_header("view", "预览"))
                     .child(
                         div()

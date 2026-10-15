@@ -86,7 +86,7 @@ src/
     把 Studio 外壳的字重全拍平了，要粗体必须**选粗体字族**。原生版照做——页面里不要写
     `.font_weight(...)`（`grep -rn "FontWeight::" src` 应当没有任何匹配），强调靠**颜色**
     （`cx.studio().colors`）与**字族 / 字号**，不要靠字重。唯一的例外是 GPUI Kit 组件内部
-    改不掉的两处与主题里的语法高亮（见下）；另外原版被 `Teleport to="body"` 挪出 `#app` 的弹窗
+    改不掉的一处（见下）；另外原版被 `Teleport to="body"` 挪出 `#app` 的弹窗
     （密码、导出、字体选择、首页删除确认、第三步的版式选择）**不在** `#app *` 的范围内，原版里
     它们仍是 500/600——原生版为了统一已经拍平，属于有意偏离。
 
@@ -101,7 +101,12 @@ src/
   正文色 + 0.5pt 字号档）。**淘汰下来的公式图必须 `drop_all`**（`Step1::render` 顺路做），
   与幻灯片位图同一条规矩。定界规则用 `huanshu_core::markdown_tools`（「价格 $5 和 $10」不被吞）。
 - 代码编辑器：`EditorState::new(window, cx).language("markdown")` + `Editor::new(&state)`。
-- **GPUI Kit 里改不掉的字重**（规矩 12 的例外，共两处）：`TextView::markdown` 的表头
-  （`gpui-component` 的 `table_head` 固定 `FontWeight::BOLD`）；语法高亮里的 `emphasis.strong`（700）
-  与 `title`（600），来自 `gpui-component` 的 `theme/default-theme.json`。按钮、输入框、
-  对话框标题与标签都**没有**内置字重，跟随页面设置。
+  **编辑器的底色、当前行、行号栏与语法高亮读 `Theme.highlight_theme`**，不设就是 GPUI Kit 的
+  「Default Light / Dark」（白底蓝标题，与任何主题都不搭）。每个主题一份在 `theme/editor.rs`
+  （`theme::apply` 在 `Theme::change` 之后写入，它会重置高亮主题）；字体、字号、行高在
+  `cx.studio().editor`，便签主题另有 `cx.studio().paper`（稿纸横线、页边、木纹 `notes/wood.svg`、
+  纸张阴影），对应原版 `notes*.css` 与 Typst 的 `deco` 开关——**按 `paper.is_some()` 分支，不按主题 id**。
+  稿纸横线是盖在编辑器上的 canvas（`step1.rs::ruled_lines`），按编辑器的行高与滚动偏移对齐。
+- **GPUI Kit 里改不掉的字重**（规矩 12 的例外）：`TextView::markdown` 的表头
+  （`gpui-component` 的 `table_head` 固定 `FontWeight::BOLD`）。语法高亮的字重已由
+  `theme/editor.rs` 清掉（粗体、标题只靠颜色）。按钮、输入框、对话框标题与标签都**没有**内置字重，跟随页面设置。
