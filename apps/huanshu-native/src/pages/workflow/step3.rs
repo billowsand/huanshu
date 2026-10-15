@@ -2296,7 +2296,18 @@ impl Step3 {
             column = column.child(group);
         }
 
-        // ⑩ 保存按钮（三态）+ 保存失败行
+        // ⑩ 保存按钮不在这里：它在右栏底部的固定操作区（`render_actions`），不跟着表单滚。
+        column.into_any_element()
+    }
+
+    /// ⑩ 右栏底部**固定**的操作区：应用更改按钮（三态）+ 生成中只读提示 + 保存失败行。
+    ///
+    /// 原版把按钮放在右栏的滚动容器里，靠 `WorkflowView.vue:2061-2065` 的
+    /// `position: sticky; bottom: 0` 吸底（模板 `Step3Editor.vue:1220`）；GPUI 没有 sticky，
+    /// 原生按自己的做法把右栏拆成「可滚动的表单区 + 固定在栏底的操作区」，长表单下按钮
+    /// 始终可见；短表单时操作区落在栏底（不模拟原版「按钮紧跟内容」）。
+    fn render_actions(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let locked = self.editing_locked(cx);
         let saving = self.saving(cx);
         let unsaved = self.has_unsaved;
         let (label, icon) = if saving {
@@ -2307,26 +2318,27 @@ impl Step3 {
             ("已保存", "checkmark")
         };
         // 原版 `.ej-save-btn` 是右栏里撑满整行的块级按钮；有 JSON 错误时禁用。
-        let mut save_group = div()
-            .flex()
-            .flex_col()
-            .gap(px(6.0))
-            .child(
-                widgets::primary_button("apply-changes", label)
-                    .icon(carbon(icon))
-                    .w_full()
-                    .disabled(saving || !unsaved || locked || !self.json_error.is_empty())
-                    .on_click(cx.listener(|this, _event, window, cx| this.apply(window, cx))),
-            )
-            .when(locked, |group| {
-                group.child(hint_text("生成进行中，完成后可编辑", cx))
-            });
-        if let Some(error) = self.save_error(cx) {
-            save_group = save_group.child(error_row(&error, cx));
+        let mut actions = div().flex().flex_col().gap(px(6.0)).child(
+            widgets::primary_button("apply-changes", label)
+                .icon(carbon(icon))
+                .w_full()
+                .disabled(saving || !unsaved || locked || !self.json_error.is_empty())
+                .on_click(cx.listener(|this, _event, window, cx| this.apply(window, cx))),
+        );
+        if locked {
+            actions = actions.child(hint_text("生成进行中，完成后可编辑", cx));
         }
-        column = column.child(save_group);
-
-        column.into_any_element()
+        if let Some(error) = self.save_error(cx) {
+            actions = actions.child(error_row(&error, cx));
+        }
+        // 左右内边距与表单区（`#editor-panel` 的 `p(12)`）对齐，按钮才与表单同宽。
+        div()
+            .flex_none()
+            .px(px(12.0))
+            .pt(px(6.0))
+            .pb(px(12.0))
+            .child(actions)
+            .into_any_element()
     }
 
     /// 左栏一行（原版 `.edit-slide-row`）。
@@ -3021,7 +3033,7 @@ impl Render for Step3 {
 
         // ── 右栏（表单） ──
         let (up_weak, down_weak, del_weak) = (cx.weak_entity(), cx.weak_entity(), cx.weak_entity());
-        let panel = div()
+        let mut panel = div()
             .flex_none()
             .w(px(PANEL_W))
             .h_full()
@@ -3074,6 +3086,10 @@ impl Render for Step3 {
                     .p(px(12.0))
                     .child(self.render_form(window, cx)),
             );
+        // 操作区固定在栏底，不参与上面那块滚动（没有草稿＝这一页没内容时不画）。
+        if self.draft.is_some() {
+            panel = panel.child(self.render_actions(cx));
+        }
 
         div()
             .id("step3")
