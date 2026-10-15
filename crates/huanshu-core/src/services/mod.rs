@@ -9,5 +9,6 @@ pub mod export;
 pub mod generation;
 pub mod media;
 pub mod projects;
+pub mod seed;
 pub mod settings;
 pub mod storage;

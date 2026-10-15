@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 
-use huanshu_core::services::{media, projects};
+use huanshu_core::services::{media, projects, seed};
 use huanshu_core::state::{storage_paths, SharedState, StoragePaths};
 use huanshu_core::types::AspectRatio;
 
@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     let paths = guard_target(&home, force)?;
     // 素材导入要调多模态模型（会 await），因此整个播种跑在一个 tokio 运行时里。
     let runtime = tokio::runtime::Runtime::new()?;
-    runtime.block_on(seed(paths))
+    runtime.block_on(seed_all(paths))
 }
 
 /// 拒绝会写到用户真实数据上的目标目录，并在需要时清空旧沙箱。
@@ -102,7 +102,7 @@ fn fixture(relative: &str) -> Result<Vec<Value>> {
     serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))
 }
 
-async fn seed(paths: StoragePaths) -> Result<()> {
+async fn seed_all(paths: StoragePaths) -> Result<()> {
     // 让本进程自己就落在沙箱里：`AppState::load()` 读 `HUANSHU_HOME`。
     let home = paths
         .bootstrap
@@ -131,7 +131,7 @@ async fn seed(paths: StoragePaths) -> Result<()> {
     let mapping = seed_images(&state, images_id).await?;
     let image_slides = spotlight_with_library_ids(&mapping)?;
 
-    let created = vec![
+    let mut created = vec![
         seed_project(
             &state,
             "全部版式 16:9",
@@ -186,9 +186,31 @@ async fn seed(paths: StoragePaths) -> Result<()> {
             )?,
         ),
     ];
+
+    // 第二步「AI 生成」的两个演示项目：一次以 error 结束的运行，以及一副 60 页的长牌组。
+    let generation_demo = seed::seed_generation_demo(&state)
+        .map_err(|e| anyhow::anyhow!("{}: {e}", seed::GENERATION_DEMO_PROJECT))?;
+    let long_deck = seed::seed_long_deck(&state, &layouts)
+        .map_err(|e| anyhow::anyhow!("{}: {e}", seed::LONG_DECK_PROJECT))?;
+    created.push((
+        generation_demo.name.clone(),
+        generation_demo.id,
+        generation_demo.pages,
+    ));
+    created.push((long_deck.name.clone(), long_deck.id, long_deck.pages));
+
     println!("\n{:<4} {:<16} {}", "id", "name", "slides");
     for (name, id, pages) in created {
         println!("{id:<4} {name:<16} {pages}");
+    }
+    if let Some(run) = &generation_demo.run {
+        println!(
+            "\n{}：run #{} 状态 error，日志 {} 条，第 {} 页生成失败（牌组里是兜底蓝图）",
+            generation_demo.name,
+            run.id,
+            run.logs,
+            run.failed_page + 1
+        );
     }
     Ok(())
 }

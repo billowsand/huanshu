@@ -841,7 +841,7 @@ fn content_page_of(deck_index: usize, deck_len: usize) -> Option<usize> {
 }
 
 /// Validation messages of the assembled deck, grouped by content page.
-fn invalid_content_pages(
+pub(crate) fn invalid_content_pages(
     issues: &[crate::validate::ValidationIssue],
     deck_len: usize,
 ) -> std::collections::BTreeMap<usize, Vec<String>> {
@@ -892,7 +892,7 @@ fn report_invalid_pages(
 
 /// Human-readable account of what still blocks the deck: retryable content pages, and
 /// problems on cover/overview/closing that a page retry cannot fix.
-fn describe_deck_issues(
+pub(crate) fn describe_deck_issues(
     pages: &[usize],
     issues: &[crate::validate::ValidationIssue],
     deck_len: usize,
