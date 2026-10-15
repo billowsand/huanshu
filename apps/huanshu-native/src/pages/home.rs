@@ -524,8 +524,9 @@ impl Render for HomePage {
                         div()
                             .relative()
                             // 原版 `.theme-anchor` 的 `@click.stop`（`HomeView.vue:181`）：
-                            // 浮层里的点击不再往上冒泡，否则根节点的「点空白关浮层」会在
-                            // mouse down 时先把浮层拆掉，主题圆点就点不到了。
+                            // 按钮上的点击不再往上冒泡，否则根节点的「点空白关浮层」会先关掉、
+                            // 按钮的 click 又把它打开。浮层是绝对定位的，不在锚点的命中范围里，
+                            // 所以浮层自己也要拦一次（见下）。
                             .on_mouse_down(gpui_kit::MouseButton::Left, |_event, _window, cx| {
                                 cx.stop_propagation()
                             })
@@ -546,6 +547,14 @@ impl Render for HomePage {
                                         .right_0()
                                         .p(px(10.0))
                                         .shadow_lg()
+                                        // GPUI 里绝对定位的子元素不撑大父元素的边界，锚点的
+                                        // mouse down 收不到浮层里的点击：根节点会在 mouse down
+                                        // 时先拆掉浮层，圆点的 click（要等 mouse up）就落空了。
+                                        .occlude()
+                                        .on_mouse_down(
+                                            gpui_kit::MouseButton::Left,
+                                            |_event, _window, cx| cx.stop_propagation(),
+                                        )
                                         .child(
                                             // 原版 `ThemeToggle.vue` 的「主题」标签（`:29-30`）。
                                             div()
