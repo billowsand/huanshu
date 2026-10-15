@@ -133,12 +133,12 @@
 | 新建 / 删除 / 上下移动幻灯片 | ✅ | 「新建幻灯片」：徽章 18→19、`4 / 19`，**DB 仍 18 页**（新建只改内存，照原版）；新页章节号继承上一页——第 5 页（`section='02'`）之后新建得到 `'02'`，封面之后新建**没有** `section`（两者都用 sqlite 验过，测完还原）；删除 / 上移**立即落库**（sqlite：18→17 页且 `feature_grid` 消失；上移后页序交换） |
 | 字段表单：简单字段（文本 / 多行 / 下拉 / 开关） | ✅ | 全按 `editor_schema` 生成：`simple_fields ∩ kind.fields`、两列网格（`textarea` 占整行、`rows` 缺省 3）、`select` 未选中时显示「请选择」（= 空串，可清除）、`boolean` 是自带标签的勾选框（`Checkbox`）；表单表由 `tests/editor_schema.rs` 对着快照锁定 |
 | 列表区、嵌套列表、对象区 | ✅ | 18 个版式逐页走查（`tools/drive.ps1` 逐页截图 + 联系表；联系表是未提交的临时产物）+ compare / swot / process 全分辨率逐项核对：区标题 / `empty_text`（删空「列表项」→「还没有列表项」）/ 每项卡片「{label} {n}」+ 上移下移删除 / `string_lists` / `nested_lists`（process 的「阶段步骤」）/ `object_sections`（compare 的左右方案、swot 的四象限）/ `issue_stack` 的 cards 提示按张数二选一（逐字）；`icon_query_keys` 有值的卡片留「图标助手」占位 |
-| 图标推荐 | ⬜ | 卡片里留 `widgets::todo_block`（下一轮）；`iconQueryKeys` 的取词范围已显示在占位里 |
-| 素材插图（主图、图集） | ⬜ | 主图 / 图集的**文本输入与增删**已做（`image`、`images`，占位「media:12 或 https://...」）；素材条（缩略图、设为主图、加入图集）留 `widgets::todo_block`（下一轮，`setPrimaryImage` / `appendGalleryImage`） |
-| 图表 JSON 框（防抖校验、失焦立即校验、只写回通过的） | ⬜ | `chart_focus` 页留 `widgets::todo_block`（下一轮，`chart_check::chart_problems_json`） |
-| 高级 JSON 模式（格式化、语义错误、插入素材引用） | ⬜ | 「打开高级 JSON / 收起高级 JSON」可展开，内容是 `widgets::todo_block`（下一轮） |
+| 图标推荐 | ✅ | 查询词 = 卡片 `icon_query_keys` 各字段值 trim 后空格连接（空不发）；`recommend_icons_for_query(query, 6)`，第一个候选直接写进 `{卡片路径}.icon`，候选小片（预览 + 名字）点击可换；「推荐中…」按钮禁用，按页 + 表单代次 + seq 作废迟到结果；实测（project:2，`target/drive/icon01~icon06`）：候选出现、预览图标随草稿变、未应用不落库；无向量库时走 core 本地关键词兜底（与原版同一份兜底，不会失败卡住） |
+| 素材插图（主图、图集） | ✅ | 显示条件照原版（kind 的 fields 含 `images` 或当前页 `image` 非空）；素材条 = 项目 `image` 素材小卡（缩略图同 step1 `media_thumb`、名字、**「设为主图」→ `image`**、**「加入图集」→ 追加 `images` 且去重**）；实测（project:1，`target/drive/g1~g5`）：重复加入不重复、设为主图预览更新、应用后 sqlite 只读核对 `image`/`images` 正确 |
+| 图表 JSON 框（防抖校验、失焦立即校验、只写回通过的） | ✅ | 框 = 草稿 `chart` 两空格缩进 JSON，有焦点不被草稿覆盖、换页/换版式重置；语法错立即「JSON 语法错误：{原因}」，合法 150ms 防抖 `chart_problems_json` + `message_zh`（「；」连接多条），**只写回通过校验的 JSON**（未通过预览保持上一次合法图表）；失焦立即校验还在等待的输入；等待时「正在校验…」，否则「type / data / encoding / series，校验通过才会应用到预览」；实测 a–d 全过（project:5，`target/drive/j01~j05`，含粘贴后立即失焦仍生效） |
+| 高级 JSON 模式（格式化、语义错误） | ✅ | 「高级 Blueprint JSON」段：`json_text` 随表单改动/换页/换版式/应用刷新（`filter_slide_json` 两空格缩进）；框内输入解析成功 → 草稿=解析结果**不过滤**、重建表单，失败 → 「第 N 行：{原因}」、草稿不动；**应用写回 `json_text` 解析出来的那一页**（手加字段应用后仍在，sqlite 实测）；有语法错应用禁用、Ctrl+S 无效；「格式化」能解析才规整；行号代码编辑器、Tab 插两个空格；语义错误（无语法错时显示，`warning` 图标）= core `slide_edit::semantic_errors`，图表语义错误 150ms 防抖只认最新；原版「插入素材引用」模板里没有触发入口，未做；实测 a–f 全过（project:2，`target/drive/adv02~adv12`） |
 | 应用更改（`Ctrl+S`）与未保存标记 | ✅ | 三态逐字：`保存中…`（`renew`）/ `应用更改 (Ctrl+S)`（`save`）/ `已保存`（`checkmark`），保存失败时按钮下方是 `.ej-error` 样式的错误行；**Ctrl+S 在第三步任何位置都生效**（有意改进：原版只在高级 JSON 框里）；实测 sqlite 前后：`Auto Slidev Layout Blueprint Test Deck` → `… LOOP4`，杀进程重进项目仍是新值；`filter_slide_json` 的有意修改保住 `aspect_ratio`（32:9 项目改封面并应用后该页仍是 `ratio_32x9`，第 2 步看板卡片仍是 32:9） |
-| 生成中只读 | ✅ | **有意偏离**：`WorkflowPage::editing_locked` 为真时应用 / 新建 / 删除 / 移动 / 换版式与全部输入框禁用，保存按钮旁显示「生成进行中，完成后可编辑」（原版没挡，它遇到生成中的空位会出错） |
+| 生成中只读 | ✅ | **有意偏离**：`WorkflowPage::editing_locked` 只在**本项目**正在生成/重试（store 正持有本项目且 `busy()`）时为真——应用/新建/删除/移动/换版式与全部输入框禁用、保存按钮旁显示「生成进行中，完成后可编辑」（原版没挡）；**别的项目**在生成时本项目第三步照常可编辑（`set_deck` 写不进时模型是唯一状态，`commit_deck` 落库写本项目自己的行，不碰生成中的项目）。core 侧生成已按运行所属项目解耦（`get_generation_deck`，见 CLAUDE.md），跨项目生成不失败、不写错牌组；人工验收（需 LM Studio） |
 
 ## 演示 `PresentationOverlay.vue` → `present.rs`
 
