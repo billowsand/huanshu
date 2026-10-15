@@ -264,6 +264,9 @@ export const useGenerationStore = defineStore('generation', () => {
       })
       // After generation, load the deck the run assembled in its own project.
       const final = await loadRunDeck(runProjectId)
+      // The user opened another project meanwhile: the store describes that project now, so
+      // leave it alone (the run's deck is already saved in its own project).
+      if (activeProjectId.value !== runProjectId) return
       blueprints.value = final
       completedSlides.value = new Set(final.map((_, index) => index))
       // Keep errors visible even when the final deck contains fallback slides.
@@ -273,6 +276,7 @@ export const useGenerationStore = defineStore('generation', () => {
       progress.value = 1
       message.value = `生成完成，共 ${count} 张幻灯片`
     } catch (e: unknown) {
+      if (activeProjectId.value !== runProjectId) return
       lastError.value = String(e)
       stage.value = 'error'
       message.value = String(e)
@@ -374,6 +378,9 @@ export const useGenerationStore = defineStore('generation', () => {
   }
 
   function loadFromJson(json: string) {
+    // Another project is being shown: stop applying a running generation's events to it.
+    // `loadLatestRun` listens again when the user returns to the project that is generating.
+    stopListening()
     try {
       const parsed = JSON.parse(json) as SlideBlueprint[]
       generationVersion++

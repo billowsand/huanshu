@@ -66,7 +66,8 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
   `get_retry_layouts`、`get_generation_deck(project_id)`（运行到达过组装才返回牌组）都按运行所属项目，
   不看 `active_project_id`。原生版 `WorkflowPage::editing_locked` 也因此只在本项目生成/重试时只读；
   Tauri 侧 store 生成结束取牌组走 `get_generation_deck`（发起生成的项目；`/new` 未落库时保留
-  `get_blueprints`）。
+  `get_blueprints`）；用户已打开别的项目时（`activeProjectId` 变了）结果不写进 store，`loadFromJson` 会
+  `stopListening`，`WorkflowView` 生成后不再自己存 `gen.blueprints`（core 已落库，再存会把别的项目的牌组写进来）。
 - 演示是盖在当前页上的覆盖层（与原版一致），打开即全屏，Esc 先关全览再退出并退出全屏。
 - 主题存在 `app_settings` 的 `app_theme` 键，与 Tauri 版（WebView localStorage）暂不同步。
 - 量内存要量**本进程**：PowerShell 里的 `$PID` 是 PowerShell 自己。只读查看器阶段实测（release，5 分钟每 100ms 翻一页）工作集稳定在 385–412 MiB。

@@ -305,10 +305,8 @@ async function onStep1StartGenerate() {
     aspectRatio.value,
     projectId.value,
   )
-
-  if (gen.stage === 'done' && gen.blueprints.length > 0 && projectId.value) {
-    await projects.saveBlueprints(projectId.value, gen.blueprints)
-  }
+  // core 已把这次生成的牌组存进它所属的项目（组装时落库）。这里不要再存 `gen.blueprints`：
+  // 生成途中用户可能已打开别的项目，store 此刻描述的是那个项目，存进来会写坏本项目。
 }
 
 // ── Step navigation ────────────────────────────────────────────────────────────
