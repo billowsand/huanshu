@@ -27,8 +27,9 @@ use huanshu_core::fonts::SystemFont;
 use huanshu_core::services::{settings, storage as storage_service};
 use huanshu_core::types::{AppGlobalSettings, FontSettings};
 
+use crate::app::AppShared;
 use crate::icons::carbon;
-use crate::router::{Route, SettingsTab};
+use crate::router::SettingsTab;
 use crate::shell::ShellHandle;
 use crate::tasks::run_bg;
 use crate::theme::{self, StudioExt as _};
@@ -43,6 +44,20 @@ pub use appearance::FontRole;
 pub enum PreviewTab {
     Slides,
     Interface,
+}
+
+/// 读设置（原版 `loadSettings()` 的 `config.load()` + `appSettings.load()`）。
+///
+/// 失败时返回原因：`settings::read_error` 判断 `settings.json` 读不出来（启动时就没读到，
+/// 或者现在已经被改坏）——那种情况下内存里那份是默认值或已经与磁盘对不上，
+/// 不能拿来显示、更不能保存回去。
+fn read_settings(shared: &AppShared) -> Result<(LlmSettings, AppGlobalSettings), String> {
+    if let Some(error) = settings::read_error(shared) {
+        return Err(error);
+    }
+    let llm = settings::get_settings(shared)?;
+    let app_settings = storage_service::get_app_settings(shared)?;
+    Ok((llm, app_settings))
 }
 
 /// 原版分区说明（`sections[].desc`，逐字）。
@@ -97,6 +112,10 @@ pub struct SettingsPage {
     initializing_embeddings: bool,
     embedding_message: String,
 
+    /// 读设置失败的原因（原版 `!ready`）：为 `Some` 时整页只显示
+    /// 「设置加载失败，请重试。」+「重新加载」，并且**不许保存**（保存按钮禁用 + `save` 里再挡一次）。
+    load_error: Option<String>,
+
     focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
@@ -111,8 +130,16 @@ impl SettingsPage {
         let shared = handle.shared();
         let saved =
             settings::get_app_theme(shared).unwrap_or_else(|_| cx.studio().theme.id.to_string());
-        let llm = settings::get_settings(shared).unwrap_or_default();
-        let app_settings = storage_service::get_app_settings(shared).unwrap_or_default();
+        // 读失败不再静默回落默认值：记下原因，页面进失败态（提示 + 重新加载，不许保存）。
+        // 失败时表单先按默认值建出来，反正那一态没有任何分区会渲染。
+        let (llm, app_settings, load_error) = match read_settings(shared) {
+            Ok((llm, app_settings)) => (llm, app_settings, None),
+            Err(error) => (
+                LlmSettings::default(),
+                AppGlobalSettings::default(),
+                Some(error),
+            ),
+        };
         let fonts = appearance::normalize_fonts(&app_settings.fonts);
 
         let repair_input = cx.new(|cx| {
@@ -218,11 +245,70 @@ impl SettingsPage {
             app_settings,
             initializing_embeddings: false,
             embedding_message: String::new(),
+            load_error,
             focus,
             _subscriptions: subscriptions,
         };
         page.load_fonts(window, cx);
         page
+    }
+
+    /// 设置是否可信（原版 `ready`）：读失败过的这一页只能提示 + 重新加载，不能编辑、不能保存。
+    fn ready(&self) -> bool {
+        self.load_error.is_none()
+    }
+
+    /// 原版「重新加载」按钮：重新从磁盘读 `settings.json`，再照 [`Self::new`] 的路子铺一遍草稿。
+    ///
+    /// 成功才恢复常态（可以编辑、可以保存）；还失败就更新提示里的原因。
+    fn reload_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // 先把磁盘上的设置读回 core：这一步失败时 `read_settings` 会拿到新的失败原因。
+        let _ = settings::reload_settings(self.handle.shared());
+        match read_settings(self.handle.shared()) {
+            Ok((llm, app_settings)) => self.adopt_settings(llm, app_settings, window, cx),
+            Err(error) => {
+                self.load_error = Some(error);
+                self.save_error = None;
+                cx.notify();
+            }
+        }
+    }
+
+    /// 把刚读到的设置铺进页面：基线、三个服务表单、生成参数输入框、字体与全局设置。
+    fn adopt_settings(
+        &mut self,
+        llm: LlmSettings,
+        app_settings: AppGlobalSettings,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let fonts = appearance::normalize_fonts(&app_settings.fonts);
+        for (form, draft) in [
+            (&self.forms[0], &llm.llm),
+            (&self.forms[1], &llm.embedding),
+            (&self.forms[2], &llm.multimodal),
+        ] {
+            form.update(cx, |form, cx| form.set_draft(draft.clone(), window, cx));
+        }
+        self.repair_rounds = llm.repair_rounds;
+        self.concurrency = llm.concurrency;
+        self.repair_input.update(cx, |state, cx| {
+            state.set_value(self.repair_rounds.to_string(), window, cx)
+        });
+        self.concurrency_input.update(cx, |state, cx| {
+            state.set_value(self.concurrency.to_string(), window, cx)
+        });
+        self.baseline = llm;
+        self.fonts = fonts.clone();
+        self.fonts_baseline = fonts;
+        self.unified = false;
+        self.app_settings = app_settings;
+        self.embedding_message.clear();
+        self.load_error = None;
+        self.save_error = None;
+        self.gen_invalid = false;
+        self.just_saved = false;
+        cx.notify();
     }
 
     /// 字体枚举（DirectWrite，同步重活）走后台；照原版显示「已安装 N 种字体」。
@@ -383,8 +469,11 @@ impl SettingsPage {
     }
 
     /// 原版 `save()`：校验生成参数 → 模型配置 → 字体 → 主题。同步 core 调用（写文件，量级小）。
+    ///
+    /// 读失败过的一页不许保存（原版 `save()` 开头的 `!ready.value` 就 return）：草稿里是默认值，
+    /// 写回去会把用户原来的配置覆盖掉。按钮那边也禁用了，这里是第二道。
     fn save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.saving || !self.dirty(cx) {
+        if self.saving || !self.ready() || !self.dirty(cx) {
             return;
         }
         // 原版保存前的校验：repair 0–10 整数、concurrency 1–8 整数，失败跳到生成设置分区。
@@ -460,9 +549,11 @@ impl SettingsPage {
     }
 
     /// 「返回工作台」：有未保存更改先弹确认框（原版 `onBeforeRouteLeave` + `leavePrompt`）。
+    ///
+    /// 回的是进设置之前那条路由（原版 `goBack()`）；没读到设置时没有可保存的东西，直接走。
     fn leave(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.dirty(cx) {
-            self.handle.navigate(Route::Home, window, cx);
+        if !self.ready() || !self.dirty(cx) {
+            self.handle.leave_settings(window, cx);
             return;
         }
         let page = cx.weak_entity();
@@ -480,7 +571,7 @@ impl SettingsPage {
                             window.close_dialog(cx);
                             let _ = discard.update(cx, |page, cx| {
                                 page.revert(window, cx);
-                                page.handle.navigate(Route::Home, window, cx);
+                                page.handle.leave_settings(window, cx);
                             });
                         },
                     ))
@@ -499,7 +590,7 @@ impl SettingsPage {
                                     page.save(window, cx);
                                     // 保存成功（不再 dirty）才离开；失败留在设置页看错误。
                                     if !page.dirty(cx) {
-                                        page.handle.navigate(Route::Home, window, cx);
+                                        page.handle.leave_settings(window, cx);
                                     }
                                 });
                             }),
@@ -590,13 +681,15 @@ impl Render for SettingsPage {
                     .child(format!("v{}", env!("CARGO_PKG_VERSION"))),
             );
 
-        let section = match self.tab {
+        // 读到设置才渲染分区：失败态下草稿是默认值，显示出来会骗人（原版这里整块
+        // `<fieldset :disabled="!ready || saving">`，我们直接不画）。
+        let section: Option<gpui_kit::AnyElement> = self.ready().then(|| match self.tab {
             SettingsTab::Appearance => self.appearance(cx).into_any_element(),
             SettingsTab::Models => self.models(cx).into_any_element(),
             SettingsTab::Generation => self.generation(cx).into_any_element(),
             SettingsTab::Storage => self.storage(cx).into_any_element(),
             SettingsTab::About => self.about(cx).into_any_element(),
-        };
+        });
 
         let status = if self.saving {
             "正在保存…"
@@ -659,7 +752,8 @@ impl Render for SettingsPage {
                         "保存更改"
                     },
                 )
-                .disabled(!self.dirty(cx) || self.saving)
+                // 读失败的一页不许保存（原版 `:disabled="!dirty || !ready || saving"`）。
+                .disabled(!self.ready() || !self.dirty(cx) || self.saving)
                 .on_click(cx.listener(|page, _event, window, cx| page.save(window, cx))),
             );
 
@@ -706,7 +800,57 @@ impl Render for SettingsPage {
                                             .child(tab_description(self.tab)),
                                     ),
                             )
-                            .child(section),
+                            // 原版 `SettingsView.vue` 252-255：没读到设置时（`!ready`）
+                            // 显示「设置加载失败，请重试。」+「重新加载」。
+                            .when_some(self.load_error.clone(), |content, error| {
+                                content.child(
+                                    div()
+                                        .id("settings-load-notice")
+                                        .flex()
+                                        .flex_row()
+                                        .items_center()
+                                        .justify_between()
+                                        .gap(px(16.0))
+                                        .px(px(14.0))
+                                        .py(px(12.0))
+                                        .rounded(px(8.0))
+                                        .bg(c.surface)
+                                        .border_1()
+                                        .border_color(c.border)
+                                        .text_color(c.muted)
+                                        .child(
+                                            // 原因里带着完整路径，可能很长：让它占满并在必要时换行，
+                                            // 别把右边的按钮挤出去。
+                                            div()
+                                                .flex_1()
+                                                .min_w_0()
+                                                .flex()
+                                                .flex_col()
+                                                .gap(px(2.0))
+                                                .child(
+                                                    div()
+                                                        .text_size(px(14.0))
+                                                        .child("设置加载失败，请重试。"),
+                                                )
+                                                // 原版没有这一行，但不说清哪里坏了用户没法修。
+                                                .child(div().text_size(px(12.0)).child(error)),
+                                        )
+                                        .child(
+                                            div().flex_none().child(
+                                                widgets::ghost_button(
+                                                    "reload-settings",
+                                                    "重新加载",
+                                                )
+                                                .on_click(cx.listener(
+                                                    |page, _event, window, cx| {
+                                                        page.reload_settings(window, cx)
+                                                    },
+                                                )),
+                                            ),
+                                        ),
+                                )
+                            })
+                            .when_some(section, |content, section| content.child(section)),
                     )
                     .child(save_bar),
             )

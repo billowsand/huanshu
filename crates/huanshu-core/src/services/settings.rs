@@ -15,6 +15,25 @@ pub fn get_settings(state: &SharedState) -> Result<LlmSettings> {
     Ok(state.settings.clone())
 }
 
+/// 设置页要看的读取失败原因（`None` = 设置可信）。
+///
+/// 两种来源都算：启动时就没读出来（内存里那份是**默认值**），或者磁盘上的
+/// `settings.json` 现在读不了 / 不是合法 JSON（界面上的设置与磁盘对不上）。
+/// 两种情况都不许显示成正常设置、更不许保存回去——那是失败态，只能提示 + 重新加载。
+pub fn read_error(state: &SharedState) -> Option<String> {
+    let state = state.lock().unwrap();
+    state
+        .settings_load_error()
+        .map(str::to_string)
+        .or_else(|| state.settings_file_error())
+}
+
+/// 重新从磁盘读 `settings.json`（设置页的「重新加载」）。失败时状态里的设置不动。
+pub fn reload_settings(state: &SharedState) -> Result<LlmSettings> {
+    let mut state = state.lock().unwrap();
+    state.reload_settings().map_err(|e| e.to_string())
+}
+
 pub fn save_settings(state: &SharedState, settings: LlmSettings) -> Result<()> {
     for (name, service) in [
         ("大语言模型", &settings.llm),

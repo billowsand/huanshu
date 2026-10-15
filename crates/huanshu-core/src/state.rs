@@ -142,6 +142,33 @@ pub fn save_bootstrap_settings(settings: &AppGlobalSettings) -> Result<()> {
     Ok(())
 }
 
+/// 读 `settings.json`。返回读到的设置与失败原因（`None` = 读成功）。
+///
+/// 文件不存在是「第一次运行」，不算失败；文件存在但读不了或解析不了才是失败——
+/// 那时把设置当默认值用，但**记住原因**（[`AppState::settings_load_error`]）：
+/// 界面必须显示失败、不允许保存，否则用户会把默认值写回、覆盖掉他原来的配置。
+fn read_settings_file(path: &std::path::Path) -> (LlmSettings, Option<String>) {
+    let text = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return (LlmSettings::default(), None)
+        }
+        Err(error) => {
+            return (
+                LlmSettings::default(),
+                Some(format!("读取 {} 失败：{error}", path.display())),
+            )
+        }
+    };
+    match serde_json::from_str::<LlmSettings>(&text) {
+        Ok(settings) => (settings, None),
+        Err(error) => (
+            LlmSettings::default(),
+            Some(format!("{} 不是有效的设置文件：{error}", path.display())),
+        ),
+    }
+}
+
 /// Global application state shared across the UI layer.
 pub struct AppState {
     pub settings: LlmSettings,
@@ -153,6 +180,8 @@ pub struct AppState {
     pub project_dir: PathBuf,
     pub db: Arc<Mutex<Connection>>,
     settings_path: PathBuf,
+    /// 上次读 `settings.json` 失败的原因（`None` = 正常）。设置页据此显示失败态并禁止保存。
+    settings_load_error: Option<String>,
 }
 
 impl AppState {
@@ -213,10 +242,7 @@ impl AppState {
         std::fs::create_dir_all(&data_dir).ok();
 
         let settings_path = data_dir.join("settings.json");
-        let settings = std::fs::read_to_string(&settings_path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
+        let (settings, settings_load_error) = read_settings_file(&settings_path);
 
         let db = Arc::new(Mutex::new(
             db::open(&data_dir).expect("failed to open SQLite database"),
@@ -280,12 +306,48 @@ impl AppState {
             project_dir,
             db,
             settings_path,
+            settings_load_error,
         }
     }
 
-    pub fn persist_settings(&self) -> Result<()> {
+    /// 上次读 `settings.json` 失败的原因；`None` 表示设置是可信的。
+    ///
+    /// 界面在它为 `Some` 时**不能**把内存里的设置当成用户的配置：那是默认值。
+    pub fn settings_load_error(&self) -> Option<&str> {
+        self.settings_load_error.as_deref()
+    }
+
+    /// `settings.json` 现在还能正常读吗？只读磁盘，不改内存。
+    ///
+    /// 应用跑着的时候文件也可能被改坏（手改、别的进程）；那时内存里那份还是好的，
+    /// 但界面上的设置与磁盘已经对不上，保存回去会把磁盘那份盖掉——所以打开设置页时
+    /// 也要再确认一次。
+    pub fn settings_file_error(&self) -> Option<String> {
+        read_settings_file(&self.settings_path).1
+    }
+
+    /// 重新从磁盘读 `settings.json`（设置页的「重新加载」）。
+    ///
+    /// 失败时不改动内存里的设置（可能还有别处在用），只更新失败原因。
+    pub fn reload_settings(&mut self) -> Result<LlmSettings> {
+        match read_settings_file(&self.settings_path) {
+            (_, Some(error)) => {
+                self.settings_load_error = Some(error.clone());
+                Err(anyhow::anyhow!(error))
+            }
+            (settings, None) => {
+                self.settings = settings;
+                self.settings_load_error = None;
+                Ok(self.settings.clone())
+            }
+        }
+    }
+
+    pub fn persist_settings(&mut self) -> Result<()> {
         let json = serde_json::to_string_pretty(&self.settings)?;
         std::fs::write(&self.settings_path, json)?;
+        // 刚落盘的就是内存里这份设置，从前的读取失败已经翻篇（写失败时不会走到这里）。
+        self.settings_load_error = None;
         Ok(())
     }
 
@@ -309,6 +371,7 @@ impl AppState {
             project_dir: PathBuf::from("."),
             db: Arc::new(Mutex::new(conn)),
             settings_path: PathBuf::from("settings.json"),
+            settings_load_error: None,
         }
     }
 }
@@ -355,5 +418,61 @@ mod tests {
             storage_paths(None),
             "an empty HUANSHU_HOME is treated as unset"
         );
+    }
+
+    /// 文件不存在 = 第一次运行（不算失败）；文件在但坏了 = 失败，且必须留下原因：
+    /// 界面靠它判定「设置不可信」，否则会把默认值当成用户的配置写回去。
+    #[test]
+    fn a_corrupt_settings_file_is_a_failure_but_a_missing_one_is_not() {
+        let dir = std::env::temp_dir().join("huanshu-core-settings-read");
+        std::fs::remove_dir_all(&dir).ok();
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+
+        let (settings, error) = read_settings_file(&path);
+        assert_eq!(settings.repair_rounds, LlmSettings::default().repair_rounds);
+        assert!(error.is_none(), "{error:?}");
+
+        std::fs::write(&path, "{ this is not json").unwrap();
+        let (_, error) = read_settings_file(&path);
+        let error = error.expect("损坏的 settings.json 必须报错");
+        assert!(error.contains("settings.json"), "{error}");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// 「重新加载」：坏文件报错并记住原因，修好后能读回真实设置并清掉失败原因。
+    #[test]
+    fn reloading_settings_recovers_after_the_file_is_fixed() {
+        let dir = std::env::temp_dir().join("huanshu-core-settings-reload");
+        std::fs::remove_dir_all(&dir).ok();
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        let conn = db::open(&dir).unwrap();
+        let mut state = AppState::for_tests(conn);
+        state.settings_path = path.clone();
+
+        std::fs::write(&path, "{ broken").unwrap();
+        // 没重读过也要能看出磁盘上那份已经坏了：设置页打开时就靠这个判定失败态。
+        assert!(state.settings_file_error().is_some());
+        assert!(state.reload_settings().is_err());
+        assert!(state.settings_load_error().is_some());
+
+        let mut fixed = LlmSettings::default();
+        fixed.repair_rounds = 7;
+        std::fs::write(&path, serde_json::to_string(&fixed).unwrap()).unwrap();
+        assert!(state.settings_file_error().is_none());
+        let loaded = state.reload_settings().unwrap();
+        assert_eq!(loaded.repair_rounds, 7);
+        assert_eq!(state.settings.repair_rounds, 7);
+        assert!(state.settings_load_error().is_none());
+
+        // 保存成功也算翻篇：刚落盘的就是内存里这份设置。
+        state.settings_load_error = Some("stale".to_string());
+        state.persist_settings().unwrap();
+        assert!(state.settings_load_error().is_none());
+
+        drop(state);
+        std::fs::remove_dir_all(&dir).ok();
     }
 }
