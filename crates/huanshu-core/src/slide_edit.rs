@@ -21,6 +21,8 @@
 //! - 原版对非对象游标赋值在严格模式下会抛 `TypeError`（Vue SFC 是模块）；这里当作「不动」。
 //!   同理，原版 `getAtPath` 对字符串也能按下标取字符（`'标题'[0]`），这里不支持——编辑器的路径
 //!   都来自 `editor_schema`，不会落在字符串上。
+//! - 语义错误的**先后**可能不同：原版按对象键的插入顺序遍历，Rust 的 `serde_json::Map` 默认按键
+//!   排序（见 [`semantic_errors`]）。文案、条数与路径规则逐字一致，快照按集合比对。
 //!
 //! **有意修改**（两边一起改）：原版 `filterSlideJson` 只保留该 kind 的 `fields`，而没有一个
 //! kind 的 `fields` 含 `aspect_ratio`——应用一次更改就把这一页的比例丢了，第 2 步看板与
@@ -474,4 +476,76 @@ pub fn move_slide(deck: &[Value], index: usize, dir: i64) -> Option<DeckEdit> {
         deck,
         active: target,
     })
+}
+
+/// 原版 `Step3Editor` 的 `syncSemanticErrors`：草稿解析得动时，把不合法的 `direction`
+/// 与不合法的色调键（`tone`、`footer_tone`、`label_tone`）报出来，再补一条缺图表的
+/// `chart_focus` 页。
+///
+/// `value` 是解析后的草稿（原版 `parsedJson.value`；解析失败时调用方不会走到这里——原版
+/// 那个条件里的 `props.jsonError` 由调用方负责）。文案逐字，语义路径照 [`walk_tone`]。
+///
+/// **与 TS 的一处差异**：原版按键的**插入顺序**遍历（`Object.entries`），而 Rust 的
+/// `serde_json::Map` 默认按键排序，所以同一条草稿里多条错误的先后可能不同——快照按集合比对
+/// （见 `tests/slide_edit.rs`），文案与条数逐条一致。
+pub fn semantic_errors(schema: &EditorSchema, value: &Value) -> Vec<String> {
+    // 原版 `if (!obj || props.jsonError) return []`：解析出来的假值（`null`、`false`、
+    // `0`、`""`）一律没有错误。
+    if !is_truthy(value) {
+        return Vec::new();
+    }
+    let mut errors = Vec::new();
+    if let Some(direction) = value.get("direction").and_then(Value::as_str) {
+        if !schema
+            .direction_options
+            .iter()
+            .any(|option| option == direction)
+        {
+            errors.push(format!(
+                "direction \"{direction}\" 无效，应为 horizontal 或 vertical"
+            ));
+        }
+    }
+    walk_tone(value, "", schema, &mut errors);
+    if value.get("kind").and_then(Value::as_str) == Some("chart_focus")
+        && value.get("chart").map_or(true, Value::is_null)
+    {
+        errors.push("chart_focus 页缺少 chart（图表数据）".to_string());
+    }
+    errors
+}
+
+/// 原版 `walkTone(node, path)`：对象按键往下走、数组按下标往下走（路径写成 `[i]`），
+/// 遇到 `tone` / `footer_tone` / `label_tone` 就是叶子——值不在 `tone_options` 里就报一条，
+/// 根节点的路径是 `root`。
+fn walk_tone(node: &Value, path: &str, schema: &EditorSchema, errors: &mut Vec<String>) {
+    match node {
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                walk_tone(item, &format!("{path}[{index}]"), schema, errors);
+            }
+        }
+        Value::Object(map) => {
+            for (key, child) in map {
+                if matches!(key.as_str(), "tone" | "footer_tone" | "label_tone") {
+                    // 原版只认字符串值（`typeof value === 'string'`）。
+                    let Some(tone) = child.as_str() else {
+                        continue;
+                    };
+                    if !schema.tone_options.iter().any(|option| option == tone) {
+                        let scope = if path.is_empty() { "root" } else { path };
+                        errors.push(format!("{scope}.{key} \"{tone}\" 无效"));
+                    }
+                } else {
+                    let next = if path.is_empty() {
+                        key.clone()
+                    } else {
+                        format!("{path}.{key}")
+                    };
+                    walk_tone(child, &next, schema, errors);
+                }
+            }
+        }
+        _ => {}
+    }
 }

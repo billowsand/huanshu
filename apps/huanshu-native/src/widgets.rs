@@ -4,11 +4,13 @@
 //! 颜色一律取自 `cx.studio().colors`（见 `theme`），尺寸按原版 CSS 的逻辑像素抄。
 //! 按钮直接用 GPUI Kit 的 `Button`（它的颜色已经由 `theme::apply` 映射成 studio token）。
 
+use std::path::PathBuf;
+
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{Sizable as _, TitleBar};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    div, img, px, App, ClickEvent, Div, ElementId, Hsla, SharedString, Stateful, Window,
+    div, img, px, AnyElement, App, ClickEvent, Div, ElementId, Hsla, SharedString, Stateful, Window,
 };
 use huanshu_core::themes::{self, Tone};
 
@@ -160,39 +162,63 @@ pub fn bar_divider(cx: &App) -> Div {
     div().w(px(1.0)).h(px(18.0)).bg(cx.studio().colors.border)
 }
 
-/// **骨架占位**：框架里还没实现的区域。标题、对照的 Vue 源码位置、要实现的功能逐条列出，
-/// 后续实现时整块替换掉。颜色用警示色虚线框，截图里一眼能看出哪里还没做。
-pub fn todo_block(title: &str, vue_ref: &str, items: &[&str], cx: &App) -> Div {
+/// 素材小卡（原版 `.ej-media-strip` 里的 `.ej-media-item`：56px 宽、缩略图 + 名字 + 操作按钮）。
+///
+/// 缩略图画法同第一步 `media_thumb`（`img` 铺满一个 52×36 的圆角框）。操作按钮由调用方给
+/// （第三步是「设为主图」/「加入图集」），所以它们带着自己的点击逻辑一起传进来。
+pub fn media_tile(
+    id: impl Into<ElementId>,
+    url: &str,
+    name: &str,
+    actions: Vec<AnyElement>,
+    cx: &App,
+) -> Stateful<Div> {
     let c = cx.studio().colors;
     div()
+        .id(id)
+        .w(px(56.0))
         .flex()
         .flex_col()
-        .gap(px(4.0))
-        .p(px(12.0))
-        .rounded(px(8.0))
-        .border_1()
-        .border_dashed()
-        .border_color(c.warning_border)
-        .bg(c.warning_bg)
+        .items_center()
+        .gap(px(2.0))
+        .p(px(3.0))
+        .rounded(px(5.0))
         .child(
             div()
-                .text_size(px(12.5))
-                .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                .text_color(c.warning)
-                .child(format!("待实现 · {title}")),
+                .w(px(52.0))
+                .h(px(36.0))
+                .rounded(px(4.0))
+                .border_1()
+                .border_color(c.border)
+                .bg(c.panel)
+                .overflow_hidden()
+                .child(img(PathBuf::from(url)).size_full()),
         )
         .child(
             div()
-                .text_size(px(11.0))
+                .max_w(px(52.0))
+                .truncate()
+                .text_size(px(8.8))
                 .text_color(c.muted)
-                .child(format!("对照 {vue_ref}")),
+                .child(SharedString::from(name.to_string())),
         )
-        .children(items.iter().map(|item| {
-            div()
-                .text_size(px(11.5))
-                .text_color(c.text)
-                .child(format!("· {item}"))
-        }))
+        .children(actions)
+        .tooltip_text(SharedString::from(name.to_string()))
+}
+
+/// 「代码」角色的等宽字体（设置 → 外观与字体；第二步的调试块用的是同一套）。
+pub fn code_font(handle: &crate::shell::ShellHandle) -> SharedString {
+    let family = handle
+        .shared()
+        .lock()
+        .ok()
+        .map(|state| state.app_settings.fonts.code.clone())
+        .unwrap_or_default();
+    if family.is_empty() {
+        SharedString::from("Consolas")
+    } else {
+        SharedString::from(family)
+    }
 }
 
 /// 主题切换圆点（原版 `ThemeToggle.vue`：六个圆点，当前主题带一圈主色）。

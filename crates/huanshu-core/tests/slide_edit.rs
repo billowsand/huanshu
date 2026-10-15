@@ -25,6 +25,7 @@ struct Snapshot {
     values: Vec<ValueProbe>,
     list_ops: Vec<ListOp>,
     deck_ops: Vec<DeckOp>,
+    semantic_errors: Vec<SemanticCase>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -107,6 +108,13 @@ struct DeckOp {
 struct DeckResult {
     deck: Vec<Value>,
     active: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct SemanticCase {
+    name: String,
+    slide: Value,
+    errors: Vec<String>,
 }
 
 fn load() -> Snapshot {
@@ -311,6 +319,27 @@ fn deck_operations_match_the_original() {
             (None, Some(_)) => panic!("{}: the original changed the deck, we did not", case.name),
             (Some(_), None) => panic!("{}: we changed the deck, the original did not", case.name),
         }
+    }
+}
+
+/// 语义错误：文案与条数与原版逐字一致。
+///
+/// 比对**按集合**：原版按键的插入顺序遍历（`Object.entries`），而 Rust 的 `serde_json::Map`
+/// 默认按键排序，同一条草稿里多条错误的先后可能不同（见 `slide_edit::semantic_errors`）。
+#[test]
+fn semantic_errors_match_the_original() {
+    let snapshot = load();
+    let schema = editor_schema();
+    assert!(
+        !snapshot.semantic_errors.is_empty(),
+        "no semantic error cases"
+    );
+    for case in &snapshot.semantic_errors {
+        let mut got = edit::semantic_errors(&schema, &case.slide);
+        let mut expected = case.errors.clone();
+        got.sort();
+        expected.sort();
+        assert_eq!(got, expected, "{}", case.name);
     }
 }
 
