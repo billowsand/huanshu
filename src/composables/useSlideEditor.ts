@@ -1,3 +1,5 @@
+// 编辑规则已移植到 huanshu_core::slide_edit（crates/huanshu-core/src/slide_edit.rs），改一边必须改另一边；
+// 一致性由 crates/huanshu-core/tests/slide_edit.rs 快照守住。
 import { ref, computed, watch, nextTick } from 'vue'
 import type { SlideBlueprint, SlideKind, AspectRatio } from '../components/types'
 import { ASPECT_DIMENSIONS } from '../components/types'
@@ -74,6 +76,10 @@ export function useSlideEditor(options: {
       const v = (slide as unknown as Record<string, unknown>)[f]
       if (v !== undefined) out[f] = v
     }
+    // 有意修改（与 Rust 侧一起改）：没有一个 kind 的 fields 含 aspect_ratio，只按 fields 过滤会把
+    // 这一页的比例丢掉，第 2 步看板与 get_retry_layouts 会退回 16:9。原本有的就保留。
+    if (slide.aspect_ratio !== undefined && !fields.includes('aspect_ratio'))
+      out.aspect_ratio = slide.aspect_ratio
     return out
   }
 

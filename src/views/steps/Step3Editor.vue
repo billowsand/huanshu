@@ -1,3 +1,5 @@
+// 编辑规则已移植到 huanshu_core::slide_edit（crates/huanshu-core/src/slide_edit.rs），改一边必须改另一边；
+// 一致性由 crates/huanshu-core/tests/slide_edit.rs 快照守住。
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
