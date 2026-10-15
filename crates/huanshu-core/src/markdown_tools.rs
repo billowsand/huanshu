@@ -438,3 +438,72 @@ pub fn extract_h1(md: &str) -> Option<String> {
     re.captures(md)
         .map(|caps| caps.get(1).map(|m| m.as_str()).unwrap_or("").to_string())
 }
+
+/// 行内数学（`$...$`）的**内容**校验：内容非空、不以空白开头、不以空白结尾。
+///
+/// 这是三处定界规则的共同部分，规则逐字对齐：
+/// - PDF/幻灯片：`slide-typst/src/math.rs` 的 `rewrite_str`（`!tex.is_empty() &&
+///   !starts_with(whitespace) && !ends_with(whitespace)`）；
+/// - 生成侧：`generator/utils.rs` 的 `find_inline_math_close`；
+/// - 屏幕预览：原生界面 Markdown 插件的 `parse`（不认领违反规则的节点，
+///   框架把该段回落成普通文字，价格类文本不被吞）。
+///
+/// 原版对照：`MarkdownWorkbench.vue` 的 `@vscode/markdown-it-katex`
+/// （opening `$` 后不跟空白、closing `$` 前不是空白）。
+/// 只校验内容本身；「闭合 `$` 后不紧跟数字」见 [`inline_math_close_ok`]。
+pub fn inline_math_content_ok(content: &str) -> bool {
+    !content.is_empty()
+        && !content.starts_with(char::is_whitespace)
+        && !content.ends_with(char::is_whitespace)
+}
+
+/// 行内数学闭合 `$` 后的下一个字符是否允许：紧跟 ASCII 数字时这段不算公式
+/// （pandoc 的货币守卫，「价格 $5 和 $10」不被吞）。`None` = 文档结尾，允许。
+pub fn inline_math_close_ok(next: Option<char>) -> bool {
+    !next.is_some_and(|c| c.is_ascii_digit())
+}
+
+/// 块级数学（`$$...$$`）的内容校验：trim 后非空。对齐 `generator/utils.rs` 的
+/// `find_display_math_close` 与 `math.rs` 的 display 分支。
+pub fn display_math_content_ok(content: &str) -> bool {
+    !content.trim().is_empty()
+}
+
+#[cfg(test)]
+mod math_delimiter_tests {
+    use super::*;
+
+    #[test]
+    fn normal_inline_content_passes() {
+        assert!(inline_math_content_ok("x^2 + y^2"));
+        assert!(inline_math_content_ok("\\frac{1}{2}"));
+    }
+
+    #[test]
+    fn empty_or_whitespace_padded_content_is_declined() {
+        assert!(!inline_math_content_ok(""));
+        assert!(!inline_math_content_ok(" x"));
+        assert!(!inline_math_content_ok("x "));
+        assert!(!inline_math_content_ok(" "));
+        assert!(!inline_math_content_ok("\t"));
+    }
+
+    #[test]
+    fn closing_before_digit_is_declined() {
+        // 「价格 $5 和 $10」：闭 $ 后面紧跟数字，整段必须回落成普通文字。
+        assert!(!inline_math_close_ok(Some('1')));
+        assert!(!inline_math_close_ok(Some('0')));
+        assert!(inline_math_close_ok(Some('，')));
+        assert!(inline_math_close_ok(Some(' ')));
+        assert!(inline_math_close_ok(None));
+    }
+
+    #[test]
+    fn display_content_must_not_be_blank() {
+        assert!(display_math_content_ok("E = mc^2"));
+        assert!(display_math_content_ok("  E = mc^2  "));
+        assert!(!display_math_content_ok(""));
+        assert!(!display_math_content_ok("   "));
+        assert!(!display_math_content_ok("\n\n"));
+    }
+}
