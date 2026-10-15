@@ -76,6 +76,9 @@ foreach ($step in ($Steps -split ";")) {
             [void][Drive]::SetCursorPos($x, $y)
         }
         "key" { [void][Drive]::SetForegroundWindow($handle); $shell.SendKeys($arg) }
+        # Like key, but leaves the foreground window alone: the keystrokes go to
+        # whichever window is already focused (e.g. a native file dialog opened by the app).
+        "keynf" { $shell.SendKeys($arg) }
         # MOUSEEVENTF_WHEEL = 0x0800; the delta is in WHEEL_DELTA (120) units (negative = up).
         "wheel" {
             [void][Drive]::SetForegroundWindow($handle)
