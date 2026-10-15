@@ -21,6 +21,17 @@ fn main() {
 
     println!("cargo:rustc-link-arg-bins=/STACK:8388608");
 
+    // Static CRT, mirroring what tauri_build does for auto-slidev-studio.exe:
+    // without it the exe imports VCRUNTIME140.dll and the UCRT and needs the
+    // VC++ 2015-2022 redistributable on a clean machine. Debug keeps the
+    // dynamic CRT (libcmtd conflicts with prebuilt deps that link msvcrt).
+    let profile = std::env::var("PROFILE").unwrap_or_default();
+    if profile != "debug" {
+        println!("cargo:rustc-link-arg-bins=/DEFAULTLIB:libcmt.lib");
+        println!("cargo:rustc-link-arg-bins=/DEFAULTLIB:libvcruntime.lib");
+        println!("cargo:rustc-link-arg-bins=/DEFAULTLIB:ucrt.lib");
+    }
+
     // Shared with the Tauri bundle (`bundle.icon`); the ico carries every size Explorer,
     // alt-tab and the taskbar ask for, so no downscaling is done here.
     let icon = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
