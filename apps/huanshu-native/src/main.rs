@@ -6,6 +6,7 @@
 mod app;
 mod cli;
 mod export;
+mod generation;
 mod icons;
 mod images;
 mod pages;

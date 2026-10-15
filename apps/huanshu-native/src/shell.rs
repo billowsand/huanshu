@@ -8,6 +8,7 @@ use gpui_kit::{div, px, App, Context, Entity, Render, WeakEntity, Window};
 use huanshu_core::services::{settings, storage};
 
 use crate::app::AppShared;
+use crate::generation::GenerationStore;
 use crate::pages::home::HomePage;
 use crate::pages::settings::SettingsPage;
 use crate::pages::wizard::WizardPage;
@@ -30,6 +31,8 @@ pub struct Shell {
     route: Route,
     page: Page,
     presentation: Option<Entity<Presentation>>,
+    /// 应用级生成状态（原版 pinia 的 `generation` store）：外壳创建、比任何页面活得久。
+    generation: Entity<GenerationStore>,
     first_frame_logged: bool,
 }
 
@@ -38,11 +41,17 @@ pub struct Shell {
 pub struct ShellHandle {
     shell: WeakEntity<Shell>,
     shared: AppShared,
+    generation: Entity<GenerationStore>,
 }
 
 impl ShellHandle {
     pub fn shared(&self) -> &AppShared {
         &self.shared
+    }
+
+    /// 应用级生成状态（原版 `useGenerationStore()`）；页面观察它即可，不要自己存一份。
+    pub fn generation(&self) -> Entity<GenerationStore> {
+        self.generation.clone()
     }
 
     /// 换页（原版 `router.push`）。
@@ -110,9 +119,15 @@ impl Shell {
             (false, Some(route)) => route,
             (false, None) => Route::Home,
         };
+        // 应用级生成状态先建：它经 ShellHandle 发给页面，页面换页时不重建。
+        let generation = {
+            let shared = shared.clone();
+            cx.new(|cx| GenerationStore::new(shared, cx))
+        };
         let handle = ShellHandle {
             shell: cx.weak_entity(),
             shared: shared.clone(),
+            generation: generation.clone(),
         };
         let page = build_page(&route, handle, window, cx);
         Self {
@@ -120,6 +135,7 @@ impl Shell {
             route,
             page,
             presentation: None,
+            generation,
             first_frame_logged: false,
         }
     }
@@ -128,6 +144,7 @@ impl Shell {
         ShellHandle {
             shell: cx.weak_entity(),
             shared: self.shared.clone(),
+            generation: self.generation.clone(),
         }
     }
 

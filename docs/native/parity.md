@@ -75,11 +75,13 @@
 | 功能 | 状态 | 说明 / 依据 |
 |---|---|---|
 | 加载中 / 加载失败（返回首页） | ✅ | |
-| 侧栏：返回、项目名、三步（状态、说明、连线）、主题、设置 | ✅ | |
-| 初始步骤（生成中→2，有蓝图→3，否则→1）与可点击规则 | ✅ | `clickable` |
+| 侧栏：返回、项目名、三步（状态、说明、连线）、主题、设置 | ✅ | 第 2 步说明按 `gen` 四态（出错 / 生成中 `stageLabel` / 已生成 N 张 / 等待开始），生成中圆点里是转圈（`Spinner`）；待截图对比 |
+| 生成状态是应用级 store（离开项目 / 回首页再进，进度接着走） | ✅ | `src/generation.rs::GenerationStore`：`Shell` 创建、`ShellHandle` 发给页面，事件接收常驻在它身上（`tasks::listen_events_in`）；页面来去不影响在跑的生成（原版 pinia store 同）；`ProjectModel` 不再存生成字段 |
+| 初始步骤（生成中→2，有蓝图→3，否则→1）与可点击规则 | ✅ | `finish_open`（原版 `onMounted` 顺序在 `GenerationStore::open_project` 里）；第 3 步点击含「没有页在重试」 |
 | 项目改名（点名字编辑，回车/失焦保存，Esc 取消） | ✅ | `mod.rs::start_rename` / `save_name`（空名不保存、保持编辑态，照原版）；待截图对比 |
 | 新建项目的草稿（名称、文稿、粒度、比例）保存与恢复 | ✅ | 800ms 防抖自动保存（`WorkflowPage::schedule_autosave` / `persist_draft`，新建落库后 `retarget_route` 对准路由）；meta 存 `app_settings` 的 `project_meta:<id>`（`services::projects::Step1ProjectMeta`，单测 `step1_meta_*`）；待截图对比 |
-| 生成完成后自动跳到第 3 步 | ✅ | `on_generation_finished`：800ms 后若还在第 2 步且未失败则切（Ok 视为无失败页——页级状态跟踪下一轮）；待截图对比 |
+| 生成完成后自动跳到第 3 步 | ✅ | `sync_advance`：原版 watch 的 `[stage, retryingPages.size, 有失败页]` 变了才判断，`done` + 无重试 + 无失败页 + 停在第 2 步时 800ms 后再查一遍再跳；计时走 `window.background_executor().timer`（不是 tokio）；待截图对比 |
+| 库里停在 `running` 的旧运行（上次进程崩了） | 🟡 | **有意偏离**：原版会一直转圈；这里按「已中断」显示（`running=false`、阶段照 `slideStatus` 的非运行分支）且允许重新生成，**不改库**（`GenerationStore::apply_run`） |
 
 ## 第一步 `Step1Prepare.vue` + `MarkdownWorkbench.vue` → `workflow/step1.rs`
 
@@ -97,15 +99,15 @@
 | 分页粒度（自动推荐 / 二级 / 三级，各自页数与标题数） | ✅ | `estimate_slides` / `detect_granularity` / `count_exact_headings`；待截图对比 |
 | 幻灯片比例三选一（写回项目） | ✅ | `update_project_aspect_ratio` |
 | 素材库（添加、拖入、列表、删除） | ✅ | `services::media::{import_media_asset, delete_media_asset, get_project_media}`；新建项目先 `create_project` + `open_project`，落库后 `retarget_route` 对准路由（原版 `router.replace`）；图注编辑原版不在第一步（第三步高级 JSON）；待截图对比 |
-| 开始 AI 生成（建项目、保存文稿、切到第 2 步） | ✅ | `WorkflowPage::start_generation`：取消防抖 → 立即落库 → 切第 2 步 → `generate_slides`（granularity auto 传 None）；事件经 `listen_events` 回 WorkflowPage 层驱动模型；出错显示「生成出错」不崩；**生成流程未真机验证**（需 LM Studio） |
+| 开始 AI 生成（建项目、保存文稿、切到第 2 步） | ✅ | `WorkflowPage::start_generation`：取消防抖 → 立即落库 → 切第 2 步 → `GenerationStore::generate`（granularity auto 传 None）；「开始 AI 生成」的可用条件即原版 `canGenerate`（**全局**没有生成 / 重试在跑）；**生成流程未真机验证**（需 LM Studio） |
 | 图表围栏的校验提示 | ⬜ | `input.rs` 的解析报错 |
 
 ## 第二步 `Step2Generate.vue` + `stores/generation.ts` → `workflow/step2.rs`
 
 | 功能 | 状态 | 说明 / 依据 |
 |---|---|---|
-| 顶部状态与统计（幻灯片数 / 关键事件 / 生成记录） | 🟡 | 幻灯片数；状态三态（生成中… 阶段标签+进度文案 / 生成出错+message / 生成完成·N 张）；「关键事件」「生成记录」待做 |
-| 生成流水线与事件 | ✅ | `services::generation::generate_slides` + `tasks::listen_events`（`CoreEvent`），事件处理在 `WorkflowPage` 层（Step2 会被切来切去，不挂它身上）；看板逐页状态消费在下一轮 |
+| 顶部状态与统计（幻灯片数 / 关键事件 / 生成记录） | 🟡 | 标题四态（生成中「`{stageLabel}...`」/「生成完成 · N 张幻灯片」/「生成遇到问题」/「准备开始」）与第二行 `message` 已按原版，N 与「幻灯片」统计都用看板条目数；「关键事件」「生成记录」待做 |
+| 生成流水线与事件 | ✅ | `GenerationStore`（原版 `stores/generation.ts`，应用级、比页面活得久）+ `services::generation::generate_slides`；五类 `CoreEvent` 都在 store 里落地；逐页状态 / 日志的消费在下一步 |
 | 整体进度、五个阶段 n/N、查看详情 | ⬜ | `utils/generationProgress.ts` |
 | 看板卡片：序号、标题、状态、版式、缩略图 | 🟡 | 状态固定「已完成」；阶段标签未做 |
 | 看板只渲染可见卡片 | ⬜ | 现在整副请求；改成虚拟列表 + `wanted` |

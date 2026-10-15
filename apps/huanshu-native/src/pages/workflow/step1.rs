@@ -621,9 +621,8 @@ impl Render for Step1 {
         let estimated = model.estimated_slides();
         let has_name = !model.name.trim().is_empty();
         let has_md = !md.trim().is_empty();
-        let can_generate = model.can_generate_local();
-        let generating = model.generating;
-        // `MediaAssetResponse` 不带 Clone，渲染前把列表需要的字段拷出来。
+        // 原版 `canGenerate`：文稿与名称非空、且没有生成 / 重试在跑（全局条件，见 `store.busy`）。
+        let can_generate = model.can_generate_local(self.handle.generation().read(cx).busy());
         let media: Vec<(i64, String, String, bool, Option<i64>, Option<i64>)> = model
             .media
             .iter()
@@ -1237,9 +1236,8 @@ impl Render for Step1 {
             .child(
                 widgets::primary_button("generate", "开始 AI 生成")
                     .icon(carbon("magic-wand"))
-                    // 原版 `canGenerate`：名称、文稿非空、不在生成中（`retryingPages`
-                    // 是单页重试的状态，下一轮才有）+ `optimizing`。
-                    .disabled(!can_generate || generating || optimizing)
+                    // 原版 `canGenerate`（含「没有页在重试」与全局的生成中）+ `optimizing`。
+                    .disabled(!can_generate || optimizing)
                     .on_click(cx.listener(|this, _event, window, cx| {
                         let _ = this.page.update(cx, |page, cx| {
                             page.start_generation(window, cx);

@@ -9,8 +9,12 @@
 //!
 //! 回调里拿到的是视图的 `&mut T` 与窗口；视图已被丢弃（换页了）时回调不会执行。
 //! **异步结果回来时，项目、页面、主题都可能已经变了**：需要时自己带上「发起时的身份」比对。
+//!
+//! `*_in` 是同一套东西的**无窗口**版本（[`run_bg_in`] / [`run_async_in`] / [`listen_events_in`]）：
+//! 应用级的 `GenerationStore` 比任何页面活得久、手上没有 `Window`，用 `cx.spawn` 在实体上下文
+//! （`AsyncApp`）上跑。回调拿到的是 `&mut Context<T>`，页面用不到窗口就不要走带窗口的版本。
 
-// `run_async` / `ChannelSink` / `listen_events` 是给生成流水线与模型服务页准备的框架接口，
+// `ChannelSink` / `listen_events` 是给生成流水线与模型服务页准备的框架接口，
 // 那些页面接上之前暂时没有调用方。
 #![allow(dead_code)]
 
@@ -37,6 +41,23 @@ pub fn run_bg<T, R>(
         let _ = this.update_in(window, move |view, window, cx| {
             done(view, result, window, cx)
         });
+    })
+    .detach();
+}
+
+/// [`run_bg`] 的无窗口版本：实体上下文（应用级 store）用。
+/// 回调拿到的是 `&mut Context<T>`，没有窗口。
+pub fn run_bg_in<T, R>(
+    cx: &mut Context<T>,
+    work: impl FnOnce() -> R + Send + 'static,
+    done: impl FnOnce(&mut T, R, &mut Context<T>) + 'static,
+) where
+    T: 'static,
+    R: Send + 'static,
+{
+    cx.spawn(async move |this, cx| {
+        let result = cx.background_spawn(async move { work() }).await;
+        let _ = this.update(cx, move |view, cx| done(view, result, cx));
     })
     .detach();
 }
@@ -78,7 +99,29 @@ pub fn run_async<T, R, F>(
     .detach();
 }
 
+/// [`run_async`] 的无窗口版本：实体上下文（应用级 store）用。
+pub fn run_async_in<T, R, F>(
+    cx: &mut Context<T>,
+    future: F,
+    done: impl FnOnce(&mut T, R, &mut Context<T>) + 'static,
+) where
+    T: 'static,
+    R: Send + 'static,
+    F: Future<Output = R> + Send + 'static,
+{
+    let handle = tokio().spawn(future);
+    cx.spawn(async move |this, cx| {
+        let Ok(result) = handle.await else {
+            return;
+        };
+        let _ = this.update(cx, move |view, cx| done(view, result, cx));
+    })
+    .detach();
+}
+
 /// 把 core 的事件送进通道。交给 `services::generation::*` 的 `Arc<dyn EventSink>`。
+/// 可以克隆：应用级 store 每次发起生成 / 重试都拿一份。
+#[derive(Clone)]
 pub struct ChannelSink(pub mpsc::UnboundedSender<CoreEvent>);
 
 impl EventSink for ChannelSink {
@@ -98,6 +141,26 @@ pub fn listen_events<T: 'static>(
         while let Some(event) = receiver.next().await {
             if this
                 .update_in(window, |view, window, cx| on_event(view, event, window, cx))
+                .is_err()
+            {
+                break;
+            }
+        }
+    })
+    .detach();
+    ChannelSink(sender)
+}
+
+/// [`listen_events`] 的无窗口版本：实体上下文（应用级 store）用。
+pub fn listen_events_in<T: 'static>(
+    cx: &mut Context<T>,
+    on_event: impl Fn(&mut T, CoreEvent, &mut Context<T>) + 'static,
+) -> ChannelSink {
+    let (sender, mut receiver) = mpsc::unbounded::<CoreEvent>();
+    cx.spawn(async move |this, cx| {
+        while let Some(event) = receiver.next().await {
+            if this
+                .update(cx, |view, cx| on_event(view, event, cx))
                 .is_err()
             {
                 break;

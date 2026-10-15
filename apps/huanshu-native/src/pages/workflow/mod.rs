@@ -1,30 +1,36 @@
 //! 项目工作流（原版 `WorkflowView.vue`）：左侧边栏 + 三步内容。
 //!
-//! 数据放在一个共享实体 [`ProjectModel`] 里，三步页面都持有它、`cx.observe` 它：
+//! 项目数据放在一个共享实体 [`ProjectModel`] 里，三步页面都持有它、`cx.observe` 它：
 //! Step1 改文稿、Step2 生成、Step3 改蓝图，都改这一个模型，侧栏与其他步骤自动更新
 //! （原版是 Pinia 的 `generation` / `projects` store 加一堆 props）。
 //!
+//! **生成状态不在这里**：它是应用级的 [`GenerationStore`]（原版 pinia 的 `generation` store，
+//! 由 `Shell` 创建、经 `ShellHandle` 发给页面）。本页只观察它、按原版规则显示
+//! （侧栏说明、初始步骤、自动跳页）；`ProjectModel.deck` 跟着 store 的牌组走，第三步用它。
+//!
 //! 已实现：加载 / 加载失败、侧栏（返回、项目名与改名、三步状态与说明、主题圆点、设置）、
 //! 按原版规则选初始步骤与判断能否点击、步骤切换时交还位图、第一步草稿防抖自动保存
-//! （含新建项目落库与路由对准）、项目附加信息读写、开始 AI 生成与事件回写。
+//! （含新建项目落库与路由对准）、项目附加信息读写、生成状态显示与自动跳页。
 //! 待实现：第 2 步的整体进度 / 看板逐页状态 / 单页重试（见 step2），都在下一轮。
 
 pub mod step1;
 pub mod step2;
 pub mod step3;
 
+use gpui_kit::component::Sizable as _;
 use gpui_kit::prelude::*;
 use gpui_kit::{
     div, px, Context, Entity, Focusable as _, Render, SharedString, Subscription, Task, Window,
 };
 use huanshu_core::db::GenerationRun;
-use huanshu_core::events::CoreEvent;
 use huanshu_core::markdown_tools::{self, Granularity};
+use huanshu_core::services::generation;
 use huanshu_core::services::media::MediaAssetResponse;
+use huanshu_core::services::projects;
 use huanshu_core::services::projects::Step1ProjectMeta;
-use huanshu_core::services::{generation, projects};
 use huanshu_core::types::AspectRatio;
 
+use crate::generation::{GenState, GenerationStore};
 use crate::icons::carbon;
 use crate::router::{Route, SettingsTab, Step};
 use crate::shell::ShellHandle;
@@ -33,6 +39,10 @@ use crate::theme::StudioExt as _;
 use crate::widgets;
 
 /// 一个项目在工作流里的全部数据。三步页面共享它。
+///
+/// 生成状态（阶段、进度、逐页状态、日志）**不在这里**：它在应用级的
+/// [`GenerationStore`] 里（原版 `stores/generation.ts`），本页只读它、把牌组镜像进
+/// [`ProjectModel::deck`]。
 pub struct ProjectModel {
     /// `None` = 新建、尚未落库（原版 `/new`）。
     pub id: Option<i64>,
@@ -49,36 +59,12 @@ pub struct ProjectModel {
     /// 草稿保存失败原因（原版 `draftSaveError`，格式工具行内错误会显示）。
     pub draft_save_error: String,
     /// 牌组按**原始 JSON** 保存（与 core 的导出、预览一致；强类型往返会挡掉能渲染的牌组）。
+    /// 由 [`GenerationStore`] 的牌组镜像而来（生成 / 重试改了牌组就跟着更新，第三步用它）。
     pub deck: Vec<serde_json::Value>,
     pub aspect: AspectRatio,
+    /// 库里最近一次生成运行（原版 `loadLatestRun` 读回来的那条；store 正为**别的**项目
+    /// 跑时，界面的静态状态由它和牌组决定，见 [`GenerationStore::state_for`]）。
     pub latest_run: Option<GenerationRun>,
-    /// 生成是否在进行（原版 `gen.running`）。待 step2 接上生成流水线后由事件驱动。
-    pub generating: bool,
-    /// 最近一次生成失败（原版 `gen.stage === 'error'`）。
-    pub generation_failed: bool,
-    /// 生成阶段（原版 `gen.stage`，core 的 `GenerationEvent.stage`）。
-    pub gen_stage: String,
-    /// 最新一条进度文案（原版 `gen.message`）。
-    pub gen_message: String,
-    /// 整体进度 0–1（原版 `gen.progress`）。
-    pub gen_progress: Option<f32>,
-}
-
-/// 原版 `stores/generation.ts` 的 `STAGE_LABELS`。
-pub fn stage_label(stage: &str) -> String {
-    match stage {
-        "idle" => "等待",
-        "start" => "初始化",
-        "init" => "验证连接",
-        "page_plan" => "规划页面",
-        "generating" => "生成中",
-        "assembling" => "组装中",
-        "validate" => "校验中",
-        "done" => "完成",
-        "error" => "出错",
-        other => other,
-    }
-    .to_string()
 }
 
 /// 草稿自动保存状态（原版 `'idle' | 'saving' | 'saved' | 'error'`）。
@@ -126,10 +112,11 @@ impl ProjectModel {
         markdown_tools::estimate_slides(&self.md_content, self.granularity)
     }
 
-    /// 「开始 AI 生成」可用条件（原版 `canGenerate` 的名称、文稿、`!gen.running` 部分；
-    /// `retryingPages.size === 0` 是单页重试的状态，下一轮才有）。
-    pub fn can_generate_local(&self) -> bool {
-        !self.md_content.trim().is_empty() && !self.name.trim().is_empty() && !self.generating
+    /// 「开始 AI 生成」可用条件（原版 `canGenerate`）：文稿与名称非空，且没有生成或
+    /// 重试在跑（`gen.running` / `gen.retryingPages` 是**全应用**的条件：同一时刻只有
+    /// 一次生成，别的项目在跑时这一步也不可用）。
+    pub fn can_generate_local(&self, generation_busy: bool) -> bool {
+        !self.md_content.trim().is_empty() && !self.name.trim().is_empty() && !generation_busy
     }
 }
 
@@ -217,6 +204,8 @@ fn has_meaningful_draft(model: &ProjectModel) -> bool {
 pub struct WorkflowPage {
     handle: ShellHandle,
     model: Entity<ProjectModel>,
+    /// 应用级生成状态（原版 `gen`）。页面只读它；它比本页活得久。
+    generation: Entity<GenerationStore>,
     load: Load,
     step: Step,
     view: Option<StepView>,
@@ -233,8 +222,15 @@ pub struct WorkflowPage {
     /// 模型在观察器里变了、待 render 时排入防抖（观察器回调拿不到 window）。
     draft_dirty: bool,
     draft_fingerprint: DraftSnapshot,
-    /// 生成完成后 800ms 自动跳第 3 步的计时。
+    /// 生成完成后 800ms 自动跳第 3 步的计时（原版 watch 的 `setTimeout`；Task 被替换即取消）。
     advance_task: Option<Task<()>>,
+    /// 上一帧看到的 `[stage, retryingPages.size, 有失败页]`（原版 watch 的触发条件：
+    /// **变了才判断**要不要排计时，不是每帧都判断）。
+    advance_watch: Option<(String, usize, bool)>,
+    /// 生成状态变了、待 render 时处理（观察器回调拿不到 window）。
+    generation_dirty: bool,
+    /// 加载完成后要进的那一步（store 的回调里没有 window，render 时补上）。
+    pending_step: Option<Step>,
     /// 持有订阅即保活：字段不读，但 drop 时会退订。
     #[allow(dead_code)]
     subscriptions: Vec<Subscription>,
@@ -260,18 +256,17 @@ impl WorkflowPage {
             deck: Vec::new(),
             aspect: AspectRatio::Ratio16x9,
             latest_run: None,
-            generating: false,
-            generation_failed: false,
-            gen_stage: "idle".to_string(),
-            gen_message: String::new(),
-            gen_progress: None,
         });
+        let generation = handle.generation();
         let fingerprint = DraftSnapshot::capture(&model.read(cx));
         let rename = cx.new(|cx| {
             gpui_kit::component::input::InputState::new(window, cx).placeholder("演示名称")
         });
         let subscriptions = vec![
             cx.observe(&model, |page, _model, cx| page.on_model_changed(cx)),
+            cx.observe(&generation, |page, _store, cx| {
+                page.on_generation_changed(cx)
+            }),
             cx.subscribe(
                 &rename,
                 |this: &mut Self, _state, event: &gpui_kit::component::input::InputEvent, cx| {
@@ -291,6 +286,7 @@ impl WorkflowPage {
         let mut page = Self {
             handle,
             model,
+            generation,
             load: Load::Loading,
             step: Step::Prepare,
             view: None,
@@ -304,12 +300,19 @@ impl WorkflowPage {
             draft_dirty: false,
             draft_fingerprint: fingerprint,
             advance_task: None,
+            advance_watch: None,
+            generation_dirty: false,
+            pending_step: None,
             subscriptions,
         };
         match id {
             Some(id) => page.load_project(id, window, cx),
             None => {
                 page.load = Load::Ready;
+                // 原版 `/new` 路由的 `gen.reset()`；store 正为别的项目跑时不动它。
+                if !page.generation.read(cx).busy() {
+                    page.generation.update(cx, |store, cx| store.reset(cx));
+                }
                 page.show_step(Step::Prepare, window, cx);
             }
         }
@@ -544,18 +547,90 @@ impl WorkflowPage {
         );
     }
 
-    // ── 开始 AI 生成（原版 `onStep1StartGenerate` + `stores/generation.ts` 的 generate） ──
+    // ── 生成状态（应用级 store） ──────────────────────────────────────────────
+
+    /// 本页看到的生成状态：store 正持有本项目时是它的实时状态，否则是库里的静态状态
+    /// （原版没有后一种：它会 `reset` 掉 store，把别的项目的在途生成整个抹掉）。
+    fn generation_state(&self, cx: &Context<Self>) -> GenState {
+        let model = self.model.read(cx);
+        self.generation
+            .read(cx)
+            .state_for(model.id, model.latest_run.as_ref(), &model.deck)
+    }
+
+    /// store 变了：把它的牌组镜像进模型（第三步用它），并让自动跳页那一套重新判断。
+    fn on_generation_changed(&mut self, cx: &mut Context<Self>) {
+        let id = self.model.read(cx).id;
+        let deck: Option<Vec<serde_json::Value>> = {
+            let store = self.generation.read(cx);
+            store.live_for(id).map(|store| {
+                store
+                    .blueprints()
+                    .iter()
+                    .filter_map(|slide| slide.clone())
+                    .collect()
+            })
+        };
+        if let Some(deck) = deck {
+            self.model.update(cx, |model, cx| {
+                if model.deck != deck {
+                    model.deck = deck;
+                    cx.notify();
+                }
+            });
+        }
+        self.generation_dirty = true;
+        cx.notify();
+    }
+
+    /// 原版 `WorkflowView.vue` 的 watch（`[gen.stage, gen.retryingPages.size, 有失败页]`）：
+    /// 值变了才判断——`stage === 'done'`、没有页在重试、没有失败页且用户正停在本项目的
+    /// 第 2 步时，800ms 后再检查一遍再跳第 3 步；条件变了就取消计时（替换 `advance_task`）。
+    fn sync_advance(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let state = self.generation_state(cx);
+        let watched = (state.stage.clone(), state.retrying, state.failed_pages);
+        if self.advance_watch.as_ref() == Some(&watched) {
+            return;
+        }
+        self.advance_watch = Some(watched);
+        // 条件变了：先取消上一轮计时。
+        self.advance_task = None;
+        if state.stage != "done"
+            || state.retrying > 0
+            || state.failed_pages
+            || self.step != Step::Generate
+        {
+            return;
+        }
+        self.advance_task = Some(cx.spawn_in(window, async move |this, window| {
+            // GPUI 自己的计时器（界面里的延时不用 tokio，见 README）。
+            window
+                .background_executor()
+                .timer(std::time::Duration::from_millis(800))
+                .await;
+            let _ = this.update_in(window, |this, window, cx| {
+                // 原版：到点再检查一遍（用户可能已经离开第 2 步）。
+                let state = this.generation_state(cx);
+                if this.step == Step::Generate && state.stage == "done" && state.retrying == 0 {
+                    this.show_step(Step::Edit, window, cx);
+                }
+            });
+        }));
+    }
+
+    // ── 开始 AI 生成（原版 `onStep1StartGenerate`） ───────────────────────────
 
     pub fn start_generation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (name, md, generating) = {
+        let (name, md, granularity, aspect) = {
             let model = self.model.read(cx);
             (
                 model.name.clone(),
                 model.md_content.clone(),
-                model.generating,
+                model.granularity,
+                model.aspect,
             )
         };
-        if md.trim().is_empty() || name.trim().is_empty() || generating {
+        if md.trim().is_empty() || name.trim().is_empty() {
             return;
         }
         // 原版：取消防抖计时器，立即同步保存一次草稿，然后切第 2 步、启动生成。
@@ -566,168 +641,22 @@ impl WorkflowPage {
             Some(
                 move |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
                     this.show_step(Step::Generate, window, cx);
-                    this.launch_generation(window, cx);
+                    // 原版 `granularity === 'auto' ? undefined : granularity`。
+                    let granularity = match granularity {
+                        Granularity::Auto => None,
+                        other => Some(other.as_str().to_string()),
+                    };
+                    // 新建的项目刚才才落库，id 要现读（原版 `projectId.value`）。
+                    let id = this.model.read(cx).id;
+                    this.generation.update(cx, |store, cx| {
+                        store.generate(md, Some(name), granularity, aspect, id, cx);
+                    });
                 },
             ),
         );
     }
 
-    /// 启动生成流水线（原版 `gen.generate`）。事件经 `tasks::listen_events` 回到本页，
-    /// 由模型驱动侧栏与 Step2 的显示（Step2 会被切来切去，事件不能挂在它身上）。
-    fn launch_generation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (id, md, name, granularity, aspect) = {
-            let model = self.model.read(cx);
-            (
-                model.id,
-                model.md_content.clone(),
-                model.name.clone(),
-                model.granularity,
-                model.aspect,
-            )
-        };
-        let sink =
-            crate::tasks::listen_events(window, cx, |this: &mut Self, event, _window, cx| {
-                this.on_gen_event(event, cx);
-            });
-        let events: std::sync::Arc<dyn huanshu_core::events::EventSink> = std::sync::Arc::new(sink);
-        let shared = self.handle.shared().clone();
-        // 原版 `granularity === 'auto' ? undefined : granularity`。
-        let granularity = match granularity {
-            Granularity::Auto => None,
-            other => Some(other.as_str().to_string()),
-        };
-        let model_id = self.model.entity_id();
-        self.model.update(cx, |model, cx| {
-            model.generating = true;
-            model.generation_failed = false;
-            model.gen_stage = "start".to_string();
-            model.gen_message = "开始生成流程".to_string();
-            model.gen_progress = Some(0.0);
-            cx.notify();
-        });
-        crate::tasks::run_async(
-            window,
-            cx,
-            async move {
-                // 生成前把 active project 对准本项目（core 会把结果存进当前项目）。
-                if let Some(id) = id {
-                    let _ = projects::open_project(&shared, id);
-                }
-                generation::generate_slides(
-                    events,
-                    &shared,
-                    md,
-                    Some(name),
-                    granularity,
-                    Some(aspect),
-                )
-                .await
-            },
-            move |this, result, window, cx| {
-                // 模型已对准别的项目（用户离开）时结果作废。
-                if this.model.entity_id() != model_id {
-                    return;
-                }
-                this.on_generation_finished(result, window, cx);
-            },
-        );
-    }
-
-    /// 生成事件（原版 `gen:progress` / `gen:error` 监听）。
-    /// SlideReady / PageStatus / Log 的看板消费在下一轮（step2）。
-    fn on_gen_event(&mut self, event: CoreEvent, cx: &mut Context<Self>) {
-        match event {
-            CoreEvent::Progress(event) => {
-                self.model.update(cx, |model, cx| {
-                    model.gen_stage = event.stage;
-                    model.gen_message = event.message;
-                    if let Some(progress) = event.progress {
-                        model.gen_progress = Some(progress);
-                    }
-                    cx.notify();
-                });
-            }
-            CoreEvent::Error(event) => {
-                self.model.update(cx, |model, cx| {
-                    model.generation_failed = true;
-                    model.generating = false;
-                    model.gen_message = event.message;
-                    cx.notify();
-                });
-            }
-            _ => {}
-        }
-    }
-
-    fn on_generation_finished(
-        &mut self,
-        result: Result<usize, String>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        match result {
-            Ok(count) => {
-                self.model.update(cx, |model, cx| {
-                    model.generating = false;
-                    model.generation_failed = false;
-                    model.gen_stage = "done".to_string();
-                    model.gen_message = format!("生成完成，共 {count} 张幻灯片");
-                    cx.notify();
-                });
-                self.reload_deck(window, cx);
-                // 原版 watch：完成且无失败页 800ms 后自动跳到第 3 步（用户已离开第 2 步则不跳）。
-                // 本轮没有页级失败状态跟踪，Ok 即视为无失败页。
-                self.advance_task = Some(cx.spawn_in(window, async move |this, window| {
-                    window
-                        .background_executor()
-                        .timer(std::time::Duration::from_millis(800))
-                        .await;
-                    let _ = this.update_in(window, |this, window, cx| {
-                        if this.step == Step::Generate && !this.model.read(cx).generation_failed {
-                            this.show_step(Step::Edit, window, cx);
-                        }
-                    });
-                }));
-            }
-            Err(error) => {
-                // 出错能显示「生成出错」且不崩；不跳页。
-                self.model.update(cx, |model, cx| {
-                    model.generating = false;
-                    model.generation_failed = true;
-                    model.gen_stage = "error".to_string();
-                    model.gen_message = error;
-                    cx.notify();
-                });
-            }
-        }
-    }
-
-    /// 生成成功后从数据库重读牌组（core 已把结果存进当前项目）。
-    fn reload_deck(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(id) = self.model.read(cx).id else {
-            return;
-        };
-        let shared = self.handle.shared().clone();
-        let model_id = self.model.entity_id();
-        run_bg(
-            window,
-            cx,
-            move || projects::open_project(&shared, id).map_err(|e| e.to_string()),
-            move |this: &mut Self, result, _window, cx| {
-                if this.model.entity_id() != model_id {
-                    return;
-                }
-                if let Ok(project) = result {
-                    let deck: Vec<serde_json::Value> =
-                        serde_json::from_str(&project.blueprints_json).unwrap_or_default();
-                    this.model.update(cx, |model, cx| {
-                        model.deck = deck;
-                        cx.notify();
-                    });
-                }
-            },
-        );
-    }
+    // ── 打开项目（原版 `WorkflowView.onMounted`） ─────────────────────────────
 
     fn load_project(&mut self, id: i64, window: &mut Window, cx: &mut Context<Self>) {
         let shared = self.handle.shared().clone();
@@ -741,22 +670,16 @@ impl WorkflowPage {
                 let meta = projects::get_step1_project_meta(&shared, id)?;
                 Ok::<_, String>((project, run, media, meta))
             },
-            |page: &mut Self, result, window, cx| {
+            move |page: &mut Self, result, _window, cx| {
                 match result {
                     Err(error) => page.load = Load::Failed(error),
                     Ok((project, run, media, meta)) => {
-                        let deck: Vec<serde_json::Value> =
-                            if project.blueprints_json.trim().is_empty() {
-                                Vec::new()
-                            } else {
-                                serde_json::from_str(&project.blueprints_json).unwrap_or_default()
-                            };
-                        let generating = run.as_ref().is_some_and(|run| run.status == "running");
-                        let failed = run.as_ref().is_some_and(|run| run.status == "error");
-                        let run_stage = run
-                            .as_ref()
-                            .and_then(|run| run.current_stage.clone())
-                            .unwrap_or_else(|| "idle".to_string());
+                        let blueprints_json = project.blueprints_json.clone();
+                        let deck: Vec<serde_json::Value> = if blueprints_json.trim().is_empty() {
+                            Vec::new()
+                        } else {
+                            serde_json::from_str(&blueprints_json).unwrap_or_default()
+                        };
                         let project_aspect = project.aspect_ratio.unwrap_or(AspectRatio::Ratio16x9);
                         page.model.update(cx, |model, cx| {
                             model.name = project.name;
@@ -779,32 +702,36 @@ impl WorkflowPage {
                             model.media = media;
                             model.deck = deck;
                             model.latest_run = run;
-                            model.generating = generating;
-                            model.generation_failed = failed;
-                            model.gen_stage = if generating || failed {
-                                run_stage
-                            } else {
-                                "idle".to_string()
-                            };
                             cx.notify();
                         });
-                        page.load = Load::Ready;
-                        // 原版：生成进行中 → 2，有蓝图 → 3，否则 → 1。
-                        let model = page.model.read(cx);
-                        let auto = if model.generating {
-                            Step::Generate
-                        } else if !model.deck.is_empty() {
-                            Step::Edit
-                        } else {
-                            Step::Prepare
-                        };
-                        let step = page.requested_step.take().unwrap_or(auto);
-                        page.show_step(step, window, cx);
-                        // 原版 `step1Bootstrapped`：初始加载完成后才打自动保存。
-                        // 同时把指纹对齐到刚加载的内容，避免加载本身触发一次回写。
-                        page.step1_bootstrapped = true;
-                        page.draft_dirty = false;
-                        page.draft_fingerprint = DraftSnapshot::capture(page.model.read(cx));
+                        // 原版 onMounted 的顺序（loadLatestRun → loadFromJson / reset →
+                        // loadLatestRun）都在 store 里；它对齐完再决定进哪一步。
+                        let page_weak = cx.weak_entity();
+                        page.generation.update(cx, |store, cx| {
+                            store.open_project(
+                                id,
+                                &blueprints_json,
+                                cx,
+                                move |store, active, cx| {
+                                    let Some(page) = page_weak.upgrade() else {
+                                        return;
+                                    };
+                                    // 注意：这里仍在 store 的借用里，**不能读 store 实体**
+                                    // （`state_for` 走手上的 `&mut Self`）。
+                                    page.update(cx, |page, cx| {
+                                        let state = {
+                                            let model = page.model.read(cx);
+                                            store.state_for(
+                                                Some(id),
+                                                model.latest_run.as_ref(),
+                                                &model.deck,
+                                            )
+                                        };
+                                        page.finish_open(id, active, state, cx);
+                                    });
+                                },
+                            );
+                        });
                     }
                 }
                 cx.notify();
@@ -812,15 +739,45 @@ impl WorkflowPage {
         );
     }
 
+    /// store 对齐完项目后落第一步：原版
+    /// `currentStep = hasActiveGeneration ? 2 : gen.blueprints.length > 0 ? 3 : 1`。
+    fn finish_open(
+        &mut self,
+        id: i64,
+        has_active_generation: bool,
+        state: GenState,
+        cx: &mut Context<Self>,
+    ) {
+        if self.model.read(cx).id != Some(id) {
+            return;
+        }
+        self.load = Load::Ready;
+        let auto = if has_active_generation {
+            Step::Generate
+        } else if state.has_blueprints {
+            Step::Edit
+        } else {
+            Step::Prepare
+        };
+        // 下标回调里没有 window，进哪一步记下来、render 里补上（同 `rename_commit`）。
+        self.pending_step = Some(self.requested_step.take().unwrap_or(auto));
+        // 原版 `step1Bootstrapped`：初始加载完成后才打自动保存。
+        // 同时把指纹对齐到刚加载的内容，避免加载本身触发一次回写。
+        self.step1_bootstrapped = true;
+        self.draft_dirty = false;
+        self.draft_fingerprint = DraftSnapshot::capture(self.model.read(cx));
+        cx.notify();
+    }
+
     /// 侧栏一步能否点（原版 `steps[].clickable`）。
     fn clickable(&self, step: Step, cx: &Context<Self>) -> bool {
-        let model = self.model.read(cx);
+        let state = self.generation_state(cx);
         match step {
             Step::Prepare => true,
             // 原版：只有已经走到第 2 步及以后才能点回第 2 步。
             Step::Generate => self.step >= Step::Generate,
-            // TODO(parity): 原版还要求没有正在重试的页（`retryingPages.size === 0`）。
-            Step::Edit => !model.deck.is_empty(),
+            // 原版 `gen.blueprints.length > 0 && gen.retryingPages.size === 0`：有页在重试时不可点。
+            Step::Edit => state.has_blueprints && state.retrying == 0,
         }
     }
 
@@ -853,12 +810,19 @@ impl WorkflowPage {
 
 impl Render for WorkflowPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // 观察器里攒下的待办：排入防抖保存 / 提交改名（订阅回调里没有 window）。
+        // 观察器 / 下标回调里攒下的待办（那里没有 window）：
+        // 排入防抖保存、提交改名、进加载完成后要进的那一步、重算自动跳页。
         if std::mem::take(&mut self.draft_dirty) && self.step1_bootstrapped {
             self.schedule_autosave(window, cx);
         }
         if std::mem::take(&mut self.rename_commit) {
             self.save_name(window, cx);
+        }
+        if let Some(step) = self.pending_step.take() {
+            self.show_step(step, window, cx);
+        }
+        if std::mem::take(&mut self.generation_dirty) {
+            self.sync_advance(window, cx);
         }
 
         let c = cx.studio().colors;
@@ -891,8 +855,8 @@ impl Render for WorkflowPage {
             Load::Ready => {}
         }
 
+        let state = self.generation_state(cx);
         let model = self.model.read(cx);
-        let slide_count = model.deck.len();
         let name = if model.name.trim().is_empty() {
             "未命名项目".to_string()
         } else {
@@ -907,23 +871,25 @@ impl Render for WorkflowPage {
             } else {
                 "上传或粘贴文稿".to_string()
             },
-            if model.generation_failed {
+            if state.stage == "error" {
                 "生成出错".to_string()
-            } else if model.generating {
+            } else if state.running {
                 // 原版 `gen.stageLabel`（等待 / 初始化 / 验证连接 / 规划页面 / …）。
-                stage_label(&model.gen_stage)
-            } else if slide_count > 0 {
-                format!("已生成 {slide_count} 张")
+                state.stage_label()
+            } else if state.slide_count > 0 {
+                format!("已生成 {} 张", state.slide_count)
             } else {
                 "等待开始".to_string()
             },
-            if slide_count > 0 {
-                format!("{slide_count} 张幻灯片")
+            if state.slide_count > 0 {
+                format!("{} 张幻灯片", state.slide_count)
             } else {
                 "生成后可编辑".to_string()
             },
         ];
-        let generation_failed = model.generation_failed;
+        let generation_failed = state.stage == "error";
+        // 原版：生成中第 2 步的圆点里是转圈（`.step-spinner`），不是序号。
+        let generation_running = state.running;
         let theme_id = cx.studio().theme.id;
 
         let steps = [
@@ -965,6 +931,11 @@ impl Render for WorkflowPage {
                         carbon("warning").into_any_element()
                     } else if done {
                         carbon("checkmark").into_any_element()
+                    } else if active && step == Step::Generate && generation_running {
+                        gpui_kit::component::spinner::Spinner::new()
+                            .xsmall()
+                            .color(c.primary)
+                            .into_any_element()
                     } else {
                         step.number().to_string().into_any_element()
                     });

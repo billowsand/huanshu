@@ -13,6 +13,7 @@ use huanshu_core::editor_schema;
 use huanshu_core::preview::PreviewOptions;
 
 use super::{ProjectModel, WorkflowPage};
+use crate::generation::GenerationStore;
 use crate::icons::carbon;
 use crate::router::Step;
 use crate::shell::ShellHandle;
@@ -26,6 +27,8 @@ const DETAIL_W: f32 = 380.0;
 
 pub struct Step2 {
     model: Entity<ProjectModel>,
+    /// 应用级生成状态（原版 `stores/generation.ts`）：页面只读它，状态不在这里。
+    store: Entity<GenerationStore>,
     page: WeakEntity<WorkflowPage>,
     selected: usize,
     thumbs: SlideImages,
@@ -44,10 +47,15 @@ impl Step2 {
         cx: &mut Context<Self>,
     ) -> Self {
         let id = model.read(cx).id;
+        let store = handle.generation();
         let shared = handle.shared().clone();
-        let subscriptions = vec![cx.observe(&model, |_this, _model, cx| cx.notify())];
+        let subscriptions = vec![
+            cx.observe(&model, |_this, _model, cx| cx.notify()),
+            cx.observe(&store, |_this, _store, cx| cx.notify()),
+        ];
         Self {
             model,
+            store,
             page,
             selected: 0,
             thumbs: SlideImages::new(
@@ -96,38 +104,39 @@ impl Step2 {
 impl Render for Step2 {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let c = cx.studio().colors;
-        let (deck, aspect, generating, generation_failed, gen_stage, gen_message) = {
+        let (deck, aspect) = {
             let model = self.model.read(cx);
-            (
-                model.deck.clone(),
-                model.aspect_ratio(),
-                model.generating,
-                model.generation_failed,
-                model.gen_stage.clone(),
-                model.gen_message.clone(),
-            )
+            (model.deck.clone(), model.aspect_ratio())
+        };
+        // 生成状态一律来自应用级 store（原版 props 都来自 `useGenerationStore()`）。
+        let state = {
+            let model = self.model.read(cx);
+            self.store
+                .read(cx)
+                .state_for(model.id, model.latest_run.as_ref(), &model.deck)
         };
         let count = deck.len();
         self.selected = self.selected.min(count.saturating_sub(1));
 
-        // 顶部状态三态（原版 Step2Generate.vue 头部 + `gen.stageLabel`）：
-        // 生成中 → 阶段标签 + 最新进度文案；出错 → 生成出错 + 错误信息；否则 生成完成。
-        let (status_title, status_sub, status_color) = if generation_failed {
-            ("生成出错".to_string(), gen_message.clone(), c.error)
-        } else if generating {
-            let label = super::stage_label(&gen_stage);
-            let sub = if gen_message.trim().is_empty() {
-                label.clone()
-            } else {
-                format!("{label} · {gen_message}")
-            };
-            ("生成中…".to_string(), sub, c.primary)
-        } else {
+        // 顶部标题（原版 `Step2Generate.vue` 的 `.gen-hd-title`）：
+        // 生成中 → 「{stageLabel}...」、完成 → 「生成完成 · N 张幻灯片」（N = 看板条目数）、
+        // 出错 → 「生成遇到问题」、否则「准备开始」；第二行是 `message`。
+        let (status_title, status_sub, status_color) = if state.running {
             (
-                format!("生成完成 · {count} 张幻灯片"),
-                format!("已加载 {count} 张幻灯片"),
+                format!("{}...", state.stage_label()),
+                state.message.clone(),
+                c.primary,
+            )
+        } else if state.stage == "done" {
+            (
+                format!("生成完成 · {} 张幻灯片", state.board_items),
+                state.message.clone(),
                 c.success,
             )
+        } else if state.stage == "error" {
+            ("生成遇到问题".to_string(), state.message.clone(), c.error)
+        } else {
+            ("准备开始".to_string(), state.message.clone(), c.muted)
         };
 
         let slots: Vec<Option<serde_json::Value>> = deck.iter().cloned().map(Some).collect();
@@ -185,7 +194,7 @@ impl Render for Step2 {
                             .child(status_sub),
                     ),
             )
-            .child(stat(count.to_string(), "幻灯片"))
+            .child(stat(state.board_items.to_string(), "幻灯片"))
             // TODO(parity): 「关键事件」「生成记录」来自 get_generation_logs。
             .child(stat("—".to_string(), "关键事件"))
             .child(stat("—".to_string(), "生成记录"));
@@ -284,7 +293,11 @@ impl Render for Step2 {
                     .child(carbon("list-boxes"))
                     .child("幻灯片生成看板")
                     .child(div().flex_1())
-                    .child(widgets::chip(count.to_string(), Tone2::Muted, cx)),
+                    .child(widgets::chip(
+                        state.board_items.to_string(),
+                        Tone2::Muted,
+                        cx,
+                    )),
             )
             .child(
                 div()
