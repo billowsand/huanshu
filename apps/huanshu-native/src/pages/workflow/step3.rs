@@ -66,7 +66,8 @@ const PANEL_W: f32 = 390.0;
 /// 工作流侧栏宽度（`mod.rs` 的 `sidebar`）。
 const SIDEBAR_W: f32 = 204.0;
 /// 栏头高度（原版 `--workflow-header-height: 3.5rem`）。
-const COL_HEAD_H: f32 = 56.0;
+/// 栏头高度：与侧栏「← 项目」、第一步工具栏、第二步状态头同高（`HEADER_H`），左右连成一条线。
+const COL_HEAD_H: f32 = super::HEADER_H;
 /// 舞台四周留白（原版 `.edit-preview-stage-wrap` 的 `padding: 1rem`）。
 const STAGE_PADDING: f32 = 16.0;
 /// 草稿变化后等这么久再发预览请求（原版 `debounceMs: 120`）。
@@ -2914,7 +2915,7 @@ impl Render for Step3 {
             .min_h_0()
             .flex()
             .flex_col()
-            .bg(c.bg)
+            // 不画底色：外壳底下就是 `bg`，便签主题则露出木纹桌面。
             .border_r_1()
             .border_color(c.border)
             .child(

@@ -7,7 +7,7 @@
 
 use std::path::PathBuf;
 
-use gpui_kit::component::input::{Editor, EditorState, Input, InputEvent, InputState};
+use gpui_kit::component::input::{Editor, EditorState};
 use gpui_kit::component::text::TextView;
 use gpui_kit::component::Disableable as _;
 use gpui_kit::prelude::*;
@@ -93,7 +93,6 @@ pub struct Step1 {
     model: Entity<ProjectModel>,
     handle: ShellHandle,
     page: WeakEntity<WorkflowPage>,
-    name: Entity<InputState>,
     editor: Entity<EditorState>,
     /// AI 优化进行中（原版 `optimizing`）。
     optimizing: bool,
@@ -113,10 +112,6 @@ pub struct Step1 {
     sync_echo: Option<f32>,
     /// 预览里的公式图（`formulas.rs`）：`TextView` 的插件只读它，出图在后台。
     formulas: Entity<formulas::FormulaCache>,
-    /// 模型里的名称被外部改写（自动保存兜底名、侧栏改名、上传/AI 优化取 H1）后，
-    /// 观察器里发现与输入框不同步就置位，推迟到 render 里 `set_value` 回填
-    /// （观察回调拿不到 window；`set_value` 不发 Change 事件，无回声）。
-    name_sync_pending: bool,
     #[allow(dead_code)]
     subscriptions: Vec<Subscription>,
 }
@@ -129,15 +124,8 @@ impl Step1 {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let (name_text, md) = {
-            let model = model.read(cx);
-            (model.name.clone(), model.md_content.clone())
-        };
-        let name = cx.new(|cx| {
-            InputState::new(window, cx)
-                .placeholder("演示名称（从 H1 自动提取或手动输入）...")
-                .default_value(name_text)
-        });
+        // 文稿名不在这一步编辑：它显示在标题栏正中，点它改名（`WorkflowPage::title_element`）。
+        let md = model.read(cx).md_content.clone();
         let editor = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("markdown")
@@ -146,16 +134,6 @@ impl Step1 {
         });
         let formulas = cx.new(|_| formulas::FormulaCache::new());
         let subscriptions = vec![
-            cx.subscribe(&name, |this: &mut Self, state, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    let value = state.read(cx).value().to_string();
-                    this.model.update(cx, |model, cx| {
-                        model.name = value;
-                        cx.notify();
-                    });
-                    // 自动保存（防抖 800ms 落库）在 WorkflowPage 层观察这个模型统一处理。
-                }
-            }),
             cx.observe(&editor, |this: &mut Self, editor, cx| {
                 let value = editor.read(cx).value().to_string();
                 this.model.update(cx, |model, cx| {
@@ -167,14 +145,6 @@ impl Step1 {
                 this.sync_editor_to_preview(cx);
                 cx.notify();
             }),
-            // 外部改名（自动保存兜底、侧栏 rename、上传/优化取 H1）回写输入框。
-            cx.observe(&model, |this: &mut Self, model, cx| {
-                let name = model.read(cx).name.clone();
-                if name != this.name.read(cx).value().as_ref() {
-                    this.name_sync_pending = true;
-                    cx.notify();
-                }
-            }),
             // 公式出图落地（或失败）后重画预览：插件的渲染只读缓存，画什么由这一次通知决定。
             cx.observe(&formulas, |_this: &mut Self, _cache, cx| cx.notify()),
         ];
@@ -182,7 +152,6 @@ impl Step1 {
             model,
             handle,
             page,
-            name,
             editor,
             optimizing: false,
             optimize_error: String::new(),
@@ -191,7 +160,6 @@ impl Step1 {
             preview_scroll: ScrollHandle::new(),
             sync_echo: None,
             formulas,
-            name_sync_pending: false,
             subscriptions,
         }
     }
@@ -251,10 +219,6 @@ impl Step1 {
                 _ => {}
             }
             cx.notify();
-        });
-        let name = self.model.read(cx).name.clone();
-        self.name.update(cx, |state, cx| {
-            state.set_value(name, window, cx);
         });
         cx.notify();
     }
@@ -321,7 +285,6 @@ impl Step1 {
                     Ok(optimized) => {
                         let next = optimized.trim().to_string();
                         let h1 = markdown_tools::extract_h1(&next).map(|h| h.trim().to_string());
-                        let has_h1 = h1.is_some();
                         this.editor.update(cx, |state, cx| {
                             state.replace_all(next.clone(), window, cx);
                         });
@@ -332,12 +295,6 @@ impl Step1 {
                             }
                             cx.notify();
                         });
-                        if has_h1 {
-                            let name = this.model.read(cx).name.clone();
-                            this.name.update(cx, |state, cx| {
-                                state.set_value(name, window, cx);
-                            });
-                        }
                     }
                     Err(error) => {
                         this.optimize_error = error;
@@ -675,16 +632,6 @@ fn ruled_lines(editor: Entity<EditorState>, rule: Hsla) -> impl IntoElement {
 
 impl Render for Step1 {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // 观察器攒下的名称回填：模型名与输入框不同步时用 `set_value` 对齐
-        // （不发 Change 事件；打字路径是输入框 → 模型，不会回声）。
-        if std::mem::take(&mut self.name_sync_pending) {
-            let name = self.model.read(cx).name.clone();
-            if name != self.name.read(cx).value().as_ref() {
-                self.name.update(cx, |state, cx| {
-                    state.set_value(name, window, cx);
-                });
-            }
-        }
         let c = cx.studio().colors;
         // 编辑器外观与稿纸（便签主题才有 `paper`），见 `theme/editor.rs`。
         let look = cx.studio().editor.clone();
@@ -736,32 +683,55 @@ impl Render for Step1 {
         let optimize_error = self.optimize_error.clone();
         let tools_disabled = optimizing || !has_md;
 
+        let tool_labels = [
+            "自动标题",
+            "清除标题加粗",
+            "删除序号",
+            "`##` 一、二、",
+            "`###` （一）（二）",
+            "`####` 1. 2.",
+        ];
+        let draft_failed =
+            matches!(draft_state, super::DraftSaveState::Error) && !draft_error.is_empty();
         let top_bar = div()
             .flex_none()
-            .h(px(64.0))
+            .h(px(super::HEADER_H))
             .px(px(18.0))
             .flex()
             .flex_row()
             .items_center()
-            .gap(px(14.0))
+            .gap(px(10.0))
             .bg(c.panel)
             .when_some(paper, |bar, p| bar.bg(widgets::paper_bar(&p)))
             .border_b_1()
             .border_color(c.border)
-            .child(
-                div()
-                    .text_size(px(14.0))
-                    .text_color(c.muted)
-                    .child("准备素材"),
-            )
+            // 格式工具占据原来「准备素材」标签与名称框的位置（名称挪到了标题栏正中）；
+            // 窗口窄时工具组先被裁，右侧的字数与操作按钮始终完整。
             .child(
                 div()
                     .flex_1()
                     .min_w_0()
-                    .max_w(px(420.0))
-                    .child(Input::new(&self.name)),
+                    .overflow_hidden()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap(px(4.0))
+                    .child(
+                        div()
+                            .flex_none()
+                            .pr(px(8.0))
+                            .text_size(px(13.0))
+                            .text_color(c.muted)
+                            .child("格式工具"),
+                    )
+                    .children(tool_labels.iter().enumerate().map(|(i, label)| {
+                        widgets::small(widgets::ghost_button(("fmt", i), *label))
+                            .disabled(tools_disabled)
+                            .on_click(cx.listener(move |this, _event, window, cx| {
+                                this.run_format_tool(i, window, cx);
+                            }))
+                    })),
             )
-            .child(div().flex_1())
             .when(!md_filename.is_empty(), |bar| {
                 // 原版 `.filename-tag`：primary 色 + primary-bg + primary-border（`WorkflowView.vue:1030-1044`）。
                 bar.child(widgets::chip_icon(
@@ -796,56 +766,25 @@ impl Render for Step1 {
                     .on_click(cx.listener(|this, _event, window, cx| this.open_file(window, cx))),
             );
 
-        let tool_labels = [
-            "自动标题",
-            "清除标题加粗",
-            "删除序号",
-            "`##` 一、二、",
-            "`###` （一）（二）",
-            "`####` 1. 2.",
-        ];
-        let tools = div()
-            .flex_none()
-            .h(px(44.0))
-            .px(px(18.0))
-            .flex()
-            .flex_row()
-            .items_center()
-            .gap(px(4.0))
-            .when_some(paper, |row, p| row.bg(widgets::paper_bar(&p)))
-            .border_b_1()
-            .border_color(c.border)
-            .child(
-                div()
-                    .pr(px(10.0))
-                    .text_size(px(13.0))
-                    .text_color(c.muted)
-                    .child("格式工具"),
-            )
-            .children(tool_labels.iter().enumerate().map(|(i, label)| {
-                widgets::small(widgets::ghost_button(("fmt", i), *label))
-                    .disabled(tools_disabled)
-                    .on_click(cx.listener(move |this, _event, window, cx| {
-                        this.run_format_tool(i, window, cx);
-                    }))
-            }))
-            .when(
-                matches!(draft_state, super::DraftSaveState::Error) && !draft_error.is_empty(),
-                |row| {
-                    row.child(
-                        div()
-                            .pl(px(10.0))
-                            .child(widgets::inline_error(draft_error, cx)),
-                    )
-                },
-            )
-            .when(!optimize_error.is_empty(), |row| {
-                row.child(
-                    div()
-                        .pl(px(10.0))
-                        .child(widgets::inline_error(optimize_error, cx)),
-                )
-            });
+        // 草稿保存失败、AI 优化失败：工具栏下面一条提示（原来挤在工具行里）。
+        let errors = (draft_failed || !optimize_error.is_empty()).then(|| {
+            div()
+                .flex_none()
+                .px(px(18.0))
+                .py(px(6.0))
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(14.0))
+                .border_b_1()
+                .border_color(c.border)
+                .when(draft_failed, |row| {
+                    row.child(widgets::inline_error(draft_error, cx))
+                })
+                .when(!optimize_error.is_empty(), |row| {
+                    row.child(widgets::inline_error(optimize_error, cx))
+                })
+        });
 
         let pane_header = |icon: &'static str, label: &'static str| {
             div()
@@ -1054,11 +993,9 @@ impl Render for Step1 {
                     .flex_shrink(1.0)
                     .flex_basis(px(0.0))
                     .min_w(px(260.0))
-                    .relative()
                     .flex()
                     .flex_col()
-                    // 便签主题：卡片之间露出木纹桌面（原版 `--notes-grain, --notes-backing`）。
-                    .when_some(paper, |col, p| col.child(widgets::wood_grain(&p)))
+                    // 不画底色：便签主题下卡片之间露出外壳铺的木纹桌面。
                     .child(pane_header("view", "预览"))
                     .child(
                         div()
@@ -1460,7 +1397,7 @@ impl Render for Step1 {
             .flex()
             .flex_col()
             .child(top_bar)
-            .child(tools)
+            .children(errors)
             .child(
                 div()
                     .flex_1()

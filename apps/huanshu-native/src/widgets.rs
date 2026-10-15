@@ -7,11 +7,11 @@
 use std::path::PathBuf;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{Sizable as _, TitleBar};
+use gpui_kit::component::{Icon, IconName, Sizable as _};
 use gpui_kit::prelude::*;
 use gpui_kit::{
     div, img, linear_color_stop, linear_gradient, point, px, AnyElement, App, Background,
-    BoxShadow, ClickEvent, Div, ElementId, Hsla, ObjectFit, SharedString, Stateful, Window,
+    BoxShadow, ClickEvent, Div, ElementId, Hsla, SharedString, Stateful, Window, WindowControlArea,
 };
 use huanshu_core::themes::{self, Tone};
 
@@ -38,24 +38,140 @@ pub fn brand_chip(size: f32, radius: f32, mark: f32) -> Div {
         .child(brand_mark(mark))
 }
 
-/// 自绘标题栏（原版 `TitleBar.vue`）：品牌图标 + 「幻述」，最小化/最大化/关闭由 GPUI Kit
-/// 的 `TitleBar` 画（Windows 上靠系统的命中测试实现拖动、贴靠、双击最大化）。
-pub fn title_bar(cx: &App) -> impl IntoElement {
+/// 窗口按钮的宽度（Windows 标准标题栏按钮约 46px）。居中标题按它左右对称留白。
+const WINDOW_BUTTON_W: f32 = 46.0;
+
+/// 自绘标题栏（原版 `TitleBar.vue`）：品牌图标 + 「幻述」，中间是当前文稿的标题（`center`），
+/// 右侧最小化 / 最大化 / 关闭。
+///
+/// 不用 GPUI Kit 的 `TitleBar`：它的窗口按钮固定取 `Theme.foreground` 着色，便签主题的深棕
+/// 标题栏上会看不见。这里一样只声明 `window_control_area`（拖动、贴靠、双击最大化、
+/// 按钮点击都交给 Windows 的命中测试），颜色自己定。
+///
+/// `center` 里要接收点击的元素必须 `.occlude()`：整条标题栏是拖动区（`HTCAPTION`），
+/// 不挡住它，点击会被系统当成拖窗口。
+pub fn title_bar(center: Option<AnyElement>, window: &Window, cx: &App) -> impl IntoElement {
     let colors = cx.studio().colors;
-    TitleBar::new().child(
-        div()
-            .flex()
-            .flex_row()
-            .items_center()
-            .gap(px(6.0))
-            .child(brand_chip(22.0, 7.0, 16.0))
-            .child(
-                div()
-                    .text_size(px(12.3))
-                    .text_color(colors.text)
-                    .child("幻述"),
+    let paper = cx.studio().paper;
+    // 便签主题：锤子便签的深棕导航条；其余主题沿用 GPUI Kit 标题栏的面板色渐变。
+    let (background, border, text, hover): (Background, Hsla, Hsla, Hsla) = match paper {
+        Some(p) => (
+            linear_gradient(
+                180.0,
+                linear_color_stop(p.chrome_top, 0.0),
+                linear_color_stop(p.chrome_bottom, 1.0),
             ),
-    )
+            p.chrome_border,
+            p.chrome_text,
+            p.chrome_hover,
+        ),
+        None => (
+            linear_gradient(
+                180.0,
+                linear_color_stop(colors.panel.blend(colors.bg.opacity(0.45)), 0.0),
+                linear_color_stop(colors.panel, 1.0),
+            ),
+            colors.border,
+            colors.text,
+            colors.text.opacity(0.08),
+        ),
+    };
+    let button = |id: &'static str, icon: IconName, area: WindowControlArea, close: bool| {
+        div()
+            .id(id)
+            .flex_none()
+            .w(px(WINDOW_BUTTON_W))
+            .h_full()
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_color(text)
+            .hover(move |style| {
+                if close {
+                    style.bg(colors.error).text_color(gpui_kit::white())
+                } else {
+                    style.bg(hover)
+                }
+            })
+            .window_control_area(area)
+            .child(Icon::new(icon).small())
+    };
+    div()
+        .id("title-bar")
+        .flex_none()
+        .h(px(crate::theme::TITLEBAR_HEIGHT))
+        .flex()
+        .flex_row()
+        .bg(background)
+        .border_b_1()
+        .border_color(border)
+        .child(
+            div()
+                .id("title-bar-drag")
+                .relative()
+                .flex_1()
+                .min_w_0()
+                .h_full()
+                .pl(px(12.0))
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(6.0))
+                .window_control_area(WindowControlArea::Drag)
+                .child(brand_chip(22.0, 7.0, 16.0))
+                .child(div().text_size(px(12.3)).text_color(text).child("幻述"))
+                .when_some(center, |bar, center| {
+                    // 右边让出三个窗口按钮的宽度，标题落在整扇窗口的正中。
+                    bar.child(
+                        div()
+                            .absolute()
+                            .top_0()
+                            .left_0()
+                            .size_full()
+                            .pl(px(WINDOW_BUTTON_W * 3.0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_color(text)
+                            .child(center),
+                    )
+                }),
+        )
+        .child(button(
+            "window-min",
+            IconName::WindowMinimize,
+            WindowControlArea::Min,
+            false,
+        ))
+        .child(button(
+            "window-max",
+            if window.is_maximized() {
+                IconName::WindowRestore
+            } else {
+                IconName::WindowMaximize
+            },
+            WindowControlArea::Max,
+            false,
+        ))
+        .child(button(
+            "window-close",
+            IconName::WindowClose,
+            WindowControlArea::Close,
+            true,
+        ))
+}
+
+/// 标题栏正中的文稿标题：超过 [`TITLE_MAX_CHARS`] 个字就截断加省略号（再窄也会按像素省略）。
+pub const TITLE_MAX_CHARS: usize = 28;
+
+pub fn clip_title(name: &str) -> SharedString {
+    let name = name.trim();
+    if name.chars().count() > TITLE_MAX_CHARS {
+        let head: String = name.chars().take(TITLE_MAX_CHARS).collect();
+        format!("{head}…").into()
+    } else {
+        SharedString::from(name.to_string())
+    }
 }
 
 /// 主按钮（原版 `.btn.btn-primary`）。
@@ -151,7 +267,14 @@ pub fn panel(cx: &App) -> Div {
 
 /// 便签主题的木纹桌面（原版 `--notes-grain, --notes-backing`）：铺满父元素（父元素要 `relative`），
 /// 放在最底层，上面的内容自己透明。
+///
+/// 纹理按原尺寸 512×1024 平铺（原版 CSS 背景就是平铺），不拉伸：铺满整扇窗口时拉伸会把纤维放粗两三倍。
+/// 固定铺 8 × 3 块（4096 × 3072 逻辑像素），多出的被裁掉；同一张 SVG 只光栅化一次。
 pub fn wood_grain(paper: &PaperLook) -> Div {
+    const TILE_W: f32 = 512.0;
+    const TILE_H: f32 = 1024.0;
+    const COLS: usize = 8;
+    const ROWS: usize = 3;
     div()
         .absolute()
         .top_0()
@@ -160,10 +283,31 @@ pub fn wood_grain(paper: &PaperLook) -> Div {
         .overflow_hidden()
         .bg(paper.backing)
         .child(
-            img("notes/wood.svg")
-                .size_full()
-                .object_fit(ObjectFit::Cover),
+            div()
+                .w(px(TILE_W * COLS as f32))
+                .flex()
+                .flex_row()
+                .flex_wrap()
+                .children((0..COLS * ROWS).map(|_| {
+                    img("notes/wood.svg")
+                        .flex_none()
+                        .w(px(TILE_W))
+                        .h(px(TILE_H))
+                })),
         )
+}
+
+/// 便签卡片（锤子便签列表里的一张）：卡片纸、细纸边、小圆角、纸张阴影。非便签主题原样返回
+/// [`panel`]。
+pub fn paper_card(cx: &App) -> Div {
+    match cx.studio().paper {
+        Some(p) => panel(cx)
+            .bg(p.card)
+            .border_color(p.edge)
+            .rounded(px(3.0))
+            .shadow(paper_shadow(&p)),
+        None => panel(cx),
+    }
 }
 
 /// 纸张阴影（原版 `--notes-paper-shadow: 0 1px 2px …, 0 4px 8px -5px …`）。

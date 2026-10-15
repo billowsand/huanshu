@@ -267,13 +267,25 @@ impl Render for Shell {
             // 全屏演示时没有标题栏：原版是演示元素自己进全屏（`requestFullscreen`），盖住整个屏幕。
             .when(
                 !(self.presentation.is_some() && window.is_fullscreen()),
-                |shell| shell.child(widgets::title_bar(cx)),
+                |shell| {
+                    // 打开文稿时标题栏正中是文稿名（点它改名），其余页面不显示。
+                    let center = match &self.page {
+                        Page::Workflow(page) => Some(WorkflowPage::title_element(page, cx)),
+                        _ => None,
+                    };
+                    shell.child(widgets::title_bar(center, window, cx))
+                },
             )
             .child(
                 div()
                     .relative()
                     .flex_1()
                     .min_h_0()
+                    // 便签主题：木纹桌面铺在所有页面底下，页面里不画底色的地方都露出它
+                    // （原版 `.home-layout, .workflow-root { background: var(--notes-grain), … }`）。
+                    .when_some(studio.paper, |area, paper| {
+                        area.child(widgets::wood_grain(&paper))
+                    })
                     .child(content)
                     .when_some(self.presentation.clone(), |element, presentation| {
                         element.child(div().absolute().inset_0().child(presentation))

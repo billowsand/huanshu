@@ -376,10 +376,11 @@ impl Render for Step2 {
         } else {
             orb.into_any_element()
         };
+        // 与侧栏「← 项目」同高（`HEADER_H`），左右连成一条线；三个统计因此排成一行的紧凑胶囊。
         let header = div()
             .flex_none()
+            .h(px(super::HEADER_H))
             .px(px(24.0))
-            .py(px(14.0))
             .flex()
             .flex_row()
             .items_center()
@@ -834,27 +835,27 @@ fn count_chip(count: usize, cx: &App) -> AnyElement {
 }
 
 /// 头部的一个统计块（原版 `.gen-stat-chip`）。
+/// 统计胶囊（原版 `.gen-stat`）：数字在前、说明在后排成一行，放得进 64px 的状态头。
 fn stat_chip(value: String, label: &'static str, accent: bool, cx: &App) -> AnyElement {
     let c = cx.studio().colors;
     div()
-        .min_w(px(54.0))
-        .px(px(11.2))
-        .py(px(6.4))
+        .h(px(34.0))
+        .px(px(12.0))
         .flex()
-        .flex_col()
+        .flex_row()
         .items_center()
-        .gap(px(1.6))
+        .gap(px(6.0))
         .rounded(px(8.0))
         .border_1()
         .border_color(c.border)
         .bg(c.surface)
         .child(
             div()
-                .text_size(px(18.0))
+                .text_size(px(17.0))
                 .text_color(if accent { c.primary } else { c.text })
                 .child(value),
         )
-        .child(div().text_size(px(9.0)).text_color(c.muted).child(label))
+        .child(div().text_size(px(11.0)).text_color(c.muted).child(label))
         .into_any_element()
 }
 

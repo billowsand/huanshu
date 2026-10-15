@@ -509,6 +509,8 @@ impl Render for HomePage {
             .items_center()
             .justify_between()
             .bg(c.panel)
+            // 便签主题：纸色渐变条（原版 `.top-bar { background: linear-gradient(#fbf7ec, #f1ebdf) }`）。
+            .when_some(cx.studio().paper, |bar, p| bar.bg(widgets::paper_bar(&p)))
             .border_b_1()
             .border_color(c.border)
             .child(div().text_size(px(13.0)).text_color(c.muted).child("项目"))
@@ -772,7 +774,8 @@ impl HomePage {
             _ => None,
         };
         let export_project = project.clone();
-        widgets::panel(cx)
+        // 便签主题下是一张便签卡（纸张阴影、小圆角），卡片之间露出木纹桌面。
+        widgets::paper_card(cx)
             .id(SharedString::from(format!("project-{id}")))
             .flex()
             .flex_row()

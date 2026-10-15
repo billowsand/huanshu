@@ -167,6 +167,14 @@ pub struct PaperLook {
     pub bar_bottom: Hsla,
     /// 墨色（标题、卡片里的强调文字；比外壳文字更深，长时间读写不费眼）。
     pub ink: Hsla,
+    /// 深棕标题栏（锤子便签的导航条；原版 `.titlebar` 的 `--notes-chrome-light → --notes-chrome`
+    /// 渐变、`#655547` 底线、纸色文字）。
+    pub chrome_top: Hsla,
+    pub chrome_bottom: Hsla,
+    pub chrome_border: Hsla,
+    pub chrome_text: Hsla,
+    /// 标题栏按钮悬停（原版 `.ctrl-btn:hover { background: #ffffff1c }`）。
+    pub chrome_hover: Hsla,
 }
 
 fn paper(theme_id: &str) -> Option<PaperLook> {
@@ -183,6 +191,11 @@ fn paper(theme_id: &str) -> Option<PaperLook> {
         bar_top: c(0xfbf7ecff),
         bar_bottom: c(0xf1ebdfff),
         ink: c(0x5c4637ff),
+        chrome_top: c(0x7f6f60ff),
+        chrome_bottom: c(0x746254ff),
+        chrome_border: c(0x655547ff),
+        chrome_text: c(0xfbf7ecff),
+        chrome_hover: c(0xffffff1c),
     })
 }
 

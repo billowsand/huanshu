@@ -51,6 +51,9 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
   每个主题一份在 `theme/editor.rs`，**不设就是白底蓝标题**；字体 / 行高在 `cx.studio().editor`。
   便签主题另有 `cx.studio().paper`（锤子便签式稿纸：32px 横线、页边、宋体、木纹 `notes/wood.svg`、纸张阴影），
   页面按 `paper.is_some()` 分支，不按主题 id 判断。
+- 标题栏是自绘的（`widgets::title_bar`，不用 GPUI Kit 的 `TitleBar`：它的窗口按钮固定用 `Theme.foreground`，
+  便签主题的深棕标题栏上看不见）。打开文稿时正中是文稿名（点它改名）；标题栏整条是拖动区（`HTCAPTION`），
+  里面要接收点击的元素必须 `.occlude()`。工作流各栏顶栏同高 `workflow::HEADER_H`（64px）。
 - 图标用原版同一套 Carbon（`icons::carbon("i-carbon:xxx")`，SVG 由 `slide_typst::render_icon_svg` 现生成）。
 - 数据只经 `huanshu_core::services`；同步重活 `tasks::run_bg`，core 的 async 服务 `tasks::run_async`（进程内一个 tokio 运行时），
   生成事件 `tasks::listen_events`（`CoreEvent` 通道，替代 Tauri 的 `listen('gen:*')`）。

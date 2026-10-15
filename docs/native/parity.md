@@ -76,12 +76,12 @@
 | 功能 | 状态 | 说明 / 依据 |
 |---|---|---|
 | 加载中 / 加载失败（返回首页） | ✅ | |
-| 侧栏：返回、项目名、三步（状态、说明、连线）、主题、设置 | ✅ | 第 2 步说明按 `gen` 四态（出错 / 生成中 `stageLabel` / 已生成 N 张 / 等待开始），生成中圆点里是转圈（`Spinner`）；审计补齐：done 态圆点/连线改成功绿（照 `WorkflowView.vue:703-759`）、可点步骤悬停变亮、说明 truncate、项目名 tooltip |
+| 侧栏：返回、项目名、三步（状态、说明、连线）、主题、设置 | ✅ | 有意偏离：顶部是「← 项目」（回上一级），项目名挪到标题栏正中（超过 28 字省略），与三步顶栏同高 64px（`HEADER_H`）。第 2 步说明按 `gen` 四态（出错 / 生成中 `stageLabel` / 已生成 N 张 / 等待开始），生成中圆点里是转圈（`Spinner`）；审计补齐：done 态圆点/连线改成功绿（照 `WorkflowView.vue:703-759`）、可点步骤悬停变亮、说明 truncate、项目名 tooltip |
 | 生成状态是应用级 store（离开项目 / 回首页再进，进度接着走） | ✅ | `src/generation.rs::GenerationStore`：`Shell` 创建、`ShellHandle` 发给页面，事件接收常驻在它身上（`tasks::listen_events_in`）；页面来去不影响在跑的生成（原版 pinia store 同）；`ProjectModel` 不再存生成字段；**生成中开别的项目曾崩溃（实体租约重入）已修**：`open_project` 的「store 正为别的项目跑」早退分支改 `defer` + WeakEntity（`f-b1-*` 5 次不崩） |
 | 静态状态（别的项目在生成时的本项目） | ✅ | store 只实时持有「发起生成的那个项目」，其他项目的第二步用库里的静态快照：`snapshot_for` 的静态分支用 `StaticCache`（打开项目时经 `run_bg` 读该项目的最近运行 + 日志一次，运行变了才失效，每帧只读缓存）恢复失败页（`progress::statuses_from_logs`）、关键事件 / 生成记录统计、最近 10 条日志、看板条目；失败段与「重试这一页」会出现但按全局规则禁用（`!live` 即禁用，因为静态分支下 store 的重试会排到别的项目的运行上；「重新生成全部」只在 `busy_elsewhere` 时禁用）；6 个新单测（`generation.rs::tests`）；原版对应 `loadLatestRun`+`loadFromJson`（`generation.ts:380-435`） |
 | 第二步选中的页码跨步骤保留 | ✅ | 下标存在 `ProjectModel::selected_slide`（`Option<usize>`，照原版 `selectedSlideIndex` 的 null 语义）：`Step2::select` 写、渲染归位（越界/未选回落 `preferred_slide_index`）、整次重新生成前清空；4 个新单测（`resolve_selected`）；原版在 `WorkflowView.vue:500,505` |
 | 初始步骤（生成中→2，有蓝图→3，否则→1）与可点击规则 | ✅ | `finish_open`（原版 `onMounted` 顺序在 `GenerationStore::open_project` 里）；第 3 步点击含「没有页在重试」 |
-| 项目改名（点名字编辑，回车/失焦保存，Esc 取消） | ✅ | `mod.rs::start_rename` / `save_name`（空名不保存、保持编辑态，照原版）；待截图对比 |
+| 项目改名（点名字编辑，回车/失焦保存，Esc 取消） | ✅ | 点标题栏正中的名字改名（`WorkflowPage::title_element`，`occlude()` 挡住拖动区）；`mod.rs::start_rename` / `save_name`（空名不保存、保持编辑态，照原版） |
 | 新建项目的草稿（名称、文稿、粒度、比例）保存与恢复 | ✅ | 800ms 防抖自动保存（`WorkflowPage::schedule_autosave` / `persist_draft`，新建落库后 `retarget_route` 对准路由）；meta 存 `app_settings` 的 `project_meta:<id>`（`services::projects::Step1ProjectMeta`，单测 `step1_meta_*`）；待截图对比 |
 | 生成完成后自动跳到第 3 步 | ✅ | `sync_advance`：条件从**应用级 store** 读（`state_for` → `GenState`），与原版 watch 的 `[stage, retryingPages.size, 有失败页]` 一样「变了才判断」——`done` + 无重试 + 无失败页 + 用户正停在本项目的第 2 步时，800ms 后再查一遍再跳；计时走 `window.background_executor().timer`（不是 tokio）；**已真机验证**（LM Studio，全部成功的生成完成后未操作自动落在第三步，`target/drive/f-d1-gen125-0.png`） |
 | 牌组的唯一写入路径 | ✅ | 第三步的每一处编辑（应用 / 新建 / 删除 / 移动 / 换版式）都只经 `WorkflowPage::commit_deck(deck, active, save, …)`：先写 `ProjectModel`（`deck` + `active_slide`）→ 再写应用级 store（`GenerationStore::set_deck`，只在 store 正持有本项目且不在生成中时写得进去）→ `save` 时整副 JSON 落库；`on_generation_changed` 的镜像比较后相等就不动，不会回环。落库状态由 `ProjectModel.deck_saving` / `deck_save_error` 单点表达（每条出口都复位） |
@@ -91,7 +91,7 @@
 
 | 功能 | 状态 | 说明 / 依据 |
 |---|---|---|
-| 名称输入（原版占位文案）、字数（UTF-16 码元数，与原版 `mdContent.length` 一致） | ✅ | `ProjectModel::md_len`；待截图对比 |
+| 名称输入（原版占位文案）、字数（UTF-16 码元数，与原版 `mdContent.length` 一致） | ✅ | 有意偏离：第一步不再单放名称框（与标题栏改名重复），格式工具提到顶栏原「准备素材」处；名称仍从 H1 自动提取。`ProjectModel::md_len` |
 | 草稿保存状态（保存中… / 已保存 / 失败） | ✅ | `WorkflowPage` 800ms 防抖自动保存置位（`DraftSaveState`）；失败原因显示在格式工具行（原版 `draftSaveError`）；待截图对比 |
 | Markdown 编辑器（高亮、行号） | ✅ | GPUI Kit `Editor`（tree-sitter markdown） |
 | Markdown 预览按页卡片（P1/P2…，`TextView::markdown`） | ✅ | `markdown_tools::split_preview_pages`（auto 先 `detect_granularity`）；空态「预览区将实时显示 Markdown 渲染效果」；**数学公式已渲染**（`formulas.rs` 插件 + `slide_typst::render_formula` Typst 位图，行内/块级、坏公式红字、价格类 `$` 不被吞；外观与原版 KaTeX 不同属有意——与幻灯片/PDF 同一套排版，2026-10-16 真机验证 `target/drive/m2-notes2`、`t2-light2`）；渲染语义差异（原版 `breaks/linkify/typographer/html:false`，GPUI 是标准 CommonMark 且会解析内联 HTML）归 ➖「表现层，按 GPUI 原生做法」；待截图对比 |

@@ -24,7 +24,8 @@ pub mod step3;
 use gpui_kit::component::Sizable as _;
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    div, px, App, Context, Entity, Focusable as _, Render, SharedString, Subscription, Task, Window,
+    div, px, AnyElement, App, Context, Entity, Focusable as _, Render, SharedString, Subscription,
+    Task, Window,
 };
 use huanshu_core::db::GenerationRun;
 use huanshu_core::markdown_tools::{self, Granularity};
@@ -42,6 +43,10 @@ use crate::tasks::{run_async, run_bg};
 use crate::theme::StudioExt as _;
 use crate::widgets;
 use crate::widgets::TooltipText as _;
+
+/// 工作流顶栏的统一高度：侧栏的「← 项目」、第一步的工具栏、第二步的状态头、第三步的三个栏头
+/// 都是这个高度，左右连成一条线。
+pub(super) const HEADER_H: f32 = 64.0;
 
 /// 一个项目在工作流里的全部数据。三步页面共享它。
 ///
@@ -372,7 +377,69 @@ impl WorkflowPage {
         cx.notify();
     }
 
-    // ── 侧栏改名（原版 `saveName`：点名字 → 输入框，Enter / 失焦保存，Esc 取消） ──
+    // ── 标题栏改名（原版侧栏的 `saveName`：点名字 → 输入框，Enter / 失焦保存，Esc 取消） ──
+
+    /// 标题栏正中的文稿名（`Shell` 每帧取一次）：平时是截断过的名字，点它进入改名；
+    /// 改名时换成输入框。两者都 `occlude()`，否则点击落在标题栏的拖动区上、被系统拿去拖窗口。
+    pub fn title_element(page: &Entity<Self>, cx: &mut App) -> AnyElement {
+        let this = page.read(cx);
+        let c = cx.studio().colors;
+        if this.editing_name {
+            let rename = this.rename.clone();
+            let focus = rename.read(cx).focus_handle(cx);
+            let page = page.clone();
+            return div()
+                .id("doc-title-edit")
+                .occlude()
+                .w(px(360.0))
+                .text_color(c.text)
+                .track_focus(&focus)
+                .on_key_down(move |event: &gpui_kit::KeyDownEvent, _window, cx| {
+                    // 原版 `@keydown.escape="editingName = false"`（Esc 不保存）。
+                    if event.keystroke.key.eq_ignore_ascii_case("escape") {
+                        page.update(cx, |this, cx| {
+                            this.editing_name = false;
+                            cx.notify();
+                        });
+                    }
+                })
+                .child(
+                    gpui_kit::component::input::Input::new(&rename)
+                        .with_size(gpui_kit::component::Size::Small),
+                )
+                .into_any_element();
+        }
+        let name = this.model.read(cx).name.trim().to_string();
+        let shown = if name.is_empty() {
+            // 原版侧栏的兜底名（`projectName || '未命名项目'`）。
+            SharedString::from("未命名项目")
+        } else {
+            widgets::clip_title(&name)
+        };
+        let page = page.clone();
+        div()
+            .id("doc-title")
+            .occlude()
+            .min_w_0()
+            .max_w(px(520.0))
+            .px(px(10.0))
+            .py(px(3.0))
+            .rounded(px(5.0))
+            .truncate()
+            .text_size(px(13.5))
+            .cursor_pointer()
+            .hover(|style| style.bg(gpui_kit::white().opacity(0.12)))
+            .tooltip_text(if name.is_empty() {
+                SharedString::from("点击命名")
+            } else {
+                SharedString::from(format!("{name}（点击改名）"))
+            })
+            .child(shown)
+            .on_click(move |_event, window, cx| {
+                page.update(cx, |this, cx| this.start_rename(window, cx));
+            })
+            .into_any_element()
+    }
 
     fn start_rename(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let name = self.model.read(cx).name.clone();
@@ -1033,11 +1100,6 @@ impl Render for WorkflowPage {
 
         let state = self.generation_state(cx);
         let model = self.model.read(cx);
-        let name = if model.name.trim().is_empty() {
-            "未命名项目".to_string()
-        } else {
-            model.name.clone()
-        };
         // 原版 `steps` 的说明文案。
         let descs = [
             if !model.md_filename.is_empty() {
@@ -1199,39 +1261,6 @@ impl Render for WorkflowPage {
             self.handle.clone(),
             self.handle.clone(),
         );
-        // 原版 `project-title-wrap`：点名字进编辑（`editingName = true; newName = projectName`），
-        // Enter / 失焦保存、Esc 取消。
-        let rename_focus = self.rename.read(cx).focus_handle(cx);
-        let name_area: gpui_kit::AnyElement = if self.editing_name {
-            div()
-                .flex_1()
-                .min_w_0()
-                .child(gpui_kit::component::input::Input::new(&self.rename))
-                .track_focus(&rename_focus)
-                .on_key_down(
-                    cx.listener(|this, event: &gpui_kit::KeyDownEvent, _window, cx| {
-                        // 原版 `@keydown.escape="editingName = false"`（Esc 不保存）。
-                        if event.keystroke.key.eq_ignore_ascii_case("escape") {
-                            this.editing_name = false;
-                            cx.notify();
-                        }
-                    }),
-                )
-                .into_any_element()
-        } else {
-            div()
-                .id("wf-name")
-                .flex_1()
-                .min_w_0()
-                .truncate()
-                .text_size(px(15.0))
-                .cursor_pointer()
-                // 原版 `:title="projectName || '未命名项目'"`（`:426`）：名字被省略号截断时悬停看全。
-                .tooltip_text(name.clone())
-                .child(name)
-                .on_click(cx.listener(|this, _event, window, cx| this.start_rename(window, cx)))
-                .into_any_element()
-        };
         let sidebar = div()
             .flex_none()
             .w(px(204.0))
@@ -1241,22 +1270,26 @@ impl Render for WorkflowPage {
             .bg(c.panel)
             .border_r_1()
             .border_color(c.border)
+            // 顶上是「回到上一级」的导航（项目列表），文稿名挪到标题栏正中（`title_element`）。
+            // 高度与三步的顶栏一致（`HEADER_H`），左右连成一条线。
             .child(
                 div()
-                    .h(px(64.0))
-                    .px(px(14.0))
+                    .flex_none()
+                    .h(px(HEADER_H))
+                    .px(px(10.0))
                     .flex()
                     .flex_row()
                     .items_center()
-                    .gap(px(10.0))
                     .border_b_1()
                     .border_color(c.border)
                     .child(
-                        widgets::icon_button("back", "arrow-left", "返回首页").on_click(
-                            move |_event, window, cx| back.navigate(Route::Home, window, cx),
-                        ),
-                    )
-                    .child(name_area),
+                        widgets::ghost_button("back", "项目")
+                            .icon(carbon("arrow-left"))
+                            .tooltip("返回项目列表")
+                            .on_click(move |_event, window, cx| {
+                                back.navigate(Route::Home, window, cx)
+                            }),
+                    ),
             )
             .child(nav)
             .child(div().flex_1())
