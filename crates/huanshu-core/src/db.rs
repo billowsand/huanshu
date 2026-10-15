@@ -429,6 +429,8 @@ pub fn append_generation_log(
     })
 }
 
+/// The newest run of a project. `id` breaks the tie: `created_at` has second resolution, so
+/// two runs of the same project can share a timestamp and the newer one must still win.
 pub fn get_latest_generation_run(
     conn: &Connection,
     project_id: i64,
@@ -438,7 +440,7 @@ pub fn get_latest_generation_run(
                 debug_dir, created_at, updated_at, finished_at
          FROM generation_runs
          WHERE project_id = ?1
-         ORDER BY created_at DESC
+         ORDER BY created_at DESC, id DESC
          LIMIT 1",
     )?;
     let mut rows = stmt.query(params![project_id])?;

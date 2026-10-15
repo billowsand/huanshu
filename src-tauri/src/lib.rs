@@ -28,6 +28,7 @@ pub fn run() {
             commands::generate::detect_granularity,
             commands::generate::optimize_markdown_headings,
             commands::generate::get_blueprints,
+            commands::generate::get_generation_deck,
             commands::generate::get_generation_status,
             commands::generate::get_latest_generation_run,
             commands::generate::get_generation_logs,

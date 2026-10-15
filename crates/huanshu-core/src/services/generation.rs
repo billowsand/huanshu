@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 use crate::config::GenerationConfig;
-use crate::db::{self, GenerationRun};
+use crate::db::{self, GenerationLogEntry, GenerationRun};
 use crate::events::{CoreEvent, EventSink, GenerationEvent, GenerationLogEvent, PageStatusEvent};
 use crate::icon::IconIndex;
 use crate::lmstudio::LmStudioClient;
@@ -294,16 +294,10 @@ pub async fn generate_slides(
             let count = blueprints.len();
             {
                 let mut st = state.lock().unwrap();
-                // Save to the project this run was started for, not whichever project is open
-                // now: the native app lets the user open another project mid-run, and reading
-                // `active_project_id` here would overwrite that project's deck.
-                if let Some(pid) = active_project_id {
-                    if let Ok(json) = serde_json::to_string(&blueprints) {
-                        let db = st.db.lock().unwrap();
-                        crate::db::update_project_blueprints(&*db, pid, &json).ok();
-                    }
-                }
-                // `st.blueprints` is the open project's deck; leave it alone if that changed.
+                // The deck is already stored in the project this run was started for (the
+                // assembly step wrote it there). `st.blueprints` is the open project's deck,
+                // so mirror the result into it only while that is still the same project:
+                // the native app lets the user open another project mid-run.
                 if st.active_project_id == active_project_id {
                     st.blueprints = blueprints;
                 }
@@ -367,6 +361,44 @@ pub async fn generate_slides(
 pub fn get_blueprints(state: &SharedState) -> Result<Vec<SlideBlueprint>> {
     let st = state.lock().unwrap();
     Ok(st.blueprints.clone())
+}
+
+/// Has this run reached assembly?
+///
+/// The log written right after the assembled deck is stored is the only marker for it: a
+/// run that failed earlier left the project's **previous** deck in the database, and that
+/// deck is not this run's result.
+fn reached_assembly(logs: &[GenerationLogEntry]) -> bool {
+    logs.iter()
+        .any(|log| log.stage == "assembling" && log.kind == "assembled")
+}
+
+/// The deck a run's own project holds in the database right now.
+fn run_deck(conn: &Connection, run: &GenerationRun) -> Result<Vec<SlideBlueprint>> {
+    let Some(project_id) = run.project_id else {
+        return Err("该生成不属于任何项目，读不到牌组".to_string());
+    };
+    let project = db::get_project(conn, project_id).map_err(|e| e.to_string())?;
+    Ok(serde_json::from_str(&project.blueprints_json).unwrap_or_default())
+}
+
+/// The deck a project's **latest** generation produced, addressed by the project it
+/// belongs to rather than by whichever project is open.
+///
+/// Empty when that run never assembled: the database then still holds the project's
+/// previous deck, which must not be mistaken for this run's result.
+pub fn get_generation_deck(state: &SharedState, project_id: i64) -> Result<Vec<SlideBlueprint>> {
+    let st = state.lock().unwrap();
+    let conn = st.db.lock().unwrap();
+    let Some(run) = db::get_latest_generation_run(&conn, project_id).map_err(|e| e.to_string())?
+    else {
+        return Ok(Vec::new());
+    };
+    let logs = db::get_generation_logs(&conn, run.id).map_err(|e| e.to_string())?;
+    if !reached_assembly(&logs) {
+        return Ok(Vec::new());
+    }
+    run_deck(&conn, &run)
 }
 
 /// Get generation status
@@ -486,8 +518,75 @@ pub struct RetryPageResult {
     pub invalid_pages: Vec<usize>,
 }
 
+/// What a single-page retry needs from the database before it may call a model.
+#[derive(Debug, Clone)]
+struct RetryPlan {
+    page: crate::types::PagePlan,
+    layout: crate::types::LayoutPlan,
+    ratio: crate::types::AspectRatio,
+    /// The deck the run's own project assembled; the retried page replaces its slot.
+    deck: Vec<SlideBlueprint>,
+}
+
+/// Read **and check** everything a page retry needs: the original page plan, its layout,
+/// the project's aspect ratio and the deck that page replaces.
+///
+/// The base deck is the run's own project's deck, not the open project's, and the run must
+/// have assembled it: without that log the database holds the project's previous deck, and
+/// replacing a slot in *that* deck would edit slides this run never produced.
+///
+/// Synchronous on purpose — so the rules can be tested without a model.
+fn plan_page_retry(
+    conn: &Connection,
+    run: &GenerationRun,
+    page_index: usize,
+    layout_kind: Option<crate::types::SlideKind>,
+) -> Result<RetryPlan> {
+    let logs = db::get_generation_logs(conn, run.id).map_err(|e| e.to_string())?;
+    if !reached_assembly(&logs) {
+        return Err("整副幻灯片尚未组装完成，请使用整副重试".to_string());
+    }
+    let assignment = logs
+        .iter()
+        .rev()
+        .find(|log| log.detail.get("layout_plans").is_some())
+        .ok_or("缺少页面规划，请重新生成整副幻灯片")?;
+    let pages: Vec<crate::types::PagePlan> =
+        serde_json::from_value(assignment.detail["page_plans"].clone())
+            .map_err(|e| e.to_string())?;
+    let layouts: Vec<crate::types::LayoutPlan> =
+        serde_json::from_value(assignment.detail["layout_plans"].clone())
+            .map_err(|e| e.to_string())?;
+    let page = pages.get(page_index).cloned().ok_or("页面索引无效")?;
+    let mut layout = layouts.get(page_index).cloned().ok_or("缺少该页布局")?;
+    let deck = run_deck(conn, run)?;
+    if deck.len() != pages.len() + 3 {
+        return Err("整副幻灯片尚未组装完成，请使用整副重试".to_string());
+    }
+    let ratio = deck[page_index + 2]
+        .aspect_ratio
+        .unwrap_or(crate::types::AspectRatio::Ratio16x9);
+    if let Some(kind) = layout_kind {
+        if let Some(reason) = crate::generator::layout_rules::ineligibility(&kind, &page, ratio) {
+            return Err(format!("所选布局不适用于这一页：{reason}"));
+        }
+        layout.kind = kind;
+        layout.reason = "用户手动选择布局进行重试".into();
+    }
+    Ok(RetryPlan {
+        page,
+        layout,
+        ratio,
+        deck,
+    })
+}
+
 /// Retry a content page using its original source and assigned layout.
 /// The assembled deck has two leading slides (cover and overview).
+///
+/// The retry belongs to the run's project (`generation_runs.project_id`): it reads that
+/// project's deck and writes the result back there, whether or not the interface still has
+/// it open. `st.blueprints` is only mirrored while that project is the open one.
 pub async fn retry_generation_page(
     events: Arc<dyn EventSink>,
     state: &SharedState,
@@ -495,71 +594,46 @@ pub async fn retry_generation_page(
     page_index: usize,
     layout_kind: Option<crate::types::SlideKind>,
 ) -> Result<RetryPageResult> {
-    let (settings, project_dir, project_id, db, run, page, layout, ratio) = {
+    let (settings, project_dir, project_id, db, run, plan) = {
         let mut st = state.lock().unwrap();
         if st.generation_running {
             return Err("请等待当前生成或重试完成".into());
         }
         let db = std::sync::Arc::clone(&st.db);
-        let (run, logs) = {
+        let (run, plan) = {
             let conn = db.lock().unwrap();
+            let run = db::get_generation_run(&conn, run_id).map_err(|e| e.to_string())?;
+            // Only the newest run of the run's own project can be retried; whichever project
+            // is open has nothing to do with it.
             let latest_id: Option<i64> = conn
                 .query_row(
                     "SELECT MAX(id) FROM generation_runs WHERE project_id IS ?1",
-                    rusqlite::params![st.active_project_id],
+                    rusqlite::params![run.project_id],
                     |row| row.get(0),
                 )
                 .map_err(|e| e.to_string())?;
             if latest_id != Some(run_id) {
                 return Err("生成记录已过期，请重试当前生成记录中的页面".into());
             }
-            (
-                db::get_generation_run(&conn, run_id).map_err(|e| e.to_string())?,
-                db::get_generation_logs(&conn, run_id).map_err(|e| e.to_string())?,
-            )
+            let plan = plan_page_retry(&conn, &run, page_index, layout_kind)?;
+            (run, plan)
         };
-        if run.project_id != st.active_project_id {
-            return Err("生成记录不属于当前项目".into());
-        }
-        let assignment = logs
-            .iter()
-            .rev()
-            .find(|log| log.detail.get("layout_plans").is_some())
-            .ok_or("缺少页面规划，请重新生成整副幻灯片")?;
-        let pages: Vec<crate::types::PagePlan> =
-            serde_json::from_value(assignment.detail["page_plans"].clone())
-                .map_err(|e| e.to_string())?;
-        let layouts: Vec<crate::types::LayoutPlan> =
-            serde_json::from_value(assignment.detail["layout_plans"].clone())
-                .map_err(|e| e.to_string())?;
-        let page = pages.get(page_index).cloned().ok_or("页面索引无效")?;
-        let mut layout = layouts.get(page_index).cloned().ok_or("缺少该页布局")?;
-        if st.blueprints.len() != pages.len() + 3 {
-            return Err("整副幻灯片尚未组装完成，请使用整副重试".into());
-        }
-        let ratio = st.blueprints[page_index + 2]
-            .aspect_ratio
-            .unwrap_or(crate::types::AspectRatio::Ratio16x9);
-        if let Some(kind) = layout_kind {
-            if let Some(reason) = crate::generator::layout_rules::ineligibility(&kind, &page, ratio)
-            {
-                return Err(format!("所选布局不适用于这一页：{reason}"));
-            }
-            layout.kind = kind;
-            layout.reason = "用户手动选择布局进行重试".into();
-        }
         st.generation_running = true;
         (
             st.settings.clone(),
             st.project_dir.clone(),
-            st.active_project_id,
+            run.project_id,
             db,
             run,
-            page,
-            layout,
-            ratio,
+            plan,
         )
     };
+    let RetryPlan {
+        page,
+        layout,
+        ratio,
+        deck,
+    } = plan;
     let result: anyhow::Result<RetryPageResult> = async {
         let mut config = GenerationConfig::from_settings(&settings, project_dir.clone(), ratio);
         config.frontmatter_title = run.frontmatter_title.clone();
@@ -613,11 +687,7 @@ pub async fn retry_generation_page(
                     .join("；")
             );
         }
-        let mut st = state.lock().unwrap();
-        if st.active_project_id != project_id {
-            anyhow::bail!("当前项目已切换，重试结果未写入");
-        }
-        let mut updated = st.blueprints.clone();
+        let mut updated = deck;
         *updated
             .get_mut(page_index + 2)
             .ok_or_else(|| anyhow::anyhow!("幻灯片列表已改变"))? = slide.clone();
@@ -633,6 +703,7 @@ pub async fn retry_generation_page(
         } else {
             describe_deck_issues(&invalid_pages, &issues, updated.len())
         };
+        let mut st = state.lock().unwrap();
         let mut conn = db.lock().unwrap();
         let tx = conn.transaction()?;
         if let Some(pid) = project_id {
@@ -642,7 +713,11 @@ pub async fn retry_generation_page(
             db::finish_generation_run(&tx, run_id, "done", Some("done"))?;
         }
         tx.commit()?;
-        st.blueprints = updated;
+        // The retried deck is the run's project's deck; `st.blueprints` is the open project's
+        // deck, so mirror it there only while that is still the same project.
+        if st.active_project_id == project_id {
+            st.blueprints = updated;
+        }
         st.last_error = (!issues.is_empty()).then(|| remaining.clone());
         Ok(RetryPageResult {
             slide,
@@ -683,6 +758,9 @@ pub struct RetryLayoutOptions {
 }
 
 /// Use the same layout eligibility table as automatic generation.
+///
+/// The ratio and the plans come from the run's own project, never from whichever project the
+/// interface has open.
 pub fn get_retry_layouts(
     state: &SharedState,
     run_id: i64,
@@ -691,9 +769,6 @@ pub fn get_retry_layouts(
     let st = state.lock().unwrap();
     let conn = st.db.lock().unwrap();
     let run = db::get_generation_run(&conn, run_id).map_err(|e| e.to_string())?;
-    if run.project_id != st.active_project_id {
-        return Err("生成记录不属于当前项目".into());
-    }
     let logs = db::get_generation_logs(&conn, run_id).map_err(|e| e.to_string())?;
     let assignment = logs
         .iter()
@@ -708,13 +783,15 @@ pub fn get_retry_layouts(
             .map_err(|e| e.to_string())?;
     let page = pages.get(page_index).ok_or("页面索引无效")?;
     let layout = layouts.get(page_index).ok_or("缺少该页布局")?;
+    // The run recorded the ratio it ran with; fall back to the deck it assembled in its own
+    // project (a run whose project row is gone has neither and reads as 16:9).
     let ratio = logs
         .iter()
         .find_map(|log| serde_json::from_value(log.detail["aspect_ratio"].clone()).ok())
         .or_else(|| {
-            st.blueprints
-                .get(page_index + 2)
-                .and_then(|bp| bp.aspect_ratio)
+            run_deck(&conn, &run)
+                .ok()
+                .and_then(|deck| deck.get(page_index + 2).and_then(|bp| bp.aspect_ratio))
         })
         .unwrap_or(crate::types::AspectRatio::Ratio16x9);
     Ok(RetryLayoutOptions {
@@ -1400,11 +1477,12 @@ async fn run_pipeline(
 
     // Keep the assembled deck even when final validation fails, so a content-page
     // retry can replace its slot rather than requiring another full generation.
+    //
+    // The deck is the run's own project's (`generation_runs.project_id`), written there
+    // whatever the interface has open. `st.blueprints` is the open project's deck, so it
+    // only follows along while that is still the project this run belongs to.
     {
         let mut st = state.lock().unwrap();
-        if st.active_project_id != project_id {
-            anyhow::bail!("当前项目已切换，生成结果未写入");
-        }
         if let Some(pid) = project_id {
             db::update_project_blueprints(
                 &db.lock().unwrap(),
@@ -1412,8 +1490,24 @@ async fn run_pipeline(
                 &serde_json::to_string(&final_slides)?,
             )?;
         }
-        st.blueprints = final_slides.clone();
+        if st.active_project_id == project_id {
+            st.blueprints = final_slides.clone();
+        }
     }
+    // The marker `get_generation_deck` and the page retry look for: this run's deck is now
+    // in the project's row, so the row holds this run's result and not the previous deck.
+    record_log(
+        &events,
+        &db,
+        run_id,
+        None,
+        "assembling",
+        "assembled",
+        "已组装牌组",
+        &format!("共 {} 张幻灯片", final_slides.len()),
+        json!({ "slide_count": final_slides.len() }),
+        false,
+    );
 
     emit_progress(&events, &db, run_id, "validate", "最终校验...", 0.95);
     let issues = crate::validate::validate_blueprints(&final_slides, &icon_index, assets.refs());
@@ -1581,6 +1675,8 @@ pub async fn recommend_icons_for_query(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::state::AppState;
+    use crate::types::SlideKind;
     use crate::validate::ValidationIssue;
 
     fn issue(slide_index: usize) -> ValidationIssue {
@@ -1588,6 +1684,108 @@ mod tests {
             slide_index,
             message: format!("slide {}: broken", slide_index + 1),
         }
+    }
+
+    /// 临时目录 + `db::open`（建好 schema）+ 最小状态，不碰真实数据目录。
+    fn test_state() -> SharedState {
+        let dir =
+            std::env::temp_dir().join(format!("huanshu-generation-test-{}", uuid::Uuid::new_v4()));
+        let conn = db::open(&dir).expect("open test database");
+        std::fs::remove_dir_all(&dir).ok();
+        std::sync::Mutex::new(AppState::for_tests(conn))
+    }
+
+    fn project(state: &SharedState, name: &str, deck: &Value) -> i64 {
+        let st = state.lock().unwrap();
+        let conn = st.db.lock().unwrap();
+        let id = db::create_project(&conn, name, "# 文稿").expect("create project");
+        db::update_project_blueprints(&conn, id, &deck.to_string()).expect("store deck");
+        id
+    }
+
+    /// 两个内容页的页面规划与布局规划（页面重试读的就是这条日志的 detail）。
+    fn plans() -> (Value, Value) {
+        (
+            json!([
+                {
+                    "page_id": "p01",
+                    "section_title": "第一章",
+                    "page_title": "第一页",
+                    "objective": "先看结论",
+                    "key_points": ["甲", "乙"],
+                    "content_shape": "list",
+                },
+                {
+                    "page_id": "p02",
+                    "section_title": "第二章",
+                    "page_title": "第二页",
+                    "objective": "再看做法",
+                    "key_points": ["丙", "丁"],
+                    "content_shape": "grid",
+                },
+            ]),
+            json!([
+                { "page_id": "p01", "kind": "section_list", "title": "第一页", "reason": "自动分配" },
+                { "page_id": "p02", "kind": "feature_grid", "title": "第二页", "reason": "自动分配" },
+            ]),
+        )
+    }
+
+    /// 两个内容页对应的整副牌组：封面 + 目录 + 2 页 + 结尾。
+    fn five_slide_deck(title: &str) -> Value {
+        json!([
+            { "kind": "cover", "title": title },
+            { "kind": "overview", "title": "目录" },
+            { "kind": "section_list", "title": "第一页", "aspect_ratio": "ratio_16x9" },
+            { "kind": "feature_grid", "title": "第二页" },
+            { "kind": "closing", "title": "结束" },
+        ])
+    }
+
+    /// 给项目造一次运行：规划日志、库里的牌组，可选地补组装日志。
+    fn seed_run(state: &SharedState, project_id: Option<i64>, assembled: bool) -> i64 {
+        let st = state.lock().unwrap();
+        let conn = st.db.lock().unwrap();
+        let run_id = db::create_generation_run(
+            &conn,
+            project_id,
+            "# 文稿",
+            Some("标题"),
+            "/tmp/huanshu-debug",
+        )
+        .expect("create run");
+        let (pages, layouts) = plans();
+        db::append_generation_log(
+            &conn,
+            run_id,
+            None,
+            "layout_plan",
+            "status",
+            "布局分配",
+            "分配完成",
+            &json!({
+                "page_plans": pages,
+                "layout_plans": layouts,
+                "aspect_ratio": "ratio_16x9",
+            }),
+            true,
+        )
+        .expect("layout log");
+        if assembled {
+            db::append_generation_log(
+                &conn,
+                run_id,
+                None,
+                "assembling",
+                "assembled",
+                "已组装牌组",
+                "共 5 张幻灯片",
+                &json!({ "slide_count": 5 }),
+                false,
+            )
+            .expect("assembled log");
+        }
+        run_id
     }
 
     #[test]
@@ -1612,5 +1810,146 @@ mod tests {
         let text = describe_deck_issues(&keys, &issues, 6);
         assert!(text.contains("第 1、3 页需要重试"), "{text}");
         assert!(text.contains("1 处问题"), "{text}");
+    }
+
+    /// 生成属于它开始时的项目：别的项目打开着也要读得到它的牌组，读的是库里的那份。
+    #[test]
+    fn the_generation_deck_is_the_runs_project_deck_while_another_project_is_open() {
+        let state = test_state();
+        let a = project(&state, "甲", &five_slide_deck("甲的封面"));
+        let b = project(
+            &state,
+            "乙",
+            &json!([{ "kind": "cover", "title": "乙的封面" }]),
+        );
+        seed_run(&state, Some(a), true);
+
+        // 打开的是乙。
+        crate::services::projects::open_project(&state, b).unwrap();
+        assert_eq!(
+            get_blueprints(&state).unwrap().len(),
+            1,
+            "开着的还是乙的牌组"
+        );
+
+        let a_deck = get_generation_deck(&state, a).unwrap();
+        assert_eq!(a_deck.len(), 5, "甲这次运行组装出的牌组");
+        assert_eq!(a_deck[0].title, "甲的封面");
+        // 乙没有运行：没有可取的运行就是空，而不是「乙的牌组」。
+        assert!(get_generation_deck(&state, b).unwrap().is_empty());
+        // 没跑过生成的项目同样是空。
+        assert!(get_generation_deck(&state, 4242).unwrap().is_empty());
+    }
+
+    /// 没到达组装的运行不能把库里上一次的旧牌组当成自己的结果。
+    #[test]
+    fn the_generation_deck_is_empty_until_the_latest_run_assembled() {
+        let state = test_state();
+        let a = project(&state, "甲", &five_slide_deck("上一次的封面"));
+        seed_run(&state, Some(a), true);
+        assert_eq!(get_generation_deck(&state, a).unwrap().len(), 5);
+
+        // 第二次运行在组装前失败：库里还是上一次的牌组，但它不是这次的结果。
+        seed_run(&state, Some(a), false);
+        assert!(get_generation_deck(&state, a).unwrap().is_empty());
+    }
+
+    /// 重试的布局选项读运行所属项目，与当前打开的项目无关。
+    #[test]
+    fn retry_layouts_follow_the_run_while_another_project_is_open() {
+        let state = test_state();
+        let a = project(&state, "甲", &five_slide_deck("甲的封面"));
+        let b = project(
+            &state,
+            "乙",
+            &json!([{ "kind": "cover", "title": "乙的封面" }]),
+        );
+        let run_id = seed_run(&state, Some(a), true);
+        crate::services::projects::open_project(&state, b).unwrap();
+
+        let options = get_retry_layouts(&state, run_id, 1).unwrap();
+        assert_eq!(options.current_kind, SlideKind::FeatureGrid);
+        assert!(!options.kinds.is_empty(), "该页至少有一个可选版式");
+        assert!(get_retry_layouts(&state, run_id, 9).is_err(), "越界页");
+    }
+
+    /// 重试前置检查（同步，不需要模型）也是按运行所属项目取的：底线是那次运行的牌组。
+    #[test]
+    fn a_page_retry_plans_against_the_runs_projects_deck() {
+        let state = test_state();
+        let a = project(&state, "甲", &five_slide_deck("甲的封面"));
+        let b = project(
+            &state,
+            "乙",
+            &json!([{ "kind": "cover", "title": "乙的封面" }]),
+        );
+        let run_id = seed_run(&state, Some(a), true);
+        crate::services::projects::open_project(&state, b).unwrap();
+
+        let st = state.lock().unwrap();
+        let conn = st.db.lock().unwrap();
+        let run = db::get_generation_run(&conn, run_id).unwrap();
+        let plan = plan_page_retry(&conn, &run, 1, None).unwrap();
+        assert_eq!(plan.page.page_id, "p02");
+        assert_eq!(plan.layout.kind, SlideKind::FeatureGrid);
+        assert_eq!(plan.ratio, crate::types::AspectRatio::Ratio16x9);
+        assert_eq!(plan.deck.len(), 5, "底稿是甲这次运行的牌组");
+        assert_eq!(plan.deck[2].title, "第一页");
+
+        // 越界页、不属于该页的版式都要拒。
+        assert_eq!(
+            plan_page_retry(&conn, &run, 9, None).unwrap_err(),
+            "页面索引无效"
+        );
+        let err = plan_page_retry(&conn, &run, 1, Some(SlideKind::ChartFocus)).unwrap_err();
+        assert!(err.starts_with("所选布局不适用于这一页："), "{err}");
+    }
+
+    /// 没到达组装（或牌组页数对不上规划）的运行不能重试单页，没有所属项目的也不行。
+    #[test]
+    fn a_page_retry_is_refused_without_an_assembled_deck() {
+        let state = test_state();
+        let a = project(&state, "甲", &five_slide_deck("甲的封面"));
+        let before = seed_run(&state, Some(a), false);
+        {
+            let st = state.lock().unwrap();
+            let conn = st.db.lock().unwrap();
+            let run = db::get_generation_run(&conn, before).unwrap();
+            let err = plan_page_retry(&conn, &run, 0, None).unwrap_err();
+            assert!(err.contains("尚未组装完成"), "{err}");
+        }
+
+        // 到达过组装，但库里的牌组页数与规划对不上（3 页 vs 规划的 2 页）。
+        {
+            let st = state.lock().unwrap();
+            let conn = st.db.lock().unwrap();
+            db::update_project_blueprints(
+                &conn,
+                a,
+                &json!([
+                    { "kind": "cover", "title": "甲" },
+                    { "kind": "overview", "title": "目录" },
+                    { "kind": "closing", "title": "结束" },
+                ])
+                .to_string(),
+            )
+            .unwrap();
+        }
+        let assembled = seed_run(&state, Some(a), true);
+        {
+            let st = state.lock().unwrap();
+            let conn = st.db.lock().unwrap();
+            let run = db::get_generation_run(&conn, assembled).unwrap();
+            let err = plan_page_retry(&conn, &run, 0, None).unwrap_err();
+            assert!(err.contains("尚未组装完成"), "{err}");
+        }
+
+        // 不属于任何项目的运行没有可取的底稿。
+        let orphan = seed_run(&state, None, true);
+        let st = state.lock().unwrap();
+        let conn = st.db.lock().unwrap();
+        let orphan_run = db::get_generation_run(&conn, orphan).unwrap();
+        let err = plan_page_retry(&conn, &orphan_run, 0, None).unwrap_err();
+        assert!(err.contains("不属于任何项目"), "{err}");
     }
 }

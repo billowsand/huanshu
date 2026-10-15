@@ -223,6 +223,19 @@ export const useGenerationStore = defineStore('generation', () => {
     unlistenPageStatus = null
   }
 
+  /**
+   * The deck a run produced, asked for by the project it was started for.
+   *
+   * The user may have opened another project while the run was going, so the open deck
+   * (`get_blueprints`) is only right while the run's project is not in the database yet
+   * (`/new` before it is saved, i.e. `activeProjectId` is null). Not keyed on the run id:
+   * that comes from the `gen:log` event, whose arrival is unordered against `invoke`'s.
+   */
+  async function loadRunDeck(projectId: number | null): Promise<SlideBlueprint[]> {
+    if (projectId === null) return invoke<SlideBlueprint[]>('get_blueprints')
+    return invoke<SlideBlueprint[]>('get_generation_deck', { projectId })
+  }
+
   async function generate(mdContent: string, frontmatterTitle?: string, granularity?: string, aspectRatio?: AspectRatio, projectId?: number | null) {
     if (running.value || retryingPages.value.size > 0) return
     generationVersion++
@@ -233,6 +246,8 @@ export const useGenerationStore = defineStore('generation', () => {
     logs.value = []
     currentRun.value = null
     activeProjectId.value = projectId ?? null
+    // The project this run belongs to, fixed for the whole run.
+    const runProjectId = activeProjectId.value
     pageStatuses.value = new Map()
     stage.value = 'start'
     message.value = ''
@@ -247,8 +262,8 @@ export const useGenerationStore = defineStore('generation', () => {
         granularity: granularity ?? null,
         aspectRatio: aspectRatio ?? null,
       })
-      // After generation, load final blueprints
-      const final = await invoke<SlideBlueprint[]>('get_blueprints')
+      // After generation, load the deck the run assembled in its own project.
+      const final = await loadRunDeck(runProjectId)
       blueprints.value = final
       completedSlides.value = new Set(final.map((_, index) => index))
       // Keep errors visible even when the final deck contains fallback slides.
@@ -263,7 +278,7 @@ export const useGenerationStore = defineStore('generation', () => {
       message.value = String(e)
       // Final validation can fail after assembly. Recover that deck for page retries.
       try {
-        const assembled = await invoke<SlideBlueprint[]>('get_blueprints')
+        const assembled = await loadRunDeck(runProjectId)
         if (assembled[0]?.kind === 'cover') {
           blueprints.value = assembled
           completedSlides.value = new Set(assembled.map((_, index) => index))

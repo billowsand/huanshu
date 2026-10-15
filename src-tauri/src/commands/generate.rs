@@ -73,6 +73,16 @@ pub fn get_blueprints(state: State<'_, Shared>) -> Result<Vec<SlideBlueprint>, S
     service::get_blueprints(&state)
 }
 
+/// The deck the latest generation of `project_id` produced, addressed by that project
+/// instead of by whichever project happens to be open. Empty until that run assembled.
+#[tauri::command]
+pub fn get_generation_deck(
+    state: State<'_, Shared>,
+    project_id: i64,
+) -> Result<Vec<SlideBlueprint>, String> {
+    service::get_generation_deck(&state, project_id)
+}
+
 /// Get generation status
 #[tauri::command]
 pub fn get_generation_status(state: State<'_, Shared>) -> Result<serde_json::Value, String> {
