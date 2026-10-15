@@ -540,11 +540,13 @@ impl Renderer {
     /// 4–200pt.
     ///
     /// The conversion is the one slides use (`math::convert_formula`: sentinel
-    /// characters stripped, then mitex), and the formula is `eval`ed into a page
-    /// sized to its content, at `pixel_per_pt` = [`FORMULA_PIXEL_PER_PT`]. A
-    /// formula mitex cannot convert, or one Typst rejects, comes back as `Err`
-    /// with the reason — the caller shows the source text instead. Formula
-    /// problems never touch other formulas or the deck export.
+    /// characters stripped, then mitex), and the formula is `eval`ed onto a page
+    /// that hugs its ink plus a 1pt margin — so superscripts, fraction
+    /// denominators and the limits of sums and integrals are never clipped — and
+    /// rasterized at `pixel_per_pt` = [`FORMULA_PIXEL_PER_PT`]. A formula mitex
+    /// cannot convert, or one Typst rejects, comes back as `Err` with the reason
+    /// — the caller shows the source text instead. Formula problems never touch
+    /// other formulas or the deck export.
     pub fn render_formula(
         &self,
         latex: &str,
@@ -1085,6 +1087,41 @@ mod tests {
         let image = formula("x_{1,2} = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}", true);
         assert_png(&image, "fraction");
         assert_eq!(pixels(&image).get_pixel(0, 0)[3], 0);
+    }
+
+    #[test]
+    fn formula_ink_keeps_clear_of_the_page_border() {
+        // The page hugs the formula, so an auto-sized page that is shorter than
+        // the formula cuts it off: with Typst's default cap-height/baseline text
+        // edges, inline fractions, sums, integrals and superscripts lost their
+        // tops and bottoms. Every formula must keep the 1pt margin empty, or it
+        // is being clipped.
+        let cases: &[(&str, bool)] = &[
+            ("x^2", false),
+            ("\\frac{1}{2}", false),
+            ("\\frac{\\frac{a}{b}}{\\frac{c}{d}}", false),
+            ("\\int_{0}^{1} e^{-x^2} dx", false),
+            ("\\sqrt[3]{\\frac{a}{b}}", false),
+            ("\\hat{\\hat{x}} \\vec{v}", false),
+            ("\\sum_{i=1}^{n} \\frac{1}{i^2}", true),
+            ("\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}", true),
+        ];
+        for (latex, display) in cases {
+            let image = formula(latex, *display);
+            let rgba = pixels(&image);
+            let (width, height) = rgba.dimensions();
+            let border: Vec<(u32, u32)> = (0..width)
+                .flat_map(|x| [(x, 0), (x, height - 1)])
+                .chain((0..height).flat_map(|y| [(0, y), (width - 1, y)]))
+                .collect();
+            for (x, y) in border {
+                assert_eq!(
+                    rgba.get_pixel(x, y)[3],
+                    0,
+                    "{latex:?} display={display}: ink at the border ({x}, {y}) is clipped",
+                );
+            }
+        }
     }
 
     #[test]

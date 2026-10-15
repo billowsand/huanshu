@@ -12,12 +12,23 @@
 
 #let spec = json("/deck.json")
 
-// `auto` page and `fill: none`: the page hugs the formula (plus the 1pt margin
-// around it, which keeps tall accents and limits from being clipped) and the
-// raster comes out with a transparent background.
+// `auto` page and `fill: none`: the page hugs the formula plus the 1pt margin
+// around it, and the raster comes out with a transparent background.
 #set page(width: auto, height: auto, margin: 1pt, fill: none)
 // Math scales with the text size, so `size_pt` is the formula's font size.
-#set text(font: spec.fonts, size: spec.size_pt * 1pt, fill: rgb(spec.fill), lang: "zh", region: "cn")
+// The `bounds` edges make the line box follow the glyphs' ink: with Typst's
+// default cap-height/baseline edges an auto-sized page comes out shorter than
+// the formula and cuts off superscripts, fraction denominators and the limits
+// of sums and integrals. The 1pt page margin then wraps the ink.
+#set text(
+  font: spec.fonts,
+  size: spec.size_pt * 1pt,
+  fill: rgb(spec.fill),
+  lang: "zh",
+  region: "cn",
+  top-edge: "bounds",
+  bottom-edge: "bounds",
+)
 // Same rule as main.typ: equations need an OpenType MATH font, and Rust passes
 // only the installed families (missing ones in a fallback list each warn).
 #show math.equation: it => if spec.math_fonts.len() > 0 {
