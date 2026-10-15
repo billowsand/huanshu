@@ -97,12 +97,7 @@ impl SettingsPage {
                             .flex()
                             .flex_col()
                             .gap(px(2.0))
-                            .child(
-                                div()
-                                    .text_size(px(14.0))
-                                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                                    .child(info.title),
-                            )
+                            .child(div().text_size(px(14.0)).child(info.title))
                             .child(
                                 div()
                                     .text_size(px(12.0))
@@ -155,12 +150,7 @@ impl SettingsPage {
                     .flex_row()
                     .items_center()
                     .justify_between()
-                    .child(
-                        div()
-                            .text_size(px(16.0))
-                            .font_weight(gpui_kit::FontWeight::BOLD)
-                            .child("连接状态"),
-                    )
+                    .child(div().text_size(px(16.0)).child("连接状态"))
                     .child(status_chip(state, cx)),
             )
             .child(
@@ -223,12 +213,7 @@ impl SettingsPage {
                     .flex()
                     .flex_col()
                     .gap(px(8.0))
-                    .child(
-                        div()
-                            .text_size(px(14.0))
-                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                            .child("这个服务用于"),
-                    )
+                    .child(div().text_size(px(14.0)).child("这个服务用于"))
                     .child(
                         div()
                             .flex()
@@ -266,12 +251,7 @@ impl SettingsPage {
                     .flex_row()
                     .items_center()
                     .gap(px(10.0))
-                    .child(
-                        div()
-                            .text_size(px(16.0))
-                            .font_weight(gpui_kit::FontWeight::BOLD)
-                            .child(info.title),
-                    )
+                    .child(div().text_size(px(16.0)).child(info.title))
                     .when_some(model_pill, |heading, pill| {
                         heading.child(widgets::chip(pill, Tone2::Muted, cx))
                     }),

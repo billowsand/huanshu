@@ -405,12 +405,7 @@ impl SettingsPage {
                         .flex_row()
                         .items_center()
                         .gap(px(12.0))
-                        .child(
-                            div()
-                                .text_size(px(17.0))
-                                .font_weight(gpui_kit::FontWeight::BOLD)
-                                .child("字体"),
-                        )
+                        .child(div().text_size(px(17.0)).child("字体"))
                         .child(
                             div()
                                 .text_size(px(13.0))
@@ -446,12 +441,7 @@ impl SettingsPage {
                             .flex_row()
                             .items_baseline()
                             .gap(px(12.0))
-                            .child(
-                                div()
-                                    .text_size(px(17.0))
-                                    .font_weight(gpui_kit::FontWeight::BOLD)
-                                    .child("界面主题"),
-                            )
+                            .child(div().text_size(px(17.0)).child("界面主题"))
                             .child(
                                 div()
                                     .text_size(px(13.0))
@@ -542,7 +532,6 @@ impl SettingsPage {
             .child(
                 div()
                     .text_size(px(24.0))
-                    .font_weight(gpui_kit::FontWeight::BOLD)
                     .font_family(role_font(FontRole::Title))
                     .child("让想法清晰呈现"),
             )
@@ -582,12 +571,7 @@ impl SettingsPage {
                     .child(widgets::brand_mark(18.0))
                     .child(div().text_size(px(13.0)).child("幻述 Studio")),
             )
-            .child(
-                div()
-                    .text_size(px(18.0))
-                    .font_weight(gpui_kit::FontWeight::BOLD)
-                    .child("新的演示文稿"),
-            )
+            .child(div().text_size(px(18.0)).child("新的演示文稿"))
             .child(
                 div()
                     .text_size(px(13.0))
@@ -639,12 +623,7 @@ impl SettingsPage {
                     .text_color(c.muted)
                     .child(self.preview_role.label()),
             )
-            .child(
-                div()
-                    .text_size(px(16.0))
-                    .font_weight(gpui_kit::FontWeight::BOLD)
-                    .child("Aa Bb"),
-            )
+            .child(div().text_size(px(16.0)).child("Aa Bb"))
             .child(div().text_size(px(14.0)).child("0123456789"))
             .child(div().text_size(px(14.0)).child("中文字体示例"));
 
@@ -844,7 +823,6 @@ impl Render for FontPicker {
                     .child(
                         div()
                             .text_size(px(17.0))
-                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                             .child(format!("选择{}", self.role.picker_label())),
                     )
                     .child(

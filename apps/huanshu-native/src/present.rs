@@ -438,12 +438,7 @@ impl Presentation {
             .min_h_0()
             .overflow_y_scroll()
             .p(px(24.0))
-            .child(
-                div()
-                    .text_size(px(18.0))
-                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                    .child("Keynote 全览"),
-            )
+            .child(div().text_size(px(18.0)).child("Keynote 全览"))
             .child(widgets::section_label("点击任意缩略图进入对应页", cx))
             .child(
                 div()

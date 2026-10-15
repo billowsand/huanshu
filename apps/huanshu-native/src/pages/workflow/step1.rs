@@ -789,7 +789,6 @@ impl Render for Step1 {
                         .border_color(c.border)
                         .bg(c.panel)
                         .text_size(px(11.0))
-                        .font_weight(gpui_kit::FontWeight::BOLD)
                         .text_color(c.muted)
                         .child(format!("P{}", index + 1)),
                 )

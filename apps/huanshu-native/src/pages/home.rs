@@ -580,12 +580,7 @@ impl Render for HomePage {
                                     .text_color(c.primary)
                                     .child("幻述 STUDIO"),
                             )
-                            .child(
-                                div()
-                                    .text_size(px(18.0))
-                                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                                    .child("我的演示文稿"),
-                            ),
+                            .child(div().text_size(px(18.0)).child("我的演示文稿")),
                     ),
             )
             .when_some(count.filter(|count| *count > 0), |row, count| {

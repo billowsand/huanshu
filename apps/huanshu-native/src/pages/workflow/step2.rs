@@ -24,8 +24,8 @@ use gpui_kit::component::{Disableable as _, IndexPath, WindowExt as _};
 use gpui_kit::prelude::*;
 use gpui_kit::{
     div, px, relative, uniform_list, Animation, AnimationExt as _, AnyElement, App, Context,
-    Entity, FocusHandle, FontWeight, Hsla, KeyDownEvent, Render, ScrollStrategy, SharedString,
-    Subscription, UniformListScrollHandle, WeakEntity, Window,
+    Entity, FocusHandle, Hsla, KeyDownEvent, Render, ScrollStrategy, SharedString, Subscription,
+    UniformListScrollHandle, WeakEntity, Window,
 };
 use huanshu_core::editor_schema::{self, EditorSchema};
 use huanshu_core::events::GenerationLogEvent;
@@ -354,12 +354,7 @@ impl Render for Step2 {
                             .min_w_0()
                             .flex()
                             .flex_col()
-                            .child(
-                                div()
-                                    .text_size(px(15.0))
-                                    .font_weight(FontWeight::BOLD)
-                                    .child(title),
-                            )
+                            .child(div().text_size(px(15.0)).child(title))
                             .when(!message.is_empty(), |column| {
                                 column.child(
                                     div()
@@ -755,7 +750,6 @@ fn panel_head(
         .border_b_1()
         .border_color(c.border)
         .text_size(px(10.0))
-        .font_weight(FontWeight::BOLD)
         .text_color(c.muted)
         .child(carbon(icon))
         .child(label)
@@ -793,7 +787,6 @@ fn stat_chip(value: String, label: &'static str, accent: bool, cx: &App) -> AnyE
         .child(
             div()
                 .text_size(px(18.0))
-                .font_weight(FontWeight::BOLD)
                 .text_color(if accent { c.primary } else { c.text })
                 .child(value),
         )
@@ -953,7 +946,6 @@ fn board_card(
                         .min_w_0()
                         .truncate()
                         .text_size(px(15.2))
-                        .font_weight(FontWeight::SEMIBOLD)
                         .child(card.title.clone()),
                 )
                 .child(widgets::chip(card.status.1.clone(), card.status.0, cx)),
@@ -1179,7 +1171,6 @@ fn progress_section(
                             .flex()
                             .flex_row()
                             .gap(px(8.0))
-                            .font_weight(FontWeight::SEMIBOLD)
                             .text_color(c.text)
                             .child(div().flex_grow(1.5).flex_basis(px(0.0)).child("阶段"))
                             .child(div().flex_grow(1.0).flex_basis(px(0.0)).child("已完成"))
@@ -1220,13 +1211,7 @@ fn progress_section(
                         .flex_row()
                         .items_center()
                         .gap(px(16.0))
-                        .child(
-                            div()
-                                .flex_none()
-                                .text_size(px(14.1))
-                                .font_weight(FontWeight::BOLD)
-                                .child("整体进度"),
-                        )
+                        .child(div().flex_none().text_size(px(14.1)).child("整体进度"))
                         .child(meta(format!("已完成 {}/{}", summary.done, total), c.muted))
                         .when(summary.active > 0, |main| {
                             main.child(meta(format!("进行中 {}", summary.active), c.muted))
@@ -1248,7 +1233,6 @@ fn progress_section(
                         .child(
                             div()
                                 .text_size(px(20.8))
-                                .font_weight(FontWeight::BOLD)
                                 .child(format!("{}%", summary.percent)),
                         )
                         .child(
@@ -1412,7 +1396,6 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
     let section_title = |text: &'static str| -> AnyElement {
         div()
             .text_size(px(12.2))
-            .font_weight(FontWeight::SEMIBOLD)
             .text_color(c.muted)
             .mb(px(7.2))
             .child(text)
@@ -1574,11 +1557,7 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
                 .flex_row()
                 .text_size(px(12.8))
                 .text_color(c.muted)
-                .child(
-                    div()
-                        .font_weight(FontWeight::BOLD)
-                        .child(kind_label.clone()),
-                )
+                .child(div().child(kind_label.clone()))
                 .child(suffix)
                 .into_any_element(),
         );
@@ -1632,13 +1611,7 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
                     .flex()
                     .flex_col()
                     .gap(px(4.0))
-                    .child(
-                        div()
-                            .text_size(px(12.2))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(c.muted)
-                            .child(label),
-                    )
+                    .child(div().text_size(px(12.2)).text_color(c.muted).child(label))
                     .child(
                         div()
                             .id(("s2-debug", position))
@@ -1760,13 +1733,7 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
                             .text_color(c.muted)
                             .child(format!("第 {} 张", index + 1)),
                     )
-                    .child(
-                        div()
-                            .mt(px(4.8))
-                            .text_size(px(17.6))
-                            .font_weight(FontWeight::BOLD)
-                            .child(title),
-                    )
+                    .child(div().mt(px(4.8)).text_size(px(17.6)).child(title))
                     .child(
                         div()
                             .mt(px(12.0))
@@ -2015,13 +1982,7 @@ impl Render for RetryLayoutDialog {
             .w_full()
             .flex()
             .flex_col()
-            .child(
-                div()
-                    .text_size(px(20.8))
-                    .font_weight(FontWeight::BOLD)
-                    .mb(px(12.0))
-                    .child("选择重试布局"),
-            )
+            .child(div().text_size(px(20.8)).mb(px(12.0)).child("选择重试布局"))
             .child(div().text_size(px(14.0)).child(format!(
                 "第 {} 页将按所选布局重新生成。",
                 self.page_index + 1

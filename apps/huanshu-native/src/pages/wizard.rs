@@ -446,7 +446,6 @@ impl Render for WizardPage {
                     .items_center()
                     .justify_center()
                     .text_size(px(13.0))
-                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .border_2()
                     .when(active, |dot| {
                         dot.bg(c.primary_bg)
@@ -523,12 +522,7 @@ impl Render for WizardPage {
                         .flex()
                         .flex_col()
                         .gap(px(10.0))
-                        .child(
-                            div()
-                                .text_size(px(13.0))
-                                .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                                .child(info.title),
-                        )
+                        .child(div().text_size(px(13.0)).child(info.title))
                         .child(self.forms[target.index()].clone())
                 });
                 div()
@@ -619,13 +613,7 @@ impl Render for WizardPage {
                         .justify_between()
                         .text_size(px(13.0))
                         .child(div().text_color(c.muted).child(label))
-                        .child(
-                            div()
-                                .font_weight(gpui_kit::FontWeight::MEDIUM)
-                                .max_w(px(340.0))
-                                .truncate()
-                                .child(value),
-                        )
+                        .child(div().max_w(px(340.0)).truncate().child(value))
                         .into_any_element()
                 };
                 let model_of = |target: ModelTarget| -> String {
@@ -698,7 +686,6 @@ impl Render for WizardPage {
                                         .child(
                                             div()
                                                 .text_size(px(13.0))
-                                                .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                                                 .text_color(c.warning)
                                                 .child("需要重启应用"),
                                         )
@@ -838,24 +825,13 @@ impl Render for WizardPage {
                                             .child(
                                                 div()
                                                     .text_size(px(11.0))
-                                                    .font_weight(gpui_kit::FontWeight::BOLD)
                                                     .text_color(c.primary)
                                                     .child("HUANSHU STUDIO"),
                                             )
-                                            .child(
-                                                div()
-                                                    .text_size(px(24.0))
-                                                    .font_weight(gpui_kit::FontWeight::BOLD)
-                                                    .child("幻述"),
-                                            ),
+                                            .child(div().text_size(px(24.0)).child("幻述")),
                                     ),
                             )
-                            .child(
-                                div()
-                                    .text_size(px(22.0))
-                                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                                    .child("首次启动配置"),
-                            )
+                            .child(div().text_size(px(22.0)).child("首次启动配置"))
                             .child(
                                 div()
                                     .text_size(px(13.0))
@@ -869,12 +845,7 @@ impl Render for WizardPage {
                             .flex()
                             .flex_col()
                             .gap(px(6.0))
-                            .child(
-                                div()
-                                    .text_size(px(19.0))
-                                    .font_weight(gpui_kit::FontWeight::BOLD)
-                                    .child(step_title),
-                            )
+                            .child(div().text_size(px(19.0)).child(step_title))
                             .when(!step_desc.is_empty(), |heading| {
                                 heading.child(
                                     div()

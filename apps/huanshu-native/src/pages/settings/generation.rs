@@ -35,12 +35,7 @@ impl SettingsPage {
                         .flex()
                         .flex_col()
                         .gap(px(3.0))
-                        .child(
-                            div()
-                                .text_size(px(14.0))
-                                .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                                .child(label),
-                        )
+                        .child(div().text_size(px(14.0)).child(label))
                         .child(div().text_size(px(13.0)).text_color(c.muted).child(desc))
                         .child(div().text_size(px(12.0)).text_color(c.muted).child(small)),
                 )
@@ -60,12 +55,7 @@ impl SettingsPage {
             .flex()
             .flex_col()
             .gap(px(20.0))
-            .child(
-                div()
-                    .text_size(px(16.0))
-                    .font_weight(gpui_kit::FontWeight::BOLD)
-                    .child("生成参数"),
-            )
+            .child(div().text_size(px(16.0)).child("生成参数"))
             .child(setting_row(
                 "自动修复轮数",
                 "生成后遇到格式校验错误时，自动修复的最大次数。",

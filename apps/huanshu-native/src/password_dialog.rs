@@ -294,7 +294,6 @@ impl Render for PasswordDialog {
                             .child(
                                 div()
                                     .text_size(px(12.0))
-                                    .font_weight(gpui_kit::FontWeight::MEDIUM)
                                     .text_color(level_color)
                                     .child(level_label),
                             ),
@@ -372,7 +371,6 @@ impl Render for PasswordDialog {
             .child(
                 div()
                     .text_size(px(18.0))
-                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .mb(px(8.0))
                     .child(match self.mode {
                         PasswordMode::Encrypt => "设置密码",

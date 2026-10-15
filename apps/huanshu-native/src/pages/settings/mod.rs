@@ -527,7 +527,6 @@ impl Render for SettingsPage {
                     .pt(px(18.0))
                     .pb(px(10.0))
                     .text_size(px(20.0))
-                    .font_weight(gpui_kit::FontWeight::BOLD)
                     .child("设置"),
             )
             .children(SettingsTab::ALL.iter().map(|tab| {
@@ -659,12 +658,7 @@ impl Render for SettingsPage {
                                     .flex()
                                     .flex_col()
                                     .gap(px(6.0))
-                                    .child(
-                                        div()
-                                            .text_size(px(26.0))
-                                            .font_weight(gpui_kit::FontWeight::BOLD)
-                                            .child(self.tab.label()),
-                                    )
+                                    .child(div().text_size(px(26.0)).child(self.tab.label()))
                                     .child(
                                         div()
                                             .text_size(px(14.0))
@@ -850,12 +844,7 @@ impl SettingsPage {
                         div()
                             .flex()
                             .flex_col()
-                            .child(
-                                div()
-                                    .text_size(px(18.0))
-                                    .font_weight(gpui_kit::FontWeight::BOLD)
-                                    .child("幻述 Studio"),
-                            )
+                            .child(div().text_size(px(18.0)).child("幻述 Studio"))
                             .child(
                                 div()
                                     .text_size(px(13.0))
@@ -869,12 +858,7 @@ impl SettingsPage {
                     .text_size(px(14.0))
                     .child("将 Markdown 文档自动转化为精美的演示文稿。"),
             )
-            .child(
-                div()
-                    .text_size(px(15.0))
-                    .font_weight(gpui_kit::FontWeight::BOLD)
-                    .child("开始使用"),
-            )
+            .child(div().text_size(px(15.0)).child("开始使用"))
             .child(step(
                 1,
                 "在「模型服务」中配置文本生成、向量检索和图片理解服务。",

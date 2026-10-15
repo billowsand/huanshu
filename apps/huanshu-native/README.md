@@ -64,7 +64,15 @@ src/
     `release` 只在页面离开时调。要显示「渲染中…」用 `SlideImages::pending()` + 自己计时（原版 150ms）。
 11. **第三步的牌组编辑只走 `WorkflowPage::commit_deck`**（唯一写入路径）：它写 `ProjectModel` → 应用级
     store（`GenerationStore::set_deck`）→ 按需落库。不要在页面里直接改 `ProjectModel.deck` 或 store 的牌组
-    （store 的镜像会盖回去，或者污染别的项目）；动手前先问 `WorkflowPage::editing_locked`（生成中只读）。
+    （store 的镜像会盖回去，或者污染别的项目）；动手前先问 `WorkflowPage::editing_locked`
+    （只有**本项目**在生成 / 重试时才只读；别的项目在生成时本项目的第三步照常可编辑）。
+12. **界面文字一律常规体**：原版 `src/themes/typography.css` 的 `#app * { font-weight: normal !important; }`
+    把 Studio 外壳的字重全拍平了，要粗体必须**选粗体字族**。原生版照做——页面里不要写
+    `.font_weight(...)`（`grep -rn "FontWeight::" src` 应当没有任何匹配），强调靠**颜色**
+    （`cx.studio().colors`）与**字族 / 字号**，不要靠字重。唯一的例外是 GPUI Kit 组件内部
+    改不掉的两处与主题里的语法高亮（见下）；另外原版被 `Teleport to="body"` 挪出 `#app` 的弹窗
+    （密码、导出、字体选择、首页删除确认、第三步的版式选择）**不在** `#app *` 的范围内，原版里
+    它们仍是 500/600——原生版为了统一已经拍平，属于有意偏离。
 
 ### 已知的 GPUI Kit 细节
 
@@ -73,3 +81,7 @@ src/
 - `img("brand/mark.svg")` 走资源源（彩色 SVG）；`Icon` 走单色遮罩，按文字颜色着色。
 - Markdown 渲染：`gpui_kit::component::text::TextView::markdown(id, text)`。
 - 代码编辑器：`EditorState::new(window, cx).language("markdown")` + `Editor::new(&state)`。
+- **GPUI Kit 里改不掉的字重**（规矩 12 的例外，共两处）：`TextView::markdown` 的表头
+  （`gpui-component` 的 `table_head` 固定 `FontWeight::BOLD`）；语法高亮里的 `emphasis.strong`（700）
+  与 `title`（600），来自 `gpui-component` 的 `theme/default-theme.json`。按钮、输入框、
+  对话框标题与标签都**没有**内置字重，跟随页面设置。

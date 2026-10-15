@@ -154,12 +154,7 @@ impl SettingsPage {
                     .flex()
                     .flex_col()
                     .gap(px(14.0))
-                    .child(
-                        div()
-                            .text_size(px(16.0))
-                            .font_weight(gpui_kit::FontWeight::BOLD)
-                            .child("文件位置"),
-                    )
+                    .child(div().text_size(px(16.0)).child("文件位置"))
                     .child(row("数据目录", data_dir, "存放数据库和项目配置文件。"))
                     .child(row("媒体目录", media_dir, "存放上传的图片和视频。")),
             )
@@ -175,12 +170,7 @@ impl SettingsPage {
                             .flex_row()
                             .items_center()
                             .justify_between()
-                            .child(
-                                div()
-                                    .text_size(px(16.0))
-                                    .font_weight(gpui_kit::FontWeight::BOLD)
-                                    .child("图标向量缓存"),
-                            )
+                            .child(div().text_size(px(16.0)).child("图标向量缓存"))
                             .child(status_badge),
                     )
                     .child(
