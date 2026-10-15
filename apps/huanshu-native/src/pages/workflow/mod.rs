@@ -164,7 +164,7 @@ fn aspect_str(aspect: AspectRatio) -> &'static str {
     }
 }
 
-fn parse_aspect(text: &str) -> Option<AspectRatio> {
+pub(super) fn parse_aspect(text: &str) -> Option<AspectRatio> {
     match text {
         "ratio_16x9" => Some(AspectRatio::Ratio16x9),
         "ratio_32x9" => Some(AspectRatio::Ratio32x9),

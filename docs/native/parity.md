@@ -80,7 +80,7 @@
 | 初始步骤（生成中→2，有蓝图→3，否则→1）与可点击规则 | ✅ | `finish_open`（原版 `onMounted` 顺序在 `GenerationStore::open_project` 里）；第 3 步点击含「没有页在重试」 |
 | 项目改名（点名字编辑，回车/失焦保存，Esc 取消） | ✅ | `mod.rs::start_rename` / `save_name`（空名不保存、保持编辑态，照原版）；待截图对比 |
 | 新建项目的草稿（名称、文稿、粒度、比例）保存与恢复 | ✅ | 800ms 防抖自动保存（`WorkflowPage::schedule_autosave` / `persist_draft`，新建落库后 `retarget_route` 对准路由）；meta 存 `app_settings` 的 `project_meta:<id>`（`services::projects::Step1ProjectMeta`，单测 `step1_meta_*`）；待截图对比 |
-| 生成完成后自动跳到第 3 步 | ✅ | `sync_advance`：原版 watch 的 `[stage, retryingPages.size, 有失败页]` 变了才判断，`done` + 无重试 + 无失败页 + 停在第 2 步时 800ms 后再查一遍再跳；计时走 `window.background_executor().timer`（不是 tokio）；待截图对比 |
+| 生成完成后自动跳到第 3 步 | ✅ | `sync_advance`：条件从**应用级 store** 读（`state_for` → `GenState`），与原版 watch 的 `[stage, retryingPages.size, 有失败页]` 一样「变了才判断」——`done` + 无重试 + 无失败页 + 用户正停在本项目的第 2 步时，800ms 后再查一遍再跳；计时走 `window.background_executor().timer`（不是 tokio）；自动跳页依赖一次成功的生成，**未真机验证**（需 LM Studio） |
 | 库里停在 `running` 的旧运行（上次进程崩了） | 🟡 | **有意偏离**：原版会一直转圈；这里按「已中断」显示（`running=false`、阶段照 `slideStatus` 的非运行分支）且允许重新生成，**不改库**（`GenerationStore::apply_run`） |
 
 ## 第一步 `Step1Prepare.vue` + `MarkdownWorkbench.vue` → `workflow/step1.rs`
@@ -99,24 +99,24 @@
 | 分页粒度（自动推荐 / 二级 / 三级，各自页数与标题数） | ✅ | `estimate_slides` / `detect_granularity` / `count_exact_headings`；待截图对比 |
 | 幻灯片比例三选一（写回项目） | ✅ | `update_project_aspect_ratio` |
 | 素材库（添加、拖入、列表、删除） | ✅ | `services::media::{import_media_asset, delete_media_asset, get_project_media}`；新建项目先 `create_project` + `open_project`，落库后 `retarget_route` 对准路由（原版 `router.replace`）；图注编辑原版不在第一步（第三步高级 JSON）；待截图对比 |
-| 开始 AI 生成（建项目、保存文稿、切到第 2 步） | ✅ | `WorkflowPage::start_generation`：取消防抖 → 立即落库 → 切第 2 步 → `GenerationStore::generate`（granularity auto 传 None）；「开始 AI 生成」的可用条件即原版 `canGenerate`（**全局**没有生成 / 重试在跑）；**生成流程未真机验证**（需 LM Studio） |
+| 开始 AI 生成（建项目、保存文稿、切到第 2 步） | ✅ | `WorkflowPage::start_generation`：取消防抖 → 立即落库 → 切第 2 步 → `GenerationStore::generate`（granularity auto 传 None）；「开始 AI 生成」的可用条件即原版 `canGenerate`（**全局**没有生成 / 重试在跑：`store.busy()`，同一时刻全应用只许一次生成或重试——别的项目在跑时这一步也不可用）；第 2 步底栏的「重新生成全部」走的就是这一条路；**生成流程未真机验证**（需 LM Studio） |
 | 图表围栏的校验提示 | ⬜ | `input.rs` 的解析报错 |
 
 ## 第二步 `Step2Generate.vue` + `stores/generation.ts` → `workflow/step2.rs`
 
 | 功能 | 状态 | 说明 / 依据 |
 |---|---|---|
-| 顶部状态与统计（幻灯片数 / 关键事件 / 生成记录） | 🟡 | 标题四态（生成中「`{stageLabel}...`」/「生成完成 · N 张幻灯片」/「生成遇到问题」/「准备开始」）与第二行 `message` 已按原版，N 与「幻灯片」统计都用看板条目数；「关键事件」「生成记录」待做 |
-| 生成流水线与事件 | ✅ | `GenerationStore`（原版 `stores/generation.ts`，应用级、比页面活得久）+ `services::generation::generate_slides`；五类 `CoreEvent` 都在 store 里落地；逐页状态 / 日志的消费在下一步 |
-| 整体进度、五个阶段 n/N、查看详情 | ⬜ | `utils/generationProgress.ts` |
-| 看板卡片：序号、标题、状态、版式、缩略图 | 🟡 | 状态固定「已完成」；阶段标签未做 |
-| 看板只渲染可见卡片 | ⬜ | 现在整副请求；改成虚拟列表 + `wanted` |
-| 键盘 ←/→/↑/↓ 选页 | ⬜ | `handleStepKeydown` |
-| 详情：大图、标题、状态、版式 | ✅ | |
-| 详情：规划页面、生成日志、调试信息 | ⬜ | `get_generation_logs`、`extractPagePlanFromLog` 等 |
-| 单页重试、换版式重试 | ⬜ | `retry_generation_page`、`get_retry_layouts`、`RetryLayoutDialog.vue` |
-| 生成出错时重试整次生成 | ⬜ | |
-| 前往编辑 | ✅ | |
+| 顶部状态与统计（幻灯片数 / 关键事件 / 生成记录） | ✅ | 标题四态（生成中「`{stageLabel}...`」/「生成完成 · N 张幻灯片」/「生成遇到问题」/「准备开始」）+ 第二行 `message`；三个统计取 core 的 `slideItems` 条数 / `important_log_count` / `prompt_log_count`（数字用主色）；`shell/project-step2-0.png`、`shell/project-step2-error-0.png` |
+| 生成流水线与事件 | ✅ | `GenerationStore`（原版 `stores/generation.ts`，应用级、比页面活得久）+ `services::generation::generate_slides`；五类 `CoreEvent` 都在 store 里落地；单页重试另见下面两行；**生成流程未真机验证**（需 LM Studio） |
+| 整体进度、五个阶段 n/N、查看详情 | ✅ | `huanshu_core::generation_progress::summarize_progress`（快照单测 `crates/huanshu-core/tests/generation_progress.rs`）；展开后的两段说明与四列表格逐字照抄；实测展开：`共 5 页 · 已完成 4 · 进行中 0 · 等待 0 · 失败 1 · 已中断 0`，五阶段 5/5 5/5 4/5 4/5 4/5 |
+| 看板卡片：序号、标题、状态、版式、缩略图 | ✅ | 状态与五个阶段标签都调 core（`slide_status` / `page_step_state`），版式名用 `step2_kind_label`（**不是** `editor_schema` 的中文名）；空状态与两种占位文案照原版；`project-step2-error-0.png`（第 3 张红色「生成失败」，阶段停在「布局」之后） |
+| 看板只渲染可见卡片 | ✅ | `uniform_list`（一行 = 一行卡片，行高 = 卡片实测高度）+ `SlideImages::set_wanted` = 可见行 + 预取一行；长牌组（60 内容页）打开时请求 6 页（另有详情 1 页），滚到底累计请求 60 页，滚回顶部 0 次新请求 |
+| 键盘 ↑/↓ 选页 | ✅ | `track_focus` + `on_key_down`：**只有 ↑/↓**，带修饰键不处理（照原版 `handleStepKeydown`；原表里的 ←/→ 是错的）；进入第 2 步时看板拿到焦点；选中的卡片滚进可见区；实测 ↑/↓ 换页 |
+| 详情：大图、标题、状态、版式 | ✅ | 大图只请求选中这一页（详情 `SlideImages` 的 `max_cached = 4`） |
+| 详情：规划页面、生成日志、调试信息 | ✅ | 「规划页面」（objective / key_points / 结论）/「布局排版」（含「· 已调整布局」与 reason）/「内容结果」三段 + 「查看当前页调试信息」（System Prompt / User Prompt / 模型原始输出 / 解析结果：等宽字体、深色底、可滚动）+「查看最近日志」（`recent_logs`，`{log_stage_label} · #{seq}`）；**已知偏差**：调试文本不可选中复制（gpui 没有可选中文本元素） |
+| 单页重试、换版式重试 | ✅ | 失败段 → `RetryLayoutDialog.vue` 对应物（`get_retry_layouts` + `editor_schema` 的 label/desc、默认选中当前版式、关掉后迟到的结果按版本号作废）→ `GenerationStore::retry_page`；实测：无 LM Studio 时该页回到「生成失败」并显示连接错误，界面不崩 |
+| 生成出错时重试整次生成 | ✅ | 底栏「重新生成全部」走与第一步「开始 AI 生成」同一条路（`WorkflowPage::start_generation`）；实测：点后进入生成中（看板清空、底栏隐藏、面板头出现实时点），连接失败后回到「生成遇到问题」 |
+| 前往编辑 | ✅ | 完成态底栏，有页在重试时禁用 |
 
 ## 第三步 `Step3Editor.vue` + `useSlideEditor.ts` → `workflow/step3.rs`
 

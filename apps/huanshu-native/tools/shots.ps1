@@ -31,6 +31,7 @@ $Shots = @(
     @("new-step1", "new"),
     @("project-step1", "project:2:1"),
     @("project-step2", "project:2:2"),
+    @("project-step2-error", "project:8:2"),
     @("project-step3", "project:2:3"),
     @("project-step3-32x9", "project:3:3"),
     @("project-step3-images", "project:1:3")

@@ -27,10 +27,8 @@
 //! 3. 原版的 `completedSlides` 只在本 store 内部使用（没有任何界面消费），这里不存；
 //!    原版的 `repairSlide` 无人调用，也没有移植。
 //!
-//! 单页重试（`retry_page`）与看板 / 详情段的消费在下一步接上，因此本文件里有一部分
-//! 访问器暂时没有调用方。
-
-#![allow(dead_code)]
+//! 界面读状态的入口是 [`GenerationStore::state_for`]（工作流侧栏与初始步骤用摘要）与
+//! [`GenerationStore::snapshot_for`]（第二步的看板与详情要逐页状态、日志、牌组）。
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -124,6 +122,36 @@ impl GenState {
     }
 }
 
+/// 第二步要的完整生成状态（[`GenerationStore::snapshot_for`]）：原版 `Step2Generate.vue`
+/// 从 `useGenerationStore()` 读的那些字段，加上界面要的看板条目与缩略图牌组。
+#[derive(Debug, Clone)]
+pub struct GenSnapshot {
+    /// 原版 `gen.stage`。
+    pub stage: String,
+    /// 原版 `gen.message`。
+    pub message: String,
+    /// 原版 `gen.running`。
+    pub running: bool,
+    /// 原版 `slideItems`。
+    pub items: Vec<SlideProgressItem>,
+    /// 原版 `gen.pageStatuses`。
+    pub statuses: Statuses,
+    /// 原版 `gen.retryingPages`。
+    pub retrying: PageSet,
+    /// 原版 `recentLogs`（最后 10 条，倒序）。
+    pub recent_logs: Vec<GenerationLogEvent>,
+    /// 原版 `importantLogCount`。
+    pub important: usize,
+    /// 原版 `promptLogCount`。
+    pub prompt_count: usize,
+    /// 原版 `gen.currentRun`（单页重试要它的 id）。
+    pub current_run: Option<GenerationRun>,
+    /// 缩略图牌组：看板条目的蓝图（含取自日志的蓝图，空位是 `None`），下标 = 看板条目下标。
+    pub thumbs: Vec<Option<Value>>,
+    /// 原版「页面比例」的来源：`props.blueprints[0]`。
+    pub aspect_source: Option<Value>,
+}
+
 /// 库里读出来的静态生成状态（原版 `loadLatestRun` 的非运行分支）。
 ///
 /// - `error` → 生成出错；
@@ -206,62 +234,23 @@ impl GenerationStore {
 
     // ── 只读状态 ──────────────────────────────────────────────────────────────
 
-    pub fn project_id(&self) -> Option<i64> {
-        self.project_id
-    }
-
-    pub fn stage(&self) -> &str {
-        &self.stage
-    }
-
-    pub fn message(&self) -> &str {
-        &self.message
-    }
-
-    pub fn progress(&self) -> f32 {
-        self.progress
-    }
-
+    /// 原版 `gen.blueprints`（工作流把牌组镜像进 `ProjectModel.deck`，第三步用它）。
     pub fn blueprints(&self) -> &[Option<Value>] {
         &self.blueprints
     }
 
-    pub fn page_statuses(&self) -> &Statuses {
-        &self.page_statuses
-    }
-
-    pub fn retrying_pages(&self) -> &PageSet {
-        &self.retrying_pages
-    }
-
-    pub fn logs(&self) -> &[GenerationLogEvent] {
-        &self.logs
-    }
-
-    pub fn current_run(&self) -> Option<&GenerationRun> {
-        self.current_run.as_ref()
-    }
-
-    pub fn running(&self) -> bool {
-        self.running
-    }
-
-    pub fn last_error(&self) -> &str {
-        &self.last_error
-    }
-
-    /// 原版 `gen.stageLabel`。
-    pub fn stage_label(&self) -> String {
-        progress::stage_label(&self.stage).to_string()
+    /// 生成用的共享状态（「选择重试布局」对话框读 `get_retry_layouts` 要用）。
+    pub fn shared(&self) -> &AppShared {
+        &self.shared
     }
 
     /// 原版 `gen.slideCount`：非空蓝图数。
-    pub fn slide_count(&self) -> usize {
+    fn slide_count(&self) -> usize {
         progress::count_ready_blueprints(&self.blueprints)
     }
 
     /// 原版 `slideItems`：看板的条目（内容页）。
-    pub fn items(&self) -> Vec<SlideProgressItem> {
+    fn items(&self) -> Vec<SlideProgressItem> {
         progress::slide_items(&self.blueprints, &self.logs, &self.page_statuses)
     }
 
@@ -321,6 +310,59 @@ impl GenerationStore {
                     board_items: progress::slide_items(&slots, &[], &statuses).len(),
                     has_blueprints: !deck.is_empty(),
                     failed_pages: false,
+                }
+            }
+        }
+    }
+
+    /// 第二步（看板与详情）读生成状态的入口：与 [`Self::state_for`] 判同一套
+    /// 「store 是不是正持有本项目」，但把逐页状态、日志、牌组一并交出来
+    /// （原版 `Step2Generate.vue` 的 props 全部来自 `useGenerationStore()`）。
+    pub fn snapshot_for(
+        &self,
+        project_id: Option<i64>,
+        run: Option<&GenerationRun>,
+        deck: &[Value],
+    ) -> GenSnapshot {
+        match self.live_for(project_id) {
+            Some(live) => {
+                let items = live.items();
+                GenSnapshot {
+                    stage: live.stage.clone(),
+                    message: live.message.clone(),
+                    running: live.running,
+                    thumbs: items.iter().map(|item| item.blueprint.clone()).collect(),
+                    items,
+                    statuses: live.page_statuses.clone(),
+                    retrying: live.retrying_pages.clone(),
+                    recent_logs: progress::recent_logs(&live.logs)
+                        .into_iter()
+                        .cloned()
+                        .collect(),
+                    important: progress::important_log_count(&live.logs),
+                    prompt_count: progress::prompt_log_count(&live.logs),
+                    current_run: live.current_run.clone(),
+                    aspect_source: live.blueprints.first().cloned().flatten(),
+                }
+            }
+            None => {
+                let slots: Vec<Option<Value>> = deck.iter().cloned().map(Some).collect();
+                let statuses = Statuses::new();
+                let items = progress::slide_items(&slots, &[], &statuses);
+                GenSnapshot {
+                    stage: stored_stage(run, deck.len()),
+                    message: stored_message(deck.len()),
+                    running: false,
+                    thumbs: items.iter().map(|item| item.blueprint.clone()).collect(),
+                    items,
+                    statuses,
+                    retrying: PageSet::new(),
+                    recent_logs: Vec::new(),
+                    important: 0,
+                    prompt_count: 0,
+                    current_run: run.cloned(),
+                    // 原版 `props.blueprints[0]?.aspect_ratio`；没有运行的静态分支用牌组的第一张。
+                    aspect_source: slots.first().cloned().flatten(),
                 }
             }
         }
