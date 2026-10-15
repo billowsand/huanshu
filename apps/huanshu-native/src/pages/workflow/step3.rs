@@ -1531,22 +1531,21 @@ impl Step3 {
         } else {
             ("已保存", "checkmark")
         };
-        let mut save_group = div().flex().flex_col().gap(px(6.0)).child(
-            div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .gap(px(8.0))
-                .child(
-                    widgets::primary_button("apply-changes", label)
-                        .icon(carbon(icon))
-                        .disabled(saving || !unsaved || locked)
-                        .on_click(cx.listener(|this, _event, window, cx| this.apply(window, cx))),
-                )
-                .when(locked, |row| {
-                    row.child(hint_text("生成进行中，完成后可编辑", cx))
-                }),
-        );
+        // 原版 `.ej-save-btn` 是右栏里撑满整行的块级按钮。
+        let mut save_group = div()
+            .flex()
+            .flex_col()
+            .gap(px(6.0))
+            .child(
+                widgets::primary_button("apply-changes", label)
+                    .icon(carbon(icon))
+                    .w_full()
+                    .disabled(saving || !unsaved || locked)
+                    .on_click(cx.listener(|this, _event, window, cx| this.apply(window, cx))),
+            )
+            .when(locked, |group| {
+                group.child(hint_text("生成进行中，完成后可编辑", cx))
+            });
         if let Some(error) = self.save_error(cx) {
             save_group = save_group.child(error_row(&error, cx));
         }

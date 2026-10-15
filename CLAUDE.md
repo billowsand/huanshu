@@ -17,6 +17,8 @@
   主题清单 `themes.rs` ↔ `src/themes/catalog.ts`、第二步进度规则 `generation_progress.rs` ↔
   `src/utils/generationProgress.ts` / `src/stores/generation.ts` / `Step2Generate.vue`（快照
   `tests/fixtures/generation-progress.json` 由 `target/` 下一次性 bun 脚本从原版代码生成，`tests/generation_progress.rs` 比对）。
+  第三步编辑规则 `slide_edit.rs` ↔ `src/composables/useSlideEditor.ts` / `Step3Editor.vue`（快照 `tests/fixtures/slide-edit.json`，
+  `tests/slide_edit.rs` 比对；`filterSlideJson` 两边都额外保留 `aspect_ratio`，否则应用一次更改就丢掉页面比例）。
 
 ## 隔离数据目录（真机验证必读）
 
@@ -57,6 +59,10 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
   （`state_for` / `snapshot_for`：store 正持有本项目用实时状态，否则用库里的静态状态）。全应用同一时刻
   只有一次生成或重试（`busy()`）。`ProjectModel.deck` 是 store 牌组的镜像：**第三步做编辑时必须把改动
   写回 store**（原版直接改 `gen.blueprints`），否则 store 下一次通知（如单页重试完成）会用旧牌组盖掉编辑。
+  现在第三步的一切牌组改动只走 `WorkflowPage::commit_deck`（模型 → `GenerationStore::set_deck` → 落库）。
+- **core 的生成依赖「当前打开的项目」**（`AppState.active_project_id`）：生成中打开别的项目（`projects::open_project`）
+  会让流水线在组装时以「当前项目已切换」失败。生成结束时的落库已改成写开始时的项目；流水线本身改成与当前项目
+  解耦之前，原生版第三步在任何生成 / 重试进行时都只读（`WorkflowPage::editing_locked` 看全局 `busy()`）。
 - 演示是盖在当前页上的覆盖层（与原版一致），打开即全屏，Esc 先关全览再退出并退出全屏。
 - 主题存在 `app_settings` 的 `app_theme` 键，与 Tauri 版（WebView localStorage）暂不同步。
 - 量内存要量**本进程**：PowerShell 里的 `$PID` 是 PowerShell 自己。只读查看器阶段实测（release，5 分钟每 100ms 翻一页）工作集稳定在 385–412 MiB。

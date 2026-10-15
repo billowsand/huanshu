@@ -294,14 +294,19 @@ pub async fn generate_slides(
             let count = blueprints.len();
             {
                 let mut st = state.lock().unwrap();
-                // Auto-save blueprints to the active project if one is set
-                if let Some(pid) = st.active_project_id {
+                // Save to the project this run was started for, not whichever project is open
+                // now: the native app lets the user open another project mid-run, and reading
+                // `active_project_id` here would overwrite that project's deck.
+                if let Some(pid) = active_project_id {
                     if let Ok(json) = serde_json::to_string(&blueprints) {
                         let db = st.db.lock().unwrap();
                         crate::db::update_project_blueprints(&*db, pid, &json).ok();
                     }
                 }
-                st.blueprints = blueprints;
+                // `st.blueprints` is the open project's deck; leave it alone if that changed.
+                if st.active_project_id == active_project_id {
+                    st.blueprints = blueprints;
+                }
                 st.generation_running = false;
             }
             finish_run(&db, run_id, "done", Some("done"));
