@@ -608,30 +608,41 @@ impl GenerationStore {
     // ── 单页重试（原版 `retryPage` / `executePageRetry`） ─────────────────────
 
     /// 原版 `retryPage(index, layoutKind?)`。
+    ///
+    /// 前置条件不满足时原版是静默 `return`；这里把原因交回调用方——「选择重试布局」对话框
+    /// 据此给用户一个轻提示，否则点「按此布局重试」只关框、什么都没发生。
+    /// 重试被 core 拒绝（`executePageRetry` 里的失败）不在其中：那条路会把原因写进该页状态，
+    /// 第二步的失败段与看板都能看到。
     pub fn retry_page(
         &mut self,
         index: i64,
         layout_kind: Option<SlideKind>,
         cx: &mut Context<Self>,
-    ) {
-        if self.retrying_pages.contains(&index)
-            || (!self.running && !self.retrying_pages.is_empty())
-            || self
-                .page_statuses
-                .get(&index)
-                .map(|status| status.stage.as_str())
-                != Some("error")
+    ) -> Result<(), &'static str> {
+        if self.retrying_pages.contains(&index) {
+            return Err("这一页正在重试");
+        }
+        // 原版：不在生成中且已经有页在重试时不许再排（`!running && retryingPages.size > 0`）。
+        if !self.running && !self.retrying_pages.is_empty() {
+            return Err("已有页面正在重试，请等它完成");
+        }
+        if self
+            .page_statuses
+            .get(&index)
+            .map(|status| status.stage.as_str())
+            != Some("error")
         {
-            return;
+            return Err("这一页不是生成失败的页，无需重试");
         }
         self.retrying_pages.insert(index);
         if self.running {
             // 生成还没结束：排队，等 `generate` 的 finally 依次执行。
             self.queued_retries.insert(index, layout_kind);
             cx.notify();
-            return;
+            return Ok(());
         }
         self.execute_page_retry(index, layout_kind, cx);
+        Ok(())
     }
 
     /// 原版 `generate` 的 finally：把排队中的重试依次执行（一次一个）。
@@ -810,7 +821,16 @@ impl GenerationStore {
         done: impl FnOnce(&mut Self, bool, &mut Context<Self>) + 'static,
     ) {
         if self.busy() && self.project_id != Some(project_id) {
-            done(self, false, cx);
+            // store 正为别的项目跑：不碰 store，直接按静态状态回调。
+            //
+            // **不能在这里同步回调**：调用方是 `WorkflowPage::load_project`，此刻正持着页面的
+            // 租约（`page.generation.update(...)` 在 `page.update(...)` 里面），回调里再
+            // `page.update()` 会撞上「already being updated」——release 构建下就是生成中回首页、
+            // 再点别的项目卡片时的 0xc0000409 崩溃。推到本次 effect 跑完（租约已还）再回调。
+            let store = cx.weak_entity();
+            cx.defer(move |cx| {
+                let _ = store.update(cx, |store, cx| done(store, false, cx));
+            });
             return;
         }
         let shared = self.shared.clone();

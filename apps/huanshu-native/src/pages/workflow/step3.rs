@@ -942,7 +942,9 @@ impl Step3 {
         cx.notify();
     }
 
-    /// 原版 `applySuggestedIcon`：点候选写进这张卡片的 `icon`。
+    /// 原版 `applySuggestedIcon(cardPath, icon)`：点候选写进这张卡片的 `icon`。
+    /// `card_path` 是**卡片**的路径（`cards[0]`），`.icon` 在本函数里拼——候选小片那边传进来
+    /// 的也是卡片路径（原版模板传的就是卡片路径）。
     fn apply_suggested_icon(&mut self, base_path: &str, icon: &str, cx: &mut Context<Self>) {
         if self.editing_locked(cx) {
             return;
@@ -1010,7 +1012,10 @@ impl Step3 {
         if !suggestions.is_empty() {
             let mut chips = div().flex().flex_wrap().gap(px(6.0));
             for icon in suggestions {
-                let chip_path = format!("{base_path}.icon");
+                // 候选小片点一下 = 原版 `applySuggestedIcon(cardPath, icon)`：传**卡片**路径，
+                // `.icon` 由 `apply_suggested_icon` 拼（这里再拼一次会写成 `…​.icon.icon`，
+                // 点上去什么都不发生）。
+                let chip_path = base_path.to_string();
                 let chip_icon = icon.clone();
                 let name = icon
                     .strip_prefix("i-carbon:")

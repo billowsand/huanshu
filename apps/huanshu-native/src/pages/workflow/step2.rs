@@ -19,6 +19,7 @@ use std::ops::Range;
 use std::time::Duration;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::notification::Notification;
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
 use gpui_kit::component::{Disableable as _, IndexPath, WindowExt as _};
 use gpui_kit::prelude::*;
@@ -1967,6 +1968,9 @@ impl RetryLayoutDialog {
     }
 
     /// 原版 `confirm()`：选的版式必须是候选里的一个，再交给 store 重试这一页。
+    ///
+    /// store 拒绝这次请求（原版是静默 `return`）时给一个轻提示：只关框、什么都不发生的话，
+    /// 用户看不出是「没点到」还是「被挡下了」。
     fn confirm(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(kind) = self
             .selected
@@ -1979,9 +1983,16 @@ impl RetryLayoutDialog {
             return;
         }
         let index = self.page_index as i64;
-        self.version += 1;
-        self.store
+        let outcome = self
+            .store
             .update(cx, |store, cx| store.retry_page(index, Some(kind), cx));
+        if let Err(reason) = outcome {
+            window.push_notification(
+                Notification::error(format!("第 {} 页未能重试：{reason}", self.page_index + 1)),
+                cx,
+            );
+        }
+        self.version += 1;
         window.close_dialog(cx);
     }
 
