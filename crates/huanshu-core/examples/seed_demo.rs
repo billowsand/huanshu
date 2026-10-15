@@ -199,6 +199,13 @@ async fn seed_all(paths: StoragePaths) -> Result<()> {
     ));
     created.push((long_deck.name.clone(), long_deck.id, long_deck.pages));
 
+    // 沙箱直接进首页：否则 `--route` 会被首次向导拦住（`--route wizard` 照样能进向导）。
+    {
+        let st = state.lock().unwrap();
+        let db = st.db.lock().unwrap();
+        huanshu_core::db::mark_first_run_done(&db).context("mark first run done")?;
+    }
+
     println!("\n{:<4} {:<16} {}", "id", "name", "slides");
     for (name, id, pages) in created {
         println!("{id:<4} {name:<16} {pages}");

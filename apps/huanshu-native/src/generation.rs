@@ -195,6 +195,8 @@ pub struct GenerationStore {
     retrying_pages: PageSet,
     /// 原版 `queuedRetries`（生成中收到的重试请求排队，生成结束后依次执行）。
     queued_retries: BTreeMap<i64, Option<SlideKind>>,
+    /// 有一次单页重试正在执行（`retrying_pages` 里还含排队的页，不能用它判断）。
+    retry_in_flight: bool,
     logs: Vec<GenerationLogEvent>,
     current_run: Option<GenerationRun>,
     running: bool,
@@ -222,6 +224,7 @@ impl GenerationStore {
             page_statuses: Statuses::new(),
             retrying_pages: PageSet::new(),
             queued_retries: BTreeMap::new(),
+            retry_in_flight: false,
             logs: Vec::new(),
             current_run: None,
             running: false,
@@ -598,9 +601,13 @@ impl GenerationStore {
         self.execute_page_retry(index, layout_kind, cx);
     }
 
-    /// 原版 `generate` 的 finally：把排队中的重试依次执行。
+    /// 原版 `generate` 的 finally：把排队中的重试依次执行（一次一个）。
+    ///
+    /// 排队的页已经在 `retrying_pages` 里（界面据此显示「已排队」），所以「还有重试在跑」
+    /// 要看 `retry_in_flight`，不能看 `retrying_pages` 是否为空——否则排队的重试永远轮不到，
+    /// `busy()` 一直为真，全应用再也不能生成。
     fn drain_queued_retries(&mut self, cx: &mut Context<Self>) {
-        if self.running || !self.retrying_pages.is_empty() {
+        if self.running || self.retry_in_flight {
             return;
         }
         let Some(index) = self.queued_retries.keys().next().copied() else {
@@ -652,6 +659,7 @@ impl GenerationStore {
             return;
         };
 
+        self.retry_in_flight = true;
         let shared = self.shared.clone();
         let sink: Arc<dyn EventSink> = Arc::new(self.sink.clone());
         run_async_in(
@@ -681,6 +689,7 @@ impl GenerationStore {
         result: Result<generation::RetryPageResult, String>,
         cx: &mut Context<Self>,
     ) {
+        self.retry_in_flight = false;
         // 原版：版本号对不上（期间换了项目 / 重新生成）时，结果整体作废。
         if version == self.version {
             match result {

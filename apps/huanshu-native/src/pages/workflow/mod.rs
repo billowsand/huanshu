@@ -630,7 +630,9 @@ impl WorkflowPage {
                 model.aspect,
             )
         };
-        if md.trim().is_empty() || name.trim().is_empty() {
+        // 原版 `canGenerate`：别的项目在生成或重试时也不能开始（第二步「重新生成全部」
+        // 在静态状态下也看得到，这里一并挡住，免得切到第 2 步却什么都没发生）。
+        if md.trim().is_empty() || name.trim().is_empty() || self.generation.read(cx).busy() {
             return;
         }
         // 原版：取消防抖计时器，立即同步保存一次草稿，然后切第 2 步、启动生成。

@@ -13,8 +13,10 @@
 - `src-tauri/src/commands/*.rs` 的每个命令只做「取参数 → 调 core → 转错误」，**不要**再把 SQL、文件读写或业务分支写回命令层。
 - 前端的「规则」也在 core：编辑器版式表 `editor_schema.rs`（`get_editor_schema`，前端缓存在 `stores/editorSchema.ts`）、
   图表校验 `chart_check.rs`（`chart_problems`）。
-- 暂时允许的两份重复（Tauri 界面下线前，**改一边必须改另一边**）：缩略图调度 `preview.rs` ↔ `useTypstThumbnails.ts`、
-  主题清单 `themes.rs` ↔ `src/themes/catalog.ts`。
+- 暂时允许的重复（Tauri 界面下线前，**改一边必须改另一边**）：缩略图调度 `preview.rs` ↔ `useTypstThumbnails.ts`、
+  主题清单 `themes.rs` ↔ `src/themes/catalog.ts`、第二步进度规则 `generation_progress.rs` ↔
+  `src/utils/generationProgress.ts` / `src/stores/generation.ts` / `Step2Generate.vue`（快照
+  `tests/fixtures/generation-progress.json` 由 `target/` 下一次性 bun 脚本从原版代码生成，`tests/generation_progress.rs` 比对）。
 
 ## 隔离数据目录（真机验证必读）
 
@@ -27,8 +29,9 @@ $env:HUANSHU_HOME = 'E:\huanshu\target\sandbox-home'
 cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库时加 --force 重建
 ```
 
-`seed_demo` 建 7 个演示项目（全部版式 16:9 / 32:9 / 48:9、图表、图表边界、压力、图片），拒绝以真实数据目录或
-bootstrap 所在目录为目标。Tauri 版用 `.claude/launch.json` 的 `tauri-dev-sandbox`。
+`seed_demo` 建 9 个演示项目（全部版式 16:9 / 32:9 / 48:9、图表、图表边界、压力、图片，以及第二步用的
+「生成记录演示」——一次以 error 结束、第 3 页失败的运行——和 60 个内容页的「长牌组」），并标记首次向导已完成；
+拒绝以真实数据目录或 bootstrap 所在目录为目标。没有 LM Studio 时，生成与重试的成功路径只能人工验收。Tauri 版用 `.claude/launch.json` 的 `tauri-dev-sandbox`。
 
 ## 原生界面（`apps/huanshu-native`，GPUI Kit）
 
@@ -49,6 +52,11 @@ bootstrap 所在目录为目标。Tauri 版用 `.claude/launch.json` 的 `tauri-
 - 页面快捷键用 `track_focus` + `on_key_down`；**不要用 `observe_keystrokes`**（全应用的，会收到其他窗口和其他页面的按键）。
 - 界面里的延时（防抖、自动跳页）用 GPUI 的 `background_executor().timer(..)`，**不要用 `tokio::time::sleep`**：它需要
   `tokio().enter()`，守卫跨 `.await` 留在 UI 线程上，两个计时同时在等就会乱序释放，tokio 直接 panic。tokio 只给 core 的 async 服务用（`tasks::run_async`）。
+- 生成状态是应用级的 `generation::GenerationStore`（原版 pinia 的 `generation` store）：`Shell` 创建、经
+  `ShellHandle::generation()` 下发，事件通道常驻在它身上，页面来去不影响在途生成。页面只读它
+  （`state_for` / `snapshot_for`：store 正持有本项目用实时状态，否则用库里的静态状态）。全应用同一时刻
+  只有一次生成或重试（`busy()`）。`ProjectModel.deck` 是 store 牌组的镜像：**第三步做编辑时必须把改动
+  写回 store**（原版直接改 `gen.blueprints`），否则 store 下一次通知（如单页重试完成）会用旧牌组盖掉编辑。
 - 演示是盖在当前页上的覆盖层（与原版一致），打开即全屏，Esc 先关全览再退出并退出全屏。
 - 主题存在 `app_settings` 的 `app_theme` 键，与 Tauri 版（WebView localStorage）暂不同步。
 - 量内存要量**本进程**：PowerShell 里的 `$PID` 是 PowerShell 自己。只读查看器阶段实测（release，5 分钟每 100ms 翻一页）工作集稳定在 385–412 MiB。

@@ -2010,15 +2010,11 @@ impl Render for RetryLayoutDialog {
                 .map(|kind| self.choices.iter().any(|(_, choice)| choice == kind))
                 .unwrap_or(false);
 
+        // 外框（底色、边框、圆角、关闭钮）由 GPUI Kit 的 Dialog 画，这里只排内容。
         div()
-            .w(px(440.0))
-            .p(px(24.0))
+            .w_full()
             .flex()
             .flex_col()
-            .rounded(px(14.0))
-            .border_1()
-            .border_color(c.border)
-            .bg(c.surface)
             .child(
                 div()
                     .text_size(px(20.8))
