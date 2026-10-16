@@ -430,7 +430,7 @@ impl WorkflowPage {
             .max_w(px(520.0))
             .px(px(10.0))
             .py(px(3.0))
-            .rounded(px(5.0))
+            .rounded(widgets::radius(cx, 5.0))
             .truncate()
             .text_size(px(13.5))
             .cursor_pointer()
@@ -1135,6 +1135,7 @@ impl Render for WorkflowPage {
         // 原版：生成中第 2 步的圆点里是转圈（`.step-spinner`），不是序号。
         let generation_running = state.running;
         let theme_id = cx.studio().theme.id;
+        let terminal = cx.studio().is_terminal();
 
         let steps = [
             (Step::Prepare, "准备素材"),
@@ -1153,6 +1154,12 @@ impl Render for WorkflowPage {
                 let circle = div()
                     .size(px(40.0))
                     .rounded_full()
+                    .when(terminal, |number| {
+                        number
+                            .rounded_none()
+                            .size(px(32.0))
+                            .font_family(widgets::code_font(cx))
+                    })
                     .flex()
                     .items_center()
                     .justify_center()
@@ -1195,7 +1202,12 @@ impl Render for WorkflowPage {
                             .color(c.primary)
                             .into_any_element()
                     } else {
-                        step.number().to_string().into_any_element()
+                        format!(
+                            "{:0width$}",
+                            step.number(),
+                            width = if terminal { 2 } else { 1 }
+                        )
+                        .into_any_element()
                     });
                 let group = SharedString::from(format!("step-{}", step.number()));
                 div()
@@ -1206,8 +1218,13 @@ impl Render for WorkflowPage {
                     .gap(px(14.0))
                     .px(px(8.0))
                     .py(px(4.0))
-                    .rounded(px(8.0))
+                    .rounded(widgets::radius(cx, 8.0))
                     .when(active, |item| item.bg(c.surface))
+                    .when(terminal, |item| {
+                        item.border_l_2()
+                            .border_color(if active { c.primary } else { c.border })
+                            .py(px(10.0))
+                    })
                     .when(!clickable, |item| item.opacity(0.5))
                     .when(clickable, |item| {
                         item.cursor_pointer().on_click(cx.listener(
@@ -1343,9 +1360,28 @@ impl Render for WorkflowPage {
         div()
             .size_full()
             .flex()
-            .flex_row()
-            .child(sidebar)
-            .child(div().flex_1().min_w_0().h_full().child(content))
+            .flex_col()
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .flex()
+                    .flex_row()
+                    .child(sidebar)
+                    .child(div().flex_1().min_w_0().h_full().child(content)),
+            )
+            .when(terminal, |body| {
+                body.child(widgets::terminal_status(
+                    format!(
+                        "{:02} / {}  │  {}",
+                        self.step.number(),
+                        steps[self.step.number() as usize - 1].1,
+                        descs[self.step.number() as usize - 1]
+                    ),
+                    cx.studio().theme.name,
+                    cx,
+                ))
+            })
             .into_any_element()
     }
 }

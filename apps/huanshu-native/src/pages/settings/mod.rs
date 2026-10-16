@@ -653,7 +653,7 @@ impl Render for SettingsPage {
                     .gap(px(10.0))
                     .px(px(12.0))
                     .py(px(9.0))
-                    .rounded(px(8.0))
+                    .rounded(widgets::radius(cx, 8.0))
                     .text_size(px(14.0))
                     .cursor_pointer()
                     .when(selected, |item| {
@@ -665,7 +665,17 @@ impl Render for SettingsPage {
                     .when(!selected, |item| {
                         item.text_color(c.muted).hover(|style| style.bg(c.surface))
                     })
-                    .child(carbon(tab.icon()))
+                    .when(cx.studio().is_terminal() && selected, |item| {
+                        item.bg(c.primary).text_color(c.primary_contrast)
+                    })
+                    .child(if cx.studio().is_terminal() {
+                        div()
+                            .font_family(widgets::code_font(cx))
+                            .child(if selected { ">" } else { "·" })
+                            .into_any_element()
+                    } else {
+                        carbon(tab.icon()).into_any_element()
+                    })
                     .child(tab.label())
                     .on_click(cx.listener(move |page, _event, _window, cx| {
                         page.tab = tab;
@@ -725,7 +735,7 @@ impl Render for SettingsPage {
                     div()
                         .px(px(6.0))
                         .py(px(1.0))
-                        .rounded(px(4.0))
+                        .rounded(widgets::radius(cx, 4.0))
                         .border_1()
                         .border_color(c.border)
                         .bg(c.surface)
@@ -792,6 +802,15 @@ impl Render for SettingsPage {
                                     .flex_col()
                                     .gap(px(6.0))
                                     // 原版 `.prefs-heading h1 { font-size: 24px }`（settings.css 62）。
+                                    .when(cx.studio().is_terminal(), |head| {
+                                        head.border_b_1().border_color(c.border).pb(px(14.0)).child(
+                                            div()
+                                                .font_family(widgets::code_font(cx))
+                                                .text_size(px(11.0))
+                                                .text_color(c.primary)
+                                                .child("CONFIG / 设置"),
+                                        )
+                                    })
                                     .child(div().text_size(px(24.0)).child(self.tab.label()))
                                     .child(
                                         div()
@@ -813,7 +832,7 @@ impl Render for SettingsPage {
                                         .gap(px(16.0))
                                         .px(px(14.0))
                                         .py(px(12.0))
-                                        .rounded(px(8.0))
+                                        .rounded(widgets::radius(cx, 8.0))
                                         .bg(c.surface)
                                         .border_1()
                                         .border_color(c.border)
@@ -920,7 +939,7 @@ impl SettingsPage {
                 div()
                     .w(px(124.0))
                     .h(px(78.0))
-                    .rounded(px(8.0))
+                    .rounded(widgets::radius(cx, 8.0))
                     .border_2()
                     .border_color(if selected { c.primary } else { c.border })
                     .bg(color(t.bg))
@@ -976,11 +995,51 @@ impl SettingsPage {
                                             div()
                                                 .h(px(9.0))
                                                 .w(px(24.0))
-                                                .rounded(px(2.0))
+                                                .rounded(widgets::radius(cx, 2.0))
                                                 .bg(color(t.primary)),
                                         ),
                                     ),
                             ),
+                    )
+                    .when(
+                        matches!(id, "dark-terminal" | "light-terminal"),
+                        |preview| {
+                            preview.child(
+                                div()
+                                    .absolute()
+                                    .inset_0()
+                                    .bg(color(t.bg))
+                                    .p(px(7.0))
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(4.0))
+                                    .child(
+                                        div()
+                                            .h(px(10.0))
+                                            .border_b_1()
+                                            .border_color(color(t.border))
+                                            .text_size(px(6.0))
+                                            .text_color(color(t.primary))
+                                            .child(">_ HUANSHU"),
+                                    )
+                                    .children((0..4).map(|row| {
+                                        div()
+                                            .h(px(8.0))
+                                            .flex()
+                                            .items_center()
+                                            .gap(px(4.0))
+                                            .px(px(3.0))
+                                            .bg(if row == 1 {
+                                                color(t.primary_bg)
+                                            } else {
+                                                color(t.bg)
+                                            })
+                                            .child(div().w(px(8.0)).h(px(2.0)).bg(color(t.muted)))
+                                            .child(div().flex_1().h(px(2.0)).bg(color(t.text)))
+                                            .child(div().w(px(16.0)).h(px(2.0)).bg(color(t.muted)))
+                                    })),
+                            )
+                        },
                     )
                     // 原版 `.prefs-theme-check`（277–278 行 / settings.css 108）：选中卡片的勾选徽章。
                     .when(selected, |preview| {

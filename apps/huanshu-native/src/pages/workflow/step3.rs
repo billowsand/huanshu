@@ -1015,7 +1015,7 @@ impl Step3 {
             .flex_col()
             .gap(px(8.0))
             .p(px(10.0))
-            .rounded(px(8.0))
+            .rounded(widgets::radius(cx, 8.0))
             .border_1()
             .border_color(c.border)
             // 原版 `.ej-icon-box` 与 `.ej-card-block` 同底（`--studio-panel-2`）。
@@ -1056,7 +1056,7 @@ impl Step3 {
                         .gap(px(5.0))
                         .px(px(8.0))
                         .py(px(4.0))
-                        .rounded(px(999.0))
+                        .rounded(widgets::radius(cx, 999.0))
                         .border_1()
                         .border_color(c.border)
                         // 原版 `.ej-icon-chip` 的底是 `--studio-surface`。
@@ -1475,12 +1475,12 @@ impl Step3 {
             .gap(px(4.0))
             .min_w_0()
             .p(px(8.0))
-            .rounded(px(6.0))
+            .rounded(widgets::radius(cx, 6.0))
             .border_1()
             .border_color(c.border)
             .bg(c.surface)
             .when_some(cx.studio().paper, |card, p| {
-                card.bg(p.card).rounded(px(3.0))
+                card.bg(p.card).rounded(widgets::radius(cx, 3.0))
             });
         match field.field_type.as_str() {
             // 勾选框自带标签，不再显示上方小标签（原版 `.ej-bool-row`）。
@@ -1630,7 +1630,7 @@ impl Step3 {
                     .items_center()
                     .gap(px(6.0))
                     .p(px(6.0))
-                    .rounded(px(6.0))
+                    .rounded(widgets::radius(cx, 6.0))
                     .border_1()
                     .border_color(c.border)
                     .bg(c.surface)
@@ -1724,7 +1724,7 @@ impl Step3 {
             .flex_col()
             .gap(px(8.0))
             .p(px(10.0))
-            .rounded(px(8.0))
+            .rounded(widgets::radius(cx, 8.0))
             .border_1()
             .border_color(c.border)
             .bg(c.panel_2)
@@ -1811,7 +1811,7 @@ impl Step3 {
                     .flex_col()
                     .gap(px(8.0))
                     .p(px(8.0))
-                    .rounded(px(8.0))
+                    .rounded(widgets::radius(cx, 8.0))
                     .border_1()
                     .border_color(c.border)
                     .bg(c.surface)
@@ -1928,7 +1928,7 @@ impl Step3 {
                         .items_center()
                         .gap(px(8.0))
                         .p(px(7.0))
-                        .rounded(px(6.0))
+                        .rounded(widgets::radius(cx, 6.0))
                         .border_1()
                         .border_color(c.border)
                         .bg(c.surface)
@@ -2076,7 +2076,7 @@ impl Step3 {
                         .flex_col()
                         .gap(px(4.0))
                         .p(px(8.0))
-                        .rounded(px(6.0))
+                        .rounded(widgets::radius(cx, 6.0))
                         .border_1()
                         .border_color(c.border)
                         .bg(c.surface)
@@ -2124,7 +2124,7 @@ impl Step3 {
                     .bg(c.surface)
                     .border_1()
                     .border_color(c.border)
-                    .rounded(px(6.0))
+                    .rounded(widgets::radius(cx, 6.0))
                     .max_h(px(120.0))
                     .overflow_y_scroll();
                 for (id, name, url) in images {
@@ -2236,7 +2236,7 @@ impl Step3 {
                         div()
                             .flex()
                             .flex_col()
-                            .rounded(px(6.0))
+                            .rounded(widgets::radius(cx, 6.0))
                             .border_1()
                             .border_color(if chart_error.is_empty() {
                                 c.border
@@ -2300,7 +2300,7 @@ impl Step3 {
                     div()
                         .flex()
                         .flex_col()
-                        .rounded(px(6.0))
+                        .rounded(widgets::radius(cx, 6.0))
                         .border_1()
                         .border_color(if json_error.is_empty() {
                             c.border
@@ -2411,7 +2411,7 @@ impl Step3 {
             .gap(px(8.0))
             .px(px(8.0))
             .py(px(6.0))
-            .rounded(px(7.0))
+            .rounded(widgets::radius(cx, 7.0))
             .border_1()
             .border_color(if selected {
                 c.primary
@@ -2604,7 +2604,7 @@ fn error_row(text: &str, cx: &App) -> Div {
         .items_start()
         .gap(px(6.0))
         .p(px(7.0))
-        .rounded(px(6.0))
+        .rounded(widgets::radius(cx, 6.0))
         .border_1()
         .border_color(c.error_border)
         .bg(c.error_bg)
@@ -2685,7 +2685,16 @@ fn col_head(icon: &str, title: &str, cx: &App) -> Div {
         .border_color(c.border)
         .text_size(px(11.5))
         .text_color(c.muted)
-        .child(carbon(icon))
+        .when(cx.studio().is_terminal(), |head| {
+            head.bg(c.panel)
+                .font_family(widgets::code_font(cx))
+                .text_color(c.primary)
+        })
+        .child(if cx.studio().is_terminal() {
+            div().child(">_").into_any_element()
+        } else {
+            carbon(icon).into_any_element()
+        })
         .child(title.to_string())
 }
 
@@ -2753,7 +2762,7 @@ fn kind_picker_body(
                     .items_center()
                     .gap(px(4.0))
                     .p(px(10.0))
-                    .rounded(px(8.0))
+                    .rounded(widgets::radius(cx, 8.0))
                     .border_1()
                     .border_color(if is_current { c.primary } else { c.border })
                     .bg(if is_current { c.primary_bg } else { c.surface })
@@ -2852,6 +2861,7 @@ impl Render for Step3 {
             (viewport.width.as_f32() - SIDEBAR_W - LIST_W - PANEL_W - 2.0 * STAGE_PADDING)
                 .max(160.0);
         let avail_h = (viewport.height.as_f32()
+            - if cx.studio().is_terminal() { 56.0 } else { 0.0 }
             - crate::theme::TITLEBAR_HEIGHT
             - COL_HEAD_H
             - 2.0 * STAGE_PADDING
@@ -3048,6 +3058,27 @@ impl Render for Step3 {
                         cx,
                     )),
             )
+            .when(cx.studio().is_terminal(), |stage| {
+                stage.child(widgets::terminal_status(
+                    format!(
+                        "第 {:02} / {:02} 页",
+                        if count == 0 { 0 } else { selected + 1 },
+                        count
+                    ),
+                    if locked {
+                        "生成中 · 只读"
+                    } else if self.saving(cx) {
+                        "保存中…"
+                    } else if self.save_error(cx).is_some() {
+                        "保存失败"
+                    } else if unsaved {
+                        "有未应用的更改"
+                    } else {
+                        "已保存"
+                    },
+                    cx,
+                ))
+            })
             // 原版：内容缩到最小仍放不下时，预览下方提示。
             .when(clipped, |col| {
                 col.child(

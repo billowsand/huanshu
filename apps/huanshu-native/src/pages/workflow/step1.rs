@@ -799,8 +799,17 @@ impl Render for Step1 {
                 .when(paper.is_some(), |head| head.bg(c.panel_2))
                 .border_b_1()
                 .border_color(c.border)
+                .when(cx.studio().is_terminal(), |head| {
+                    head.bg(c.panel)
+                        .text_color(c.primary)
+                        .font_family(widgets::code_font(cx))
+                })
                 .child(carbon(icon))
-                .child(label)
+                .child(if cx.studio().is_terminal() && label == "编辑" {
+                    "source.md / 编辑"
+                } else {
+                    label
+                })
         };
 
         // 预览页卡片（原版 `MarkdownWorkbench.vue` 的 `md-preview-slide`）：
@@ -829,7 +838,7 @@ impl Render for Step1 {
             div()
                 .relative()
                 .flex_none()
-                .rounded(px(2.0))
+                .rounded(widgets::radius(cx, 2.0))
                 .border_1()
                 .border_color(p.edge)
                 .bg(p.card)
@@ -873,7 +882,7 @@ impl Render for Step1 {
             }
             div()
                 .relative()
-                .rounded(px(14.0))
+                .rounded(widgets::radius(cx, 14.0))
                 .border_1()
                 .border_color(c.border)
                 .bg(c.surface)
@@ -884,7 +893,7 @@ impl Render for Step1 {
                         .right(px(12.0))
                         .px(px(7.0))
                         .py(px(2.0))
-                        .rounded(px(999.0))
+                        .rounded(widgets::radius(cx, 999.0))
                         .border_1()
                         .border_color(c.border)
                         .bg(c.panel)
@@ -1044,7 +1053,7 @@ impl Render for Step1 {
                 .flex()
                 .flex_col()
                 .gap(px(6.0))
-                .rounded(px(8.0))
+                .rounded(widgets::radius(cx, 8.0))
                 .border_1()
                 .border_color(if selected { c.primary_border } else { c.border })
                 .bg(if selected { c.primary_bg } else { c.surface })
@@ -1109,7 +1118,7 @@ impl Render for Step1 {
                 .flex_col()
                 .items_center()
                 .gap(px(4.0))
-                .rounded(px(8.0))
+                .rounded(widgets::radius(cx, 8.0))
                 .border_1()
                 .border_color(if selected { c.primary_border } else { c.border })
                 .bg(if selected { c.primary_bg } else { c.surface })
@@ -1151,7 +1160,7 @@ impl Render for Step1 {
                         .w(px(68.0))
                         .h(px(51.0))
                         .flex_none()
-                        .rounded(px(6.0))
+                        .rounded(widgets::radius(cx, 6.0))
                         .border_1()
                         .border_color(c.border)
                         .bg(c.surface)
@@ -1252,7 +1261,7 @@ impl Render for Step1 {
                     .p(px(8.0))
                     .flex()
                     .flex_col()
-                    .rounded(px(8.0))
+                    .rounded(widgets::radius(cx, 8.0))
                     .border_1()
                     .border_dashed()
                     // 素材拖放悬停高亮同 `drag_over`，框架拿不到拖入事件（见 parity.md）。

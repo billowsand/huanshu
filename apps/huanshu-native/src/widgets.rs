@@ -20,6 +20,40 @@ use huanshu_core::themes::{self, Tone};
 use crate::icons::carbon;
 use crate::theme::{tokens, PaperLook, StudioExt as _};
 
+/// Shared geometry for terminal panes, badges, menus and inspectors.
+pub fn radius(cx: &App, ordinary: f32) -> gpui_kit::Pixels {
+    px(if cx.studio().is_terminal() {
+        0.0
+    } else {
+        ordinary
+    })
+}
+
+/// A real status strip: callers supply the current state instead of decorative metrics.
+pub fn terminal_status(
+    left: impl Into<SharedString>,
+    right: impl Into<SharedString>,
+    cx: &App,
+) -> Div {
+    let c = cx.studio().colors;
+    div()
+        .flex_none()
+        .h(px(28.0))
+        .px(px(12.0))
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap(px(12.0))
+        .bg(c.panel)
+        .border_t_1()
+        .border_color(c.border)
+        .font_family(code_font(cx))
+        .text_size(px(11.0))
+        .text_color(c.muted)
+        .child(div().min_w_0().truncate().child(left.into()))
+        .child(div().flex_none().child(right.into()))
+}
+
 /// 原版 `BrandMark.vue`（同一份 SVG，见 `assets/brand-mark.svg`）。
 pub fn brand_mark(size: f32) -> impl IntoElement {
     img("brand/mark.svg").size(px(size)).flex_none()
@@ -67,7 +101,11 @@ struct TitleBarState {
 ///   AppKit 不接管标题栏拖动，由这里 `TitleBarState` + `start_window_move` 手动拖；
 ///   双击走 `titlebar_double_click`（跟随系统「连按标题栏」设置）。红绿灯由系统画在
 ///   左上角，左侧留 [`TRAFFIC_LIGHTS_WIDTH`] 不遮它。
-pub fn title_bar(center: Option<AnyElement>, window: &mut Window, cx: &mut App) -> impl IntoElement {
+pub fn title_bar(
+    center: Option<AnyElement>,
+    window: &mut Window,
+    cx: &mut App,
+) -> impl IntoElement {
     let colors = cx.studio().colors;
     let paper = cx.studio().paper;
     let is_macos = cfg!(target_os = "macos");
@@ -85,6 +123,12 @@ pub fn title_bar(center: Option<AnyElement>, window: &mut Window, cx: &mut App) 
             p.chrome_border,
             p.chrome_text,
             p.chrome_hover,
+        ),
+        None if cx.studio().is_terminal() => (
+            colors.panel.into(),
+            colors.border,
+            colors.text,
+            colors.surface,
         ),
         None => (
             linear_gradient(
@@ -176,7 +220,18 @@ pub fn title_bar(center: Option<AnyElement>, window: &mut Window, cx: &mut App) 
                 .items_center()
                 .gap(px(6.0))
                 .window_control_area(WindowControlArea::Drag)
-                .child(brand_chip(22.0, 7.0, 16.0))
+                .child(if cx.studio().is_terminal() {
+                    div()
+                        .size(px(22.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .font_family(code_font(cx))
+                        .text_color(colors.primary)
+                        .child(">_")
+                } else {
+                    brand_chip(22.0, 7.0, 16.0)
+                })
                 .child(div().text_size(px(12.3)).text_color(text).child("幻述"))
                 .when_some(center, |bar, center| {
                     // 标题落在整扇窗口的正中：Windows 右边让出三个窗口按钮的宽度；
@@ -281,11 +336,13 @@ pub fn chip(text: impl Into<SharedString>, tone: Tone2, cx: &App) -> Div {
         .flex_none()
         .px(px(8.0))
         .py(px(1.0))
-        .rounded(px(if cx.studio().theme.id == "light-editorial" {
-            0.0
-        } else {
-            999.0
-        }))
+        .rounded(px(
+            if cx.studio().theme.id == "light-editorial" || cx.studio().is_terminal() {
+                0.0
+            } else {
+                999.0
+            },
+        ))
         .border_1()
         .border_color(border)
         .bg(bg)
@@ -308,11 +365,13 @@ pub fn chip_icon(icon: &'static str, text: impl Into<SharedString>, tone: Tone2,
         .flex_none()
         .px(px(8.0))
         .py(px(1.0))
-        .rounded(px(if cx.studio().theme.id == "light-editorial" {
-            0.0
-        } else {
-            999.0
-        }))
+        .rounded(px(
+            if cx.studio().theme.id == "light-editorial" || cx.studio().is_terminal() {
+                0.0
+            } else {
+                999.0
+            },
+        ))
         .border_1()
         .border_color(border)
         .bg(bg)
@@ -333,11 +392,13 @@ pub fn panel(cx: &App) -> Div {
         .bg(c.panel)
         .border_1()
         .border_color(c.border)
-        .rounded(px(if cx.studio().theme.id == "light-editorial" {
-            0.0
-        } else {
-            10.0
-        }))
+        .rounded(px(
+            if cx.studio().theme.id == "light-editorial" || cx.studio().is_terminal() {
+                0.0
+            } else {
+                10.0
+            },
+        ))
 }
 
 /// 便签主题的木纹桌面（原版 `--notes-grain, --notes-backing`）：铺满父元素（父元素要 `relative`），
@@ -379,7 +440,7 @@ pub fn paper_card(cx: &App) -> Div {
         Some(p) => panel(cx)
             .bg(p.card)
             .border_color(p.edge)
-            .rounded(px(3.0))
+            .rounded(radius(cx, 3.0))
             .shadow(paper_shadow(&p)),
         None => panel(cx),
     }
@@ -394,7 +455,7 @@ pub fn note_sheet(cx: &App) -> Div {
                 linear_color_stop(p.card.blend(gpui_kit::white().opacity(0.48)), 0.0),
                 linear_color_stop(p.bar_top, 1.0),
             ))
-            .rounded(px(2.0))
+            .rounded(radius(cx, 2.0))
             .shadow(vec![
                 BoxShadow {
                     color: p.ink.opacity(0.13),
@@ -553,12 +614,12 @@ pub fn media_tile(
         .items_center()
         .gap(px(2.0))
         .p(px(3.0))
-        .rounded(px(5.0))
+        .rounded(radius(cx, 5.0))
         .child(
             div()
                 .w(px(52.0))
                 .h(px(36.0))
-                .rounded(px(4.0))
+                .rounded(radius(cx, 4.0))
                 .border_1()
                 .border_color(c.border)
                 .bg(c.panel)

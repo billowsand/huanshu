@@ -5,9 +5,11 @@
 //! （普通 `.keynn`、加密 `.keynn` 与 PDF）、导入 `.keynn`（加密文件弹密码对话框，
 //! 密码错误不关闭可重试，照原版 `handlePasswordSubmit`）。
 
+use gpui_kit::base::InteractiveElementExt as _;
 use gpui_kit::component::button::ButtonVariant;
 use gpui_kit::component::dialog::{AlertDialog, Dialog, DialogClose, DialogFooter};
 use gpui_kit::component::notification::Notification;
+use gpui_kit::component::Sizable as _;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::{Disableable as _, Selectable as _};
 use gpui_kit::prelude::*;
@@ -73,6 +75,7 @@ pub struct HomePage {
     projects: Option<Vec<ProjectSummary>>,
     load_error: Option<String>,
     show_theme_picker: bool,
+    terminal_selected: Option<i64>,
     /// 正在导出的项目（按钮显示转圈，禁止重复点击）。
     exporting: Option<i64>,
     /// PDF 导出互斥（原版 `usePdfExport.ts` 的全局 `exporting`：同一时刻只跑一次）。
@@ -92,6 +95,7 @@ impl HomePage {
             projects: None,
             load_error: None,
             show_theme_picker: false,
+            terminal_selected: None,
             exporting: None,
             pdf_exporting: false,
             importing: false,
@@ -187,7 +191,7 @@ impl HomePage {
                         .items_center()
                         .gap(px(12.0))
                         .p(px(12.0))
-                        .rounded(px(8.0))
+                        .rounded(widgets::radius(cx, 8.0))
                         .border_1()
                         .border_color(c.border)
                         .bg(c.surface)
@@ -546,6 +550,7 @@ impl Render for HomePage {
         let c = cx.studio().colors;
         let theme_id = cx.studio().theme.id;
         let editorial = theme_id == "light-editorial";
+        let terminal = cx.studio().is_terminal();
         let library_width = (window.viewport_size().width.as_f32() - 48.0)
             .min(1184.0)
             .max(0.0);
@@ -602,7 +607,11 @@ impl Render for HomePage {
                     .when_some(cx.studio().paper, |label, p| {
                         label.text_color(p.chrome_text)
                     })
-                    .child("项目"),
+                    .child(if terminal {
+                        ">_ 幻述 / 工作区"
+                    } else {
+                        "项目"
+                    }),
             )
             .child(
                 div()
@@ -737,7 +746,7 @@ impl Render for HomePage {
                         div()
                             .size(px(42.0))
                             .when(cx.studio().paper.is_some(), |logo| logo.hidden())
-                            .rounded(px(10.0))
+                            .rounded(widgets::radius(cx, 10.0))
                             .flex()
                             .items_center()
                             .justify_center()
@@ -769,7 +778,36 @@ impl Render for HomePage {
                 )
             });
 
-        let heading = if editorial {
+        let heading = if terminal {
+            div()
+                .flex()
+                .items_center()
+                .justify_between()
+                .border_b_1()
+                .border_color(c.border)
+                .pb(px(14.0))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(12.0))
+                        .child(
+                            div()
+                                .font_family(widgets::code_font(cx))
+                                .text_color(c.primary)
+                                .child(">_"),
+                        )
+                        .child(div().text_size(px(20.0)).child("我的演示文稿")),
+                )
+                .child(
+                    div()
+                        .font_family(widgets::code_font(cx))
+                        .text_size(px(11.0))
+                        .text_color(c.muted)
+                        .child(format!("PROJECTS / {:02}", count.unwrap_or(0))),
+                )
+                .into_any_element()
+        } else if editorial {
             div()
                 .relative()
                 .w_full()
@@ -847,7 +885,7 @@ impl Render for HomePage {
                             div()
                                 .w(px(220.0))
                                 .h(px(12.0))
-                                .rounded(px(4.0))
+                                .rounded(widgets::radius(cx, 4.0))
                                 .bg(c.surface),
                         )
                 }))
@@ -887,6 +925,7 @@ impl Render for HomePage {
                     )
                     .into_any_element()
             }
+            Some(list) if terminal => self.terminal_index(list, window, cx),
             Some(list) => div()
                 .flex()
                 .flex_col()
@@ -925,7 +964,11 @@ impl Render for HomePage {
                         div()
                             .mx_auto()
                             .w_full()
-                            .max_w(px(if editorial { 1232.0 } else { BODY_MAX_W }))
+                            .max_w(px(if editorial || terminal {
+                                1232.0
+                            } else {
+                                BODY_MAX_W
+                            }))
                             // 原版 `.home-body` 的 `padding: 1.5rem`（含左右）。
                             .px(px(24.0))
                             .py(px(24.0))
@@ -949,10 +992,255 @@ impl Render for HomePage {
                 &self.scroll,
                 cx,
             ))
+            .when(terminal, |home| {
+                home.child(widgets::terminal_status(
+                    format!("项目 {:02}  │  本地工作区", count.unwrap_or(0)),
+                    "单击选择 · 双击打开",
+                    cx,
+                ))
+            })
     }
 }
 
 impl HomePage {
+    fn terminal_index(
+        &self,
+        list: &[ProjectSummary],
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> gpui_kit::AnyElement {
+        let c = cx.studio().colors;
+        let selected = list
+            .iter()
+            .find(|p| Some(p.id) == self.terminal_selected)
+            .or_else(|| list.first());
+        let selected_id = selected.map(|p| p.id);
+        let wide = window.viewport_size().width.as_f32() >= 1280.0;
+        let dates = window.viewport_size().width.as_f32() >= 1050.0;
+        let cell = |text: String, width: f32| div().flex_none().w(px(width)).truncate().child(text);
+        let table = widgets::panel(cx)
+            .flex_1()
+            .min_w_0()
+            .overflow_hidden()
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .h(px(34.0))
+                    .px(px(12.0))
+                    .flex()
+                    .items_center()
+                    .gap(px(12.0))
+                    .bg(c.surface)
+                    .border_b_1()
+                    .border_color(c.border)
+                    .text_size(px(11.0))
+                    .text_color(c.muted)
+                    .child(cell("编号".into(), 44.0))
+                    .child(div().flex_1().child("项目名称"))
+                    .child(cell("页数".into(), 44.0))
+                    .child(cell("比例".into(), 54.0))
+                    .when(dates, |row| row.child(cell("修改时间".into(), 138.0)))
+                    .child(cell("操作".into(), 112.0)),
+            )
+            .children(list.iter().enumerate().map(|(index, project)| {
+                let id = project.id;
+                let active = Some(id) == selected_id;
+                let open = self.handle.clone();
+                let double_open = open.clone();
+                let export_project = project.clone();
+                let exporting = self.exporting == Some(id);
+                div()
+                    .id(SharedString::from(format!("terminal-project-{id}")))
+                    .h(px(52.0))
+                    .px(px(12.0))
+                    .flex()
+                    .items_center()
+                    .gap(px(12.0))
+                    .border_b_1()
+                    .border_color(c.border)
+                    .text_size(px(12.0))
+                    .cursor_pointer()
+                    .bg(if active { c.primary_bg } else { c.panel })
+                    .hover(|row| row.bg(c.surface))
+                    .on_click(cx.listener(move |page, _, _, cx| {
+                        page.terminal_selected = Some(id);
+                        cx.notify();
+                    }))
+                    .on_double_click(move |_, window, cx| {
+                        double_open.navigate(
+                            Route::Project {
+                                id: Some(id),
+                                step: None,
+                            },
+                            window,
+                            cx,
+                        )
+                    })
+                    .child(
+                        cell(
+                            format!("{} {:02}", if active { ">" } else { " " }, index + 1),
+                            44.0,
+                        )
+                        .font_family(widgets::code_font(cx))
+                        .text_color(if active {
+                            c.primary
+                        } else {
+                            c.muted
+                        }),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .truncate()
+                            .child(project.name.clone()),
+                    )
+                    .child(
+                        cell(format!("{:02}", project.slide_count), 44.0)
+                            .font_family(widgets::code_font(cx)),
+                    )
+                    .child(
+                        cell(
+                            project
+                                .aspect_ratio
+                                .unwrap_or(AspectRatio::Ratio16x9)
+                                .label()
+                                .split_whitespace()
+                                .next()
+                                .unwrap_or("16:9")
+                                .to_string(),
+                            54.0,
+                        )
+                        .font_family(widgets::code_font(cx))
+                        .text_color(c.muted),
+                    )
+                    .when(dates, |row| {
+                        row.child(
+                            cell(format_date(project.updated_at), 138.0)
+                                .font_family(widgets::code_font(cx))
+                                .text_size(px(10.5))
+                                .text_color(c.muted),
+                        )
+                    })
+                    .child(
+                        div()
+                            .flex_none()
+                            .w(px(112.0))
+                            .flex()
+                            .items_center()
+                            .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
+                                cx.stop_propagation()
+                            })
+                            .child(
+                                widgets::ghost_button(
+                                    SharedString::from(format!("terminal-open-{id}")),
+                                    "打开",
+                                )
+                                .small()
+                                .on_click(move |_, window, cx| {
+                                    cx.stop_propagation();
+                                    open.navigate(
+                                        Route::Project {
+                                            id: Some(id),
+                                            step: None,
+                                        },
+                                        window,
+                                        cx,
+                                    );
+                                }),
+                            )
+                            .child(
+                                widgets::icon_button(
+                                    SharedString::from(format!("terminal-export-{id}")),
+                                    if exporting { "renew" } else { "download" },
+                                    "导出（.keynn / PDF）",
+                                )
+                                .small()
+                                .disabled(exporting)
+                                .on_click(cx.listener(
+                                    move |page, _, window, cx| {
+                                        cx.stop_propagation();
+                                        page.open_export(export_project.clone(), window, cx);
+                                    },
+                                )),
+                            )
+                            .child(
+                                widgets::icon_button(
+                                    SharedString::from(format!("terminal-delete-{id}")),
+                                    "trash-can",
+                                    "删除",
+                                )
+                                .small()
+                                .on_click(cx.listener(
+                                    move |page, _, window, cx| {
+                                        cx.stop_propagation();
+                                        page.confirm_delete(id, window, cx);
+                                    },
+                                )),
+                            ),
+                    )
+            }));
+        div()
+            .flex()
+            .gap(px(16.0))
+            .when(!wide, |d| d.flex_col())
+            .child(table)
+            .when_some(selected, |body, project| {
+                let detail = widgets::panel(cx)
+                    .flex_none()
+                    .when(wide, |d| d.w(px(250.0)))
+                    .child(
+                        div()
+                            .px(px(14.0))
+                            .py(px(9.0))
+                            .border_b_1()
+                            .border_color(c.border)
+                            .font_family(widgets::code_font(cx))
+                            .text_size(px(11.0))
+                            .text_color(c.primary)
+                            .child("[ 项目信息 ]"),
+                    )
+                    .child(
+                        div()
+                            .p(px(16.0))
+                            .flex()
+                            .flex_col()
+                            .gap(px(16.0))
+                            .child(div().text_size(px(20.0)).child(project.name.clone()))
+                            .child(div().text_size(px(12.0)).text_color(c.muted).child(format!(
+                                    "{} 张幻灯片  /  {}",
+                                    project.slide_count,
+                                    project
+                                        .aspect_ratio
+                                        .unwrap_or(AspectRatio::Ratio16x9)
+                                        .label()
+                                        .split_whitespace()
+                                        .next()
+                                        .unwrap_or("16:9")
+                                )))
+                            .child(
+                                div()
+                                    .font_family(widgets::code_font(cx))
+                                    .text_size(px(11.0))
+                                    .text_color(c.muted)
+                                    .child(format!("修改于 {}", format_date(project.updated_at))),
+                            )
+                            .child(
+                                div()
+                                    .border_t_1()
+                                    .border_color(c.border)
+                                    .pt(px(12.0))
+                                    .text_size(px(12.0))
+                                    .text_color(c.muted)
+                                    .child("选择项目查看信息，打开后继续编辑。"),
+                            ),
+                    );
+                body.child(detail)
+            })
+            .into_any_element()
+    }
+
     fn project_card(&self, project: &ProjectSummary, cx: &mut Context<Self>) -> impl IntoElement {
         let c = cx.studio().colors;
         let editorial = cx.studio().theme.id == "light-editorial";
@@ -1039,7 +1327,7 @@ impl HomePage {
                     div()
                         .flex_none()
                         .size(px(37.0))
-                        .rounded(px(9.0))
+                        .rounded(widgets::radius(cx, 9.0))
                         .flex()
                         .items_center()
                         .justify_center()

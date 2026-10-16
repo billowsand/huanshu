@@ -90,6 +90,13 @@ pub struct Studio {
 
 impl Global for Studio {}
 
+impl Studio {
+    /// Terminal chrome is opt-in; the other theme families retain their own layout.
+    pub fn is_terminal(&self) -> bool {
+        matches!(self.theme.id, "dark-terminal" | "light-terminal")
+    }
+}
+
 // Root-level defaults also reach dialogs, menus, notifications and tooltips,
 // which are siblings of Shell rather than its children.
 struct TypographyLayer;
@@ -186,7 +193,17 @@ pub fn apply(
     let kit = Theme::global_mut(cx);
     kit.font_family = font.clone();
     kit.mono_font_family = code;
-    kit.radius = px(if theme.id == "light-editorial" {
+    kit.radius = px(
+        if matches!(
+            theme.id,
+            "light-editorial" | "dark-terminal" | "light-terminal"
+        ) {
+            0.0
+        } else {
+            8.0
+        },
+    );
+    kit.radius_lg = px(if matches!(theme.id, "dark-terminal" | "light-terminal") {
         0.0
     } else {
         8.0

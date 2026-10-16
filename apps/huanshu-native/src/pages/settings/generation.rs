@@ -90,7 +90,7 @@ impl SettingsPage {
                 .gap(px(10.0))
                 .px(px(14.0))
                 .py(px(12.0))
-                .rounded(px(8.0))
+                .rounded(widgets::radius(cx, 8.0))
                 .bg(c.primary_bg)
                 .text_size(px(13.0))
                 .text_color(c.muted)

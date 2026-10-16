@@ -238,6 +238,7 @@ impl Step2 {
 impl Render for Step2 {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let c = cx.studio().colors;
+        let terminal = cx.studio().is_terminal();
 
         // ── 数据：生成状态一律来自应用级 store（原版 props 都来自 `useGenerationStore()`） ──
         let (model_id, run, deck) = {
@@ -280,7 +281,7 @@ impl Render for Step2 {
         let panel_w = (viewport.width.as_f32() - SIDEBAR_W).max(GRID_MIN_COL + 2.0 * GRID_PAD);
         // 原版 `@media (max-width: 1200px) { .slides-workbench { grid-template-columns: 1fr } }`：
         // 窗口不宽于 1200px 时详情面板整宽排在看板下方（`.slide-detail-panel { max-height: none }`）。
-        let narrow = viewport.width.as_f32() <= NARROW_MAX_W;
+        let narrow = viewport.width.as_f32() <= if terminal { 1050.0 } else { NARROW_MAX_W };
         let detail_w = if narrow {
             panel_w
         } else {
@@ -291,12 +292,23 @@ impl Render for Step2 {
         } else {
             (panel_w - PANEL_GAP - detail_w).max(GRID_MIN_COL + 2.0 * GRID_PAD)
         };
-        let grid = Grid::new(grid_w);
+        let grid = if terminal {
+            Grid {
+                columns: 1,
+                column_w: (grid_w - 2.0 * GRID_PAD).max(1.0),
+            }
+        } else {
+            Grid::new(grid_w)
+        };
         let columns = grid.columns;
         let column_w = grid.column_w;
         let preview_w = grid.preview_w();
         let preview_h = preview_w * aspect_ratio;
-        let card_h = card_height(preview_h);
+        let card_h = if terminal {
+            56.0
+        } else {
+            card_height(preview_h)
+        };
         let detail_stage_w = (detail_w - 2.0 * (PANEL_PAD + CARD_BORDER)).max(1.0);
         self.columns = columns;
 
@@ -323,7 +335,7 @@ impl Render for Step2 {
         let wanted: Vec<usize> = (row_start * columns..(row_end + 1) * columns)
             .take_while(|index| *index < items.len())
             .collect();
-        self.thumbs.set_wanted(&wanted);
+        self.thumbs.set_wanted(if terminal { &[] } else { &wanted });
         let focus_index = selected.filter(|index| wanted.contains(index));
         self.thumbs
             .pump(focus_index, |this: &mut Self| &mut this.thumbs, window, cx);
@@ -363,8 +375,9 @@ impl Render for Step2 {
             .flex_none()
             .size(px(12.0))
             .rounded_full()
+            .when(terminal, |orb| orb.rounded_none())
             .bg(orb_color);
-        let orb: AnyElement = if orb_pulse {
+        let orb: AnyElement = if orb_pulse && !terminal {
             orb.with_animation(
                 "s2-orb",
                 Animation::new(Duration::from_millis(1800)).repeat(),
@@ -527,7 +540,7 @@ impl Render for Step2 {
                                         .flex()
                                         .flex_row()
                                         .gap(px(GRID_GAP))
-                                        .pb(px(GRID_GAP))
+                                        .pb(px(if terminal { 0.0 } else { GRID_GAP }))
                                         .children((start..end).map(|index| {
                                             board_card(
                                                 &cards[index],
@@ -559,23 +572,48 @@ impl Render for Step2 {
             .when(!narrow, |panel| panel.h_full())
             .flex()
             .flex_col()
-            .rounded(px(16.0))
+            .rounded(widgets::radius(cx, 16.0))
             .border_1()
             .border_color(c.border)
             .bg(c.surface)
             .when_some(cx.studio().paper, |panel, p| {
                 panel
                     .bg(p.card)
-                    .rounded(px(3.0))
+                    .rounded(widgets::radius(cx, 3.0))
                     .shadow(widgets::paper_shadow(&p))
             })
             .overflow_hidden()
             .child(
-                panel_head("catalog", "幻灯片生成看板", cx)
-                    .when(running, |head| head.child(live_dot(cx)))
-                    .child(div().flex_1())
-                    .child(count_chip(cards.len(), cx)),
+                panel_head(
+                    "catalog",
+                    if terminal {
+                        "逐页任务 / TASKS"
+                    } else {
+                        "幻灯片生成看板"
+                    },
+                    cx,
+                )
+                .when(running, |head| head.child(live_dot(cx)))
+                .child(div().flex_1())
+                .child(count_chip(cards.len(), cx)),
             )
+            .when(terminal, |board| {
+                board.child(
+                    div()
+                        .mx(px(GRID_PAD))
+                        .h(px(28.0))
+                        .flex_none()
+                        .flex()
+                        .items_center()
+                        .gap(px(10.0))
+                        .font_family(widgets::code_font(cx))
+                        .text_size(px(10.0))
+                        .text_color(c.muted)
+                        .child(div().w(px(32.0)).child("页码"))
+                        .child(div().flex_1().child("页面 / 版式"))
+                        .child(div().w(px(100.0)).child("状态")),
+                )
+            })
             .child(board_grid);
 
         // ── 详情（右侧；窄窗口下在看板下方） ────────────────────────────────────
@@ -684,6 +722,71 @@ impl Render for Step2 {
                     .child(board)
                     .child(detail),
             )
+            .when(terminal, |body| {
+                body.child(
+                    widgets::panel(cx)
+                        .flex_none()
+                        .mx(px(12.0))
+                        .mt(px(10.0))
+                        .mb(px(8.0))
+                        .child(panel_head("terminal", "生成日志 / LOG", cx))
+                        .child(
+                            div()
+                                .px(px(12.0))
+                                .py(px(6.0))
+                                .flex()
+                                .flex_col()
+                                .gap(px(4.0))
+                                .when(snap.recent_logs.is_empty(), |log| {
+                                    log.child(
+                                        div()
+                                            .text_size(px(11.0))
+                                            .text_color(c.muted)
+                                            .child("等待生成事件…"),
+                                    )
+                                })
+                                .children(
+                                    snap.recent_logs
+                                        .iter()
+                                        .rev()
+                                        .take(3)
+                                        .collect::<Vec<_>>()
+                                        .into_iter()
+                                        .rev()
+                                        .map(|log| {
+                                            use chrono::TimeZone as _;
+                                            let time = chrono::Local
+                                                .timestamp_opt(log.created_at, 0)
+                                                .single()
+                                                .map(|t| t.format("%H:%M:%S").to_string())
+                                                .unwrap_or_default();
+                                            let error = log.stage == "error" || log.kind == "error";
+                                            div()
+                                                .flex()
+                                                .items_center()
+                                                .gap(px(10.0))
+                                                .text_size(px(11.0))
+                                                .font_family(widgets::code_font(cx))
+                                                .text_color(if error { c.error } else { c.muted })
+                                                .child(div().flex_none().w(px(64.0)).child(time))
+                                                .child(
+                                                    div().flex_none().w(px(70.0)).child(
+                                                        progress::log_stage_label(&log.stage)
+                                                            .to_string(),
+                                                    ),
+                                                )
+                                                .child(div().flex_1().min_w_0().truncate().child(
+                                                    if log.summary.is_empty() {
+                                                        log.title.clone()
+                                                    } else {
+                                                        log.summary.clone()
+                                                    },
+                                                ))
+                                        }),
+                                ),
+                        ),
+                )
+            })
             .child(bottom)
     }
 }
@@ -820,7 +923,16 @@ fn panel_head(
         .border_color(c.border)
         .text_size(px(10.0))
         .text_color(c.muted)
-        .child(carbon(icon))
+        .when(cx.studio().is_terminal(), |head| {
+            head.font_family(widgets::code_font(cx))
+                .text_size(px(11.0))
+                .text_color(c.primary)
+        })
+        .child(if cx.studio().is_terminal() {
+            div().child(">_").into_any_element()
+        } else {
+            carbon(icon).into_any_element()
+        })
         .child(label)
 }
 
@@ -829,7 +941,7 @@ fn count_chip(count: usize, cx: &App) -> AnyElement {
     let c = cx.studio().colors;
     div()
         .px(px(6.4))
-        .rounded(px(999.0))
+        .rounded(widgets::radius(cx, 999.0))
         .border_1()
         .border_color(c.border)
         .bg(c.surface)
@@ -849,7 +961,7 @@ fn stat_chip(value: String, label: &'static str, accent: bool, cx: &App) -> AnyE
         .flex_row()
         .items_center()
         .gap(px(6.0))
-        .rounded(px(8.0))
+        .rounded(widgets::radius(cx, 8.0))
         .border_1()
         .border_color(c.border)
         .bg(c.surface)
@@ -914,6 +1026,78 @@ fn board_card(
     let on_pick = this.clone();
     let on_retry = this;
 
+    if cx.studio().is_terminal() {
+        let (mark, tone) = match card.status.0 {
+            Tone2::Success => ("✓", c.success),
+            Tone2::Primary => (">", c.primary),
+            Tone2::Error => ("!", c.error),
+            _ => ("·", c.muted),
+        };
+        return div()
+            .id(("s2-card", index))
+            .flex_none()
+            .w(px(column_w))
+            .h(px(card_h))
+            .flex()
+            .items_center()
+            .gap(px(10.0))
+            .px(px(8.0))
+            .border_b_1()
+            .border_color(c.border)
+            .border_l_2()
+            .border_color(if selected { c.primary } else { c.border })
+            .bg(if selected { c.primary_bg } else { c.panel })
+            .cursor_pointer()
+            .hover(|row| row.bg(c.surface))
+            .on_click(move |_, _, cx| {
+                let _ = on_pick.update(cx, |this, cx| this.select(index, cx));
+            })
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(32.0))
+                    .font_family(widgets::code_font(cx))
+                    .text_size(px(12.0))
+                    .text_color(tone)
+                    .child(format!("{:02}", index + 1)),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .gap(px(3.0))
+                    .child(
+                        div()
+                            .truncate()
+                            .text_size(px(13.0))
+                            .child(card.title.clone()),
+                    )
+                    .child(
+                        div()
+                            .truncate()
+                            .text_size(px(10.0))
+                            .text_color(c.muted)
+                            .child(
+                                card.layout
+                                    .clone()
+                                    .unwrap_or_else(|| "等待布局排版结果".into()),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(100.0))
+                    .font_family(widgets::code_font(cx))
+                    .text_size(px(11.0))
+                    .text_color(tone)
+                    .child(format!("{mark} {}", card.status.1)),
+            )
+            .into_any_element();
+    }
+
     // 阶段标签的三种样式（原版 `.spc-step.is-done / .is-active / 默认`）。
     let step_chip = move |state: &'static str, label: &'static str| {
         let (fg, bg, border) = match state {
@@ -927,7 +1111,7 @@ fn board_card(
             .h(px(20.0))
             .flex()
             .items_center()
-            .rounded(px(999.0))
+            .rounded(widgets::radius(cx, 999.0))
             .border_1()
             .border_color(border)
             .bg(bg)
@@ -969,7 +1153,7 @@ fn board_card(
             .items_center()
             .justify_center()
             .gap(px(8.0))
-            .rounded(px(12.0))
+            .rounded(widgets::radius(cx, 12.0))
             .border_1()
             .border_color(c.border)
             .bg(c.bg)
@@ -987,13 +1171,13 @@ fn board_card(
         .flex()
         .flex_col()
         .gap(px(CARD_GAP))
-        .rounded(px(16.0))
+        .rounded(widgets::radius(cx, 16.0))
         .bg(c.panel)
         .border_1()
         .border_color(if selected { c.primary_border } else { c.border })
         .when_some(cx.studio().paper, |card, p| {
             card.bg(p.card)
-                .rounded(px(3.0))
+                .rounded(widgets::radius(cx, 3.0))
                 .shadow(widgets::paper_shadow(&p))
         })
         .cursor_pointer()
@@ -1050,7 +1234,7 @@ fn board_card(
                             .px(px(10.4))
                             .py(px(3.8))
                             .truncate()
-                            .rounded(px(999.0))
+                            .rounded(widgets::radius(cx, 999.0))
                             .border_1()
                             .border_color(c.primary_border)
                             .bg(c.primary_bg)
@@ -1065,7 +1249,7 @@ fn board_card(
                             .px(px(10.4))
                             .py(px(3.8))
                             .truncate()
-                            .rounded(px(999.0))
+                            .rounded(widgets::radius(cx, 999.0))
                             .border_1()
                             .border_color(c.border)
                             .bg(c.surface)
@@ -1164,7 +1348,7 @@ fn progress_section(
                                     heading.child(
                                         div()
                                             .px(px(4.8))
-                                            .rounded(px(5.0))
+                                            .rounded(widgets::radius(cx, 5.0))
                                             .bg(c.primary_bg)
                                             .text_size(px(10.4))
                                             .text_color(c.primary)
@@ -1267,7 +1451,7 @@ fn progress_section(
         .mb(px(16.0))
         .px(px(17.6))
         .py(px(14.4))
-        .rounded(px(14.0))
+        .rounded(widgets::radius(cx, 14.0))
         .border_1()
         .border_color(c.border)
         .bg(c.surface)
@@ -1334,7 +1518,7 @@ fn progress_section(
                 .mt(px(9.6))
                 .h(px(4.0))
                 .w_full()
-                .rounded(px(999.0))
+                .rounded(widgets::radius(cx, 999.0))
                 .bg(c.border)
                 .overflow_hidden()
                 .child(div().h_full().w(relative(fraction)).bg(c.primary)),
@@ -1389,14 +1573,14 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
             })
             .flex()
             .flex_col()
-            .rounded(px(16.0))
+            .rounded(widgets::radius(cx, 16.0))
             .border_1()
             .border_color(c.border)
             .bg(c.surface)
             .when_some(cx.studio().paper, |panel, p| {
                 panel
                     .bg(p.card)
-                    .rounded(px(3.0))
+                    .rounded(widgets::radius(cx, 3.0))
                     .shadow(widgets::paper_shadow(&p))
             })
             .overflow_hidden()
@@ -1459,7 +1643,7 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
             .items_center()
             .justify_center()
             .gap(px(8.0))
-            .rounded(px(14.0))
+            .rounded(widgets::radius(cx, 14.0))
             .border_1()
             .border_color(c.border)
             .bg(c.bg)
@@ -1505,7 +1689,7 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
     let wrap = |children: Vec<AnyElement>| -> AnyElement {
         div()
             .p(px(12.0))
-            .rounded(px(12.0))
+            .rounded(widgets::radius(cx, 12.0))
             .border_1()
             .border_color(c.border)
             .bg(c.surface)
@@ -1709,7 +1893,7 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
                             .max_h(px(240.0))
                             .w_full()
                             .overflow_y_scroll()
-                            .rounded(px(10.0))
+                            .rounded(widgets::radius(cx, 10.0))
                             .border_1()
                             .border_color(c.border)
                             .bg(c.bg)
@@ -1726,7 +1910,7 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
         body.push(
             div()
                 .p(px(12.0))
-                .rounded(px(12.0))
+                .rounded(widgets::radius(cx, 12.0))
                 .border_1()
                 .border_color(c.border)
                 .bg(c.surface)
@@ -1758,7 +1942,7 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
     body.push(
         div()
             .p(px(12.0))
-            .rounded(px(12.0))
+            .rounded(widgets::radius(cx, 12.0))
             .border_1()
             .border_color(c.border)
             .bg(c.surface)
@@ -1784,13 +1968,13 @@ fn detail_panel(args: DetailArgs<'_>, cx: &App) -> AnyElement {
                     args.recent_logs.iter().map(|log| {
                         div()
                             .p(px(10.4))
-                            .rounded(px(10.0))
+                            .rounded(widgets::radius(cx, 10.0))
                             .border_1()
                             .border_color(c.border)
                             .bg(c.surface)
                             .child(div().text_size(px(11.5)).text_color(c.muted).child(format!(
                                 "{} · #{}",
-                                progress::log_stage_label(&log.stage),
+                                progress::log_stage_label(&log.stage).to_string(),
                                 log.seq
                             )))
                             .child(div().mt(px(3.2)).text_size(px(12.8)).child(

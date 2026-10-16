@@ -35,7 +35,7 @@ pub(super) fn status_chip(state: ServiceState, cx: &gpui_kit::App) -> impl IntoE
         .gap(px(5.0))
         .px(px(8.0))
         .py(px(2.0))
-        .rounded(px(999.0))
+        .rounded(widgets::radius(cx, 999.0))
         .border_1()
         .border_color(border)
         .bg(bg)
@@ -73,7 +73,7 @@ impl SettingsPage {
                     .gap(px(12.0))
                     .px(px(16.0))
                     .py(px(14.0))
-                    .rounded(px(10.0))
+                    .rounded(widgets::radius(cx, 10.0))
                     .cursor_pointer()
                     .border_1()
                     .when(selected, |tile| {
