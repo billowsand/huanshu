@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-16
+
+### Added
+
+- **原生 GPUI 界面**（`apps/huanshu-native`）：用 Rust + GPUI Kit 逐页复刻 Tauri + Vue 版的全部界面——首页、首次向导、设置（外观与字体 / 模型服务 / 生成 / 存储 / 关于）、三步工作流、全屏演示与全览。与 Tauri 版共用同一份 `huanshu-core` 业务内核和同一个数据目录，功能对照表见 [`docs/native/parity.md`](docs/native/parity.md)，逐页审计记录见 `docs/native/audit-*.md`。便签·稿纸主题在原生界面里取样为锤子便签材质：浅木纹桌面、横向金属回形针、稿纸页边与横线，演示与全览铺木纹并给纸张投影。标题栏自绘（品牌、文稿名、窗口按钮、整条拖动区），打开文稿时正中是文稿名（点它改名），三步工作流各栏顶栏同高。支持命令行开关（`--route` / `--theme` / `--quit-after` / `--open <id> --export-pdf`）与截图脚本 `apps/huanshu-native/tools/shots.ps1`，真机验证一律在 `HUANSHU_HOME` 沙箱里进行。打包脚本 `scripts/package-native.ps1` 产出免安装单文件与 NSIS 安装包（与 Tauri 版安装目录、产品名完全分开，互不覆盖）。
+
+- **沙箱数据目录与演示数据**：设 `HUANSHU_HOME` 后数据库、`settings.json`、素材与 `bootstrap.json` 全部落在该目录下（未设置时行为不变）；新增 `cargo run -p huanshu-core --example seed_demo -- <dir>` 建 9 个演示项目（含 60 页长牌组与一次以失败告终的生成记录），供无模型时把界面完整走一遍。
+
+- **原生界面的数学公式预览**：第一步 Markdown 预览里的 `$...$` / `$$...$$` 由 `Renderer::render_formula` 出透明底 PNG 内嵌（按「公式 + 行内/块级 + 颜色 + 字号」缓存，后台出图），坏公式显示红色原文而不是让整页预览失败；显示尺寸按「正文 px × 0.75」折算，公式不会再小一号。
+
+### Changed
+
+- **幻灯片只剩一个渲染器**：删除 18 个 Vue 幻灯片模板与整条 ECharts 管线。屏幕上的每一页幻灯片（生成看板缩略图、演示主画面与全览、编辑器预览）都是 Typst 排版出的 PNG，PDF 也来自同一份排版；图表改由 `typst/lib/chart.typ` 原生绘制（折线 / 柱状 / 环形 / 分组柱状 / 堆叠面积），与已删除的 ECharts SSR 输出逐项对过几何，平均像素差 ≤ 0.43。形式上「所见即所得」不再只是承诺：编辑器预览与 PDF 是同一段代码的两种输出。幻灯片正文不再走 KaTeX（随 Vue 模板一起删除）；Tauri 版第一步的 Markdown 预览仍是 KaTeX 渲染公式，原生界面的同一处改用 Typst 出图。
+
+- **业务逻辑整体下沉到 `crates/huanshu-core`**：生成、存储、导出、设置、编辑器版式表、图表校验、缩略图调度全部移入与界面无关的 crate（`cargo tree -p huanshu-core` 里没有 tauri），`src-tauri/src/commands/*` 只剩「取参数 → 调 core → 转错误」；生成事件经 `CoreEvent` 通道对外发，线上格式由 `tests/fixtures/generation-events.json` 锁定。前端能直接读的规则（编辑器版式表、图表问题文案）改为从 Rust 取，不再各写一份。
+
+- **版式选择改为「逐页候选 + 全局分配」**：2a 阶段每页并发给出 2–3 个候选版式（只看本页适配度），回复由 `candidate_parsing` 逐条宽松解析并按 `layout_rules` 的适用条件表过滤；2b 阶段 `planning::assign_layouts` 用纯 CPU 的确定性算法在候选集合上求最优（Viterbi + 单页交换局部搜索），目标函数为 `Σscore − 3·相邻同款 − 1·隔页同款 − 2·单一版式超出 30% 上限`，结果只取决于候选、与并发数无关；2c 阶段才并发生成内容。LLM 失败或修复到最后一轮时走同一张 `layout_scoring` 兜底打分表，兜底版式同样只从可用版式中选。每次生成的观测文件新增 `02-layout-NN.parsed.json`、`02-layout-assignment.json`、`05-layout-final.json`，另有真机探针 `cargo test -p huanshu-core --lib layout_probe -- --ignored --nocapture`。
+
+- **生成与「当前打开的项目」解耦**：一次生成属于它开始时的项目（`generation_runs.project_id`）——组装落库写那个项目的行，`AppState.blueprints` 只在该项目仍打开时镜像；单页重试的底稿与写回、`get_retry_layouts`、`get_generation_deck(project_id)` 都按运行所属项目判断。用户中途打开了别的项目时，结果不会再被旧项目的牌组覆盖。原生界面的生成状态提升为应用级的 `GenerationStore`（原版 pinia store 的对应物），页面来去不影响在途生成。
+
+- **第三步编辑写入 store**：编辑器的改动经 `WorkflowPage::commit_deck` 落到模型 → `GenerationStore::set_deck` → 落库，避免单页重试完成后用旧牌组盖掉用户刚做的编辑。
+
+- **界面细节**：三步工作流栏顶栏统一 64px；标题栏显示文稿名并支持点击改名；主题浮层在原生界面里跟随主题换色；PDF 导出报告逐条列出缺失图片（页码 + 引用 + 原因）与占位页。
+
+### Fixed
+
+- **原生界面真机验收（LM Studio 实际生成）发现并修复的问题**：失败页自动重试的活锁（无限请求编译不过的牌组）、跨窗口共用缓存键导致的图串页、启动时把路由改写到未建好的 shell、设置读失败时静默回退默认值（改为报错并阻止保存）、长表单把「应用」按钮挤出可视区（固定底栏）、第三步选中页下标在切换步骤后丢失、删除项目时留下模型残片；只读查看器阶段实测（release，5 分钟每 100ms 翻一页）工作集稳定在 385–412 MiB。
+
+### Documentation
+
+- **README 全面更新**：改用真实截图（`docs/screenshots/`），修正已过时的描述——版式选择改为候选 + 全局分配、图表与公式改为 Typst 原生、项目结构改为当前 workspace 布局（两套界面 + 两个 crate）、补上原生界面的运行与出包方式。
+- 原生界面对照表 `docs/native/parity.md`、逐页审计 `docs/native/audit-*.md` 与设计文档 `docs/design/*` 随本次发布同步更新；`CLAUDE.md` 记录渲染与迁移的现状。
+
 ## [0.4.0] - 2026-10-14
 
 ### Added
