@@ -20,6 +20,7 @@ use huanshu_core::types::AspectRatio;
 use crate::export;
 use crate::icons::carbon;
 use crate::password_dialog::{PasswordDialog, PasswordMode};
+use crate::platform;
 use crate::router::{Route, SettingsTab};
 use crate::shell::ShellHandle;
 use crate::tasks::{run_async, run_bg};
@@ -275,11 +276,26 @@ impl HomePage {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(path) =
-            export::ask_save_path(&format!("{}.keynn", project.name), "幻述项目", "keynn")
-        else {
-            return;
-        };
+        let default_name = format!("{}.keynn", project.name);
+        platform::save_path(
+            self,
+            &default_name,
+            platform::KEYNN,
+            window,
+            cx,
+            move |page, path, window, cx| page.write_keynn(project, password, path, window, cx),
+        );
+    }
+
+    /// 保存路径定下之后的 `.keynn` 导出（[`Self::export_keynn`] 的后半段）。
+    fn write_keynn(
+        &mut self,
+        project: ProjectSummary,
+        password: Option<String>,
+        path: std::path::PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.exporting = Some(project.id);
         cx.notify();
         let shared = self.handle.shared().clone();
@@ -347,9 +363,28 @@ impl HomePage {
             return;
         }
         let default_name = format!("{}.pdf", safe_file_name(&project.name));
-        let Some(path) = export::ask_save_path(&default_name, "PDF", "pdf") else {
+        platform::save_path(
+            self,
+            &default_name,
+            platform::PDF,
+            window,
+            cx,
+            move |page, path, window, cx| page.write_pdf(project, path, window, cx),
+        );
+    }
+
+    /// 保存路径定下之后的 PDF 导出（[`Self::export_pdf`] 的后半段）。
+    fn write_pdf(
+        &mut self,
+        project: ProjectSummary,
+        path: std::path::PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // macOS 的保存面板是异步的：面板开着时可能又点了一次导出，这里再拦一次。
+        if self.pdf_exporting {
             return;
-        };
+        }
         self.pdf_exporting = true;
         self.exporting = Some(project.id);
         cx.notify();
@@ -374,12 +409,22 @@ impl HomePage {
     /// 导入 `.keynn`（原版 `handleImport` / `handlePasswordSubmit`）。
     /// 加密文件先读入内存，弹 decrypt 密码对话框；密码错误不关闭对话框，可重试。
     fn import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("幻述项目", &["keynn"])
-            .pick_file()
-        else {
-            return;
-        };
+        platform::pick_paths(
+            self,
+            platform::Pick::File(platform::KEYNN),
+            window,
+            cx,
+            |page, mut paths, window, cx| page.import_path(paths.remove(0), window, cx),
+        );
+    }
+
+    /// 选好文件之后的导入（[`Self::import`] 的后半段）。
+    fn import_path(
+        &mut self,
+        path: std::path::PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.importing = true;
         cx.notify();
         let shared = self.handle.shared().clone();

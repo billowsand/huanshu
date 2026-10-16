@@ -705,8 +705,8 @@ impl Step3 {
 
     fn on_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let modifiers = &event.keystroke.modifiers;
-        // Ctrl+S 在第三步任何位置都生效（**有意的小改进**：原版只在高级 JSON 文本框里）。
-        if (modifiers.control || modifiers.platform)
+        // Ctrl+S（macOS ⌘S）在第三步任何位置都生效（**有意的小改进**：原版只在高级 JSON 文本框里）。
+        if crate::platform::primary_modifier(modifiers)
             && event.keystroke.key.eq_ignore_ascii_case("s")
         {
             self.apply(window, cx);
@@ -799,9 +799,28 @@ impl Step3 {
         let Some(id) = id else {
             return;
         };
-        let Some(path) = crate::export::ask_save_path(&format!("{name}.pdf"), "PDF", "pdf") else {
+        crate::platform::save_path(
+            self,
+            &format!("{name}.pdf"),
+            crate::platform::PDF,
+            window,
+            cx,
+            move |this, path, window, cx| this.write_pdf(id, path, window, cx),
+        );
+    }
+
+    /// 保存路径定下之后的 PDF 导出（[`Self::export_pdf`] 的后半段）。牌组与「未应用」
+    /// 提示取此刻的状态（macOS 的保存面板是异步的，面板开着时仍可编辑）。
+    fn write_pdf(
+        &mut self,
+        id: i64,
+        path: std::path::PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.exporting {
             return;
-        };
+        }
         self.exporting = true;
         cx.notify();
         // 与首页一致：先开「正在生成 PDF…」，结果/失败框由 show_report 收起它。
@@ -2320,12 +2339,15 @@ impl Step3 {
         let locked = self.editing_locked(cx);
         let saving = self.saving(cx);
         let unsaved = self.has_unsaved;
-        let (label, icon) = if saving {
-            ("保存中…", "renew")
+        let (label, icon): (SharedString, _) = if saving {
+            ("保存中…".into(), "renew")
         } else if unsaved {
-            ("应用更改 (Ctrl+S)", "save")
+            (
+                format!("应用更改 ({})", crate::platform::shortcut_label("s")).into(),
+                "save",
+            )
         } else {
-            ("已保存", "checkmark")
+            ("已保存".into(), "checkmark")
         };
         // 原版 `.ej-save-btn` 是右栏里撑满整行的块级按钮；有 JSON 错误时禁用。
         let mut actions = div().flex().flex_col().gap(px(6.0)).child(

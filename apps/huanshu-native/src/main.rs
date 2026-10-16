@@ -17,6 +17,7 @@ mod icons;
 mod images;
 mod pages;
 mod password_dialog;
+mod platform;
 mod present;
 mod router;
 mod shell;
@@ -26,7 +27,7 @@ mod theme;
 mod widgets;
 
 use gpui_kit::prelude::*;
-use gpui_kit::{px, size, App, Bounds, TitlebarOptions, WindowBounds};
+use gpui_kit::{point, px, size, App, Bounds, TitlebarOptions, WindowBounds};
 
 /// 进程入口时刻，用来报冷启动到首帧。
 static PROCESS_START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
@@ -44,6 +45,8 @@ fn main() {
         .with_assets(icons::NativeAssets)
         .run(move |cx: &mut App| {
             gpui_kit::init(cx);
+            // 退出、菜单栏、⌘Q（macOS）；关掉最后一个窗口即退出（全平台）。
+            platform::init(cx);
             theme::init_typography(cx);
             let (shared, current, _data_dir) = app::load();
             let theme_id = match cli.theme.as_deref() {
@@ -82,6 +85,10 @@ fn main() {
             // 这里与 Tauri 版 `app.windows[0].title` 对齐（同时也是安装版验收看的标题）。
             options.titlebar = Some(TitlebarOptions {
                 title: Some("幻述".into()),
+                // 红绿灯位置（仅 macOS）：自绘标题栏高 36px，(12, 12) 让系统按钮纵向居中、
+                // 左边距与正文对齐；gpui-component 默认的 (9, 9) 是按它 34px 的栏高定的。
+                // `widgets::title_bar` 在红绿灯右边留出 TRAFFIC_LIGHTS_WIDTH。
+                traffic_light_position: Some(point(px(12.0), px(12.0))),
                 ..gpui_kit::component::TitleBar::title_bar_options()
             });
             options.window_min_size = Some(size(px(1080.), px(680.)));

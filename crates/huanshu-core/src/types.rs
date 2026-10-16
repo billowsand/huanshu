@@ -41,8 +41,13 @@ impl AspectRatio {
     }
 }
 
+/// 本平台的默认字体（Windows 微软雅黑、macOS 苹方），见 `slide_typst::DEFAULT_FONT`。
 fn default_font() -> String {
-    "Microsoft YaHei".to_string()
+    slide_typst::DEFAULT_FONT.to_string()
+}
+
+fn default_math_font() -> String {
+    slide_typst::DEFAULT_MATH_FONT.to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -71,7 +76,7 @@ impl Default for FontSettings {
             number: default_font(),
             code: default_font(),
             editor: default_font(),
-            math: "Cambria Math".to_string(),
+            math: default_math_font(),
             fallback: default_font(),
         }
     }
@@ -97,7 +102,7 @@ impl FontSettings {
             };
         }
         self.math = if self.math.trim().is_empty() {
-            "Cambria Math".to_string()
+            default_math_font()
         } else {
             self.math.trim().to_string()
         };
@@ -155,8 +160,8 @@ mod typography_tests {
         fonts.normalize();
         assert_eq!(fonts.title, "KaiTi");
         assert_eq!(fonts.body, "思源黑体");
-        assert_eq!(fonts.interface, "Microsoft YaHei");
-        assert_eq!(fonts.code, "Microsoft YaHei");
+        assert_eq!(fonts.interface, slide_typst::DEFAULT_FONT);
+        assert_eq!(fonts.code, slide_typst::DEFAULT_FONT);
         let restored: FontSettings =
             serde_json::from_str(&serde_json::to_string(&fonts).unwrap()).unwrap();
         assert_eq!(restored, fonts);

@@ -381,6 +381,8 @@ impl WorkflowPage {
 
     /// 标题栏正中的文稿名（`Shell` 每帧取一次）：平时是截断过的名字，点它进入改名；
     /// 改名时换成输入框。两者都 `occlude()`，否则点击落在标题栏的拖动区上、被系统拿去拖窗口。
+    /// 改名框另外要阻断 mouse down 冒泡：macOS 的拖窗是标题栏自己实现的（`widgets::title_bar`），
+    /// 不阻断的话，在框里拖选文字会把窗口拖走。
     pub fn title_element(page: &Entity<Self>, cx: &mut App) -> AnyElement {
         let this = page.read(cx);
         let c = cx.studio().colors;
@@ -393,6 +395,10 @@ impl WorkflowPage {
                 .occlude()
                 .w(px(360.0))
                 .text_color(c.text)
+                // 框内的按下/拖选不冒泡给标题栏（见上面的文档注释）。
+                .on_mouse_down(gpui_kit::MouseButton::Left, |_, _, cx| {
+                    cx.stop_propagation()
+                })
                 .track_focus(&focus)
                 .on_key_down(move |event: &gpui_kit::KeyDownEvent, _window, cx| {
                     // 原版 `@keydown.escape="editingName = false"`（Esc 不保存）。

@@ -333,8 +333,8 @@ mod tests {
             "code": "Consolas", "body": "SimSun"
         }))
         .unwrap();
-        assert_eq!(fonts.editor, "Microsoft YaHei");
-        assert_eq!(fonts.math, "Cambria Math");
+        assert_eq!(fonts.editor, slide_typst::DEFAULT_FONT);
+        assert_eq!(fonts.math, slide_typst::DEFAULT_MATH_FONT);
         fonts.editor = "KaiTi".into();
         fonts.fallback = "DengXian".into();
         fonts.math = "STIX Two Math".into();

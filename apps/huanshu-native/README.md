@@ -11,6 +11,16 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 首次：
 cargo run -p huanshu-native --release
 ```
 
+macOS（zsh）：
+
+```bash
+export HUANSHU_HOME="$PWD/target/sandbox-home"
+cargo run -p huanshu-core --example seed_demo -- "$HUANSHU_HOME"
+cargo run -p huanshu-native --release
+```
+
+平台差异（菜单与退出、⌘ 快捷键、文件对话框、默认字体）都在 `src/platform.rs`，见根 `CLAUDE.md`。
+
 命令行开关（脚本化验证用）：
 
 | 开关 | 作用 |
@@ -29,7 +39,10 @@ cargo run -p huanshu-native --release
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-native.ps1
 ```
 
-产物（`dist-package/`）：免安装 `huanshu-native_windows_x64.exe` + NSIS 安装包
+macOS：`scripts/package-native-macos.sh [--universal] [--no-dmg]` → `dist-package/幻述.app`、
+`HuanshuNative_<version>_macos_<arch>.dmg`、`huanshu-native_macos_<arch>.zip`（签名与公证见根 `CLAUDE.md`）。
+
+Windows 产物（`dist-package/`）：免安装 `huanshu-native_windows_x64.exe` + NSIS 安装包
 `HuanshuNative_<version>_x64-setup.exe`（安装目录 `%LOCALAPPDATA%\HuanshuNative`、
 卸载项「幻述（原生版）」，与 Tauri 版分开；两版共用同一个真实数据目录，这是有意的）。
 release 不弹控制台、静态 CRT（免装 VC++ Redist）、exe 带图标与版本资源。
@@ -55,7 +68,8 @@ src/
                  + FormulaCache（上限 512 条，淘汰的图由 Step1 render 顺路 drop_all）
   tasks.rs       线程：run_bg（同步重活）、run_async（core 的 async，tokio）、listen_events（生成事件）
   present.rs     演示覆盖层
-  export.rs      保存对话框、PDF 结果对话框
+  export.rs      PDF 进行中 / 结果 / 失败对话框
+  platform.rs    平台差异：退出与菜单栏（macOS）、Ctrl/⌘ 快捷键、文件对话框、默认字体
   pages/         一个页面一个模块（home 是样板）；workflow/ 下是三步
 ```
 

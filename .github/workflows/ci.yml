@@ -16,22 +16,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest, macos-latest]
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Linux system dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          # Prefer ayatana appindicator; libappindicator3-dev conflicts with it on Ubuntu 24.04.
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            librsvg2-dev \
-            patchelf \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -69,9 +57,16 @@ jobs:
         run: cargo test --locked --all-targets
         working-directory: src-tauri
 
-  frontend:
-    name: frontend (build)
-    runs-on: ubuntu-latest
+  # 原生 GPUI 版不在 default-members，上面的 test job 编不到它；这里在 macOS 与 Windows 上
+  # 各编一遍并跑它的单测（平台分支——菜单、文件对话框、字体——两边都要编得过）。
+  native:
+    name: native (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+
     steps:
       - uses: actions/checkout@v4
 
@@ -80,8 +75,17 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
+        # Carbon icons.json for the core/slide-typst build scripts
         run: bun install
 
-      - name: Type check
-        run: bun run build
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Test native (GPUI) build
+        run: cargo test --locked -p huanshu-native
+
+      - name: Test core fonts and defaults on this platform
+        run: cargo test --locked -p huanshu-core --lib -- fonts types

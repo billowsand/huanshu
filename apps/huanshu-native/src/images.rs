@@ -1,7 +1,7 @@
 //! 位图的交接：Typst 给的像素 → GPUI 能画的 `RenderImage`，以及释放。
 //!
 //! GPUI 以 BGRA8 上传图片（直通道 alpha）：Windows 图集是 `DXGI_FORMAT_B8G8R8A8_UNORM`，
-//! 内置解码器最后一步都是 `pixel.swap(0, 2)`。core 的 `render_pixels` 给的是 RGBA8，
+//! macOS 的 Metal 图集是 `BGRA8Unorm`，内置解码器最后一步都是 `pixel.swap(0, 2)`。core 的 `render_pixels` 给的是 RGBA8，
 //! 所以这里换一下通道——这也是唯一一处需要知道通道顺序的地方。
 
 use std::sync::Arc;

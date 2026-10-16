@@ -8,80 +8,12 @@ on:
 permissions:
   contents: write
 
+# Only the native (GPUI) build is published, for Windows and macOS.
+# The Tauri build and the frontend dist are no longer released.
 jobs:
-  release:
-    name: release (${{ matrix.platform }})
-    runs-on: ${{ matrix.platform }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - platform: windows-latest
-            target: x86_64-pc-windows-msvc
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Linux system dependencies
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          # Prefer ayatana appindicator; libappindicator3-dev conflicts with it on Ubuntu 24.04.
-          # fuse/appimagetool deps for AppImage bundling
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            librsvg2-dev \
-            patchelf \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            libfuse2 \
-            file
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install frontend dependencies
-        # Needed for build.rs icon embedding and beforeBuildCommand
-        run: bun install
-
-      - name: Build Tauri
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          # Leave projectPath at repo root so beforeBuildCommand (`bun run build`)
-          # finds package.json; tauri-action discovers src-tauri/tauri.conf.json.
-          tagName: ${{ github.ref_name }}
-          releaseName: "幻述 ${{ github.ref_name }}"
-          releaseBody: |
-            ## 下载
-
-            - **Windows**: `Huanshu_*_x64-setup.exe`（NSIS 安装包）
-            - **Linux**: `Huanshu_*.AppImage` 或 `Huanshu_*.deb`
-            - 也可使用 portable 二进制：`auto-slidev-studio_windows_x64.exe` / `auto-slidev-studio_linux_x64`
-
-            查看 [CHANGELOG](https://github.com/billowsand/huanshu/blob/master/CHANGELOG.md) 了解详细更新内容。
-          # Publish as a real (non-draft) release so downloads are public.
-          releaseDraft: false
-          prerelease: false
-          # Also upload plain binaries as a fallback for portable use.
-          uploadPlainBinary: true
-
   native-windows:
     name: native (windows)
     runs-on: windows-latest
-    # After the Tauri job: tauri-action owns creating the release, and reusing it here
-    # keeps the two builds from racing each other into a duplicate-release conflict.
-    needs: release
     steps:
       - uses: actions/checkout@v4
 
@@ -101,36 +33,56 @@ jobs:
         shell: cmd
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package-native.ps1
 
-      - name: Upload native artifacts
+      # This job creates the GitHub release; the macOS job (see `needs`) appends to it.
+      # Release notes come from a committed file: action-gh-release reads it as UTF-8,
+      # while inline Chinese in a .ps1 would be read as ANSI by Windows PowerShell.
+      - name: Create the release and upload Windows artifacts
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          name: 幻述 ${{ github.ref_name }}
+          body_path: .github/release-notes.md
+          draft: false
+          prerelease: false
           files: |
             dist-package/huanshu-native_windows_x64.exe
             dist-package/HuanshuNative_*_x64-setup.exe
 
-      # tauri-action wrote the notes before this job ran, and those notes only listed the
-      # Tauri artifacts. Rewrite them from a committed file: gh reads it as UTF-8, while
-      # inline Chinese in a .ps1 would be read as ANSI by Windows PowerShell.
-      - name: Rewrite the release notes to cover both builds
-        shell: cmd
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit %GITHUB_REF_NAME% --notes-file .github\release-notes.md
-
-  frontend-release:
-    name: frontend (dist)
-    runs-on: ubuntu-latest
+  native-macos:
+    name: native (macos)
+    runs-on: macos-14
+    # The Windows job creates the release; serializing keeps the two jobs from racing
+    # each other into a duplicate-release conflict.
+    needs: native-windows
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - name: Install and build
-        run: bun install && bun run build
-      - name: Upload frontend assets
-        uses: actions/upload-artifact@v4
+
+      # The packaging script refuses to build without the Carbon icon set (blank icons otherwise).
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          name: dist-studio
-          path: src-tauri/dist-studio/
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Universal (arm64 + x86_64) .app, ad-hoc signed unless the signing secrets are set.
+      # To ship a Developer ID signed + notarized DMG, import the certificate into a temporary
+      # keychain and set HUANSHU_SIGN_IDENTITY / HUANSHU_NOTARY_PROFILE before this step.
+      - name: Package the native (GPUI) build
+        run: scripts/package-native-macos.sh --universal
+
+      - name: Upload macOS artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist-package/HuanshuNative_*_macos_universal.dmg
+            dist-package/huanshu-native_macos_universal.zip

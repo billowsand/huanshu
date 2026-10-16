@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-17
+
+### Added
+
+- **原生版支持 macOS**：`apps/huanshu-native` 新增 `platform.rs`，平台差异集中在这一处——macOS 菜单栏与
+  ⌘Q / ⌘H / ⌥⌘H / ⌘M 快捷键、文件对话框走 GPUI 的异步 `prompt_for_paths` / `prompt_for_new_path`
+  （不再用同步 rfd 的模态循环）、「Ctrl/⌘ + 键」统一按平台取修饰键与显示文字。默认字体按平台区分
+  （macOS：苹方 / STIX Two Math / Menlo、Monaco，Typst 兜底链末尾加冬青黑体 / 黑体-简 / 宋体-简），
+  系统字体枚举在非 Windows 平台走 fontdb。新增 `scripts/package-native-macos.sh`：构建 universal
+  （arm64 + x86_64）`.app`，ad-hoc 签名（可用 `HUANSHU_SIGN_IDENTITY` / `HUANSHU_NOTARY_PROFILE`
+  换成 Developer ID 签名 + 公证），产出 DMG 与 zip。
+- **keynote 样本**（`keynote/`）：28 页的产品发布演说，以幻述自己的工程格式交付（`.keynn` 项目包 +
+  Typst 原生排版 PDF + 逐页位图），报刊·钴蓝主题、18 种版式与五种图表全覆盖。
+
+### Changed
+
+- **发布流程只出原生版**：`release.yml` 移除了 Tauri（tauri-action）与前端 dist 两个 job，Release 只含
+  Windows（NSIS 安装包 + 免安装 exe）与 macOS（DMG + zip）的原生产物；发布说明由
+  `.github/release-notes.md` 在创建 Release 时直接写入。CI 的测试矩阵去掉 Linux，只在 Windows 与
+  macOS 上跑，并移除了只服务 Tauri 版的前端构建 job。
+
 ## [0.5.1] - 2026-10-16
 
 ### Fixed

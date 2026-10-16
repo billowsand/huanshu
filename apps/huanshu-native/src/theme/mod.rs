@@ -133,8 +133,8 @@ impl StudioExt for App {
 
 /// 原版 `--titlebar-height`。
 pub const TITLEBAR_HEIGHT: f32 = 36.0;
-/// 原版界面字体的默认值（`--font-interface`）。
-pub const DEFAULT_INTERFACE_FONT: &str = "Microsoft YaHei";
+/// 原版界面字体的默认值（`--font-interface`）：Windows 微软雅黑，macOS 苹方（见 `platform`）。
+pub const DEFAULT_INTERFACE_FONT: &str = crate::platform::DEFAULT_FONT;
 
 /// 切换主题：写 [`Studio`] 全局量，并把 token 映射进 GPUI Kit 的 `Theme`。
 ///
@@ -156,7 +156,7 @@ pub fn apply(
             family,
             fonts.fallback.as_str(),
             DEFAULT_INTERFACE_FONT,
-            "Segoe UI",
+            crate::platform::UI_FALLBACK_FONT,
         ]
         .into_iter()
         .find(|name| installed.iter().any(|f| f.eq_ignore_ascii_case(name)))

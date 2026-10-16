@@ -1,4 +1,7 @@
-//! 枚举本机安装的字体家族（DirectWrite，Windows）。设置页与 PDF 导出的字体角色都基于它。
+//! 枚举本机安装的字体家族。设置页与 PDF 导出的字体角色都基于它。
+//!
+//! Windows 走 DirectWrite；其余平台（macOS、Linux）走 fontdb——Typst 扫系统字体用的也是它
+//! （`typst-kit`），所以设置页里能选到的字体与幻灯片里能渲染出来的字体是同一批。
 
 use serde::Serialize;
 
@@ -55,7 +58,53 @@ pub fn enumerate_system_fonts() -> Result<Vec<SystemFont>, String> {
 
 #[cfg(not(windows))]
 pub fn enumerate_system_fonts() -> Result<Vec<SystemFont>, String> {
-    Err("当前平台暂不支持读取系统字体".to_string())
+    let mut db = fontdb::Database::new();
+    db.load_system_fonts();
+    // 一个家族有多个字面（常规、粗体……），按英文名归并，各字面的本地化名合在一起。
+    let mut families: std::collections::BTreeMap<String, Vec<(String, String)>> =
+        std::collections::BTreeMap::new();
+    for face in db.faces() {
+        let Some((primary, _)) = face.families.first() else {
+            continue;
+        };
+        if primary.trim().is_empty() || primary.starts_with('.') {
+            // `.SF NS` 之类以点开头的是 macOS 的私有系统字体，不给用户选。
+            continue;
+        }
+        let names = families.entry(primary.to_lowercase()).or_default();
+        for (name, language) in &face.families {
+            let entry = (locale_tag(*language), name.clone());
+            if !names.contains(&entry) {
+                names.push(entry);
+            }
+        }
+    }
+    let mut fonts: Vec<SystemFont> = families
+        .into_values()
+        .filter_map(family_from_names)
+        .collect();
+    fonts.sort_by_key(|font| font.name.to_lowercase());
+    fonts.dedup_by(|a, b| a.name.eq_ignore_ascii_case(&b.name));
+    if fonts.is_empty() {
+        return Err("读取系统字体失败：没有找到任何字体".to_string());
+    }
+    Ok(fonts)
+}
+
+/// fontdb 的语言 → DirectWrite 风格的小写区域名（`family_from_names` 认 `en-us` / `zh-*`）。
+#[cfg(not(windows))]
+fn locale_tag(language: fontdb::Language) -> String {
+    use fontdb::Language as L;
+    match language {
+        L::English_UnitedStates => "en-us",
+        L::Chinese_PeoplesRepublicOfChina => "zh-cn",
+        L::Chinese_Singapore => "zh-sg",
+        L::Chinese_Taiwan => "zh-tw",
+        L::Chinese_HongKongSAR => "zh-hk",
+        L::Chinese_MacaoSAR => "zh-mo",
+        _ => "other",
+    }
+    .to_string()
 }
 
 fn family_from_names(names: Vec<(String, String)>) -> Option<SystemFont> {
@@ -99,7 +148,8 @@ mod tests {
         assert!(family_from_names(Vec::new()).is_none());
     }
 
-    #[cfg(windows)]
+    /// 只在一定装有字体的桌面系统上跑（精简的 Linux 容器可能一个字体都没有）。
+    #[cfg(any(windows, target_os = "macos"))]
     #[test]
     fn enumerates_installed_families() {
         let fonts = enumerate_system_fonts().unwrap();
@@ -110,9 +160,6 @@ mod tests {
         assert!(fonts
             .windows(2)
             .all(|pair| !pair[0].name.eq_ignore_ascii_case(&pair[1].name)));
-        println!(
-            "DirectWrite enumerated {} installed font families",
-            fonts.len()
-        );
+        println!("enumerated {} installed font families", fonts.len());
     }
 }

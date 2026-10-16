@@ -187,7 +187,32 @@ pub const SUPPORTED_KINDS: &[&str] = &[
     "chart_focus",
 ];
 
-const DEFAULT_FONT: &str = "Microsoft YaHei";
+/// 本平台的默认中文字体：设置页「恢复默认」、界面字体与 Typst 兜底链都从这里取。
+/// Windows（以及 Linux）保持原值；macOS 没有微软雅黑，用系统自带的苹方。
+#[cfg(not(target_os = "macos"))]
+pub const DEFAULT_FONT: &str = "Microsoft YaHei";
+#[cfg(target_os = "macos")]
+pub const DEFAULT_FONT: &str = "PingFang SC";
+
+/// 本平台的默认数学字体（必须在 [`MATH_FONTS`] 里）：Windows 自带 Cambria Math，
+/// macOS 自带 STIX Two Math（`/System/Library/Fonts/Supplemental`）。
+#[cfg(not(target_os = "macos"))]
+pub const DEFAULT_MATH_FONT: &str = "Cambria Math";
+#[cfg(target_os = "macos")]
+pub const DEFAULT_MATH_FONT: &str = "STIX Two Math";
+
+/// 默认等宽字体（[`FontRoles::uniform`] 的代码角色排在中文字体前面）。
+#[cfg(not(target_os = "macos"))]
+pub const DEFAULT_CODE_FONTS: &[&str] = &["Cascadia Mono", "Consolas"];
+#[cfg(target_os = "macos")]
+pub const DEFAULT_CODE_FONTS: &[&str] = &["Menlo", "Monaco"];
+
+/// 追加在通用中文兜底之后、只在本平台才有的中文字体。macOS 的苹方是按需下载的系统资源
+/// （`/System/Library/AssetsV2`），万一没下载，这几款随系统常驻在 `/System/Library/Fonts`。
+#[cfg(not(target_os = "macos"))]
+const PLATFORM_CJK_FALLBACKS: &[&str] = &[];
+#[cfg(target_os = "macos")]
+const PLATFORM_CJK_FALLBACKS: &[&str] = &["Hiragino Sans GB", "Heiti SC", "Songti SC"];
 
 /// Theme ids with a Typst token file under `typst/themes/`; unknown ids fall
 /// back to `light-notes` (see `themes` in `typst/main.typ`).
@@ -224,7 +249,7 @@ impl FontRoles {
             caption: list.clone(),
             number: list.clone(),
             code: [
-                vec!["Cascadia Mono".to_string(), "Consolas".to_string()],
+                DEFAULT_CODE_FONTS.iter().map(|f| f.to_string()).collect(),
                 list,
             ]
             .concat(),
@@ -242,7 +267,11 @@ impl FontRoles {
                 list.push(name.to_string());
             }
         }
-        for fallback in [DEFAULT_FONT, "PingFang SC", "Noto Sans CJK SC", "SimHei"] {
+        let common = [DEFAULT_FONT, "PingFang SC", "Noto Sans CJK SC", "SimHei"];
+        for fallback in common
+            .into_iter()
+            .chain(PLATFORM_CJK_FALLBACKS.iter().copied())
+        {
             if !list.iter().any(|f| f.eq_ignore_ascii_case(fallback)) {
                 list.push(fallback.to_string());
             }

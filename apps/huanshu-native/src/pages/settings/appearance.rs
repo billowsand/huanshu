@@ -19,8 +19,8 @@ use crate::tasks::run_bg;
 use crate::theme::StudioExt as _;
 use crate::widgets::{self};
 
-/// 原版 `DEFAULT_FONT`。
-pub const DEFAULT_FONT: &str = "Microsoft YaHei";
+/// 原版 `DEFAULT_FONT`（按平台取值，见 `platform::DEFAULT_FONT`）。
+pub const DEFAULT_FONT: &str = crate::platform::DEFAULT_FONT;
 
 /// 字体角色（原版 `FontRole`，顺序照 `fontRoles`）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -198,21 +198,8 @@ pub fn find_system_font<'a>(fonts: &'a [SystemFont], name: &str) -> Option<&'a S
 
 /// 原版 `commonNames`：无搜索词时常用字体优先（code 角色一份单独的名单）。
 pub fn common_names(role: FontRole) -> &'static [&'static str] {
-    if role == FontRole::Code {
-        &["Consolas", "Cascadia Code", "JetBrains Mono", DEFAULT_FONT]
-    } else {
-        &[
-            DEFAULT_FONT,
-            "Microsoft YaHei UI",
-            "SimSun",
-            "SimHei",
-            "KaiTi",
-            "DengXian",
-            "MiSans",
-            "Arial",
-            "Georgia",
-        ]
-    }
+    // 名单按平台不同（macOS 没有雅黑 / 宋体 / Consolas），见 `platform::common_font_names`。
+    crate::platform::common_font_names(role == FontRole::Code)
 }
 
 /// 原版 `filtered`：搜索词过滤全部；无搜索词时常用优先、其余按原名序跟上。
@@ -291,7 +278,7 @@ fn trigger_label(fonts: &[SystemFont], value: &str, loaded: bool) -> String {
     match find_system_font(fonts, value) {
         Some(font) => font.label.clone(),
         None if !loaded => value.to_string(),
-        None if value == DEFAULT_FONT => "微软雅黑".to_string(),
+        None if value == DEFAULT_FONT => crate::platform::DEFAULT_FONT_LABEL.to_string(),
         None => value.to_string(),
     }
 }
@@ -389,12 +376,12 @@ impl SettingsPage {
                         .gap(px(4.0))
                         .child(trigger)
                         .when(missing, |col| {
-                            col.child(
-                                div()
-                                    .text_size(px(12.0))
-                                    .text_color(c.primary)
-                                    .child("此字体未安装，已回退到微软雅黑。"),
-                            )
+                            col.child(div().text_size(px(12.0)).text_color(c.primary).child(
+                                format!(
+                                    "此字体未安装，已回退到{}。",
+                                    crate::platform::DEFAULT_FONT_LABEL
+                                ),
+                            ))
                         }),
                 )
         });
@@ -525,7 +512,13 @@ impl SettingsPage {
             )
         });
         window.open_dialog(cx, move |dialog, _window, _cx| {
-            dialog.overlay(true).w(px(760.0)).child(picker.clone())
+            // 关掉 GPUI Kit 自带的关闭按钮：弹层头部已经有自己的「关闭字体选择」（与原版
+            // `SystemFontPicker.vue` 一致），两个都留着右上角就有两个 X。
+            dialog
+                .overlay(true)
+                .close_button(false)
+                .w(px(760.0))
+                .child(picker.clone())
         });
         // 原版打开弹层后把焦点放进搜索框（`SystemFontPicker.vue` 49 行的 `searchInput.focus()`）。
         search.update(cx, |state, cx| state.focus(window, cx));
@@ -1259,6 +1252,10 @@ mod tests {
                 &["Microsoft YaHei UI", "微软雅黑"],
             ),
             font("SimSun", "宋体", &["SimSun"]),
+            // macOS 的常用字体，让排序测试在两个平台上都有东西可排。
+            font("Menlo", "Menlo", &[]),
+            font("PingFang SC", "苹方-简", &["苹方-简"]),
+            font("Songti SC", "宋体-简", &["宋体-简"]),
         ]
     }
 
@@ -1272,7 +1269,7 @@ mod tests {
             }
             assert_eq!(role.get(&settings), "KaiTi", "{role:?} 应同步");
         }
-        assert_eq!(settings.math, "Cambria Math");
+        assert_eq!(settings.math, slide_typst::DEFAULT_MATH_FONT);
         assert_eq!(settings.fallback, DEFAULT_FONT);
     }
 
@@ -1303,7 +1300,7 @@ mod tests {
 
     #[test]
     fn reset_fonts_returns_to_defaults() {
-        // 原版 resetFonts：全部角色归 Microsoft YaHei（core FontSettings::default）。
+        // 原版 resetFonts：全部角色归平台默认字体（core FontSettings::default）。
         let settings = FontSettings {
             interface: "Arial".into(),
             title: "KaiTi".into(),
@@ -1351,18 +1348,26 @@ mod tests {
     fn filtered_prioritizes_common_fonts_without_query() {
         let fonts = fonts();
         let filtered = filtered_font_indices(&fonts, "", FontRole::Body);
-        // 常用名单里的 Microsoft YaHei / KaiTi / SimSun 排最前（按名单顺序）。
+        // 常用名单里的字体排最前（按名单顺序）；Windows 下是 Microsoft YaHei / SimSun / KaiTi。
         let first_names: Vec<&str> = filtered
             .iter()
             .map(|&index| fonts[index].name.as_str())
             .collect();
-        assert_eq!(first_names[0], "Microsoft YaHei");
-        assert_eq!(first_names[1], "SimSun");
-        assert_eq!(first_names[2], "KaiTi");
+        let expected: Vec<&str> = common_names(FontRole::Body)
+            .iter()
+            .copied()
+            .filter(|name| fonts.iter().any(|font| font.name == *name))
+            .collect();
+        assert!(!expected.is_empty());
+        assert_eq!(first_names[..expected.len()], expected[..]);
         assert_eq!(filtered.len(), fonts.len());
-        // code 角色：Consolas 最前。
+        // code 角色：名单里第一个装了的等宽字体最前（Windows 是 Consolas，macOS 是 Menlo）。
         let filtered = filtered_font_indices(&fonts, "", FontRole::Code);
-        assert_eq!(fonts[filtered[0]].name, "Consolas");
+        let first_code = common_names(FontRole::Code)
+            .iter()
+            .find(|name| fonts.iter().any(|font| font.name == **name))
+            .unwrap();
+        assert_eq!(fonts[filtered[0]].name, *first_code);
     }
 
     #[test]

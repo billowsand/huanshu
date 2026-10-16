@@ -6,12 +6,14 @@
 
 use std::path::PathBuf;
 
+use gpui_kit::base::InteractiveElementExt as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{Icon, IconName, Sizable as _};
 use gpui_kit::prelude::*;
 use gpui_kit::{
     div, img, linear_color_stop, linear_gradient, point, px, AnyElement, App, Background,
-    BoxShadow, ClickEvent, Div, ElementId, Hsla, SharedString, Stateful, Window, WindowControlArea,
+    BoxShadow, ClickEvent, Div, ElementId, Hsla, MouseButton, SharedString, Stateful, Window,
+    WindowControlArea,
 };
 use huanshu_core::themes::{self, Tone};
 
@@ -41,18 +43,37 @@ pub fn brand_chip(size: f32, radius: f32, mark: f32) -> Div {
 /// 窗口按钮的宽度（Windows 标准标题栏按钮约 46px）。居中标题按它左右对称留白。
 const WINDOW_BUTTON_W: f32 = 46.0;
 
+/// macOS 标题栏左侧让给系统红绿灯按钮的宽度：红绿灯放在 (12, 12)（见 `main.rs` 的
+/// `traffic_light_position`），三个按钮占到 x≈64，留 80px 内容不压它们。
+const TRAFFIC_LIGHTS_WIDTH: f32 = 80.0;
+
+/// 标题栏的拖窗状态（macOS / Linux 手动拖窗，见 [`title_bar`]）：按下置位，随后的移动
+/// 交给系统拖窗；抬起或按下落在栏外即复位。
+struct TitleBarState {
+    should_move: bool,
+}
+
 /// 自绘标题栏（原版 `TitleBar.vue`）：品牌图标 + 「幻述」，中间是当前文稿的标题（`center`），
-/// 右侧最小化 / 最大化 / 关闭。
+/// 右侧最小化 / 最大化 / 关闭（**仅 Windows / Linux**；macOS 用系统红绿灯，不画自绘按钮）。
 ///
 /// 不用 GPUI Kit 的 `TitleBar`：它的窗口按钮固定取 `Theme.foreground` 着色，便签主题的深棕
-/// 标题栏上会看不见。这里一样只声明 `window_control_area`（拖动、贴靠、双击最大化、
-/// 按钮点击都交给 Windows 的命中测试），颜色自己定。
+/// 标题栏上会看不见。颜色自己定，窗口行为按平台分（拖窗、双击与 GPUI Kit `TitleBar` 同一套
+/// 做法）：
 ///
-/// `center` 里要接收点击的元素必须 `.occlude()`：整条标题栏是拖动区（`HTCAPTION`），
-/// 不挡住它，点击会被系统当成拖窗口。
-pub fn title_bar(center: Option<AnyElement>, window: &Window, cx: &App) -> impl IntoElement {
+/// - **Windows**：整条栏声明 `window_control_area`（拖动、贴靠、双击最大化、按钮点击都
+///   交给系统的命中测试）。`center` 里要接收点击的元素必须 `.occlude()`：整条标题栏是
+///   拖动区（`HTCAPTION`），不挡住它，点击会被系统当成拖窗口。
+/// - **macOS**：窗口选项带 `app_owns_titlebar_drag`（`TitleBar::window_options()`），
+///   AppKit 不接管标题栏拖动，由这里 `TitleBarState` + `start_window_move` 手动拖；
+///   双击走 `titlebar_double_click`（跟随系统「连按标题栏」设置）。红绿灯由系统画在
+///   左上角，左侧留 [`TRAFFIC_LIGHTS_WIDTH`] 不遮它。
+pub fn title_bar(center: Option<AnyElement>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let colors = cx.studio().colors;
     let paper = cx.studio().paper;
+    let is_macos = cfg!(target_os = "macos");
+    let maximized = window.is_maximized();
+    let fullscreen = window.is_fullscreen();
+    let state = window.use_state(cx, |_, _| TitleBarState { should_move: false });
     // 便签主题：锤子便签的深棕导航条；其余主题沿用 GPUI Kit 标题栏的面板色渐变。
     let (background, border, text, hover): (Background, Hsla, Hsla, Hsla) = match paper {
         Some(p) => (
@@ -105,6 +126,38 @@ pub fn title_bar(center: Option<AnyElement>, window: &Window, cx: &App) -> impl 
         .bg(background)
         .border_b_1()
         .border_color(border)
+        // 双击标题栏：macOS 跟随系统设置（放大 / 最小化），Linux 直接切换最大化；
+        // Windows 不用处理——整条栏是 HTCAPTION，系统自己响应双击。
+        .when(is_macos, |bar| {
+            bar.on_double_click(|_, window, _| window.titlebar_double_click())
+        })
+        .when(cfg!(target_os = "linux"), |bar| {
+            bar.on_double_click(|_, window, _| window.zoom_window())
+        })
+        // 手动拖窗（Windows 上这条链不会触发：拖动区是非客户区，收不到客户区鼠标事件）。
+        // 子元素先收到按下事件，不阻断冒泡则视为「按住标题栏」——正中标题等可点元素
+        // 要自己 `stop_propagation`（见 `WorkflowPage::title_element` 的改名框）。
+        .on_mouse_down_out(window.listener_for(&state, |state, _, _, _| {
+            state.should_move = false;
+        }))
+        .on_mouse_down(
+            MouseButton::Left,
+            window.listener_for(&state, |state, _, _, _| {
+                state.should_move = true;
+            }),
+        )
+        .on_mouse_up(
+            MouseButton::Left,
+            window.listener_for(&state, |state, _, _, _| {
+                state.should_move = false;
+            }),
+        )
+        .on_mouse_move(window.listener_for(&state, |state, _, window, _| {
+            if state.should_move {
+                state.should_move = false;
+                window.start_window_move();
+            }
+        }))
         .child(
             div()
                 .id("title-bar-drag")
@@ -112,7 +165,12 @@ pub fn title_bar(center: Option<AnyElement>, window: &Window, cx: &App) -> impl 
                 .flex_1()
                 .min_w_0()
                 .h_full()
-                .pl(px(12.0))
+                // macOS：内容从系统红绿灯右边开始；全屏时红绿灯自动隐藏，恢复普通边距。
+                .pl(px(if is_macos && !fullscreen {
+                    TRAFFIC_LIGHTS_WIDTH
+                } else {
+                    12.0
+                }))
                 .flex()
                 .flex_row()
                 .items_center()
@@ -121,14 +179,16 @@ pub fn title_bar(center: Option<AnyElement>, window: &Window, cx: &App) -> impl 
                 .child(brand_chip(22.0, 7.0, 16.0))
                 .child(div().text_size(px(12.3)).text_color(text).child("幻述"))
                 .when_some(center, |bar, center| {
-                    // 右边让出三个窗口按钮的宽度，标题落在整扇窗口的正中。
+                    // 标题落在整扇窗口的正中：Windows 右边让出三个窗口按钮的宽度；
+                    // macOS 左右对称让出红绿灯的宽度（右边没有自绘按钮）。
                     bar.child(
                         div()
                             .absolute()
                             .top_0()
                             .left_0()
                             .size_full()
-                            .pl(px(WINDOW_BUTTON_W * 3.0))
+                            .when(is_macos, |d| d.px(px(TRAFFIC_LIGHTS_WIDTH)))
+                            .when(!is_macos, |d| d.pl(px(WINDOW_BUTTON_W * 3.0)))
                             .flex()
                             .items_center()
                             .justify_center()
@@ -137,28 +197,31 @@ pub fn title_bar(center: Option<AnyElement>, window: &Window, cx: &App) -> impl 
                     )
                 }),
         )
-        .child(button(
-            "window-min",
-            IconName::WindowMinimize,
-            WindowControlArea::Min,
-            false,
-        ))
-        .child(button(
-            "window-max",
-            if window.is_maximized() {
-                IconName::WindowRestore
-            } else {
-                IconName::WindowMaximize
-            },
-            WindowControlArea::Max,
-            false,
-        ))
-        .child(button(
-            "window-close",
-            IconName::WindowClose,
-            WindowControlArea::Close,
-            true,
-        ))
+        // 自绘窗口按钮不进 macOS：红绿灯是系统画的，再画一套既重复又抢点击。
+        .when(!is_macos, |bar| {
+            bar.child(button(
+                "window-min",
+                IconName::WindowMinimize,
+                WindowControlArea::Min,
+                false,
+            ))
+            .child(button(
+                "window-max",
+                if maximized {
+                    IconName::WindowRestore
+                } else {
+                    IconName::WindowMaximize
+                },
+                WindowControlArea::Max,
+                false,
+            ))
+            .child(button(
+                "window-close",
+                IconName::WindowClose,
+                WindowControlArea::Close,
+                true,
+            ))
+        })
 }
 
 /// 标题栏正中的文稿标题：超过 [`TITLE_MAX_CHARS`] 个字就截断加省略号（再窄也会按像素省略）。

@@ -1,4 +1,4 @@
-//! 导出：保存对话框、PDF 进行中 / 结果 / 失败三个对话框（原版 `PdfExportDialog.vue`）。
+//! 导出：PDF 进行中 / 结果 / 失败三个对话框（原版 `PdfExportDialog.vue`）。
 //!
 //! 渲染是同步的重活，在后台线程上跑（见 `app::export_pdf`）；UI 线程只改按钮状态。
 //! 三个对话框都挂在**窗口**上、状态是进程级的一份（原版 `usePdfExport` 的全局
@@ -7,7 +7,6 @@
 //! 首页（`pages/home.rs::export_pdf`）与第三步（`workflow/step3.rs::export_pdf`）共用结果框与
 //! 失败框；「正在生成 PDF…」由调用方在导出前各调一句 [`begin_export`]。
 
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -23,14 +22,6 @@ use huanshu_core::themes;
 
 use crate::icons::carbon;
 use crate::theme::{StudioColors, StudioExt as _};
-
-/// 弹原生保存对话框。用户取消时返回 `None`。
-pub fn ask_save_path(default_name: &str, filter: &str, extension: &str) -> Option<PathBuf> {
-    rfd::FileDialog::new()
-        .set_file_name(default_name)
-        .add_filter(filter, &[extension])
-        .save_file()
-}
 
 // ── 「正在生成 PDF…」 ────────────────────────────────────────────────────────
 

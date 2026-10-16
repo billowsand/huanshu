@@ -80,6 +80,24 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
 - 演示是盖在当前页上的覆盖层（与原版一致），打开即全屏，全屏时外壳不画标题栏。Esc 照原版：先关全览；
   全屏时只退出全屏，非全屏时才退出演示。
 - `apps/huanshu-native/build.rs` 把 Windows 主线程栈调到 8 MiB：默认 1 MiB，debug 构建打开第三步表单就栈溢出（release 不会）。
+- **平台差异集中在 `platform.rs`**（标题栏的除外，在 `widgets::title_bar`），页面里不要再写 `cfg!(target_os)`：
+  - 退出与菜单：`platform::init` 设 `QuitMode::LastWindowClosed`（关掉最后一个窗口即退出；Windows/Linux 本来如此，
+    macOS 默认会留在 Dock）；macOS 另加菜单栏与 ⌘Q / ⌘H / ⌥⌘H / ⌘M（GPUI Kit 不替应用做，不加则 ⌘Q 无效）。
+    ⌘Q 不经过窗口关闭流程，与 Windows 上点关闭一样**不**弹设置页的「未保存」确认。
+  - 快捷键：「Ctrl/⌘ + 键」一律 `platform::primary_modifier`（即 `Modifiers::secondary()`），显示文字用
+    `platform::shortcut_label("s")`（`Ctrl + S` / `⌘S`），不要写死 `modifiers.control` 或 "Ctrl"。
+  - 文件对话框一律 `platform::pick_paths` / `save_path`（回调式）。Windows/Linux 照旧同步 rfd；**macOS 不用 rfd**
+    （同步 `runModal` 会在 GPUI 事件回调里再套一层 AppKit 模态循环，有重入风险），走 GPUI 的
+    `prompt_for_paths` / `prompt_for_new_path`（异步、没有类型过滤：选完按扩展名筛，保存时缺扩展名自动补）。
+    因为 macOS 上是异步的，「拿到路径之后」的逻辑放在回调里，并在回调里**再查一次**进行中标志（面板开着时可能又点了一次）。
+  - 默认字体按平台：`slide_typst::DEFAULT_FONT` / `DEFAULT_MATH_FONT` / `DEFAULT_CODE_FONTS`（Windows 与 Linux：
+    微软雅黑 / Cambria Math / Cascadia Mono、Consolas；macOS：苹方 / STIX Two Math / Menlo、Monaco），
+    core 的 `FontSettings::default`、界面字体、设置页常用名单都从这里取；macOS 另在 Typst 兜底链末尾加
+    冬青黑体 / 黑体-简 / 宋体-简（苹方是按需下载的系统资源）。Windows 上的取值与之前逐字相同。
+  - 系统字体枚举（`huanshu_core::fonts`）：Windows 走 DirectWrite，其余平台走 fontdb（与 typst-kit 扫字体同一个库）。
+- macOS 构建：只需 Xcode Command Line Tools（GPUI Kit 开了 `runtime_shaders`，不用完整 Xcode 的 Metal 编译器），
+  先 `bun install`（Carbon 图标）。数据目录是 `~/Library/Application Support/auto-slidev-studio/`（数据与 `bootstrap.json`
+  同在这一个目录）。`.app` 从访达打开时不继承 `HUANSHU_HOME`，沙箱验证直接跑 `target/release/huanshu-native`。
 - 主题存在 `app_settings` 的 `app_theme` 键，与 Tauri 版（WebView localStorage）暂不同步。
 - 量内存要量**本进程**：PowerShell 里的 `$PID` 是 PowerShell 自己。只读查看器阶段实测（release，5 分钟每 100ms 翻一页）工作集稳定在 385–412 MiB。
 - **原版首次向导在沙箱里会指回真实目录**：`FirstRunWizard.vue` 用前端的 `localDataDir()` 拼默认目录，不认 `HUANSHU_HOME`。
@@ -748,6 +766,28 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-native.ps1
 先 `choco install nsis`——**CI 上没有 Tauri 自带的那份 NSIS，不装就只能出免安装 exe**。
 发布说明由 tauri-action 先写一遍（只有 Tauri 产物），native job 再用 `.github/release-notes.md`
 重写一遍；说明文字放文件而不是内联，`.ps1` 里内联中文会被 ANSI 读成乱码。Linux 暂时只发 Tauri 版。
+
+### macOS 打包（`scripts/package-native-macos.sh`）
+
+```bash
+scripts/package-native-macos.sh               # 本机架构；--universal 合成 arm64+x86_64；--no-dmg 只出 .app 与 zip
+```
+
+`cargo build --release -p huanshu-native` → 组装 `dist-package/幻述.app`（`Info.plist` 由脚本生成，图标用
+`src-tauri/icons/icon.icns`，Bundle ID `com.auto-slidev.studio.native`）→ 签名 → `huanshu-native_macos_<arch>.zip`（ditto）
+与 `HuanshuNative_<version>_macos_<arch>.dmg`（hdiutil，带「应用程序」快捷方式）。
+
+- **签名**：默认 ad-hoc（`codesign -s -`；Apple 芯片不跑无签名的二进制，改过 Info.plist 必须整体重签）。
+  ad-hoc 包在别的 Mac 上首次打开会被 Gatekeeper 拦（右键 →「打开」）。正式分发设 `HUANSHU_SIGN_IDENTITY`
+  （Developer ID，自动开 hardened runtime）+ `HUANSHU_NOTARY_PROFILE`（`xcrun notarytool store-credentials` 的条目），
+  脚本会公证并 `stapler staple` 到 DMG。
+- `CFBundleName` 决定菜单栏第一项的名字（裸跑 `target/release/huanshu-native` 时是二进制名）；
+  `CFBundleDevelopmentRegion = zh_CN`，系统自动加的菜单项才是中文。
+- 缺 `node_modules/@iconify-json/carbon` 时脚本直接失败（否则图标全空白），先 `bun install`。
+- 随 tag 发布：`release.yml` 的 `native-macos` job（`macos-14`，`--universal`），同样 `needs: release`，
+  产物追加到同一个 Release，并用 `.github/release-notes.md` 重写说明。CI 的 `native` job 在 macOS 与 Windows 上
+  `cargo test -p huanshu-native`（default-members 不含它，原来的 test job 编不到）。
+- 版本号仍只有一个来源（`apps/huanshu-native/Cargo.toml`），脚本读它写进 `CFBundleShortVersionString`。
 
 ### 与 Tauri 版的关系
 

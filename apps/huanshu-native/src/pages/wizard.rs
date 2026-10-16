@@ -5,6 +5,8 @@
 //! 依次测试三类服务）→ 初始化向量库（先保存服务配置再 `ensure_icon_embeddings`）→
 //! 配置完成（摘要、目录变更的重启警告、`finishWizard` 顺序保存后进入首页）。
 
+use std::path::PathBuf;
+
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::Disableable as _;
 use gpui_kit::prelude::*;
@@ -13,6 +15,7 @@ use huanshu_core::services::{generation, settings, storage};
 
 use crate::icons::carbon;
 use crate::pages::settings::service_form::{ModelTarget, ServiceForm};
+use crate::platform;
 use crate::router::Route;
 use crate::shell::ShellHandle;
 use crate::tasks::{run_async, run_bg};
@@ -205,9 +208,16 @@ impl WizardPage {
     /// 原版 `browseDataDir`：浏览后若媒体目录不含 "/projects/"（容忍 \ 分隔符），
     /// 自动设为 `<选中>/media`。
     fn browse_data_dir(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(selected) = rfd::FileDialog::new().pick_folder() else {
-            return;
-        };
+        platform::pick_paths(
+            self,
+            platform::Pick::Folder,
+            window,
+            cx,
+            |this, mut paths, window, cx| this.set_data_dir(paths.remove(0), window, cx),
+        );
+    }
+
+    fn set_data_dir(&mut self, selected: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
         let selected = selected.to_string_lossy().to_string();
         self.data_dir.update(cx, |state, cx| {
             state.set_value(selected.clone(), window, cx)
@@ -220,9 +230,16 @@ impl WizardPage {
     }
 
     fn browse_media_dir(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(selected) = rfd::FileDialog::new().pick_folder() else {
-            return;
-        };
+        platform::pick_paths(
+            self,
+            platform::Pick::Folder,
+            window,
+            cx,
+            |this, mut paths, window, cx| this.set_media_dir(paths.remove(0), window, cx),
+        );
+    }
+
+    fn set_media_dir(&mut self, selected: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
         let selected = selected.to_string_lossy().to_string();
         self.media_dir
             .update(cx, |state, cx| state.set_value(selected, window, cx));
@@ -878,8 +895,15 @@ mod tests {
     #[test]
     fn browsing_data_dir_refreshes_media_dir_unless_it_is_a_projects_dir() {
         // 默认联动：媒体目录设为 <选中>/media。
-        let media = suggest_media_dir(r"E:\huanshu\sandbox", r"C:\old\media");
-        assert_eq!(media.unwrap(), r"E:\huanshu\sandbox\media");
+        // 分隔符跟随平台（Windows `\`、macOS `/`），所以期望值也用 `Path::join` 拼。
+        let selected = if cfg!(windows) {
+            r"E:\huanshu\sandbox"
+        } else {
+            "/Users/me/huanshu/sandbox"
+        };
+        let media = suggest_media_dir(selected, r"C:\old\media");
+        let expected = std::path::Path::new(selected).join("media");
+        assert_eq!(media.unwrap(), expected.to_string_lossy());
         // 媒体目录已经是项目子目录时不覆盖（原版 includes("/projects/")，\ 也容忍）。
         assert!(suggest_media_dir(r"D:\new", r"D:\data\projects\1\media").is_none());
         assert!(suggest_media_dir(r"D:\new", "D:/data/projects/1/media").is_none());

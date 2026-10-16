@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "filename": "studio-mockup.png",
+    "original_name": "工作台界面示意.png",
+    "media_type": "image",
+    "mime_type": "image/png",
+    "caption": "幻述工作台：左侧三步工作流，中间生成看板，右侧逐字段编辑器",
+    "description": "三步工作流界面示意，用于展示生成看板与编辑器预览。",
+    "storage_path": "projects/1/images/studio-mockup.png",
+    "slide_index": null,
+    "file_size": 86270,
+    "width": 1760,
+    "height": 1100
+  },
+  {
+    "id": 2,
+    "filename": "pipeline-diagram.png",
+    "original_name": "生成流水线示意.png",
+    "media_type": "image",
+    "mime_type": "image/png",
+    "caption": "生成流水线的八个环节：从 Markdown 源稿到 PDF 与位图交付",
+    "description": "流水线示意图，标注规划、生成、校验与交付四类阶段。",
+    "storage_path": "projects/1/images/pipeline-diagram.png",
+    "slide_index": null,
+    "file_size": 119808,
+    "width": 1760,
+    "height": 900
+  },
+  {
+    "id": 3,
+    "filename": "layout-poster.png",
+    "original_name": "全部版式示意.png",
+    "media_type": "image",
+    "mime_type": "image/png",
+    "caption": "18 种版式的线框对照：封面、总览、栅格、时间线、SWOT、图表页等",
+    "description": "版式海报，一屏列出渲染器支持的全部版式。",
+    "storage_path": "projects/1/images/layout-poster.png",
+    "slide_index": null,
+    "file_size": 94645,
+    "width": 1800,
+    "height": 928
+  },
+  {
+    "id": 4,
+    "filename": "cover-art.png",
+    "original_name": "封面视觉.png",
+    "media_type": "image",
+    "mime_type": "image/png",
+    "caption": "报刊·钴蓝主题下的封面视觉：方角、细线与钴蓝强调色",
+    "description": "封面视觉稿，取自主题的纸面与钴蓝配色。",
+    "storage_path": "projects/1/images/cover-art.png",
+    "slide_index": null,
+    "file_size": 44375,
+    "width": 1760,
+    "height": 900
+  },
+  {
+    "id": 5,
+    "filename": "stats-poster.png",
+    "original_name": "牌组数字.png",
+    "media_type": "image",
+    "mime_type": "image/png",
+    "caption": "一副牌组的四个数字：26 页、18 种版式、5 种图表、6 套主题",
+    "description": "数字海报，与封面视觉同尺寸，用于多图主视觉版式。",
+    "storage_path": "projects/1/images/stats-poster.png",
+    "slide_index": null,
+    "file_size": 73943,
+    "width": 1760,
+    "height": 900
+  }
+]

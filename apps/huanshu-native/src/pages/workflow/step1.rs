@@ -23,6 +23,7 @@ use huanshu_core::types::AspectRatio;
 use super::{ProjectModel, WorkflowPage};
 use crate::formulas;
 use crate::icons::carbon;
+use crate::platform;
 use crate::router::Route;
 use crate::shell::ShellHandle;
 use crate::tasks::{run_async, run_bg};
@@ -223,15 +224,15 @@ impl Step1 {
         cx.notify();
     }
 
-    /// 上传文件（原版 `openFile`：`rfd` 选 `.md` / `.txt`）。
+    /// 上传文件（原版 `openFile`：选 `.md` / `.txt`）。
     fn open_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("Markdown", &["md", "txt"])
-            .pick_file()
-        else {
-            return;
-        };
-        self.load_path(path, window, cx);
+        platform::pick_paths(
+            self,
+            platform::Pick::File(platform::MARKDOWN),
+            window,
+            cx,
+            |this, mut paths, window, cx| this.load_path(paths.remove(0), window, cx),
+        );
     }
 
     fn load_path(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
@@ -1228,19 +1229,15 @@ impl Render for Step1 {
                                 widgets::small(widgets::ghost_button("add-media", "添加素材"))
                                     .icon(carbon("add-alt"))
                                     .on_click(cx.listener(|this, _event, window, cx| {
-                                        let Some(paths) = rfd::FileDialog::new()
-                                            .add_filter(
-                                                "图片 / 视频",
-                                                &[
-                                                    "png", "jpg", "jpeg", "gif", "webp", "svg",
-                                                    "mp4", "webm", "mov",
-                                                ],
-                                            )
-                                            .pick_files()
-                                        else {
-                                            return;
-                                        };
-                                        this.add_media_paths(paths, window, cx);
+                                        platform::pick_paths(
+                                            this,
+                                            platform::Pick::Files(platform::MEDIA),
+                                            window,
+                                            cx,
+                                            |this, paths, window, cx| {
+                                                this.add_media_paths(paths, window, cx)
+                                            },
+                                        );
                                     })),
                             ),
                     ),

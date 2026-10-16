@@ -606,7 +606,10 @@ impl SettingsPage {
 
     fn on_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let keystroke = &event.keystroke;
-        if keystroke.modifiers.control && keystroke.key.eq_ignore_ascii_case("s") {
+        // Ctrl+S；macOS 是 ⌘S。
+        if crate::platform::primary_modifier(&keystroke.modifiers)
+            && keystroke.key.eq_ignore_ascii_case("s")
+        {
             self.save(window, cx);
         }
     }
@@ -697,7 +700,7 @@ impl Render for SettingsPage {
         } else {
             "所有更改已保存"
         };
-        // 有未保存的更改时补一个 `Ctrl + S` 提示（原版 `SettingsView.vue` 534 行的 `kbd`）。
+        // 有未保存的更改时补一个 `Ctrl + S`（macOS `⌘S`）提示（原版 `SettingsView.vue` 534 行的 `kbd`）。
         let show_shortcut = self.dirty(cx) && !self.saving;
         let save_bar = div()
             .flex_none()
@@ -728,7 +731,7 @@ impl Render for SettingsPage {
                         .bg(c.surface)
                         .text_size(px(11.0))
                         .text_color(c.muted)
-                        .child("Ctrl + S"),
+                        .child(crate::platform::shortcut_label("s")),
                 )
             })
             .when_some(self.save_error.clone(), |bar, error| {

@@ -4234,6 +4234,7 @@ dependencies = [
  "base64 0.22.1",
  "bincode",
  "dirs 5.0.1",
+ "fontdb",
  "image",
  "rand 0.8.5",
  "regex",
@@ -4250,7 +4251,7 @@ dependencies = [
 
 [[package]]
 name = "huanshu-native"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "chrono",
