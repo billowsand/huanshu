@@ -109,18 +109,18 @@ fn table(theme_id: &str) -> EditorTable {
         // 报刊：墨色标题，唯一强调色钴蓝给符号与链接，代码用报刊的印章红。
         "light-editorial" => EditorTable {
             background: None,
-            foreground: 0x1c2723ff,
-            gutter: 0x1c272308,
-            active_line: 0x1d4ed80d,
-            selection: 0x1d4ed82e,
+            foreground: 0x141414ff,
+            gutter: 0x14141408,
+            active_line: 0x2549d80d,
+            selection: 0x2549d82e,
             syntax: SyntaxTable {
-                heading: 0x0f1714ff,
-                strong: 0x0f1714ff,
-                emphasis: 0x1a43bfff,
-                link: 0x1d4ed8ff,
+                heading: 0x141414ff,
+                strong: 0x141414ff,
+                emphasis: 0x1d3db8ff,
+                link: 0x2549d8ff,
                 code: 0xa8322aff,
-                meta: 0xa39b8bff,
-                list: 0x1d4ed8ff,
+                meta: 0x989890ff,
+                list: 0x2549d8ff,
             },
         },
         // 便签·稿纸（锤子便签）：纸色、深棕墨、页边略深；强调色取自原版 notes.css 的覆盖。

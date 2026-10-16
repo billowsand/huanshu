@@ -84,6 +84,7 @@
   lh,
   text(
     font: ctx.fonts.at(role),
+    weight: if is-editorial(ctx) and role in ("title", "number") { "bold" } else { "regular" },
     fill: if fill == auto { ctx.theme.ink } else { fill },
     ..args,
     if type(body) == str { rich(body) } else { body },
@@ -174,11 +175,15 @@
   let th = ctx.theme
   txt(ctx, "title", ctx.ty.title, 1.18, slide.title, tracking: th.tracking.title)
   v(0.6 * rem)
-  divider-line(ctx, 100%, height: 2 * px, faded: true)
+  if is-editorial(ctx) {
+    line(length: 100%, stroke: 1 * px + th.edge)
+  } else { divider-line(ctx, 100%, height: 2 * px, faded: true) }
   v(1 * rem)
   if has(slide.at("subtitle", default: none)) {
     v(subtitle-gap * px)
-    label-bar(ctx, slide.subtitle)
+    if is-editorial(ctx) {
+      txt(ctx, "subtitle", ctx.ty.subtitle, 1.5, slide.subtitle, fill: th.muted)
+    } else { label-bar(ctx, slide.subtitle) }
   }
 }
 
@@ -210,7 +215,9 @@
   inset: inset,
   radius: if radius == auto { ctx.theme.radius.card * px } else { radius },
   fill: if fill == auto { ctx.theme.paper } else { fill },
-  stroke: if stroke == auto { 1 * px + ctx.theme.edge } else { stroke },
+  stroke: if stroke == auto {
+    if is-editorial(ctx) { (top: 1 * px + ctx.theme.edge) } else { 1 * px + ctx.theme.edge }
+  } else { stroke },
   ..args,
   body,
 )

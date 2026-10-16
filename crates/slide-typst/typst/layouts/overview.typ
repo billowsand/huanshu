@@ -130,8 +130,8 @@
           fill: if is-terminal(ctx) or is-glass(ctx) { th.paper } else {
             gradient.linear((th.sheet-tint, 0%), (th.sheet-tint, 6 * px / w * 100%), (th.paper, 6 * px / w * 100%), (th.paper, 100%))
           },
-          stroke: 1 * px + th.edge,
-          radius: if is-glass(ctx) { th.radius.card * px } else { 2 * px },
+          stroke: if is-editorial(ctx) { (top: 1 * px + th.edge) } else { 1 * px + th.edge },
+          radius: if is-terminal(ctx) or is-glass(ctx) { th.radius.card * px } else { 2 * px },
           inset: if is-terminal(ctx) or is-glass(ctx) { card-pad(f) } else {
             (left: card-pad(f) + 6 * px, right: card-pad(f), y: card-pad(f))
           },

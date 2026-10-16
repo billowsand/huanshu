@@ -218,7 +218,11 @@ pub fn chip(text: impl Into<SharedString>, tone: Tone2, cx: &App) -> Div {
         .flex_none()
         .px(px(8.0))
         .py(px(1.0))
-        .rounded(px(999.0))
+        .rounded(px(if cx.studio().theme.id == "light-editorial" {
+            0.0
+        } else {
+            999.0
+        }))
         .border_1()
         .border_color(border)
         .bg(bg)
@@ -241,7 +245,11 @@ pub fn chip_icon(icon: &'static str, text: impl Into<SharedString>, tone: Tone2,
         .flex_none()
         .px(px(8.0))
         .py(px(1.0))
-        .rounded(px(999.0))
+        .rounded(px(if cx.studio().theme.id == "light-editorial" {
+            0.0
+        } else {
+            999.0
+        }))
         .border_1()
         .border_color(border)
         .bg(bg)
@@ -262,7 +270,11 @@ pub fn panel(cx: &App) -> Div {
         .bg(c.panel)
         .border_1()
         .border_color(c.border)
-        .rounded(px(10.0))
+        .rounded(px(if cx.studio().theme.id == "light-editorial" {
+            0.0
+        } else {
+            10.0
+        }))
 }
 
 /// 便签主题的木纹桌面（原版 `--notes-grain, --notes-backing`）：铺满父元素（父元素要 `relative`），

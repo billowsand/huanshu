@@ -29,6 +29,8 @@ use crate::widgets::{self, Tone2};
 /// 内容列的最大宽度（原版 `.home-body` 的 `max-width: 860px`，`box-sizing: border-box`
 /// 所以 1.5rem 的内边距算在里面）。
 const BODY_MAX_W: f32 = 860.0;
+/// Keep the home list density identical across themes.
+const PROJECT_ROW_HEIGHT: f32 = 74.0;
 
 /// 原版 `usePdfExport.ts` 的 `safeFileName`：PDF 的默认文件名去掉 Windows 不允许的字符
 /// （连续的非法字符合成一个 `_`，名字为空时用「未命名演示」）。`.keynn` 照原版不做处理
@@ -495,14 +497,25 @@ fn format_date(seconds: i64) -> String {
 }
 
 impl Render for HomePage {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let c = cx.studio().colors;
         let theme_id = cx.studio().theme.id;
+        let editorial = theme_id == "light-editorial";
+        let library_width = (window.viewport_size().width.as_f32() - 48.0)
+            .min(1184.0)
+            .max(0.0);
+        let two_columns = editorial && library_width >= 940.0;
+        let card_width = if two_columns {
+            (library_width - 12.0) / 2.0
+        } else {
+            library_width
+        };
         let handle = self.handle.clone();
 
         // ── 操作栏 ─────────────────────────────────────────────
         let (settings_handle, new_handle) = (handle.clone(), handle.clone());
         let top_bar = div()
+            .relative()
             .flex_none()
             .h(px(48.0))
             .px(px(20.0))
@@ -520,11 +533,27 @@ impl Render for HomePage {
                 ))
             })
             .border_b_1()
-            .border_color(c.border)
+            .border_color(if editorial { c.primary } else { c.border })
+            .when(editorial, |bar| {
+                bar.child(
+                    div()
+                        .absolute()
+                        .bottom_0()
+                        .left_0()
+                        .w_full()
+                        .h(px(1.0))
+                        .bg(c.primary),
+                )
+            })
             .child(
                 div()
+                    .when(editorial, |label| {
+                        label
+                            .font_weight(gpui_kit::FontWeight::BOLD)
+                            .text_color(c.text)
+                    })
                     .text_size(px(15.0))
-                    .text_color(c.muted)
+                    .text_color(if editorial { c.text } else { c.muted })
                     .when_some(cx.studio().paper, |label, p| {
                         label.text_color(p.chrome_text)
                     })
@@ -695,6 +724,66 @@ impl Render for HomePage {
                 )
             });
 
+        let heading = if editorial {
+            div()
+                .relative()
+                .w_full()
+                .py(px(18.0))
+                .flex()
+                .items_center()
+                .justify_between()
+                .child(
+                    div()
+                        .flex_1()
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .gap(px(8.0))
+                        .child(
+                            div()
+                                .font_family(cx.studio().fonts.code.clone())
+                                .text_size(px(10.0))
+                                .text_color(c.muted)
+                                .child("HUANSHU / PRESENTATION STUDIO"),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .text_size(px(if two_columns { 38.0 } else { 30.0 }))
+                                .font_weight(gpui_kit::FontWeight::BOLD)
+                                .child("我的")
+                                .child(div().text_color(c.primary).child("演示"))
+                                .child("文稿"),
+                        ),
+                )
+                .when_some(count, |row, count| {
+                    row.child(
+                        div()
+                            .flex_none()
+                            .flex()
+                            .flex_col()
+                            .items_end()
+                            .gap(px(4.0))
+                            .child(
+                                div()
+                                    .text_size(px(28.0))
+                                    .font_weight(gpui_kit::FontWeight::BOLD)
+                                    .child(format!("{count:02}")),
+                            )
+                            .child(
+                                div()
+                                    .font_family(cx.studio().fonts.code.clone())
+                                    .text_size(px(10.0))
+                                    .text_color(c.muted)
+                                    .child("/ PROJECTS"),
+                            ),
+                    )
+                })
+                .into_any_element()
+        } else {
+            heading.into_any_element()
+        };
+
         // ── 列表 / 骨架 / 空状态 ──────────────────────────────
         let body: gpui_kit::AnyElement = match &self.projects {
             None => div()
@@ -757,7 +846,12 @@ impl Render for HomePage {
                 .flex()
                 .flex_col()
                 .gap(px(10.0))
-                .children(list.iter().map(|project| self.project_card(project, cx)))
+                .when(editorial, |grid| grid.flex_row().flex_wrap().gap(px(12.0)))
+                .children(list.iter().map(|project| {
+                    div()
+                        .when(editorial, |cell| cell.w(px(card_width)).flex_none())
+                        .child(self.project_card(project, cx))
+                }))
                 .into_any_element(),
         };
 
@@ -786,7 +880,7 @@ impl Render for HomePage {
                         div()
                             .mx_auto()
                             .w_full()
-                            .max_w(px(BODY_MAX_W))
+                            .max_w(px(if editorial { 1232.0 } else { BODY_MAX_W }))
                             // 原版 `.home-body` 的 `padding: 1.5rem`（含左右）。
                             .px(px(24.0))
                             .py(px(24.0))
@@ -794,7 +888,18 @@ impl Render for HomePage {
                             .flex_col()
                             .gap(px(20.0))
                             .child(heading)
-                            .child(body),
+                            .child(body)
+                            .when(editorial, |body| {
+                                body.child(
+                                    div()
+                                        .border_t_1()
+                                        .border_color(c.border)
+                                        .pt(px(12.0))
+                                        .text_size(px(11.0))
+                                        .text_color(c.muted)
+                                        .child("本地保存 · 随时继续创作"),
+                                )
+                            }),
                     ),
                 &self.scroll,
                 cx,
@@ -805,6 +910,7 @@ impl Render for HomePage {
 impl HomePage {
     fn project_card(&self, project: &ProjectSummary, cx: &mut Context<Self>) -> impl IntoElement {
         let c = cx.studio().colors;
+        let editorial = cx.studio().theme.id == "light-editorial";
         let id = project.id;
         let exporting = self.exporting == Some(id);
         let handle = self.handle.clone();
@@ -822,11 +928,19 @@ impl HomePage {
             .flex_row()
             .items_center()
             .gap(px(14.0))
+            .h(px(PROJECT_ROW_HEIGHT))
+            .flex_none()
             .px(px(18.0))
             .py(px(12.0))
+            .when(editorial, |row| {
+                row.h(px(112.0))
+                    .gap(px(16.0))
+                    .border_t_2()
+                    .border_color(c.border)
+                    .hover(|row| row.border_color(c.primary))
+            })
             .when_some(cx.studio().paper, |row, p| {
-                row.pl(px(68.0))
-                    .h(px(96.0))
+                row.pl(px(56.0))
                     .py_0()
                     .child(
                         div()
@@ -834,7 +948,7 @@ impl HomePage {
                             .left_0()
                             .top_0()
                             .bottom_0()
-                            .w(px(48.0))
+                            .w(px(37.0))
                             .bg(p.margin)
                             .border_r_1()
                             .border_color(p.margin_line),
@@ -844,22 +958,26 @@ impl HomePage {
                             .absolute()
                             .left_0()
                             .right_0()
-                            .top(px(34.0))
+                            .top(px(27.0))
                             .h(px(1.0))
                             .bg(p.rule.opacity(0.55)),
                     )
                     .child(
                         gpui_kit::img("notes/paperclip.svg")
                             .absolute()
-                            .left(px(-30.0))
-                            .top(px(39.0))
-                            .w(px(48.0))
-                            .h(px(24.0)),
+                            .left(px(-22.0))
+                            .top(px(30.0))
+                            .w(px(36.0))
+                            .h(px(18.0)),
                     )
             })
             .cursor_pointer()
             .hover(|style| {
-                style.border_color(cx.studio().paper.map(|p| p.edge).unwrap_or(c.border_hover))
+                style.border_color(if editorial {
+                    c.primary
+                } else {
+                    cx.studio().paper.map(|p| p.edge).unwrap_or(c.border_hover)
+                })
             })
             .on_click(move |_event, window, cx| {
                 handle.navigate(
@@ -871,7 +989,7 @@ impl HomePage {
                     cx,
                 )
             })
-            .when(cx.studio().paper.is_none(), |row| {
+            .when(cx.studio().paper.is_none() && !editorial, |row| {
                 row.child(
                     div()
                         .flex_none()
@@ -884,6 +1002,53 @@ impl HomePage {
                         .border_1()
                         .border_color(c.border)
                         .child(widgets::brand_mark(24.0)),
+                )
+            })
+            .when(editorial, |row| {
+                row.child(
+                    div()
+                        .relative()
+                        .flex_none()
+                        .w(px(100.0))
+                        .h(px(64.0))
+                        .bg(c.bg)
+                        .border_1()
+                        .border_color(c.border)
+                        .border_t_2()
+                        .flex()
+                        .flex_col()
+                        .justify_between()
+                        .p(px(6.0))
+                        .overflow_hidden()
+                        .child(
+                            div()
+                                .absolute()
+                                .top_0()
+                                .left_0()
+                                .w_full()
+                                .h(px(2.0))
+                                .bg(c.primary),
+                        )
+                        .child(
+                            div()
+                                .text_size(px(7.0))
+                                .text_color(c.muted)
+                                .child("HUANSHU / PRESENTATION"),
+                        )
+                        .child(
+                            div()
+                                .text_size(px(12.0))
+                                .font_weight(gpui_kit::FontWeight::BOLD)
+                                .text_color(c.text)
+                                .truncate()
+                                .child(project.name.clone()),
+                        )
+                        .child(
+                            div()
+                                .text_size(px(7.0))
+                                .text_color(c.primary)
+                                .child(format!("{:02} / SLIDES", project.slide_count)),
+                        ),
                 )
             })
             .child(
@@ -899,14 +1064,12 @@ impl HomePage {
                     .child(
                         div()
                             .text_size(px(15.0))
+                            .when(editorial, |title| {
+                                title.font_weight(gpui_kit::FontWeight::BOLD)
+                            })
                             .truncate()
                             .when_some(cx.studio().paper, |title, p| {
-                                title
-                                    .h(px(60.0))
-                                    .flex()
-                                    .items_center()
-                                    .text_size(px(20.0))
-                                    .text_color(p.ink)
+                                title.h(px(46.0)).flex().items_center().text_color(p.ink)
                             })
                             .child(project.name.clone()),
                     )
@@ -916,12 +1079,13 @@ impl HomePage {
                             .flex_row()
                             .items_center()
                             .gap(px(8.0))
-                            .when(cx.studio().paper.is_some(), |meta| meta.h(px(34.0)))
+                            .when(editorial, |meta| meta.flex_wrap().gap(px(4.0)))
+                            .when(cx.studio().paper.is_some(), |meta| meta.h(px(26.0)))
                             .when_some(ratio, |meta, ratio| {
                                 if cx.studio().paper.is_some() {
                                     meta.child(
                                         div()
-                                            .text_size(px(13.0))
+                                            .text_size(px(12.0))
                                             .text_color(c.muted.opacity(0.65))
                                             .child(format!("{ratio} ·")),
                                     )
@@ -929,17 +1093,17 @@ impl HomePage {
                                     meta.child(widgets::chip(ratio, Tone2::Warning, cx))
                                 }
                             })
-                            .when(cx.studio().paper.is_none(), |meta| {
+                            .when(cx.studio().paper.is_none() && !editorial, |meta| {
                                 meta.child(widgets::chip(
                                     format!("{} 张幻灯片", project.slide_count),
                                     Tone2::Primary,
                                     cx,
                                 ))
                             })
-                            .when(cx.studio().paper.is_some(), |meta| {
+                            .when(cx.studio().paper.is_some() || editorial, |meta| {
                                 meta.child(
                                     div()
-                                        .text_size(px(13.0))
+                                        .text_size(px(12.0))
                                         .text_color(c.muted.opacity(0.65))
                                         .child(format!("{} 张幻灯片 ·", project.slide_count)),
                                 )
@@ -949,7 +1113,7 @@ impl HomePage {
                                     .text_size(px(12.0))
                                     .text_color(c.muted)
                                     .when(cx.studio().paper.is_some(), |date| {
-                                        date.text_size(px(13.0)).text_color(c.muted.opacity(0.65))
+                                        date.text_color(c.muted.opacity(0.65))
                                     })
                                     .child(format_date(project.updated_at)),
                             ),

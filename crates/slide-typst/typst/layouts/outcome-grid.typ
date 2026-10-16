@@ -81,9 +81,11 @@
     // (the screen's `outcome-top-bar` only renders when the data sets a bar
     // class).
     let flat = is-terminal(ctx) or is-glass(ctx)
-    block(width: col-w, height: card-h, fill: th.paper, stroke: 1 * px + if flat {
+    block(width: col-w, height: card-h, fill: th.paper, stroke: if is-editorial(ctx) {
+      (left: 1 * px + th.edge)
+    } else { 1 * px + if flat {
       th.edge
-    } else { tone.border }, radius: if flat { th.radius.card * px } else { 4 * px }, {
+    } else { tone.border } }, radius: if flat { th.radius.card * px } else { 4 * px }, {
       // `outline: 1px; outline-offset: -5px` — a hairline frame 4–5px inside.
       if th.deco.certificate {
         place(top + left, dx: 4.5 * px, dy: 4.5 * px, rect(

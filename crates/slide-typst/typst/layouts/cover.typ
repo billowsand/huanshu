@@ -2,7 +2,36 @@
 
 #import "../lib/components.typ": *
 
+#let editorial-cover(ctx, slide) = layout(size => {
+  let th = ctx.theme
+  let number = if ctx.index < 9 { "0" + str(ctx.index + 1) } else { str(ctx.index + 1) }
+  let main-w = calc.min(size.width * 0.7, 1080 * px)
+  let gap = 40 * px
+  let side-w = size.width - main-w - gap
+  txt(ctx, "caption", 12 * px, 1.5, number + " / PRESENTATION", fill: th.muted, tracking: 0.12em)
+  v(32 * px)
+  let body-h = size.height - 60 * px
+  grid(columns: (main-w, side-w), column-gutter: gap, align: horizon,
+    fit-height(main-w, body-h, f => {
+      let badges = slide.at("badges", default: none)
+      if has(badges) {
+        txt(ctx, "caption", ctx.ty.caption * f, 1.5, badges.join(" / "), fill: th.primary, tracking: th.tracking.label)
+        v(20 * px * f)
+      }
+      headline(ctx, ctx.ty.cover-title * 1.25 * f, 1.15, slide.title, tracking: th.tracking.title)
+      if has(slide.at("subtitle", default: none)) {
+        v(24 * px * f)
+        txt(ctx, "subtitle", ctx.ty.cover-subtitle * f, 1.5, slide.subtitle, fill: th.muted)
+      }
+    }, slide-index: ctx.index, center: true),
+    block(width: side-w, height: body-h, stroke: (left: 1 * px + th.edge), inset: (left: 28 * px),
+      align(center + horizon, text(font: ctx.fonts.number, size: calc.min(210 * px, side-w * 0.62),
+        fill: rgb(0, 0, 0, 0), stroke: 1 * px + th.primary.transparentize(25%), weight: "bold", number))),
+  )
+})
+
 #let render(ctx, slide) = {
+  if is-editorial(ctx) { return editorial-cover(ctx, slide) }
   let th = ctx.theme
   let ty = ctx.ty
   let w = ctx.canvas.w

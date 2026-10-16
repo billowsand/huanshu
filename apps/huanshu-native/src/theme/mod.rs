@@ -186,7 +186,11 @@ pub fn apply(
     let kit = Theme::global_mut(cx);
     kit.font_family = font.clone();
     kit.mono_font_family = code;
-    kit.radius = px(8.0);
+    kit.radius = px(if theme.id == "light-editorial" {
+        0.0
+    } else {
+        8.0
+    });
     let k = &mut kit.colors;
     // Component surfaces are paper, not the wooden desktop. Both dialogs and
     // light-mode input fields read this value.
@@ -211,8 +215,16 @@ pub fn apply(
     k.primary_active = colors.primary_light;
     k.primary_foreground = colors.primary_contrast;
     // GPUI Kit 的按钮读自己的一组 `button_*`，不读上面的 `primary*`。
-    k.button_primary = colors.primary;
-    k.button_primary_hover = colors.primary_light;
+    k.button_primary = if theme.id == "light-editorial" {
+        colors.text
+    } else {
+        colors.primary
+    };
+    k.button_primary_hover = if theme.id == "light-editorial" {
+        colors.primary
+    } else {
+        colors.primary_light
+    };
     k.button_primary_active = colors.primary_light;
     k.button_primary_foreground = colors.primary_contrast;
     k.button = colors.surface;

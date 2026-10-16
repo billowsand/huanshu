@@ -227,7 +227,7 @@ async function handlePasswordSubmit(password: string) {
                     </div>
                     <div class="heading-copy">
                         <span class="heading-eyebrow">幻述 Studio</span>
-                        <h1 class="page-title">我的演示文稿</h1>
+                        <h1 class="page-title">我的<span class="editorial-title-accent">演示</span>文稿</h1>
                     </div>
                 </div>
                 <span
@@ -281,6 +281,11 @@ async function handlePasswordSubmit(password: string) {
                     @click="router.push(`/project/${p.id}`)"
                 >
                     <div class="card-accent" />
+                    <div class="editorial-project-cover" aria-hidden="true">
+                        <span>HUANSHU / PRESENTATION</span>
+                        <strong>{{ p.name }}</strong>
+                        <span>{{ String(p.slide_count).padStart(2, '0') }} / SLIDES</span>
+                    </div>
                     <div class="card-icon-wrap">
                         <BrandMark :size="24" class="card-icon" />
                     </div>
@@ -326,6 +331,7 @@ async function handlePasswordSubmit(password: string) {
                     </div>
                 </div>
             </div>
+            <div class="editorial-library-footer">本地保存 · 随时继续创作</div>
         </div>
 
         <!-- 删除确认对话框 -->
@@ -367,6 +373,10 @@ async function handlePasswordSubmit(password: string) {
         />
     </div>
 </template>
+
+<style scoped>
+.editorial-project-cover, .editorial-library-footer { display: none; }
+</style>
 
 <style scoped>
 .home-layout {

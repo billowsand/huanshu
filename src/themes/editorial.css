@@ -1,18 +1,18 @@
 /* 报刊·钴蓝 (light-editorial): a newspaper / magazine layout language.
    Warm newsprint, near-black ink, a single cobalt accent; no shadows, no
-   radii, no grid. The slide rendering lives in Typst now
+   radii, open columns. The slide rendering lives in Typst now
    (crates/slide-typst/typst/themes/light-editorial.typ), which reuses the
    terminal geometry with its own cobalt rules. */
 [data-theme="light-editorial"] {
   color-scheme: light;
-  --editorial-paper: #f3efe6;
-  --editorial-ink: #1c2723;
-  --editorial-muted: #63675e;
-  --editorial-rule: #cbc5b8;
-  --editorial-cobalt: #1d4ed8;
-  --editorial-cobalt-deep: #1a43bf;
-  --editorial-tint: #e1e7f3;
-  --editorial-tint-border: #b7c5e6;
+  --editorial-paper: #f6f5f0;
+  --editorial-ink: #141414;
+  --editorial-muted: #73736f;
+  --editorial-rule: #d8d6cf;
+  --editorial-cobalt: #2549d8;
+  --editorial-cobalt-deep: #1d3db8;
+  --editorial-tint: #e9edfc;
+  --editorial-tint-border: #bdc9f1;
 
   --bg: var(--editorial-paper);
   --bg-gradient: var(--editorial-paper);
@@ -57,21 +57,21 @@
   --danger-contrast: #ffffff;
 
   /* chart tokens（Typst 主题 chart 字典的对照来源） */
-  --chart-grid:  #e4ded2;
-  --chart-axis:  #cbc5b8;
-  --chart-palette-0: #1d4ed8;
+  --chart-grid:  #e8e7e1;
+  --chart-axis:  #d8d6cf;
+  --chart-palette-0: #2549d8;
   --chart-palette-1: #2e6e4f;
   --chart-palette-2: #9a6212;
   --chart-palette-3: #a8322a;
   --chart-palette-4: #5b6f86;
   --chart-palette-5: #7a5c99;
 
-  --studio-bg: #eae5da;
-  --studio-panel: #f6f3ec;
-  --studio-panel-2: #f1ede4;
-  --studio-surface: #e6e0d3;
-  --studio-border: #d3ccbe;
-  --studio-border-hover: #a39b8b;
+  --studio-bg: #f6f5f0;
+  --studio-panel: #ffffff;
+  --studio-panel-2: #faf9f6;
+  --studio-surface: #eeede7;
+  --studio-border: #d8d6cf;
+  --studio-border-hover: #989890;
   --studio-text: var(--editorial-ink);
   --studio-muted: var(--editorial-muted);
   --studio-primary: var(--editorial-cobalt);
@@ -92,7 +92,7 @@
   .heading-mark, .titlebar-brand-chip, .empty-icon-circle, .slide-card-bg,
   .theme-popover, .modal-box, .badge
 ) {
-  border-radius: 2px;
+  border-radius: 0;
   box-shadow: none;
 }
 
@@ -111,4 +111,60 @@
 
 [data-theme="light-editorial"] .card-accent {
   background: var(--studio-primary);
+}
+
+/* Shared editorial library: wide paper, a masthead and compact ruled columns. */
+[data-theme="light-editorial"] .home-layout .home-body { max-width: 1232px; }
+[data-theme="light-editorial"] .home-layout .top-bar { border-bottom-color: var(--primary); }
+[data-theme="light-editorial"] .home-layout .page-crumb { color: var(--text); }
+[data-theme="light-editorial"] .home-layout .page-heading { position: relative; padding: 18px 0; }
+[data-theme="light-editorial"] .home-layout .heading-brand { flex: 1; justify-content: center; }
+[data-theme="light-editorial"] .home-layout .heading-mark { display: none; }
+[data-theme="light-editorial"] .home-layout .heading-copy { align-items: center; gap: 8px; }
+[data-theme="light-editorial"] .home-layout .heading-eyebrow { font-size: 0; color: var(--text-muted); }
+[data-theme="light-editorial"] .home-layout .heading-eyebrow::after {
+  content: "HUANSHU / PRESENTATION STUDIO";
+  font: 10px var(--font-code, monospace); letter-spacing: 0.12em;
+}
+[data-theme="light-editorial"] .home-layout .page-title { font-size: 38px; font-weight: 800; }
+[data-theme="light-editorial"] .editorial-title-accent { color: var(--primary); }
+[data-theme="light-editorial"] .home-layout .project-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
+}
+[data-theme="light-editorial"] .home-layout .project-card {
+  min-width: 0; min-height: 112px; padding: 16px 18px; gap: 16px;
+  background: var(--studio-panel); border: 1px solid var(--studio-border);
+  border-top-width: 2px; border-radius: 0; box-shadow: none; animation: none;
+}
+[data-theme="light-editorial"] .home-layout .project-card:hover { border-color: var(--primary); }
+[data-theme="light-editorial"] .home-layout .project-card .card-icon-wrap { display: none; }
+[data-theme="light-editorial"] .home-layout .card-accent { display: none; }
+[data-theme="light-editorial"] .home-layout .card-name { font-weight: 700; }
+[data-theme="light-editorial"] .home-layout .card-meta { flex-wrap: wrap; gap: 4px; }
+[data-theme="light-editorial"] .home-layout .card-meta .badge {
+  border: 0; padding: 0; background: transparent; color: var(--text-muted);
+}
+[data-theme="light-editorial"] .home-layout .card-actions { opacity: 1; }
+[data-theme="light-editorial"] .home-layout .editorial-project-cover {
+  display: flex; flex-direction: column; justify-content: space-between;
+  flex: 0 0 100px; height: 64px; padding: 6px; box-sizing: border-box;
+  background: var(--bg); border: 1px solid var(--studio-border); border-top: 2px solid var(--primary);
+  overflow: hidden;
+}
+[data-theme="light-editorial"] .editorial-project-cover span {
+  font: 7px var(--font-code, monospace); color: var(--text-muted); white-space: nowrap;
+}
+[data-theme="light-editorial"] .editorial-project-cover span:last-child { color: var(--primary); }
+[data-theme="light-editorial"] .editorial-project-cover strong {
+  font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+[data-theme="light-editorial"] .home-layout .editorial-library-footer {
+  display: block; border-top: 1px solid var(--studio-border); margin-top: 20px;
+  padding-top: 12px; font-size: 11px; color: var(--text-muted);
+}
+[data-theme="light-editorial"] .btn-primary { background: var(--text); color: white; border-color: var(--text); }
+[data-theme="light-editorial"] .btn-primary:hover { background: var(--primary); border-color: var(--primary); }
+@media (max-width: 987px) {
+  [data-theme="light-editorial"] .home-layout .project-grid { grid-template-columns: minmax(0, 1fr); }
+  [data-theme="light-editorial"] .home-layout .page-title { font-size: 30px; }
 }

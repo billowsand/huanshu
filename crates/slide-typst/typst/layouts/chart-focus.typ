@@ -108,7 +108,7 @@
     height: height,
     // `.glass-card` under each theme: the paper color (measured), not the sheet tint.
     fill: th.paper,
-    stroke: 1 * px + th.edge,
+    stroke: if is-editorial(ctx) { (left: 1 * px + th.edge) } else { 1 * px + th.edge },
     radius: th.radius.card * px,
     clip: true,
     pad(

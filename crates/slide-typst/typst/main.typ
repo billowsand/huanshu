@@ -115,5 +115,17 @@
     assets: deck.at("assets", default: (:)),
   )
   let render = layouts.at(slide.kind, default: none)
+  // A real page folio, outside the content area, shared by every editorial layout.
+  if theme-module.theme.family == "editorial" {
+    place(top + left, dy: (canvas.h - frame-inset.top - 32) * px, block(
+      width: (canvas.w - frame-inset.left - frame-inset.right) * px,
+      stroke: (top: 1 * px + theme-module.theme.edge),
+      inset: (top: 8 * px),
+      grid(columns: (1fr, auto),
+        text(font: deck.fonts.caption, size: 11 * px, fill: theme-module.theme.muted, "幻述 / PRESENTATION"),
+        text(font: deck.fonts.number, size: 11 * px, fill: theme-module.theme.muted, if index < 9 { "0" + str(index + 1) } else { str(index + 1) }),
+      ),
+    ))
+  }
   if render == none { unsupported-page(ctx, slide) } else { render(ctx, slide) }
 }
