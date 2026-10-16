@@ -13,8 +13,6 @@
 
 <sub>第二步「AI 生成」：每页独立状态与进度，右侧是这一页的蓝图、校验与重试</sub>
 
-![架构概览](project-backbone.png)
-
 ## 30 秒上手
 
 仓库里有两套界面，共用同一份业务内核 `huanshu-core`：Tauri + Vue 版与原生 GPUI 版。
