@@ -741,6 +741,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-native.ps1
 
 找不到 makensis（本机 Tauri 自带 `%LOCALAPPDATA%\tauri\NSIS`）时只出免安装版并提示，不失败。
 
+### 随 tag 发布
+
+`.github/workflows/release.yml` 的 `native-windows` job 在 `windows-latest` 上跑同一个脚本，
+产物追加到同一个 Release：`needs: release`（tauri-action 负责创建 Release，两个 job 同时创建会撞车），
+先 `choco install nsis`——**CI 上没有 Tauri 自带的那份 NSIS，不装就只能出免安装 exe**。
+发布说明由 tauri-action 先写一遍（只有 Tauri 产物），native job 再用 `.github/release-notes.md`
+重写一遍；说明文字放文件而不是内联，`.ps1` 里内联中文会被 ANSI 读成乱码。Linux 暂时只发 Tauri 版。
+
 ### 与 Tauri 版的关系
 
 - 安装目录 `%LOCALAPPDATA%\HuanshuNative`、产品/卸载项「幻述（原生版）」，与 Tauri 版

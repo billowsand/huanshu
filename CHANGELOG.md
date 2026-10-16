@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-16
+
+### Fixed
+
+- **原生版现在随 tag 一起发布**：`.github/workflows/release.yml` 增加 `native-windows` job——在
+  `windows-latest` 上装 NSIS（`scripts/package-native.ps1` 找不到 makensis 时只会出免安装 exe，
+  CI 上必须先装）、跑同一个打包脚本、把 `HuanshuNative_<version>_x64-setup.exe` 与
+  `huanshu-native_windows_x64.exe` 追加到 Release，并用 `.github/release-notes.md`
+  重写发布说明（原来只列 Tauri 产物）。这个 job `needs: release`，因为 tauri-action 负责创建
+  Release，两个 job 同时创建会撞车。v0.5.0 的 Release 只有 Tauri 产物，本版本起两版并列。
+  Linux 的原生版暂时没出：GPUI 在 Linux 上要额外装一堆 X11/Wayland 依赖，先只发 Windows。
+
 ## [0.5.0] - 2026-10-16
 
 ### Added

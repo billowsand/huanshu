@@ -76,6 +76,48 @@ jobs:
           # Also upload plain binaries as a fallback for portable use.
           uploadPlainBinary: true
 
+  native-windows:
+    name: native (windows)
+    runs-on: windows-latest
+    # After the Tauri job: tauri-action owns creating the release, and reusing it here
+    # keeps the two builds from racing each other into a duplicate-release conflict.
+    needs: release
+    steps:
+      - uses: actions/checkout@v4
+
+      # scripts/package-native.ps1 finds makensis in Program Files (x86)\NSIS first;
+      # the Tauri toolchain copy is only present on a developer machine.
+      - name: Install NSIS
+        run: choco install nsis -y --no-progress
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # No bun here on purpose: the native build is pure Rust, it does not build src/.
+      # The script must stay ASCII-only and is invoked the same way it is locally.
+      - name: Package the native (GPUI) build
+        shell: cmd
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package-native.ps1
+
+      - name: Upload native artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist-package/huanshu-native_windows_x64.exe
+            dist-package/HuanshuNative_*_x64-setup.exe
+
+      # tauri-action wrote the notes before this job ran, and those notes only listed the
+      # Tauri artifacts. Rewrite them from a committed file: gh reads it as UTF-8, while
+      # inline Chinese in a .ps1 would be read as ANSI by Windows PowerShell.
+      - name: Rewrite the release notes to cover both builds
+        shell: cmd
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit %GITHUB_REF_NAME% --notes-file .github\release-notes.md
+
   frontend-release:
     name: frontend (dist)
     runs-on: ubuntu-latest

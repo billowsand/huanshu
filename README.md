@@ -94,11 +94,19 @@ cargo run -p huanshu-native --release
 
 ## 安装运行
 
-想直接用：到 [Releases](https://github.com/billowsand/huanshu/releases) 下载安装包（Windows / Linux）。
-原生 GPUI 版也可以在本机出包：
+想直接用：到 [Releases](https://github.com/billowsand/huanshu/releases) 下载——Windows 上有两版可选
+（推荐原生版），Linux 目前只有 Tauri 版：
+
+| 产物 | 说明 |
+|---|---|
+| `HuanshuNative_*_x64-setup.exe` | 原生 GPUI 版安装包（currentUser 静默 `/S`，卸载 `uninstall.exe /S`） |
+| `huanshu-native_windows_x64.exe` | 原生 GPUI 版免安装单文件，不需要 WebView2 与 VC++ 运行库 |
+| `Huanshu_*_x64-setup.exe` / `.AppImage` / `.deb` | Tauri + Vue 版 |
+| `auto-slidev-studio_windows_x64.exe` | Tauri 版免安装单文件 |
+
+原生版也可以在本机出包：
 
 ```powershell
-# 原生界面（免安装单文件 + NSIS 安装包 → dist-package/）
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-native.ps1
 ```
 
