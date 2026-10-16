@@ -1,0 +1,59 @@
+/* Keep the surround visible in both fullscreen and windowed presentation. */
+:root,
+[data-theme="dark-yellow"] {
+  --pres-backdrop:
+    repeating-linear-gradient(0deg, #f59e0b0b 0 1px, transparent 1px 96px),
+    repeating-linear-gradient(90deg, #f59e0b0b 0 1px, transparent 1px 96px),
+    linear-gradient(135deg, #231b10, #0b0c11);
+  --pres-page-shadow: 0 1px 3px #0b0c11a6, 0 6px 14px -3px #0b0c1180;
+  --pres-page-radius: 2px;
+}
+
+[data-theme="dark-blue"] {
+  --pres-backdrop:
+    radial-gradient(circle, #0ea5e938 0 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(135deg, #031827, #020810);
+  --pres-page-shadow: 0 1px 3px #020810a6, 0 6px 14px -3px #02081080;
+  --pres-page-radius: 0px;
+}
+
+[data-theme="dark-terminal"] {
+  --pres-backdrop:
+    repeating-linear-gradient(0deg, #eeeede06 0 1px, transparent 1px 4px),
+    linear-gradient(135deg, #2b231c, #151614);
+  --pres-page-shadow: 0 1px 3px #151614a6, 0 6px 14px -3px #15161480;
+  --pres-page-radius: 2px;
+}
+
+[data-theme="light-terminal"] {
+  --pres-backdrop:
+    radial-gradient(circle, #656b5c29 0 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(135deg, #eaeade, #f4f3eb);
+  --pres-page-shadow: 0 1px 3px #25291f1f, 0 6px 14px -3px #25291f2e;
+  --pres-page-radius: 2px;
+}
+
+[data-theme="light-editorial"] {
+  --pres-backdrop:
+    linear-gradient(#1d4ed866, #1d4ed866) top / 100% 2px no-repeat,
+    repeating-linear-gradient(90deg, transparent 0 32px, #a39b8b1f 32px 33px, transparent 33px 160px),
+    linear-gradient(135deg, #e3ddd1, #eae5da);
+  --pres-page-shadow: 0 1px 3px #1c27231f, 0 6px 14px -3px #1c27232e;
+  --pres-page-radius: 0px;
+}
+
+[data-theme="light-notes"] {
+  --pres-backdrop: var(--notes-grain), var(--notes-backing);
+  --pres-page-shadow: var(--notes-paper-shadow);
+  --pres-page-radius: 2px;
+}
+
+[data-theme] .presentation-overlay,
+[data-theme] .presentation-overlay:fullscreen {
+  background: var(--pres-backdrop);
+}
+
+[data-theme] :is(.pres-transition-container, .pres-overview-thumb) {
+  border-radius: var(--pres-page-radius);
+  box-shadow: var(--pres-page-shadow);
+}

@@ -8,6 +8,7 @@
 //! 滚动条、轻提示）也是同一套颜色，不会出现「组件一套、页面一套」。
 
 pub mod editor;
+pub mod presentation;
 pub mod tokens;
 
 pub use editor::{EditorLook, PaperLook};

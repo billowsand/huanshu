@@ -14,6 +14,7 @@ import './themes/terminal.css'
 import './themes/notes.css'
 import './themes/notes-studio.css'
 import './themes/editorial.css'
+import './themes/presentation.css'
 import { DEFAULT_THEME, isKnownTheme } from './themes/catalog'
 
 const savedTheme = localStorage.getItem('app-theme')

@@ -24,6 +24,7 @@ use huanshu_core::preview::PreviewOptions;
 use crate::icons::carbon;
 use crate::shell::ShellHandle;
 use crate::slides::{slide_frame, SlideImages};
+use crate::theme::presentation::{backdrop, page_shadow};
 use crate::theme::StudioExt as _;
 use crate::widgets;
 
@@ -330,11 +331,13 @@ impl Render for Presentation {
                 .flex()
                 .items_center()
                 .justify_center()
-                .bg(gpui_kit::rgb(0x000000))
-                .when_some(cx.studio().paper, |area, p| {
-                    area.child(widgets::wood_grain(&p))
-                })
-                .child(frame)
+                .child(
+                    div()
+                        .relative()
+                        .flex_none()
+                        .shadow(page_shadow(cx))
+                        .child(frame),
+                )
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(|this, _event, _window, cx| {
@@ -595,9 +598,7 @@ impl Render for Presentation {
             // 全屏时控制条 `absolute` 贴在底边，相对本层定位。
             .relative()
             .bg(c.bg)
-            .when_some(cx.studio().paper, |area, p| {
-                area.child(widgets::wood_grain(&p))
-            })
+            .child(backdrop(cx))
             .child(content)
             .child(controls)
     }
@@ -643,13 +644,10 @@ impl Presentation {
                             .border_2()
                             .border_color(if active { c.primary } else { c.border })
                             .when_some(cx.studio().paper, |sheet, p| {
-                                sheet
-                                    .bg(p.card)
-                                    .rounded(px(2.0))
-                                    .shadow(widgets::paper_shadow(&p))
+                                sheet.bg(p.card).rounded(px(2.0))
                             })
                             .cursor_pointer()
-                            .child(slide_frame(
+                            .child(div().relative().shadow(page_shadow(cx)).child(slide_frame(
                                 ("ov-frame", index),
                                 state,
                                 CARD_W,
@@ -657,7 +655,7 @@ impl Presentation {
                                 false,
                                 None,
                                 cx,
-                            ))
+                            )))
                             .child(
                                 div()
                                     .flex()
