@@ -748,7 +748,6 @@ impl Render for Step2 {
                                 .children(
                                     snap.recent_logs
                                         .iter()
-                                        .rev()
                                         .take(3)
                                         .collect::<Vec<_>>()
                                         .into_iter()
@@ -760,8 +759,22 @@ impl Render for Step2 {
                                                 .single()
                                                 .map(|t| t.format("%H:%M:%S").to_string())
                                                 .unwrap_or_default();
-                                            let error = log.stage == "error" || log.kind == "error";
+                                            let error =
+                                                log.stage == "error" || log.kind.contains("error");
+                                            // Keep multiline diagnostics in the detail panel. This
+                                            // strip shows only the latest three single-line events.
+                                            let summary = if log.title.is_empty() {
+                                                &log.summary
+                                            } else {
+                                                &log.title
+                                            }
+                                            .split_whitespace()
+                                            .collect::<Vec<_>>()
+                                            .join(" ");
                                             div()
+                                                .h(px(20.0))
+                                                .flex_none()
+                                                .overflow_hidden()
                                                 .flex()
                                                 .items_center()
                                                 .gap(px(10.0))
@@ -775,13 +788,13 @@ impl Render for Step2 {
                                                             .to_string(),
                                                     ),
                                                 )
-                                                .child(div().flex_1().min_w_0().truncate().child(
-                                                    if log.summary.is_empty() {
-                                                        log.title.clone()
-                                                    } else {
-                                                        log.summary.clone()
-                                                    },
-                                                ))
+                                                .child(
+                                                    div()
+                                                        .flex_1()
+                                                        .min_w_0()
+                                                        .truncate()
+                                                        .child(summary),
+                                                )
                                         }),
                                 ),
                         ),
@@ -1299,6 +1312,7 @@ fn progress_section(
                 div()
                     .size(px(12.0))
                     .rounded_full()
+                    .when(cx.studio().is_terminal(), |mark| mark.rounded_none())
                     .bg(c.primary)
                     .into_any_element()
             } else {
@@ -1319,6 +1333,7 @@ fn progress_section(
                         .items_center()
                         .justify_center()
                         .rounded_full()
+                        .when(cx.studio().is_terminal(), |mark| mark.rounded_none())
                         .border_1()
                         .border_color(if done {
                             c.success
