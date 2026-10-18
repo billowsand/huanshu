@@ -86,10 +86,15 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
     ⌘Q 不经过窗口关闭流程，与 Windows 上点关闭一样**不**弹设置页的「未保存」确认。
   - 快捷键：「Ctrl/⌘ + 键」一律 `platform::primary_modifier`（即 `Modifiers::secondary()`），显示文字用
     `platform::shortcut_label("s")`（`Ctrl + S` / `⌘S`），不要写死 `modifiers.control` 或 "Ctrl"。
-  - 文件对话框一律 `platform::pick_paths` / `save_path`（回调式）。Windows/Linux 照旧同步 rfd；**macOS 不用 rfd**
-    （同步 `runModal` 会在 GPUI 事件回调里再套一层 AppKit 模态循环，有重入风险），走 GPUI 的
-    `prompt_for_paths` / `prompt_for_new_path`（异步、没有类型过滤：选完按扩展名筛，保存时缺扩展名自动补）。
-    因为 macOS 上是异步的，「拿到路径之后」的逻辑放在回调里，并在回调里**再查一次**进行中标志（面板开着时可能又点了一次）。
+  - 文件对话框一律 `platform::pick_paths` / `save_path`（回调式），**两个平台都是异步的**：面板开着时界面线程照常跑
+    GPUI，回调经 `update_in` 回来。
+    - Windows/Linux 用 rfd 的 `AsyncFileDialog`（面板跑在自己的线程上，保留类型过滤与父窗口）。
+      **不要换回同步的 `rfd::FileDialog::pick_*` / `save_file()`**：它在 GPUI 的点击回调里直接跑一层 Win32 模态
+      消息循环，期间主窗口的重绘 / 定时器消息照常派发进来，GPUI 一处理就要借用正被外层 `App::update_entity`
+      借着的 App，`RefCell already borrowed` 直接中止进程（2026-10 实测：第一步点「上传文件」打开面板几秒内必崩，
+      与文稿有没有文字无关）。macOS 的同步 `runModal` 有同样的 AppKit 模态循环问题，所以那边不用 rfd。
+    - macOS 走 GPUI 的 `prompt_for_paths` / `prompt_for_new_path`（异步、没有类型过滤：选完按扩展名筛，保存时缺扩展名自动补）。
+    - 因为都是异步的，「拿到路径之后」的逻辑放在回调里，并在回调里**再查一次**进行中标志（面板开着时可能又点了一次）。
   - 默认字体按平台：`slide_typst::DEFAULT_FONT` / `DEFAULT_MATH_FONT` / `DEFAULT_CODE_FONTS`（Windows 与 Linux：
     微软雅黑 / Cambria Math / Cascadia Mono、Consolas；macOS：苹方 / STIX Two Math / Menlo、Monaco），
     core 的 `FontSettings::default`、界面字体、设置页常用名单都从这里取；macOS 另在 Typst 兜底链末尾加

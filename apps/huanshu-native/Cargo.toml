@@ -33,8 +33,10 @@ tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 futures = "0.3"
 anyhow = "1.0"
 
-# 原生文件对话框（导入导出、上传文稿、选目录）。macOS 改用 GPUI 自己的异步面板
-# （`platform::pick_paths` / `save_path`），不链接 rfd。
+# 原生文件对话框（导入导出、上传文稿、选目录）。Windows / Linux 只用 rfd 的
+# **异步**面板（`AsyncFileDialog`）：同步的 `FileDialog::pick_*` 会在 GPUI 回调里跑
+# 一层 Win32 模态消息循环，重入 App 时 `RefCell already borrowed` 直接中止。
+# macOS 不走 rfd，改用 GPUI 自己的异步面板（`platform::pick_paths` / `save_path`）。
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 rfd = "0.15"
 

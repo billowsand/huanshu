@@ -134,11 +134,17 @@ pub enum Pick {
 
 /// 弹「打开」对话框；用户选了东西才调用 `done`（取消则什么都不做）。
 ///
-/// - **Windows / Linux**：照旧同步弹 rfd 对话框（带类型过滤），行为与之前逐字相同。
-/// - **macOS**：走 GPUI 的 `prompt_for_paths`（`NSOpenPanel` + completion handler，异步）。
-///   不用同步的 rfd：它在 GPUI 的事件回调里再跑一层 AppKit 模态循环，期间 GPUI 收到的
-///   重绘 / 窗口事件会重入正被借用的 App。GPUI 的面板没有类型过滤，所以选完再按扩展名筛，
-///   全被筛掉时提示一句。
+/// 两个平台的对话框都是**异步**的：打开面板期间界面线程照常跑 GPUI 的循环，回调在
+/// 用户选完之后才经 `update_in` 回到视图。
+///
+/// - **Windows / Linux**：rfd 的 `AsyncFileDialog`（面板跑在自己的线程上，带类型过滤、
+///   挂在主窗口上）。**不要用同步的 `FileDialog::pick_*`**：它在 GPUI 的点击回调里直接
+///   跑一层 Win32 模态消息循环，期间主窗口的重绘 / 定时器消息照常派发进来，GPUI 一处理
+///   就要借用正被外层 `App::update_entity` 借着的 App，直接
+///   `RefCell already borrowed` 中止（第一步点「上传文件」打开面板几秒内必崩，与文稿有没有文字无关）。
+/// - **macOS**：走 GPUI 的 `prompt_for_paths`（`NSOpenPanel` + completion handler）。
+///   同步 rfd 同样会在事件回调里套一层 AppKit 模态循环。GPUI 的面板没有类型过滤，
+///   所以选完再按扩展名筛，全被筛掉时提示一句。
 pub fn pick_paths<T: 'static>(
     this: &mut T,
     pick: Pick,
@@ -174,21 +180,43 @@ pub fn pick_paths<T: 'static>(
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let picked = match pick {
-            Pick::Folder => rfd::FileDialog::new().pick_folder().map(|path| vec![path]),
-            Pick::File(filter) => rfd::FileDialog::new()
-                .add_filter(filter.name, filter.extensions)
-                .pick_file()
-                .map(|path| vec![path]),
-            Pick::Files(filter) => rfd::FileDialog::new()
-                .add_filter(filter.name, filter.extensions)
-                .pick_files(),
-        };
-        if let Some(paths) = picked {
-            if let Some(paths) = accept_picked(pick, paths, window, cx) {
-                done(this, paths, window, cx);
-            }
+        let _ = this;
+        let mut dialog = rfd::AsyncFileDialog::new().set_parent(&*window);
+        if let Pick::File(filter) | Pick::Files(filter) = pick {
+            dialog = dialog.add_filter(filter.name, filter.extensions);
         }
+        cx.spawn_in(window, async move |view, window| {
+            let Some(paths) = async_pick(pick, dialog).await else {
+                return;
+            };
+            let _ = view.update_in(window, move |view, window, cx| {
+                if let Some(paths) = accept_picked(pick, paths, window, cx) {
+                    done(view, paths, window, cx);
+                }
+            });
+        })
+        .detach();
+    }
+}
+
+/// rfd 异步面板的三种产物统一成路径列表（Windows / Linux 分支）。
+#[cfg(not(target_os = "macos"))]
+async fn async_pick(pick: Pick, dialog: rfd::AsyncFileDialog) -> Option<Vec<PathBuf>> {
+    match pick {
+        Pick::Folder => dialog
+            .pick_folder()
+            .await
+            .map(|handle| vec![handle.path().to_path_buf()]),
+        Pick::File(_) => dialog
+            .pick_file()
+            .await
+            .map(|handle| vec![handle.path().to_path_buf()]),
+        Pick::Files(_) => dialog.pick_files().await.map(|handles| {
+            handles
+                .iter()
+                .map(|handle| handle.path().to_path_buf())
+                .collect()
+        }),
     }
 }
 
@@ -223,7 +251,8 @@ fn accept_picked<T>(
 /// 弹「保存」对话框；用户确定了路径才调用 `done`。路径缺扩展名时补上 `filter` 的第一个。
 ///
 /// 平台分工同 [`pick_paths`]：macOS 走 GPUI 的 `prompt_for_new_path`（`NSSavePanel`，异步），
-/// 初始目录是「文稿」；其余平台照旧同步弹 rfd。
+/// 初始目录是「文稿」；其余平台走 rfd 的 `AsyncFileDialog`（同样异步，保留过滤器与父窗口），
+/// **不要**换回同步的 `save_file()`（原因见 [`pick_paths`]）。
 pub fn save_path<T: 'static>(
     this: &mut T,
     default_name: &str,
@@ -248,13 +277,19 @@ pub fn save_path<T: 'static>(
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let picked = rfd::FileDialog::new()
+        let _ = this;
+        let dialog = rfd::AsyncFileDialog::new()
             .set_file_name(default_name)
             .add_filter(filter.name, filter.extensions)
-            .save_file();
-        if let Some(path) = picked {
-            done(this, with_extension(path, filter), window, cx);
-        }
+            .set_parent(&*window);
+        cx.spawn_in(window, async move |view, window| {
+            let Some(handle) = dialog.save_file().await else {
+                return;
+            };
+            let path = with_extension(handle.path().to_path_buf(), filter);
+            let _ = view.update_in(window, move |view, window, cx| done(view, path, window, cx));
+        })
+        .detach();
     }
 }
 
