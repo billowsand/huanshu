@@ -24,6 +24,10 @@ gpui_kit::actions!(huanshu, [Quit, Hide, HideOthers, ShowAll, Minimize, Zoom]);
 ///   行为与之前完全一样。
 pub fn init(cx: &mut App) {
     cx.set_quit_mode(QuitMode::LastWindowClosed);
+    // Windows 上 GPUI 默认跟随系统 ClearType 走次像素渲染：中文笔画被网格对齐得又细又毛，
+    // 深色底上还带彩边（原版 WebView2 与系统 UWP 界面都是灰度抗锯齿）。统一用灰度。
+    #[cfg(windows)]
+    cx.set_text_rendering_mode(gpui_kit::TextRenderingMode::Grayscale);
     #[cfg(target_os = "macos")]
     init_macos_menus(cx);
 }
@@ -344,6 +348,25 @@ pub const UI_FALLBACK_FONT: &str = if cfg!(target_os = "macos") {
 } else {
     "Segoe UI"
 };
+
+/// 本机装有这个字体家族吗。`gpui_names` 是 `cx.text_system().all_font_names()`。
+///
+/// 设置里存的是字体的英文名（`SimSun`），GPUI 在 Windows 上只按系统语言列名（中文系统上是
+/// `宋体`），只查那份清单会把宋体、微软雅黑这类中文字体全判成没装、悄悄换成兜底字体。
+/// Windows 另经 DirectWrite 按全部本地化名查一次；macOS 的 GPUI 清单就是英文名，与设置一致。
+pub fn font_installed(name: &str, gpui_names: &[String]) -> bool {
+    if gpui_names.iter().any(|f| f.eq_ignore_ascii_case(name)) {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        huanshu_core::fonts::has_family(name)
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
 
 /// 设置页字体选择器无搜索词时置顶的常用字体（原版 `commonNames`）。
 pub fn common_font_names(code: bool) -> &'static [&'static str] {

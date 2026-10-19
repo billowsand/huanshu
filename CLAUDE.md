@@ -100,6 +100,13 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
     core 的 `FontSettings::default`、界面字体、设置页常用名单都从这里取；macOS 另在 Typst 兜底链末尾加
     冬青黑体 / 黑体-简 / 宋体-简（苹方是按需下载的系统资源）。Windows 上的取值与之前逐字相同。
   - 系统字体枚举（`huanshu_core::fonts`）：Windows 走 DirectWrite，其余平台走 fontdb（与 typst-kit 扫字体同一个库）。
+  - 「字体装了没有」一律 `platform::font_installed(name, &cx.text_system().all_font_names())`，**不要**只在
+    `all_font_names` 里比字符串：设置存的是英文名（`SimSun`），GPUI 在 Windows 上按系统语言列名（中文系统是 `宋体`），
+    只比清单会把宋体、微软雅黑都判成没装、整个界面悄悄落到 Segoe UI（2026-10 实测）。Windows 另走
+    `huanshu_core::fonts::has_family`（DirectWrite `FindFamilyName`，认全部本地化名，几微秒）。
+  - Windows 上文字用灰度抗锯齿（`platform::init` 的 `set_text_rendering_mode(Grayscale)`）：GPUI 默认跟随系统 ClearType，
+    中文笔画细而毛、深色底带彩边；原版 WebView2 也是灰度。笔画仍比 Chromium 略细，那是 GPUI 的 DirectWrite 光栅化
+    （推荐渲染模式的网格对齐 + 着色器的 gamma），要再改只能 patch `gpui-pre-windows`。
 - macOS 构建：只需 Xcode Command Line Tools（GPUI Kit 开了 `runtime_shaders`，不用完整 Xcode 的 Metal 编译器），
   先 `bun install`（Carbon 图标）。数据目录是 `~/Library/Application Support/auto-slidev-studio/`（数据与 `bootstrap.json`
   同在这一个目录）。`.app` 从访达打开时不继承 `HUANSHU_HOME`，沙箱验证直接跑 `target/release/huanshu-native`。

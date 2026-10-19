@@ -166,7 +166,7 @@ pub fn apply(
             crate::platform::UI_FALLBACK_FONT,
         ]
         .into_iter()
-        .find(|name| installed.iter().any(|f| f.eq_ignore_ascii_case(name)))
+        .find(|name| crate::platform::font_installed(name, &installed))
         .unwrap_or(".SystemUIFont")
         .to_string()
         .into()

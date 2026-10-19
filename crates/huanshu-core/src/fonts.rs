@@ -56,6 +56,47 @@ pub fn enumerate_system_fonts() -> Result<Vec<SystemFont>, String> {
     enumerate().map_err(|error| format!("读取系统字体失败：{error}"))
 }
 
+/// 本机是否装有名为 `name` 的字体家族，任一本地化名都算（`SimSun` 与 `宋体` 是同一家族）。
+///
+/// 设置里存的是英文名（[`SystemFont::name`]），而 GPUI 的 `all_font_names` 在中文系统上
+/// 只列中文名，拿英文名去那份清单里找会把宋体、微软雅黑都判成「没装」。DirectWrite 的
+/// `FindFamilyName` 认所有本地化名，也是 GPUI 加载字体时实际走的匹配，一次查询只要几微秒。
+#[cfg(windows)]
+pub fn has_family(name: &str) -> bool {
+    use windows::core::{BOOL, HSTRING};
+    use windows::Win32::Graphics::DirectWrite::{
+        DWriteCreateFactory, IDWriteFactory, DWRITE_FACTORY_TYPE_SHARED,
+    };
+
+    let name = name.trim();
+    if name.is_empty() {
+        return false;
+    }
+    // SAFETY: DirectWrite owns the interfaces; the out-params are plain values.
+    unsafe {
+        let Ok(factory) = DWriteCreateFactory::<IDWriteFactory>(DWRITE_FACTORY_TYPE_SHARED) else {
+            return false;
+        };
+        let mut collection = None;
+        // 检查更新：刚装的字体也要认得出来（与设置页的枚举一致）。
+        if factory
+            .GetSystemFontCollection(&mut collection, true)
+            .is_err()
+        {
+            return false;
+        }
+        let Some(collection) = collection else {
+            return false;
+        };
+        let mut index = 0u32;
+        let mut exists = BOOL(0);
+        collection
+            .FindFamilyName(&HSTRING::from(name), &mut index, &mut exists)
+            .is_ok()
+            && exists.as_bool()
+    }
+}
+
 #[cfg(not(windows))]
 pub fn enumerate_system_fonts() -> Result<Vec<SystemFont>, String> {
     let mut db = fontdb::Database::new();
@@ -161,5 +202,18 @@ mod tests {
             .windows(2)
             .all(|pair| !pair[0].name.eq_ignore_ascii_case(&pair[1].name)));
         println!("enumerated {} installed font families", fonts.len());
+    }
+
+    /// 每个家族的任一本地化名都能查到（中文系统上 GPUI 只列中文名，设置里存的是英文名）。
+    #[cfg(windows)]
+    #[test]
+    fn every_localized_name_is_an_installed_family() {
+        for font in enumerate_system_fonts().unwrap() {
+            for alias in &font.aliases {
+                assert!(has_family(alias), "{alias} ({}) not found", font.name);
+            }
+        }
+        assert!(!has_family("No Such Font Family 4f1c"));
+        assert!(!has_family("  "));
     }
 }
