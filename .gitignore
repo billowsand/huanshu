@@ -5,3 +5,6 @@ example
 .code-review-graph/
 dist-package/
 output/
+
+# 含个人 API 密钥的临时文件，勿提交
+model_api_test.md.txt
