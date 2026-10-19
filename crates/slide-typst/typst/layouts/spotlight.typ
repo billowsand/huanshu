@@ -11,9 +11,12 @@
 
 #let default-side = 288 // `w-72`
 
-// Tailwind width class → CSS px: `w-80`, `w-[360px]`, `w-1/3` (of content width).
+// Tailwind width class → CSS px: `w-80`, `w-[360px]`, `w-1/3` (of content width);
+// a bare percentage (`42%`, the editor schema's format) is also of content width.
 #let side-width(value, content-w) = {
   if not has(value) { return default-side }
+  let m = str(value).match(regex("^(\d+(?:\.\d+)?)%$"))
+  if m != none { return content-w * float(m.captures.at(0)) / 100 }
   let m = str(value).match(regex("^w-(\d+(?:\.\d+)?)$"))
   if m != none { return float(m.captures.at(0)) * 4 }
   let m = str(value).match(regex("^w-\[(\d+(?:\.\d+)?)px\]$"))
@@ -141,7 +144,7 @@
   let amber = th.tones.amber
   let meta = ty.meta * f
   let soft = th.ink.transparentize(30%)
-  let mode = p.at("kind", default: "default")
+  let mode = p.at("kind", default: "text")
   let items = p.at("items", default: ())
   let items = if items == none { () } else { items }
   let highlighted = has(p.at("highlight", default: none))
@@ -215,16 +218,8 @@
           )
         }),
     ))
-  } else if items.len() > 0 {
-    parts.push(stack(spacing: 4 * px * f, ..items.map(item => grid(
-      columns: (auto, 1fr),
-      column-gutter: 4 * px,
-      align: horizon,
-      icon("i-carbon:checkmark", th.primary, meta),
-      txt(ctx, "body", meta, 1.45, item, fill: soft),
-    ))))
   }
-  let steps = p.at("steps", default: ())
+  let steps = if mode == "steps" { items } else { () }
   if has(steps) {
     parts.push(stack(spacing: 8 * px * f, ..steps
       .enumerate()

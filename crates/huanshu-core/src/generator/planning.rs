@@ -703,6 +703,9 @@ pub async fn assemble_slides(
 ) -> Vec<SlideBlueprint> {
     let mut slides = Vec::with_capacity(content_slides.len() + 3);
     slides.push(SlideBlueprint {
+        layers_title: None,
+        summary: None,
+        ranking_title: None,
         kind: SlideKind::Cover,
         aspect_ratio: Some(config.aspect_ratio),
         section: None,
@@ -782,9 +785,12 @@ pub async fn make_overview_slide(
         .collect::<Vec<_>>();
 
     SlideBlueprint {
+        layers_title: None,
+        summary: None,
+        ranking_title: None,
         kind: SlideKind::Overview,
         aspect_ratio: Some(config.aspect_ratio),
-        section: Some("00".to_string()),
+        section: None,
         title: "提纲总览".to_string(),
         subtitle: None,
         badge: None,
@@ -821,6 +827,9 @@ pub async fn make_overview_slide(
 
 pub fn make_closing_slide(model: &str, aspect_ratio: AspectRatio) -> SlideBlueprint {
     SlideBlueprint {
+        layers_title: None,
+        summary: None,
+        ranking_title: None,
         kind: SlideKind::Closing,
         aspect_ratio: Some(aspect_ratio),
         section: None,
@@ -2020,8 +2029,15 @@ mod tests {
         let mut slide =
             crate::generator::normalize::make_fallback_slide(&page, None, AspectRatio::Ratio16x9);
         // Fallback slides use the chapter number, not page_id ("7").
-        assert_eq!(slide.section.as_deref(), Some("03"));
+        let supports_section = crate::editor_schema::editor_schema()
+            .kind(slide.kind.as_str())
+            .unwrap()
+            .fields
+            .iter()
+            .any(|field| field == "section");
+        assert_eq!(slide.section.as_deref(), supports_section.then_some("03"));
 
+        slide.kind = SlideKind::FeatureGrid;
         slide.section = Some("09".to_string()); // e.g. copied from a schema example
         crate::generator::normalize::stamp_section_number(&mut slide, &page);
         assert_eq!(slide.section.as_deref(), Some("03"));

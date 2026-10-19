@@ -125,7 +125,8 @@
           "多条 checklist",
           "默认边框风格"
         ],
-        "highlight": "适合验证高亮标题和正文间距"
+        "highlight": "适合验证高亮标题和正文间距",
+        "kind": "matrix"
       },
       {
         "title": "流程块",
@@ -294,22 +295,19 @@
         "title": "可直接入库",
         "tone": "blue",
         "icon": "i-carbon:save",
-        "body": "整组蓝图数据可以直接写入 `projects.blueprints` 字段。",
-        "conclusion": "无需再手工拼装"
+        "body": "整组蓝图数据可以直接写入 `projects.blueprints` 字段。"
       },
       {
         "title": "覆盖全部布局",
         "tone": "green",
         "icon": "i-carbon:events",
-        "body": "每种 `kind` 至少一页，便于做一轮完整视觉冒烟测试。",
-        "conclusion": "避免漏测单一布局"
+        "body": "每种 `kind` 至少一页，便于做一轮完整视觉冒烟测试。"
       },
       {
         "title": "包含边界内容",
         "tone": "amber",
         "icon": "i-carbon:overflow-menu-horizontal",
-        "body": "部分页面故意使用较长标题和较多项内容，用来放大样式问题。",
-        "conclusion": "更容易暴露问题"
+        "body": "部分页面故意使用较长标题和较多项内容，用来放大样式问题。"
       }
     ]
   },
@@ -681,17 +679,14 @@
     "subtitle": "左侧要点 + 右侧图表，验证图表页版式",
     "points": [
       {
-        "step": "01",
         "title": "趋势判断",
         "body": "指标整体向上，Q3 起增速明显加快。"
       },
       {
-        "step": "02",
         "title": "关键拐点",
         "body": "Q3 新增自动化流水线后，交付量跳升。"
       },
       {
-        "step": "03",
         "title": "行动建议",
         "body": "建议复制该机制到其余两条业务线。"
       }

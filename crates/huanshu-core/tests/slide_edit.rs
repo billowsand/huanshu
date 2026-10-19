@@ -356,10 +356,10 @@ fn aspect_ratio_survives_a_slide_filter() {
         "cards": ["不该留下的字段"],
     });
     let filtered = edit::filter_slide_json(&schema, &slide);
-    assert_eq!(
-        filtered,
-        json!({"kind": "cover", "title": "标题", "aspect_ratio": "ratio_32x9"})
-    );
+    assert_eq!(filtered, slide);
+    assert!(edit::semantic_errors(&schema, &filtered)
+        .iter()
+        .any(|e| e.contains("cards")));
     // 没有 aspect_ratio 的页不会被凭空加上它。
     let filtered = edit::filter_slide_json(&schema, &json!({"kind": "cover", "title": "标题"}));
     assert_eq!(filtered, json!({"kind": "cover", "title": "标题"}));

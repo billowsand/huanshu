@@ -100,6 +100,12 @@ pub fn parse_markdown(raw: &str) -> Result<ParsedDocument> {
             if line == "```" {
                 let json = buf.join("\n");
                 chart_fence = None;
+                let raw_chart: serde_json::Value = serde_json::from_str(&json)
+                    .map_err(|e| anyhow::anyhow!("```chart 块 JSON 解析失败: {e}"))?;
+                let contract_errors = crate::slide_contract::chart_errors(&raw_chart);
+                if !contract_errors.is_empty() {
+                    bail!("```chart 块字段不合法：{}", contract_errors.join("；"));
+                }
                 let chart: crate::types::ChartSpec = serde_json::from_str(&json)
                     .map_err(|e| anyhow::anyhow!("```chart 块 JSON 解析失败: {e}\n{json}"))?;
                 // 数据错误只有用户能修；放进生成流程只会被 repair 反复打回，最后换模板把图丢掉。
@@ -317,7 +323,7 @@ mod tests {
     fn invalid_chart_json_reports_source() {
         let raw = "# 标题\n\n## 章节\n\n```chart\n{\"type\": 123}\n```\n";
         let err = parse_markdown(raw).unwrap_err().to_string();
-        assert!(err.contains("```chart 块 JSON 解析失败"), "{err}");
+        assert!(err.contains("chart.type"), "{err}");
     }
 
     #[test]

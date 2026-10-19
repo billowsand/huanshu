@@ -16,8 +16,15 @@ use crate::generator::utils::{
 /// The LLM is not told the real chapter, so whatever it wrote (often a value copied from the
 /// schema example, or the page index) must not survive.
 pub fn stamp_section_number(slide: &mut SlideBlueprint, page: &PagePlan) {
-    if let Some(number) = &page.section_number {
-        slide.section = Some(number.clone());
+    if crate::editor_schema::editor_schema()
+        .kind(slide.kind.as_str())
+        .is_some_and(|entry| entry.fields.iter().any(|field| field == "section"))
+    {
+        if let Some(number) = &page.section_number {
+            slide.section = Some(number.clone());
+        }
+    } else {
+        slide.section = None;
     }
 }
 
@@ -154,7 +161,6 @@ pub fn make_fallback_slide(
             conclusion: None,
             footer_tag: None,
             footer_tone: None,
-            top_bar_class: None,
             risk: None,
             tag: None,
         })
@@ -173,10 +179,20 @@ pub fn make_fallback_slide(
         .collect();
 
     SlideBlueprint {
+        layers_title: None,
+        summary: None,
+        ranking_title: None,
         kind: kind.clone(),
         aspect_ratio: Some(aspect_ratio),
         // Chapter number, not page_id (the global page index).
-        section: page.section_number.clone(),
+        section: if crate::editor_schema::editor_schema()
+            .kind(kind.as_str())
+            .is_some_and(|entry| entry.fields.iter().any(|field| field == "section"))
+        {
+            page.section_number.clone()
+        } else {
+            None
+        },
         title: page.page_title.clone(),
         subtitle: None,
         badge: None,
@@ -211,7 +227,13 @@ pub fn make_fallback_slide(
             _ => Vec::new(),
         },
         points: match kind {
-            SlideKind::ChartFocus => list_items,
+            SlideKind::ChartFocus => list_items
+                .into_iter()
+                .map(|mut point| {
+                    point.step = None;
+                    point
+                })
+                .collect(),
             _ => Vec::new(),
         },
         ranking: Vec::new(),
@@ -316,9 +338,6 @@ pub fn normalize_lengths(slide: &mut SlideBlueprint) {
             .map(|v| summarize(&clean_model_text(v), 88));
         for item in &mut panel.items {
             *item = summarize(&clean_model_text(item), 22);
-        }
-        for step in &mut panel.steps {
-            *step = summarize(&clean_model_text(step), 22);
         }
     }
     for item in slide
@@ -545,7 +564,6 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
                     conclusion: None,
                     footer_tag: None,
                     footer_tone: None,
-                    top_bar_class: None,
                     risk: None,
                     tag: None,
                 });
@@ -590,7 +608,6 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
                     conclusion: None,
                     footer_tag: None,
                     footer_tone: Some("blue".to_string()),
-                    top_bar_class: None,
                     risk: None,
                     tag: None,
                 });
@@ -620,7 +637,6 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
                     conclusion: None,
                     footer_tag: None,
                     footer_tone: None,
-                    top_bar_class: None,
                     risk: None,
                     tag: None,
                 });
@@ -654,17 +670,15 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
             // 与其他卡片布局的 card.items.truncate(4) 保持同一内容规范。
             for panel in &mut slide.panels {
                 panel.items.truncate(4);
-                panel.steps.truncate(4);
             }
             if slide.panels.is_empty() {
                 slide.panels.push(SpotlightPanel {
                     title: "核心说明".to_string(),
-                    kind: None,
+                    kind: Some("text".to_string()),
                     icon: Some("i-carbon:idea".to_string()),
                     tone: Some("blue".to_string()),
                     body: Some("待补充".to_string()),
                     items: Vec::new(),
-                    steps: Vec::new(),
                     highlight: None,
                 });
             }
@@ -741,21 +755,15 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
                     conclusion: None,
                     footer_tag: None,
                     footer_tone: None,
-                    top_bar_class: Some("bg-gradient-to-r from-blue-500 to-blue-700".to_string()),
                     risk: None,
                     tag: Some("成果".to_string()),
                 });
             }
-            for (idx, card) in slide.cards.iter_mut().enumerate() {
+            for card in &mut slide.cards {
                 card.body.get_or_insert_with(|| "待补充".to_string());
                 card.icon
                     .get_or_insert_with(|| "i-carbon:checkmark-filled".to_string());
                 card.tag.get_or_insert_with(|| "成果".to_string());
-                card.top_bar_class.get_or_insert_with(|| match idx {
-                    0 => "bg-gradient-to-r from-amber-500 to-amber-700".to_string(),
-                    1 => "bg-gradient-to-r from-blue-500 to-blue-700".to_string(),
-                    _ => "bg-gradient-to-r from-green-500 to-green-700".to_string(),
-                });
             }
         }
         SlideKind::Timeline => {
@@ -850,6 +858,7 @@ pub fn apply_component_defaults(slide: &mut SlideBlueprint) {
             slide.phases.truncate(4);
             if slide.phases.is_empty() {
                 slide.phases.push(PhaseItem {
+                    subtitle: None,
                     phase: "阶段1".to_string(),
                     title: "补充流程".to_string(),
                     icon: Some("i-carbon:idea".to_string()),

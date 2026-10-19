@@ -598,7 +598,12 @@ fn long_deck_page(base: &Value, chapter_no: &str, slot: usize, page_no: usize) -
         .unwrap_or("未命名页面")
         .to_string();
     page["title"] = json!(format!("{chapter_no}.{slot:02} {title}"));
-    page["section"] = json!(chapter_no);
+    if crate::editor_schema::editor_schema()
+        .kind(page["kind"].as_str().unwrap_or(""))
+        .is_some_and(|entry| entry.fields.iter().any(|field| field == "section"))
+    {
+        page["section"] = json!(chapter_no);
+    }
     page["aspect_ratio"] = json!(DEMO_ASPECT);
     restamp_text(&mut page, &format!("（第 {page_no} 页）"));
     page

@@ -3,7 +3,7 @@
 //!
 //! 这些规则原本只存在于 TypeScript（`useSlideEditor.ts` 与 `Step3Editor.vue`），界面通过
 //! `get_editor_schema` 取到这份内容渲染。`tests/fixtures/editor-schema.json` 是搬家前从旧表
-//! 导出的快照，单测逐字比对它，证明搬家无损。
+//! 导出的快照现用于锁定当前契约。字段变更需同步更新表单、契约、生成与渲染。
 
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -225,21 +225,18 @@ pub fn editor_schema() -> EditorSchema {
                             "icon": json!("i-carbon:target"),
                             "tone": json!("blue"),
                             "body": json!("明确业务目标、成效口径与验收标准。"),
-                            "tag": json!("Why"),
                         }),
                         json!({
                             "title": json!("能力建设"),
                             "icon": json!("i-carbon:skill-level-advanced"),
-                            "tone": json!("emerald"),
+                            "tone": json!("green"),
                             "body": json!("搭建数据、模型、流程三层能力。"),
-                            "tag": json!("What"),
                         }),
                         json!({
                             "title": json!("推进机制"),
                             "icon": json!("i-carbon:workflow-automation"),
                             "tone": json!("amber"),
                             "body": json!("建立跨团队协同与持续优化闭环。"),
-                            "tag": json!("How"),
                         }),
                     ]),
                 }),
@@ -275,7 +272,7 @@ pub fn editor_schema() -> EditorSchema {
                             "title": json!("智能内容生成"),
                             "subtitle": json!("缩短方案产出时间"),
                             "icon": json!("i-carbon:machine-learning-model"),
-                            "tone": json!("violet"),
+                            "tone": json!("blue"),
                             "body": json!("基于模板与上下文快速生成初稿，再由人工精修。"),
                             "conclusion": json!("适合标准化程度高的交付场景"),
                         }),
@@ -283,7 +280,7 @@ pub fn editor_schema() -> EditorSchema {
                             "title": json!("过程可追踪"),
                             "subtitle": json!("方便复盘与审计"),
                             "icon": json!("i-carbon:task-complete"),
-                            "tone": json!("emerald"),
+                            "tone": json!("green"),
                             "body": json!("保留版本、输入来源和关键决策记录。"),
                             "risk": json!("需提前定义记录粒度"),
                         }),
@@ -329,7 +326,7 @@ pub fn editor_schema() -> EditorSchema {
                             "title": json!("关键动作"),
                             "kind": json!("flow"),
                             "icon": json!("i-carbon:flow-stream"),
-                            "tone": json!("emerald"),
+                            "tone": json!("green"),
                             "items": json!([
                                 json!("梳理字段"),
                                 json!("搭建评分模型"),
@@ -343,7 +340,7 @@ pub fn editor_schema() -> EditorSchema {
                             "kind": json!("steps"),
                             "icon": json!("i-carbon:chart-line"),
                             "tone": json!("amber"),
-                            "steps": json!([
+                            "items": json!([
                                 json!("线索响应时效缩短 60%"),
                                 json!("销售跟进更聚焦"),
                                 json!("复盘数据可量化"),
@@ -361,6 +358,7 @@ pub fn editor_schema() -> EditorSchema {
                     "kind",
                     "section",
                     "title",
+                    "layers_title",
                     "subtitle",
                     "left_items",
                     "layers",
@@ -402,12 +400,12 @@ pub fn editor_schema() -> EditorSchema {
                         json!({
                             "title": json!("流程编排"),
                             "meta": json!("任务流、审批流、智能触发器"),
-                            "tone": json!("emerald"),
+                            "tone": json!("green"),
                         }),
                         json!({
                             "title": json!("模型与规则"),
                             "meta": json!("分类、评分、召回、推荐"),
-                            "tone": json!("violet"),
+                            "tone": json!("blue"),
                         }),
                         json!({
                             "title": json!("数据底座"),
@@ -462,6 +460,7 @@ pub fn editor_schema() -> EditorSchema {
                     "kind",
                     "section",
                     "title",
+                    "ranking_title",
                     "subtitle",
                     "points",
                     "example_title",
@@ -477,19 +476,16 @@ pub fn editor_schema() -> EditorSchema {
                     "subtitle": json!("左边讲原则，右边给例子，便于理解抽象概念。"),
                     "points": json!([
                         json!({
-                            "step": json!("01"),
                             "title": json!("先给判断标准"),
                             "body": json!("说明什么情况下该采用这套方法。"),
                             "icon": json!("i-carbon:rule"),
                         }),
                         json!({
-                            "step": json!("02"),
                             "title": json!("再讲落地动作"),
                             "body": json!("把动作拆成可执行的步骤。"),
                             "icon": json!("i-carbon:play-outline-filled"),
                         }),
                         json!({
-                            "step": json!("03"),
                             "title": json!("最后展示效果"),
                             "body": json!("给出产出、收益或变化。"),
                             "icon": json!("i-carbon:result"),
@@ -530,28 +526,25 @@ pub fn editor_schema() -> EditorSchema {
                     "section": json!("07"),
                     "title": json!("阶段成果"),
                     "subtitle": json!("适合总结结果、结论、价值输出。"),
-                    "note": json!("可以把 `footer_tag`、`conclusion` 当作每个成果卡片的收束语。"),
+                    "note": json!("成果写在标题和正文中，标签用于简短分类或状态。"),
                     "cards": json!([
                         json!({
                             "title": json!("效率提升"),
                             "icon": json!("i-carbon:flash"),
                             "tone": json!("amber"),
                             "body": json!("提案准备时间从 2 天缩短到 4 小时。"),
-                            "conclusion": json!("团队可把精力转向深度判断"),
                         }),
                         json!({
                             "title": json!("质量更稳"),
                             "icon": json!("i-carbon:checkmark-outline"),
-                            "tone": json!("emerald"),
+                            "tone": json!("green"),
                             "body": json!("输出结构更统一，漏项明显减少。"),
-                            "footer_tag": json!("可复用"),
                         }),
                         json!({
                             "title": json!("协作顺畅"),
                             "icon": json!("i-carbon:group"),
                             "tone": json!("blue"),
                             "body": json!("销售、方案、交付之间共享同一套上下文。"),
-                            "footer_tone": json!("blue"),
                         }),
                     ]),
                 }),
@@ -580,13 +573,13 @@ pub fn editor_schema() -> EditorSchema {
                             "title": json!("机制"),
                             "desc": json!("再固化流程"),
                             "icon": json!("i-carbon:workflow-automation"),
-                            "tone": json!("emerald"),
+                            "tone": json!("green"),
                         }),
                         json!({
                             "title": json!("数据"),
                             "desc": json!("持续反馈优化"),
                             "icon": json!("i-carbon:data-vis-4"),
-                            "tone": json!("violet"),
+                            "tone": json!("blue"),
                         }),
                         json!({
                             "title": json!("组织"),
@@ -630,14 +623,14 @@ pub fn editor_schema() -> EditorSchema {
                             "date": json!("第 2-3 周"),
                             "title": json!("方案搭建"),
                             "body": json!("输出流程设计、页面原型和字段映射。"),
-                            "tone": json!("violet"),
+                            "tone": json!("blue"),
                             "icon": json!("i-carbon:build-tool"),
                         }),
                         json!({
                             "date": json!("第 4-5 周"),
                             "title": json!("试点运行"),
                             "body": json!("接入真实业务，跟踪异常和效果。"),
-                            "tone": json!("emerald"),
+                            "tone": json!("green"),
                             "icon": json!("i-carbon:play-filled"),
                         }),
                         json!({
@@ -684,13 +677,13 @@ pub fn editor_schema() -> EditorSchema {
                             "title": json!("设计机制"),
                             "body": json!("定义流程、规则和人机协作方式。"),
                             "icon": json!("i-carbon:flow"),
-                            "tone": json!("violet"),
+                            "tone": json!("blue"),
                         }),
                         json!({
                             "title": json!("接入系统"),
                             "body": json!("把能力挂到真实业务链路中。"),
                             "icon": json!("i-carbon:application-web"),
-                            "tone": json!("emerald"),
+                            "tone": json!("green"),
                         }),
                         json!({
                             "title": json!("持续优化"),
@@ -707,10 +700,12 @@ pub fn editor_schema() -> EditorSchema {
                 label: "流程".to_string(),
                 icon: "i-carbon:process".to_string(),
                 desc: "多阶段流程任务分解".to_string(),
-                fields: ["kind", "section", "title", "subtitle", "phases", "footer"]
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect(),
+                fields: [
+                    "kind", "section", "title", "summary", "subtitle", "phases", "footer",
+                ]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
                 defaults: json!({
                     "section": json!("10"),
                     "title": json!("执行流程"),
@@ -737,7 +732,7 @@ pub fn editor_schema() -> EditorSchema {
                             "phase": json!("Phase 2"),
                             "title": json!("实施阶段"),
                             "icon": json!("i-carbon:play-outline"),
-                            "tone": json!("emerald"),
+                            "tone": json!("green"),
                             "steps": json!([
                                 json!({
                                     "label": json!("搭建流程"),
@@ -814,7 +809,7 @@ pub fn editor_schema() -> EditorSchema {
                         }),
                         "right": json!({
                             "title": json!("方案 B：体系化建设"),
-                            "tone": json!("emerald"),
+                            "tone": json!("green"),
                             "icon": json!("i-carbon:enterprise"),
                             "items": json!([
                                 json!({
@@ -905,9 +900,9 @@ pub fn editor_schema() -> EditorSchema {
                     "swot_data": json!({
                         "quadrants": json!([
                             json!({
-                                "key": json!("S"),
+                                "key": json!("strengths"),
                                 "title": json!("优势 Strengths"),
-                                "tone": json!("emerald"),
+                                "tone": json!("green"),
                                 "icon": json!("i-carbon:thumbs-up"),
                                 "items": json!([
                                     json!("已有行业案例积累"),
@@ -916,7 +911,7 @@ pub fn editor_schema() -> EditorSchema {
                                 "summary": json!("内部基础较好"),
                             }),
                             json!({
-                                "key": json!("W"),
+                                "key": json!("weaknesses"),
                                 "title": json!("劣势 Weaknesses"),
                                 "tone": json!("amber"),
                                 "icon": json!("i-carbon:warning"),
@@ -927,7 +922,7 @@ pub fn editor_schema() -> EditorSchema {
                                 "summary": json!("落地复杂度偏高"),
                             }),
                             json!({
-                                "key": json!("O"),
+                                "key": json!("opportunities"),
                                 "title": json!("机会 Opportunities"),
                                 "tone": json!("blue"),
                                 "icon": json!("i-carbon:growth"),
@@ -938,9 +933,9 @@ pub fn editor_schema() -> EditorSchema {
                                 "summary": json!("外部窗口期明确"),
                             }),
                             json!({
-                                "key": json!("T"),
+                                "key": json!("threats"),
                                 "title": json!("威胁 Threats"),
-                                "tone": json!("rose"),
+                                "tone": json!("red"),
                                 "icon": json!("i-carbon:storm-tracker"),
                                 "items": json!([
                                     json!("竞品推进速度快"),
@@ -970,17 +965,14 @@ pub fn editor_schema() -> EditorSchema {
                     "subtitle": json!("数据来自文档中的 ```chart 围栏块，正文负责解读而非复述。"),
                     "points": json!([
                         json!({
-                            "step": json!("01"),
                             "title": json!("趋势判断"),
                             "body": json!("说明指标的整体走向与阶段特征。"),
                         }),
                         json!({
-                            "step": json!("02"),
                             "title": json!("关键拐点"),
                             "body": json!("指出变化最明显的时间点或分类并解释原因。"),
                         }),
                         json!({
-                            "step": json!("03"),
                             "title": json!("行动建议"),
                             "body": json!("基于图表给出可执行的下一步建议。"),
                         }),
@@ -1071,7 +1063,6 @@ pub fn editor_schema() -> EditorSchema {
                         "body": json!(""),
                         "tone": json!("blue"),
                         "icon": json!(""),
-                        "tag": json!(""),
                     }),
                     fields: vec![
                         EditorField {
@@ -1091,28 +1082,12 @@ pub fn editor_schema() -> EditorSchema {
                             options: None,
                         },
                         EditorField {
-                            key: "tag".to_string(),
-                            label: "标签".to_string(),
-                            field_type: "text".to_string(),
-                            placeholder: Some("Why".to_string()),
-                            rows: None,
-                            options: None,
-                        },
-                        EditorField {
                             key: "tone".to_string(),
                             label: "色调".to_string(),
                             field_type: "select".to_string(),
                             placeholder: None,
                             rows: None,
-                            options: Some(
-                                [
-                                    "blue", "emerald", "green", "violet", "amber", "rose", "gray",
-                                    "red",
-                                ]
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
-                            ),
+                            options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                         },
                         EditorField {
                             key: "icon".to_string(),
@@ -1123,13 +1098,14 @@ pub fn editor_schema() -> EditorSchema {
                             options: None,
                         },
                     ],
-                    string_lists: vec![],
+                    string_lists: vec![StringListDef {
+                        key: "items".to_string(),
+                        label: "要点".to_string(),
+                        placeholder: None,
+                    }],
                     nested_lists: vec![],
                     icon_query_keys: Some(
-                        ["title", "body", "tag"]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
+                        ["title", "body"].iter().map(|s| s.to_string()).collect(),
                     ),
                 }],
             ),
@@ -1202,23 +1178,7 @@ pub fn editor_schema() -> EditorSchema {
                             field_type: "select".to_string(),
                             placeholder: None,
                             rows: None,
-                            options: Some(
-                                [
-                                    "blue", "emerald", "green", "violet", "amber", "rose", "gray",
-                                    "red",
-                                ]
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
-                            ),
-                        },
-                        EditorField {
-                            key: "tag".to_string(),
-                            label: "卡片标签".to_string(),
-                            field_type: "text".to_string(),
-                            placeholder: Some("Why".to_string()),
-                            rows: None,
-                            options: None,
+                            options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                         },
                         EditorField {
                             key: "tone".to_string(),
@@ -1226,15 +1186,7 @@ pub fn editor_schema() -> EditorSchema {
                             field_type: "select".to_string(),
                             placeholder: None,
                             rows: None,
-                            options: Some(
-                                [
-                                    "blue", "emerald", "green", "violet", "amber", "rose", "gray",
-                                    "red",
-                                ]
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
-                            ),
+                            options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                         },
                         EditorField {
                             key: "icon".to_string(),
@@ -1272,7 +1224,6 @@ pub fn editor_schema() -> EditorSchema {
                         "tone": json!("blue"),
                         "icon": json!(""),
                         "items": json!([]),
-                        "steps": json!([]),
                     }),
                     fields: vec![
                         EditorField {
@@ -1286,10 +1237,10 @@ pub fn editor_schema() -> EditorSchema {
                         EditorField {
                             key: "kind".to_string(),
                             label: "类型".to_string(),
-                            field_type: "text".to_string(),
-                            placeholder: Some("flow / text / steps".to_string()),
+                            field_type: "select".to_string(),
+                            placeholder: None,
                             rows: None,
-                            options: None,
+                            options: Some(PANEL_KINDS.iter().map(|s| s.to_string()).collect()),
                         },
                         EditorField {
                             key: "body".to_string(),
@@ -1313,15 +1264,7 @@ pub fn editor_schema() -> EditorSchema {
                             field_type: "select".to_string(),
                             placeholder: None,
                             rows: None,
-                            options: Some(
-                                [
-                                    "blue", "emerald", "green", "violet", "amber", "rose", "gray",
-                                    "red",
-                                ]
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
-                            ),
+                            options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                         },
                         EditorField {
                             key: "icon".to_string(),
@@ -1332,18 +1275,11 @@ pub fn editor_schema() -> EditorSchema {
                             options: None,
                         },
                     ],
-                    string_lists: vec![
-                        StringListDef {
-                            key: "items".to_string(),
-                            label: "要点列表".to_string(),
-                            placeholder: Some("梳理字段".to_string()),
-                        },
-                        StringListDef {
-                            key: "steps".to_string(),
-                            label: "结果列表".to_string(),
-                            placeholder: Some("线索响应时效缩短 60%".to_string()),
-                        },
-                    ],
+                    string_lists: vec![StringListDef {
+                        key: "items".to_string(),
+                        label: "要点列表".to_string(),
+                        placeholder: Some("梳理字段".to_string()),
+                    }],
                     nested_lists: vec![],
                     icon_query_keys: Some(
                         ["title", "body", "highlight"]
@@ -1438,15 +1374,7 @@ pub fn editor_schema() -> EditorSchema {
                                 field_type: "select".to_string(),
                                 placeholder: None,
                                 rows: None,
-                                options: Some(
-                                    [
-                                        "blue", "emerald", "green", "violet", "amber", "rose",
-                                        "gray", "red",
-                                    ]
-                                    .iter()
-                                    .map(|s| s.to_string())
-                                    .collect(),
-                                ),
+                                options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                             },
                         ],
                         string_lists: vec![],
@@ -1516,20 +1444,11 @@ pub fn editor_schema() -> EditorSchema {
                         label: "要点".to_string(),
                         empty_text: "还没有要点".to_string(),
                         new_item: json!({
-                            "step": json!(""),
                             "title": json!(""),
                             "body": json!(""),
                             "icon": json!(""),
                         }),
                         fields: vec![
-                            EditorField {
-                                key: "step".to_string(),
-                                label: "编号".to_string(),
-                                field_type: "text".to_string(),
-                                placeholder: Some("01".to_string()),
-                                rows: None,
-                                options: None,
-                            },
                             EditorField {
                                 key: "title".to_string(),
                                 label: "标题".to_string(),
@@ -1625,6 +1544,14 @@ pub fn editor_schema() -> EditorSchema {
                     }),
                     fields: vec![
                         EditorField {
+                            key: "tag".to_string(),
+                            label: "标签".to_string(),
+                            field_type: "text".to_string(),
+                            placeholder: Some("分类或状态".to_string()),
+                            rows: None,
+                            options: None,
+                        },
+                        EditorField {
                             key: "title".to_string(),
                             label: "标题".to_string(),
                             field_type: "text".to_string(),
@@ -1641,52 +1568,12 @@ pub fn editor_schema() -> EditorSchema {
                             options: None,
                         },
                         EditorField {
-                            key: "conclusion".to_string(),
-                            label: "结论".to_string(),
-                            field_type: "text".to_string(),
-                            placeholder: Some("团队可把精力转向深度判断".to_string()),
-                            rows: None,
-                            options: None,
-                        },
-                        EditorField {
-                            key: "footer_tag".to_string(),
-                            label: "底部标签".to_string(),
-                            field_type: "text".to_string(),
-                            placeholder: Some("可复用".to_string()),
-                            rows: None,
-                            options: None,
-                        },
-                        EditorField {
-                            key: "footer_tone".to_string(),
-                            label: "标签色调".to_string(),
-                            field_type: "select".to_string(),
-                            placeholder: None,
-                            rows: None,
-                            options: Some(
-                                [
-                                    "blue", "emerald", "green", "violet", "amber", "rose", "gray",
-                                    "red",
-                                ]
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
-                            ),
-                        },
-                        EditorField {
                             key: "tone".to_string(),
                             label: "主色调".to_string(),
                             field_type: "select".to_string(),
                             placeholder: None,
                             rows: None,
-                            options: Some(
-                                [
-                                    "blue", "emerald", "green", "violet", "amber", "rose", "gray",
-                                    "red",
-                                ]
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
-                            ),
+                            options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                         },
                         EditorField {
                             key: "icon".to_string(),
@@ -1700,7 +1587,7 @@ pub fn editor_schema() -> EditorSchema {
                     string_lists: vec![],
                     nested_lists: vec![],
                     icon_query_keys: Some(
-                        ["title", "body", "conclusion"]
+                        ["title", "body", "tag"]
                             .iter()
                             .map(|s| s.to_string())
                             .collect(),
@@ -1742,15 +1629,7 @@ pub fn editor_schema() -> EditorSchema {
                             field_type: "select".to_string(),
                             placeholder: None,
                             rows: None,
-                            options: Some(
-                                [
-                                    "blue", "emerald", "green", "violet", "amber", "rose", "gray",
-                                    "red",
-                                ]
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
-                            ),
+                            options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                         },
                         EditorField {
                             key: "icon".to_string(),
@@ -1812,15 +1691,7 @@ pub fn editor_schema() -> EditorSchema {
                             field_type: "select".to_string(),
                             placeholder: None,
                             rows: None,
-                            options: Some(
-                                [
-                                    "blue", "emerald", "green", "violet", "amber", "rose", "gray",
-                                    "red",
-                                ]
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
-                            ),
+                            options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                         },
                         EditorField {
                             key: "icon".to_string(),
@@ -1876,15 +1747,7 @@ pub fn editor_schema() -> EditorSchema {
                             field_type: "select".to_string(),
                             placeholder: None,
                             rows: None,
-                            options: Some(
-                                [
-                                    "blue", "emerald", "green", "violet", "amber", "rose", "gray",
-                                    "red",
-                                ]
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
-                            ),
+                            options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                         },
                         EditorField {
                             key: "icon".to_string(),
@@ -1918,6 +1781,14 @@ pub fn editor_schema() -> EditorSchema {
                     }),
                     fields: vec![
                         EditorField {
+                            key: "subtitle".to_string(),
+                            label: "阶段说明".to_string(),
+                            field_type: "text".to_string(),
+                            placeholder: None,
+                            rows: None,
+                            options: None,
+                        },
+                        EditorField {
                             key: "phase".to_string(),
                             label: "阶段名".to_string(),
                             field_type: "text".to_string(),
@@ -1947,15 +1818,7 @@ pub fn editor_schema() -> EditorSchema {
                             field_type: "select".to_string(),
                             placeholder: None,
                             rows: None,
-                            options: Some(
-                                [
-                                    "blue", "emerald", "green", "violet", "amber", "rose", "gray",
-                                    "red",
-                                ]
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
-                            ),
+                            options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                         },
                         EditorField {
                             key: "icon".to_string(),
@@ -2037,15 +1900,7 @@ pub fn editor_schema() -> EditorSchema {
                             field_type: "select".to_string(),
                             placeholder: None,
                             rows: None,
-                            options: Some(
-                                [
-                                    "blue", "emerald", "green", "violet", "amber", "rose", "gray",
-                                    "red",
-                                ]
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
-                            ),
+                            options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                         },
                         EditorField {
                             key: "icon".to_string(),
@@ -2074,19 +1929,10 @@ pub fn editor_schema() -> EditorSchema {
                     label: "解读要点".to_string(),
                     empty_text: "还没有解读要点".to_string(),
                     new_item: json!({
-                        "step": json!(""),
                         "title": json!(""),
                         "body": json!(""),
                     }),
                     fields: vec![
-                        EditorField {
-                            key: "step".to_string(),
-                            label: "编号".to_string(),
-                            field_type: "text".to_string(),
-                            placeholder: Some("01".to_string()),
-                            rows: None,
-                            options: None,
-                        },
                         EditorField {
                             key: "title".to_string(),
                             label: "标题".to_string(),
@@ -2148,15 +1994,7 @@ pub fn editor_schema() -> EditorSchema {
                                 field_type: "select".to_string(),
                                 placeholder: None,
                                 rows: None,
-                                options: Some(
-                                    [
-                                        "blue", "emerald", "green", "violet", "amber", "rose",
-                                        "gray", "red",
-                                    ]
-                                    .iter()
-                                    .map(|s| s.to_string())
-                                    .collect(),
-                                ),
+                                options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                             },
                             EditorField {
                                 key: "icon".to_string(),
@@ -2234,15 +2072,7 @@ pub fn editor_schema() -> EditorSchema {
                                 field_type: "select".to_string(),
                                 placeholder: None,
                                 rows: None,
-                                options: Some(
-                                    [
-                                        "blue", "emerald", "green", "violet", "amber", "rose",
-                                        "gray", "red",
-                                    ]
-                                    .iter()
-                                    .map(|s| s.to_string())
-                                    .collect(),
-                                ),
+                                options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                             },
                             EditorField {
                                 key: "icon".to_string(),
@@ -2334,10 +2164,10 @@ pub fn editor_schema() -> EditorSchema {
                             EditorField {
                                 key: "key".to_string(),
                                 label: "象限标识".to_string(),
-                                field_type: "text".to_string(),
-                                placeholder: Some("S".to_string()),
+                                field_type: "select".to_string(),
+                                placeholder: None,
                                 rows: None,
-                                options: None,
+                                options: Some(SWOT_KEYS.iter().map(|s| s.to_string()).collect()),
                             },
                             EditorField {
                                 key: "title".to_string(),
@@ -2361,15 +2191,7 @@ pub fn editor_schema() -> EditorSchema {
                                 field_type: "select".to_string(),
                                 placeholder: None,
                                 rows: None,
-                                options: Some(
-                                    [
-                                        "blue", "emerald", "green", "violet", "amber", "rose",
-                                        "gray", "red",
-                                    ]
-                                    .iter()
-                                    .map(|s| s.to_string())
-                                    .collect(),
-                                ),
+                                options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
                             },
                             EditorField {
                                 key: "icon".to_string(),
@@ -2413,12 +2235,7 @@ pub fn editor_schema() -> EditorSchema {
                 }],
             ),
         ],
-        tone_options: [
-            "blue", "emerald", "green", "violet", "amber", "rose", "gray", "red",
-        ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect(),
+        tone_options: TONE_OPTIONS.iter().map(|s| s.to_string()).collect(),
         direction_options: ["horizontal", "vertical"]
             .iter()
             .map(|s| s.to_string())
@@ -2460,14 +2277,7 @@ pub fn simple_fields() -> Vec<EditorField> {
                 field_type: "select".to_string(),
                 placeholder: None,
                 rows: None,
-                options: Some(
-                    [
-                        "blue", "emerald", "green", "violet", "amber", "rose", "gray", "red",
-                    ]
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect(),
-                ),
+                options: Some(TONE_OPTIONS.iter().map(|s| s.to_string()).collect()),
             },
             EditorField {
                 key: "title".to_string(),
@@ -2555,6 +2365,30 @@ pub fn simple_fields() -> Vec<EditorField> {
                 options: None,
             },
             EditorField {
+                key: "layers_title".to_string(),
+                label: "分层区域标题".to_string(),
+                field_type: "text".to_string(),
+                placeholder: None,
+                rows: None,
+                options: None,
+            },
+            EditorField {
+                key: "summary".to_string(),
+                label: "流程摘要".to_string(),
+                field_type: "text".to_string(),
+                placeholder: None,
+                rows: None,
+                options: None,
+            },
+            EditorField {
+                key: "ranking_title".to_string(),
+                label: "排序区域标题".to_string(),
+                field_type: "text".to_string(),
+                placeholder: None,
+                rows: None,
+                options: None,
+            },
+            EditorField {
                 key: "image".to_string(),
                 label: "主图路径".to_string(),
                 field_type: "text".to_string(),
@@ -2567,7 +2401,10 @@ pub fn simple_fields() -> Vec<EditorField> {
 }
 
 /// The dropdown options a tone or direction field may offer.
-pub const TONE_OPTIONS: &[&str] = &[
-    "blue", "emerald", "green", "violet", "amber", "rose", "gray", "red",
-];
+pub const TONE_OPTIONS: &[&str] = &["amber", "blue", "green", "red"];
 pub const DIRECTION_OPTIONS: &[&str] = &["horizontal", "vertical"];
+
+/// Canonical semantic enums shared by forms, validation and generation.
+pub const SWOT_KEYS: &[&str] = &["strengths", "weaknesses", "opportunities", "threats"];
+pub const PANEL_KINDS: &[&str] = &["text", "flow", "matrix", "steps"];
+pub const COMPARE_MODES: &[&str] = &["side-by-side", "pros-cons", "versus"];

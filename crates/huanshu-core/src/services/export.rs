@@ -172,6 +172,22 @@ pub fn prepare_export_values(
         return Err("没有可导出的幻灯片".to_string());
     }
 
+    // Known layouts obey the same contract as the form/JSON editor. Unknown layouts
+    // still reach the renderer's explicit diagnostic page.
+    let schema = crate::editor_schema::editor_schema();
+    for (i, slide) in slides.iter().enumerate() {
+        if slide
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|kind| schema.kind(kind).is_some())
+        {
+            let errors = crate::slide_contract::errors(&schema, slide, false);
+            if !errors.is_empty() {
+                return Err(format!("第 {} 页：{}", i + 1, errors.join("；")));
+            }
+        }
+    }
+
     // 页面比例从 JSON 的同一个键读（强类型那版读 `SlideBlueprint.aspect_ratio`）。
     let slide_ratio = slides.first().and_then(|slide| {
         slide

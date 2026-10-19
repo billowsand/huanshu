@@ -1440,7 +1440,7 @@ async fn run_pipeline(
     };
 
     // Ensure fallback slides have all required fields filled (e.g. OutcomeGrid
-    // needs icon/tag/top_bar_class on each card).  Slides already normalized by
+    // needs result copy on each card). Slides already normalized by
     // the per-page pipeline are not harmed by a second pass.
     for slide in content_slides.iter_mut() {
         crate::generator::normalize::apply_component_defaults(slide);

@@ -98,6 +98,12 @@ pub fn parse_blueprint_with_repair(
         value = Value::Object(Map::from_iter([("slide".to_string(), value)]));
     }
     normalize_blueprint_value(&mut value, expected_kind);
+    let errors = crate::slide_contract::errors(
+        &crate::editor_schema::editor_schema(),
+        &value["slide"],
+        true,
+    );
+    anyhow::ensure!(errors.is_empty(), "slide contract: {}", errors.join("; "));
     serde_json::from_value(value).context("model did not return a valid slide blueprint")
 }
 
@@ -545,20 +551,6 @@ pub fn is_cjk(ch: char) -> bool {
     )
 }
 
-pub fn infer_tone_from_class(class_name: &str) -> Option<&'static str> {
-    if class_name.contains("amber") {
-        Some("amber")
-    } else if class_name.contains("blue") {
-        Some("blue")
-    } else if class_name.contains("green") {
-        Some("green")
-    } else if class_name.contains("red") {
-        Some("red")
-    } else {
-        None
-    }
-}
-
 pub fn promote_string_field(obj: &mut Map<String, Value>, from: &str, to: &str) {
     if obj.get(to).is_some() {
         return;
@@ -694,11 +686,7 @@ fn normalize_feature_grid_like_slide(slide: &mut Map<String, Value>) {
             card_obj.insert("items".to_string(), Value::Array(Vec::new()));
         }
         if card_obj.get("tone").is_none() {
-            let inferred = card_obj
-                .get("top_bar_class")
-                .and_then(Value::as_str)
-                .and_then(infer_tone_from_class)
-                .unwrap_or(tones[idx % tones.len()]);
+            let inferred = tones[idx % tones.len()];
             card_obj.insert("tone".to_string(), Value::String(inferred.to_string()));
         }
         remove_keys(card_obj, &["description", "content", "color"]);
@@ -1053,261 +1041,34 @@ pub fn slide_kind_name(kind: &SlideKind) -> &'static str {
 }
 
 pub fn blueprint_schema_hint(kind: &SlideKind) -> &'static str {
-    match kind {
-        SlideKind::SectionIntro => {
-            r#"{
-  "kind": "section_intro",
-  "badge": "章节导览",
-  "title": "...",
-  "subtitle": "...",
-  "note": "...",
-  "cards": [
-    { "title": "...", "tone": "green", "icon": "i-carbon:roadmap", "body": "..." },
-    { "title": "...", "tone": "blue", "icon": "i-carbon:idea", "body": "..." },
-    { "title": "...", "tone": "amber", "icon": "i-carbon:workflow-automation", "body": "..." }
-  ]
-}"#
-        }
-        SlideKind::FeatureGrid => {
-            r#"{
-  "kind": "feature_grid",
-  "title": "...",
-  "subtitle": "...",
-  "note": "...",
-  "cards": [
-    { "title": "...", "tone": "amber", "icon": "i-carbon:idea", "body": "...", "items": ["...", "..."], "conclusion": "..." },
-    { "title": "...", "tone": "blue", "icon": "i-carbon:data-base", "body": "...", "items": ["...", "..."], "conclusion": "..." },
-    { "title": "...", "tone": "green", "icon": "i-carbon:workflow-automation", "body": "...", "items": ["...", "..."], "conclusion": "..." }
-  ]
-}"#
-        }
-        SlideKind::Spotlight => {
-            r#"{
-  "kind": "spotlight",
-  "title": "...",
-  "label": "...",
-  "label_tone": "blue",
-  "image": "/figure/example.png",
-  "placeholder": "图片待补充",
-  "panels": [
-    { "title": "...", "icon": "i-carbon:idea", "tone": "blue", "body": "..." }
-  ]
-}"#
-        }
-        SlideKind::SplitLayers => {
-            r#"{
-  "kind": "split_layers",
-  "title": "...",
-  "subtitle": "...",
-  "left_items": [
-    { "icon": "i-carbon:api", "title": "...", "body": "..." }
-  ],
-  "layers": [
-    { "title": "...", "meta": "...", "tone": "amber" }
-  ],
-  "footer": "..."
-}"#
-        }
-        SlideKind::SectionList => {
-            r#"{
-  "kind": "section_list",
-  "title": "...",
-  "subtitle": "...",
-  "list_items": [
-    { "step": "1", "icon": "i-carbon:list-checked", "title": "...", "body": "..." }
-  ]
-}"#
-        }
-        SlideKind::FocusExample => {
-            r#"{
-  "kind": "focus_example",
-  "title": "...",
-  "subtitle": "...",
-  "points": [
-    { "icon": "i-carbon:idea", "title": "...", "body": "..." }
-  ],
-  "example_title": "...",
-  "example_body": "...",
-  "ranking": [
-    { "index": "1.", "label": "...", "meta": "...", "muted": false }
-  ]
-}"#
-        }
-        SlideKind::OutcomeGrid => {
-            r#"{
-  "kind": "outcome_grid",
-  "title": "...",
-  "subtitle": "...",
-  "note": "...",
-  "cards": [
-    { "title": "...", "tone": "amber", "icon": "i-carbon:list-checked", "body": "...", "tag": "成果", "top_bar_class": "bg-gradient-to-r from-amber-500 to-amber-700" }
-  ]
-}"#
-        }
-        SlideKind::CenterGrid => {
-            r#"{
-  "kind": "center_grid",
-  "badge": "总结",
-  "title": "主标题",
-  "accent": "副标题或补充说明（简短文字）",
-  "center_items": [
-    { "title": "...", "desc": "...", "icon": "i-carbon:growth", "tone": "amber" }
-  ],
-  "footer": "..."
-}"#
-        }
-        SlideKind::Timeline => {
-            r#"{
-  "kind": "timeline",
-  "title": "...",
-  "subtitle": "...",
-  "timeline_events": [
-    { "date": "2024年1月", "title": "...", "body": "...", "tone": "amber", "icon": "i-carbon:time" },
-    { "date": "2024年6月", "title": "...", "body": "...", "tone": "blue", "icon": "i-carbon:calendar" },
-    { "date": "2025年3月", "title": "...", "body": "...", "tone": "red", "icon": "i-carbon:warning" }
-  ],
-  "footer": "..."
-}"#
-        }
-        SlideKind::StepFlow => {
-            r#"{
-  "kind": "step_flow",
-  "title": "...",
-  "subtitle": "...",
-  "direction": "horizontal",
-  "steps": [
-    { "title": "步骤1", "body": "描述", "icon": "i-carbon:idea", "tone": "amber" },
-    { "title": "步骤2", "body": "描述", "icon": "i-carbon:chevron-right", "tone": "blue" },
-    { "title": "步骤3", "body": "描述", "icon": "i-carbon:checkmark", "tone": "green" }
-  ],
-  "footer": "..."
-}"#
-        }
-        SlideKind::Process => {
-            r#"{
-  "kind": "process",
-  "title": "...",
-  "subtitle": "...",
-  "phases": [
-    {
-      "phase": "阶段1",
-      "title": "...",
-      "icon": "i-carbon:idea",
-      "tone": "amber",
-      "steps": [
-        { "label": "步骤1.1", "desc": "..." },
-        { "label": "步骤1.2", "desc": "..." }
-      ],
-      "highlight": "关键结论"
-    }
-  ],
-  "footer": "..."
-}"#
-        }
-        SlideKind::Compare => {
-            r#"{
-  "kind": "compare",
-  "title": "...",
-  "subtitle": "...",
-  "compare_data": {
-    "mode": "side-by-side",
-    "left": {
-      "title": "左侧标题",
-      "tone": "blue",
-      "icon": "i-carbon:checkmark",
-      "items": [
-        { "label": "要点1", "desc": "描述", "highlight": false },
-        { "label": "要点2", "desc": "描述", "highlight": true }
-      ],
-      "conclusion": "左侧结论"
-    },
-    "right": {
-      "title": "右侧标题",
-      "tone": "amber",
-      "icon": "i-carbon:close",
-      "items": [
-        { "label": "要点1", "desc": "描述", "highlight": false },
-        { "label": "要点2", "desc": "描述", "highlight": false }
-      ],
-      "conclusion": "右侧结论"
-    }
-  },
-  "footer": "..."
-}"#
-        }
-        SlideKind::IssueStack => {
-            r#"{
-  "kind": "issue_stack",
-  "title": "...",
-  "subtitle": "...",
-  "cards": [
-    { "title": "问题一", "tone": "blue", "icon": "i-carbon:warning-alt", "body": "...", "items": ["...", "...", "..."] },
-    { "title": "问题二", "tone": "green", "icon": "i-carbon:warning-other", "body": "...", "items": ["...", "..."] },
-    { "title": "问题三", "tone": "amber", "icon": "i-carbon:data-error", "body": "...", "items": ["...", "...", "..."] }
-  ],
-  "footer": "..."
-}"#
-        }
-        SlideKind::Swot => {
-            r#"{
-  "kind": "swot",
-  "title": "...",
-  "subtitle": "...",
-  "swot_data": {
-    "quadrants": [
-      {
-        "key": "strengths",
-        "title": "优势",
-        "tone": "green",
-        "icon": "i-carbon:thumbs-up",
-        "items": ["要点1", "要点2"],
-        "summary": "内部正向能力"
-      },
-      {
-        "key": "weaknesses",
-        "title": "劣势",
-        "tone": "red",
-        "icon": "i-carbon:warning-alt",
-        "items": ["要点1", "要点2"],
-        "summary": "内部约束"
-      },
-      {
-        "key": "opportunities",
-        "title": "机会",
-        "tone": "blue",
-        "icon": "i-carbon:growth",
-        "items": ["要点1", "要点2"],
-        "summary": "外部增长窗口"
-      },
-      {
-        "key": "threats",
-        "title": "威胁",
-        "tone": "amber",
-        "icon": "i-carbon:security",
-        "items": ["要点1", "要点2"],
-        "summary": "外部风险压力"
-      }
-    ],
-    "strategy": "利用优势抓住机会，同时针对劣势与威胁建立补强动作。"
-  }
-}"#
-        }
-        SlideKind::ChartFocus => {
-            r#"{
-  "kind": "chart_focus",
-  "title": "...",
-  "subtitle": "...",
-  "points": [
-    { "step": "01", "title": "要点标题", "body": "要点描述" },
-    { "step": "02", "title": "要点标题", "body": "要点描述" }
-  ],
-  "footer": "..."
-}"#
-        }
-        SlideKind::Cover | SlideKind::Closing | SlideKind::Overview => {
-            r#"{"kind": "feature_grid"}"#
-        }
-    }
+    static HINTS: std::sync::OnceLock<std::collections::BTreeMap<String, String>> =
+        std::sync::OnceLock::new();
+    HINTS
+        .get_or_init(|| {
+            let schema = crate::editor_schema::editor_schema();
+            schema
+                .kinds
+                .iter()
+                .map(|entry| {
+                    let mut rule = crate::slide_contract::json_schema(&schema, &entry.kind)
+                        .expect("known kind");
+                    for field in ["section", "aspect_ratio"] {
+                        rule["properties"].as_object_mut().unwrap().remove(field);
+                    }
+                    // Source chart data is attached deterministically, never generated by the LLM.
+                    if entry.kind == "chart_focus" {
+                        rule["properties"].as_object_mut().unwrap().remove("chart");
+                    }
+                    (
+                        entry.kind.clone(),
+                        serde_json::to_string_pretty(&rule).expect("schema serializes"),
+                    )
+                })
+                .collect()
+        })
+        .get(kind.as_str())
+        .expect("known kind")
+        .as_str()
 }
 
 pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
@@ -1497,40 +1258,15 @@ mod tests {
         );
     }
 
-    fn chart_points(raw: &str) -> Vec<(Option<String>, String)> {
-        let resp = parse_blueprint_with_repair(raw, &SlideKind::ChartFocus).unwrap();
-        resp.slide
-            .points
-            .into_iter()
-            .map(|p| (p.step, p.title))
-            .collect()
-    }
-
     #[test]
-    fn stray_step_string_before_a_point_becomes_its_step() {
-        // Real model output (valid JSON): `"02",` sits between two point objects.
-        let points = chart_points(include_str!(
-            "../../fixtures/model-output/chart-focus-bare-step-valid.txt"
-        ));
-        let steps: Vec<_> = points.iter().map(|(s, _)| s.as_deref()).collect();
-        assert_eq!(steps, [Some("01"), Some("02"), Some("03"), Some("04")]);
-    }
-
-    #[test]
-    fn point_missing_its_open_brace_is_repaired() {
-        // Real model output (invalid JSON): `"02", "title": …, "body": … },` — the `{` is gone
-        // and the step number was written bare. Failed the page on every retry.
-        let points = chart_points(include_str!(
-            "../../fixtures/model-output/chart-focus-bare-step-broken.txt"
-        ));
-        assert_eq!(
-            points,
-            vec![
-                (Some("01".to_string()), "上半年稳步扩容".to_string()),
-                (Some("02".to_string()), "自动化提效显著".to_string()),
-                (Some("03".to_string()), "下半年高峰与封网".to_string()),
-            ]
-        );
+    fn obsolete_point_steps_are_rejected_even_after_syntax_repair() {
+        for raw in [
+            include_str!("../../fixtures/model-output/chart-focus-bare-step-valid.txt"),
+            include_str!("../../fixtures/model-output/chart-focus-bare-step-broken.txt"),
+        ] {
+            let error = parse_blueprint_with_repair(raw, &SlideKind::ChartFocus).unwrap_err();
+            assert!(error.to_string().contains(".step"), "{error}");
+        }
     }
 
     #[test]

@@ -20,7 +20,7 @@
 // Keep in sync with `skipKeys` in SlideRenderer.vue.
 #let load-skip-keys = (
   "kind", "aspect_ratio", "tone", "icon", "label_tone", "footer_tone",
-  "titleTone", "top_bar_class", "topBarClass", "chart",
+  "chart",
 )
 
 // LaTeX math (`$...$` / `$$...$$`) reaches templates already converted to Typst

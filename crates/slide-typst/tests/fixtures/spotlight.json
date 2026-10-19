@@ -1,131 +1,136 @@
 [
- {
-  "kind": "spotlight",
-  "title": "单张宽图：平台分层架构",
-  "label": "架构",
-  "label_tone": "blue",
-  "image": "media:1",
-  "panels": [
-   {
-    "title": "分层职责",
-    "icon": "i-carbon:layers",
-    "tone": "blue",
-    "body": "四层各自<strong>只依赖下一层</strong>，跨层调用一律走服务层。",
-    "items": [
-     "应用层不直连存储",
-     "计算层可独立扩容",
-     "存储层按冷热分区"
+  {
+    "kind": "spotlight",
+    "title": "单张宽图：平台分层架构",
+    "label": "架构",
+    "label_tone": "blue",
+    "image": "media:1",
+    "panels": [
+      {
+        "title": "分层职责",
+        "icon": "i-carbon:layers",
+        "tone": "blue",
+        "body": "四层各自<strong>只依赖下一层</strong>，跨层调用一律走服务层。",
+        "items": [
+          "应用层不直连存储",
+          "计算层可独立扩容",
+          "存储层按冷热分区"
+        ],
+        "highlight": "边界清晰是演进的前提",
+        "kind": "matrix"
+      },
+      {
+        "title": "数据流向",
+        "kind": "flow",
+        "icon": "i-carbon:flow-stream",
+        "tone": "green",
+        "items": [
+          "采集入湖",
+          "批流计算",
+          "指标沉淀",
+          "服务输出"
+        ]
+      },
+      {
+        "title": "治理维度",
+        "kind": "matrix",
+        "icon": "i-carbon:category",
+        "tone": "amber",
+        "items": [
+          "元数据",
+          "血缘",
+          "质量",
+          "权限",
+          "成本",
+          "复盘"
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "spotlight",
+    "title": "竖幅图片 + 宽侧栏 + 步骤",
+    "label": "现场",
+    "label_tone": "green",
+    "image": "media:2",
+    "side_width": "w-96",
+    "panels": [
+      {
+        "title": "巡检步骤",
+        "icon": "i-carbon:task",
+        "tone": "green",
+        "highlight": "照片需包含设备铭牌",
+        "kind": "steps",
+        "items": [
+          "到场核对设备编号与工单",
+          "拍照记录关键部位状态",
+          "填写异常项并标注等级",
+          "现场负责人签字确认"
+        ]
+      },
+      {
+        "title": "注意事项",
+        "icon": "i-carbon:warning-alt",
+        "tone": "red",
+        "items": [
+          "雨天暂停高处作业",
+          "带电设备保持安全距离",
+          "异常立即上报，不得自行处置"
+        ],
+        "kind": "matrix"
+      }
+    ]
+  },
+  {
+    "kind": "spotlight",
+    "title": "多图：轮播在 PDF 中平铺展示",
+    "label": "图集",
+    "label_tone": "amber",
+    "images": [
+      "media:1",
+      "media:3",
+      "figure/legacy.bmp",
+      "figure/diagram.svg"
     ],
-    "highlight": "边界清晰是演进的前提"
-   },
-   {
-    "title": "数据流向",
-    "kind": "flow",
-    "icon": "i-carbon:flow-stream",
-    "tone": "green",
-    "items": [
-     "采集入湖",
-     "批流计算",
-     "指标沉淀",
-     "服务输出"
+    "side_width": "w-64",
+    "panels": [
+      {
+        "title": "图集说明",
+        "icon": "i-carbon:image",
+        "tone": "amber",
+        "body": "屏幕上是轮播；导出 PDF 时所有图片同时可见。",
+        "items": [
+          "PNG 架构图",
+          "WebP 图表",
+          "BMP 截图（转码）",
+          "SVG 矢量图"
+        ],
+        "kind": "matrix"
+      }
     ]
-   },
-   {
-    "title": "治理维度",
-    "kind": "matrix",
-    "icon": "i-carbon:category",
-    "tone": "amber",
-    "items": [
-     "元数据",
-     "血缘",
-     "质量",
-     "权限",
-     "成本",
-     "复盘"
-    ]
-   }
-  ]
- },
- {
-  "kind": "spotlight",
-  "title": "竖幅图片 + 宽侧栏 + 步骤",
-  "label": "现场",
-  "label_tone": "green",
-  "image": "media:2",
-  "side_width": "w-96",
-  "panels": [
-   {
-    "title": "巡检步骤",
-    "icon": "i-carbon:task",
-    "tone": "green",
-    "steps": [
-     "到场核对设备编号与工单",
-     "拍照记录关键部位状态",
-     "填写异常项并标注等级",
-     "现场负责人签字确认"
+  },
+  {
+    "kind": "spotlight",
+    "title": "缺失与损坏的图片",
+    "label": "容错",
+    "label_tone": "red",
+    "images": [
+      "media:99",
+      "media:5"
     ],
-    "highlight": "照片需包含设备铭牌"
-   },
-   {
-    "title": "注意事项",
-    "icon": "i-carbon:warning-alt",
-    "tone": "red",
-    "items": [
-     "雨天暂停高处作业",
-     "带电设备保持安全距离",
-     "异常立即上报，不得自行处置"
+    "placeholder": "图片待补充",
+    "panels": [
+      {
+        "title": "预期行为",
+        "icon": "i-carbon:information",
+        "tone": "red",
+        "items": [
+          "引用不存在 → 占位",
+          "文件损坏 → 占位",
+          "导出不中断，并在结果里报告"
+        ],
+        "kind": "matrix"
+      }
     ]
-   }
-  ]
- },
- {
-  "kind": "spotlight",
-  "title": "多图：轮播在 PDF 中平铺展示",
-  "label": "图集",
-  "label_tone": "amber",
-  "images": [
-   "media:1",
-   "media:3",
-   "figure/legacy.bmp",
-   "figure/diagram.svg"
-  ],
-  "side_width": "w-64",
-  "panels": [
-   {
-    "title": "图集说明",
-    "icon": "i-carbon:image",
-    "tone": "amber",
-    "body": "屏幕上是轮播；导出 PDF 时所有图片同时可见。",
-    "items": [
-     "PNG 架构图",
-     "WebP 图表",
-     "BMP 截图（转码）",
-     "SVG 矢量图"
-    ]
-   }
-  ]
- },
- {
-  "kind": "spotlight",
-  "title": "缺失与损坏的图片",
-  "label": "容错",
-  "label_tone": "red",
-  "images": [
-   "media:99",
-   "media:5"
-  ],
-  "placeholder": "图片待补充",
-  "panels": [
-   {
-    "title": "预期行为",
-    "icon": "i-carbon:information",
-    "tone": "red",
-    "items": [
-     "引用不存在 → 占位",
-     "文件损坏 → 占位",
-     "导出不中断，并在结果里报告"
-    ]
-   }
-  ]
- }
+  }
 ]

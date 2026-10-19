@@ -69,8 +69,11 @@
     v(16 * px * f)
     divider-line(ctx, 100%)
     v(16 * px * f)
-    txt(ctx, "body", ctx.ty.meta * f, 1.5, "正确的关注顺序：")
-    v(8 * px * f)
+    let title = slide.at("ranking_title", default: none)
+    if has(title) {
+      txt(ctx, "body", ctx.ty.meta * f, 1.5, title)
+      v(8 * px * f)
+    }
     stack(spacing: 8 * px * f, ..ranking.map(item => ranking-row(ctx, item, f)))
   }
 }

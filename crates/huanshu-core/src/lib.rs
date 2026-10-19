@@ -27,6 +27,7 @@ pub mod markdown_tools;
 pub mod network;
 pub mod preview;
 pub mod services;
+pub mod slide_contract;
 pub mod slide_edit;
 pub mod state;
 pub mod themes;

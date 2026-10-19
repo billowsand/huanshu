@@ -8,14 +8,14 @@
 #import "../lib/components.typ": *
 
 #let densities = (
-  normal: (head-x: 1, head-y: 0.75, head: 1.25, body: 1, pad: 1, icon: 1.25, number: 1.5, gap: 1),
-  compact: (head-x: 0.75, head-y: 0.5, head: 1.171875, body: 0.9375, pad: 0.75, icon: 1.125, number: 1.25, gap: 0.75),
-  mini: (head-x: 0.5, head-y: 0.5, head: 1.09375, body: 0.875, pad: 0.5, icon: 1, number: 1.125, gap: 0.5),
+  normal: (head-x: 1, head-y: 0.75, head: 1.25, body: 1, pad: 1, icon: 1.25, gap: 1),
+  compact: (head-x: 0.75, head-y: 0.5, head: 1.171875, body: 0.9375, pad: 0.75, icon: 1.125, gap: 0.75),
+  mini: (head-x: 0.5, head-y: 0.5, head: 1.09375, body: 0.875, pad: 0.5, icon: 1, gap: 0.5),
 )
 
-#let field-rows = ("number", "subtitle", "body", "items", "risk", "conclusion", "footer")
+#let field-rows = ("subtitle", "body", "items", "risk", "conclusion", "footer")
 
-#let footer-tag(card) = card.at("footer_tag", default: card.at("footerTag", default: none))
+#let footer-tag(card) = card.at("footer_tag", default: none)
 
 #let field(ctx, card, row, d, f) = {
   let th = ctx.theme
@@ -24,9 +24,7 @@
   let body-size = d.body * rem * s * f
   let value = if row == "footer" { footer-tag(card) } else { card.at(row, default: none) }
   if not has(value) { return none }
-  if row == "number" {
-    txt(ctx, "number", d.number * rem * s * f, 1.2, str(value), fill: tone.solid.transparentize(50%))
-  } else if row == "subtitle" {
+  if row == "subtitle" {
     txt(ctx, "subtitle", body-size, 1.5, value, fill: th.muted)
   } else if row == "body" {
     // `.feature-copy` is `opacity-70`: exactly `muted` on light-notes, but the
@@ -36,9 +34,8 @@
     } else { th.muted })
   } else if row == "items" {
     stack(spacing: 0.5 * rem * f, ..value.map(item => {
-      let item = if type(item) == str { (text: item) } else { item }
-      let item-tone = tone-of(ctx, item.at("iconTone", default: none), default: card.at("tone", default: "amber"))
-      let accent = item.at("accent", default: false) == true
+      let item = (text: item)
+      let item-tone = tone-of(ctx, none, default: card.at("tone", default: "amber"))
       grid(
         columns: (auto, 1fr),
         column-gutter: 0.5 * rem * f,
@@ -48,7 +45,7 @@
           item-tone.text,
           d.icon * rem * s * f,
         )),
-        txt(ctx, "body", body-size, 1.5, item.text, fill: if accent { tone.text } else { th.ink }),
+        txt(ctx, "body", body-size, 1.5, item.text, fill: th.ink),
       )
     }))
   } else if row == "risk" {
@@ -78,7 +75,7 @@
       align(center, txt(ctx, "body", body-size, 1.5, "→ " + value, fill: tone.text)),
     )
   } else if row == "footer" {
-    let ft = tone-of(ctx, card.at("footer_tone", default: card.at("footerTone", default: none)), default: card.at(
+    let ft = tone-of(ctx, card.at("footer_tone", default: none), default: card.at(
       "tone",
       default: "amber",
     ))
@@ -87,7 +84,7 @@
 }
 
 #let header(ctx, card, d, f) = {
-  let tone = tone-of(ctx, card.at("titleTone", default: card.at("tone", default: none)))
+  let tone = tone-of(ctx, card.at("tone", default: none))
   let s = ctx.ty.meta / rem
   let size = d.head * rem * s * f
   let icon-name = card.at("icon", default: none)

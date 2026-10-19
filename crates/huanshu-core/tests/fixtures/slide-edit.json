@@ -94,22 +94,19 @@
             "title": "目标定义",
             "icon": "i-carbon:target",
             "tone": "blue",
-            "body": "明确业务目标、成效口径与验收标准。",
-            "tag": "Why"
+            "body": "明确业务目标、成效口径与验收标准。"
           },
           {
             "title": "能力建设",
             "icon": "i-carbon:skill-level-advanced",
-            "tone": "emerald",
-            "body": "搭建数据、模型、流程三层能力。",
-            "tag": "What"
+            "tone": "green",
+            "body": "搭建数据、模型、流程三层能力。"
           },
           {
             "title": "推进机制",
             "icon": "i-carbon:workflow-automation",
             "tone": "amber",
-            "body": "建立跨团队协同与持续优化闭环。",
-            "tag": "How"
+            "body": "建立跨团队协同与持续优化闭环。"
           }
         ],
         "kind": "section_intro"
@@ -141,7 +138,7 @@
             "title": "智能内容生成",
             "subtitle": "缩短方案产出时间",
             "icon": "i-carbon:machine-learning-model",
-            "tone": "violet",
+            "tone": "blue",
             "body": "基于模板与上下文快速生成初稿，再由人工精修。",
             "conclusion": "适合标准化程度高的交付场景"
           },
@@ -149,7 +146,7 @@
             "title": "过程可追踪",
             "subtitle": "方便复盘与审计",
             "icon": "i-carbon:task-complete",
-            "tone": "emerald",
+            "tone": "green",
             "body": "保留版本、输入来源和关键决策记录。",
             "risk": "需提前定义记录粒度"
           }
@@ -181,7 +178,7 @@
             "title": "关键动作",
             "kind": "flow",
             "icon": "i-carbon:flow-stream",
-            "tone": "emerald",
+            "tone": "green",
             "items": [
               "梳理字段",
               "搭建评分模型",
@@ -195,7 +192,7 @@
             "kind": "steps",
             "icon": "i-carbon:chart-line",
             "tone": "amber",
-            "steps": [
+            "items": [
               "线索响应时效缩短 60%",
               "销售跟进更聚焦",
               "复盘数据可量化"
@@ -242,12 +239,12 @@
           {
             "title": "流程编排",
             "meta": "任务流、审批流、智能触发器",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "模型与规则",
             "meta": "分类、评分、召回、推荐",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "数据底座",
@@ -300,19 +297,16 @@
         "subtitle": "左边讲原则，右边给例子，便于理解抽象概念。",
         "points": [
           {
-            "step": "01",
             "title": "先给判断标准",
             "body": "说明什么情况下该采用这套方法。",
             "icon": "i-carbon:rule"
           },
           {
-            "step": "02",
             "title": "再讲落地动作",
             "body": "把动作拆成可执行的步骤。",
             "icon": "i-carbon:play-outline-filled"
           },
           {
-            "step": "03",
             "title": "最后展示效果",
             "body": "给出产出、收益或变化。",
             "icon": "i-carbon:result"
@@ -349,28 +343,25 @@
         "section": "07",
         "title": "阶段成果",
         "subtitle": "适合总结结果、结论、价值输出。",
-        "note": "可以把 `footer_tag`、`conclusion` 当作每个成果卡片的收束语。",
+        "note": "成果写在标题和正文中，标签用于简短分类或状态。",
         "cards": [
           {
             "title": "效率提升",
             "icon": "i-carbon:flash",
             "tone": "amber",
-            "body": "提案准备时间从 2 天缩短到 4 小时。",
-            "conclusion": "团队可把精力转向深度判断"
+            "body": "提案准备时间从 2 天缩短到 4 小时。"
           },
           {
             "title": "质量更稳",
             "icon": "i-carbon:checkmark-outline",
-            "tone": "emerald",
-            "body": "输出结构更统一，漏项明显减少。",
-            "footer_tag": "可复用"
+            "tone": "green",
+            "body": "输出结构更统一，漏项明显减少。"
           },
           {
             "title": "协作顺畅",
             "icon": "i-carbon:group",
             "tone": "blue",
-            "body": "销售、方案、交付之间共享同一套上下文。",
-            "footer_tone": "blue"
+            "body": "销售、方案、交付之间共享同一套上下文。"
           }
         ],
         "kind": "outcome_grid"
@@ -395,13 +386,13 @@
             "title": "机制",
             "desc": "再固化流程",
             "icon": "i-carbon:workflow-automation",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "数据",
             "desc": "持续反馈优化",
             "icon": "i-carbon:data-vis-4",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "组织",
@@ -434,14 +425,14 @@
             "date": "第 2-3 周",
             "title": "方案搭建",
             "body": "输出流程设计、页面原型和字段映射。",
-            "tone": "violet",
+            "tone": "blue",
             "icon": "i-carbon:build-tool"
           },
           {
             "date": "第 4-5 周",
             "title": "试点运行",
             "body": "接入真实业务，跟踪异常和效果。",
-            "tone": "emerald",
+            "tone": "green",
             "icon": "i-carbon:play-filled"
           },
           {
@@ -476,13 +467,13 @@
             "title": "设计机制",
             "body": "定义流程、规则和人机协作方式。",
             "icon": "i-carbon:flow",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "接入系统",
             "body": "把能力挂到真实业务链路中。",
             "icon": "i-carbon:application-web",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "持续优化",
@@ -525,7 +516,7 @@
             "phase": "Phase 2",
             "title": "实施阶段",
             "icon": "i-carbon:play-outline",
-            "tone": "emerald",
+            "tone": "green",
             "steps": [
               {
                 "label": "搭建流程",
@@ -591,7 +582,7 @@
           },
           "right": {
             "title": "方案 B：体系化建设",
-            "tone": "emerald",
+            "tone": "green",
             "icon": "i-carbon:enterprise",
             "items": [
               {
@@ -674,9 +665,9 @@
         "swot_data": {
           "quadrants": [
             {
-              "key": "S",
+              "key": "strengths",
               "title": "优势 Strengths",
-              "tone": "emerald",
+              "tone": "green",
               "icon": "i-carbon:thumbs-up",
               "items": [
                 "已有行业案例积累",
@@ -685,7 +676,7 @@
               "summary": "内部基础较好"
             },
             {
-              "key": "W",
+              "key": "weaknesses",
               "title": "劣势 Weaknesses",
               "tone": "amber",
               "icon": "i-carbon:warning",
@@ -696,7 +687,7 @@
               "summary": "落地复杂度偏高"
             },
             {
-              "key": "O",
+              "key": "opportunities",
               "title": "机会 Opportunities",
               "tone": "blue",
               "icon": "i-carbon:growth",
@@ -707,9 +698,9 @@
               "summary": "外部窗口期明确"
             },
             {
-              "key": "T",
+              "key": "threats",
               "title": "威胁 Threats",
-              "tone": "rose",
+              "tone": "red",
               "icon": "i-carbon:storm-tracker",
               "items": [
                 "竞品推进速度快",
@@ -733,17 +724,14 @@
         "subtitle": "数据来自文档中的 ```chart 围栏块，正文负责解读而非复述。",
         "points": [
           {
-            "step": "01",
             "title": "趋势判断",
             "body": "说明指标的整体走向与阶段特征。"
           },
           {
-            "step": "02",
             "title": "关键拐点",
             "body": "指出变化最明显的时间点或分类并解释原因。"
           },
           {
-            "step": "03",
             "title": "行动建议",
             "body": "基于图表给出可执行的下一步建议。"
           }
@@ -814,20 +802,6 @@
           "b"
         ],
         "kind": "cover",
-        "section": "07",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "footer": "页脚",
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -867,19 +841,6 @@
           "b"
         ],
         "kind": "closing",
-        "section": "07",
-        "badge": "徽章",
-        "accent": "强调",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "footer": "页脚",
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -932,23 +893,6 @@
           }
         ],
         "kind": "overview",
-        "subtitle": "副标题",
-        "badge": "徽章",
-        "accent": "强调",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
-        "footer": "页脚",
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -990,40 +934,22 @@
             "title": "目标定义",
             "icon": "i-carbon:target",
             "tone": "blue",
-            "body": "明确业务目标、成效口径与验收标准。",
-            "tag": "Why"
+            "body": "明确业务目标、成效口径与验收标准。"
           },
           {
             "title": "能力建设",
             "icon": "i-carbon:skill-level-advanced",
-            "tone": "emerald",
-            "body": "搭建数据、模型、流程三层能力。",
-            "tag": "What"
+            "tone": "green",
+            "body": "搭建数据、模型、流程三层能力。"
           },
           {
             "title": "推进机制",
             "icon": "i-carbon:workflow-automation",
             "tone": "amber",
-            "body": "建立跨团队协同与持续优化闭环。",
-            "tag": "How"
+            "body": "建立跨团队协同与持续优化闭环。"
           }
         ],
         "kind": "section_intro",
-        "accent": "强调",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
-        "footer": "页脚",
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -1076,7 +1002,7 @@
             "title": "智能内容生成",
             "subtitle": "缩短方案产出时间",
             "icon": "i-carbon:machine-learning-model",
-            "tone": "violet",
+            "tone": "blue",
             "body": "基于模板与上下文快速生成初稿，再由人工精修。",
             "conclusion": "适合标准化程度高的交付场景"
           },
@@ -1084,28 +1010,12 @@
             "title": "过程可追踪",
             "subtitle": "方便复盘与审计",
             "icon": "i-carbon:task-complete",
-            "tone": "emerald",
+            "tone": "green",
             "body": "保留版本、输入来源和关键决策记录。",
             "risk": "需提前定义记录粒度"
           }
         ],
         "kind": "feature_grid",
-        "badge": "徽章",
-        "accent": "强调",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
-        "footer": "页脚",
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -1159,7 +1069,7 @@
             "title": "关键动作",
             "kind": "flow",
             "icon": "i-carbon:flow-stream",
-            "tone": "emerald",
+            "tone": "green",
             "items": [
               "梳理字段",
               "搭建评分模型",
@@ -1173,7 +1083,7 @@
             "kind": "steps",
             "icon": "i-carbon:chart-line",
             "tone": "amber",
-            "steps": [
+            "items": [
               "线索响应时效缩短 60%",
               "销售跟进更聚焦",
               "复盘数据可量化"
@@ -1181,16 +1091,6 @@
           }
         ],
         "kind": "spotlight",
-        "section": "07",
-        "subtitle": "副标题",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "badges": [
-          "a",
-          "b"
-        ],
-        "footer": "页脚",
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -1254,12 +1154,12 @@
           {
             "title": "流程编排",
             "meta": "任务流、审批流、智能触发器",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "模型与规则",
             "meta": "分类、评分、召回、推荐",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "数据底座",
@@ -1269,22 +1169,6 @@
         ],
         "footer": "页脚",
         "kind": "split_layers",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -1340,23 +1224,6 @@
           }
         ],
         "kind": "section_list",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
-        "footer": "页脚",
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -1393,19 +1260,16 @@
         "subtitle": "副标题",
         "points": [
           {
-            "step": "01",
             "title": "先给判断标准",
             "body": "说明什么情况下该采用这套方法。",
             "icon": "i-carbon:rule"
           },
           {
-            "step": "02",
             "title": "再讲落地动作",
             "body": "把动作拆成可执行的步骤。",
             "icon": "i-carbon:play-outline-filled"
           },
           {
-            "step": "03",
             "title": "最后展示效果",
             "body": "给出产出、收益或变化。",
             "icon": "i-carbon:result"
@@ -1432,23 +1296,6 @@
           }
         ],
         "kind": "focus_example",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
-        "footer": "页脚",
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -1489,41 +1336,22 @@
             "title": "效率提升",
             "icon": "i-carbon:flash",
             "tone": "amber",
-            "body": "提案准备时间从 2 天缩短到 4 小时。",
-            "conclusion": "团队可把精力转向深度判断"
+            "body": "提案准备时间从 2 天缩短到 4 小时。"
           },
           {
             "title": "质量更稳",
             "icon": "i-carbon:checkmark-outline",
-            "tone": "emerald",
-            "body": "输出结构更统一，漏项明显减少。",
-            "footer_tag": "可复用"
+            "tone": "green",
+            "body": "输出结构更统一，漏项明显减少。"
           },
           {
             "title": "协作顺畅",
             "icon": "i-carbon:group",
             "tone": "blue",
-            "body": "销售、方案、交付之间共享同一套上下文。",
-            "footer_tone": "blue"
+            "body": "销售、方案、交付之间共享同一套上下文。"
           }
         ],
         "kind": "outcome_grid",
-        "badge": "徽章",
-        "accent": "强调",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
-        "footer": "页脚",
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -1569,13 +1397,13 @@
             "title": "机制",
             "desc": "再固化流程",
             "icon": "i-carbon:workflow-automation",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "数据",
             "desc": "持续反馈优化",
             "icon": "i-carbon:data-vis-4",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "组织",
@@ -1586,22 +1414,6 @@
         ],
         "footer": "页脚",
         "kind": "center_grid",
-        "section": "07",
-        "subtitle": "副标题",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -1648,14 +1460,14 @@
             "date": "第 2-3 周",
             "title": "方案搭建",
             "body": "输出流程设计、页面原型和字段映射。",
-            "tone": "violet",
+            "tone": "blue",
             "icon": "i-carbon:build-tool"
           },
           {
             "date": "第 4-5 周",
             "title": "试点运行",
             "body": "接入真实业务，跟踪异常和效果。",
-            "tone": "emerald",
+            "tone": "green",
             "icon": "i-carbon:play-filled"
           },
           {
@@ -1668,22 +1480,6 @@
         ],
         "footer": "页脚",
         "kind": "timeline",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -1730,13 +1526,13 @@
             "title": "设计机制",
             "body": "定义流程、规则和人机协作方式。",
             "icon": "i-carbon:flow",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "接入系统",
             "body": "把能力挂到真实业务链路中。",
             "icon": "i-carbon:application-web",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "持续优化",
@@ -1747,22 +1543,6 @@
         ],
         "footer": "页脚",
         "kind": "step_flow",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -1819,7 +1599,7 @@
             "phase": "Phase 2",
             "title": "实施阶段",
             "icon": "i-carbon:play-outline",
-            "tone": "emerald",
+            "tone": "green",
             "steps": [
               {
                 "label": "搭建流程",
@@ -1850,22 +1630,6 @@
         ],
         "footer": "页脚",
         "kind": "process",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -1925,7 +1689,7 @@
           },
           "right": {
             "title": "方案 B：体系化建设",
-            "tone": "emerald",
+            "tone": "green",
             "icon": "i-carbon:enterprise",
             "items": [
               {
@@ -1947,22 +1711,6 @@
         },
         "footer": "页脚",
         "kind": "compare",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -2035,22 +1783,6 @@
         ],
         "footer": "页脚",
         "kind": "issue_stack",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -2088,9 +1820,9 @@
         "swot_data": {
           "quadrants": [
             {
-              "key": "S",
+              "key": "strengths",
               "title": "优势 Strengths",
-              "tone": "emerald",
+              "tone": "green",
               "icon": "i-carbon:thumbs-up",
               "items": [
                 "已有行业案例积累",
@@ -2099,7 +1831,7 @@
               "summary": "内部基础较好"
             },
             {
-              "key": "W",
+              "key": "weaknesses",
               "title": "劣势 Weaknesses",
               "tone": "amber",
               "icon": "i-carbon:warning",
@@ -2110,7 +1842,7 @@
               "summary": "落地复杂度偏高"
             },
             {
-              "key": "O",
+              "key": "opportunities",
               "title": "机会 Opportunities",
               "tone": "blue",
               "icon": "i-carbon:growth",
@@ -2121,9 +1853,9 @@
               "summary": "外部窗口期明确"
             },
             {
-              "key": "T",
+              "key": "threats",
               "title": "威胁 Threats",
-              "tone": "rose",
+              "tone": "red",
               "icon": "i-carbon:storm-tracker",
               "items": [
                 "竞品推进速度快",
@@ -2135,23 +1867,6 @@
           "strategy": "建议采用\"试点先行 + 能力沉淀\"策略，先快速证明价值，再逐步扩展。"
         },
         "kind": "swot",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
-        "footer": "页脚",
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -2188,17 +1903,14 @@
         "subtitle": "副标题",
         "points": [
           {
-            "step": "01",
             "title": "趋势判断",
             "body": "说明指标的整体走向与阶段特征。"
           },
           {
-            "step": "02",
             "title": "关键拐点",
             "body": "指出变化最明显的时间点或分类并解释原因。"
           },
           {
-            "step": "03",
             "title": "行动建议",
             "body": "基于图表给出可执行的下一步建议。"
           }
@@ -2232,22 +1944,6 @@
         },
         "footer": "页脚",
         "kind": "chart_focus",
-        "badge": "徽章",
-        "accent": "强调",
-        "note": "备注",
-        "label": "标签",
-        "label_tone": "rose",
-        "image": "media:3",
-        "images": [
-          "media:1",
-          "media:2"
-        ],
-        "placeholder": "占位说明",
-        "side_width": "38%",
-        "badges": [
-          "a",
-          "b"
-        ],
         "aspect_ratio": "ratio_32x9"
       }
     },
@@ -2282,8 +1978,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "accent": " 强调 "
+        "kind": "cover"
       }
     },
     {
@@ -2317,8 +2012,7 @@
           "Q&A",
           "Follow-up"
         ],
-        "kind": "closing",
-        "accent": " 强调 "
+        "kind": "closing"
       }
     },
     {
@@ -2365,8 +2059,7 @@
             "desc": "阶段目标、资源需求与里程碑安排。"
           }
         ],
-        "kind": "overview",
-        "accent": " 强调 "
+        "kind": "overview"
       }
     },
     {
@@ -2403,26 +2096,22 @@
             "title": "目标定义",
             "icon": "i-carbon:target",
             "tone": "blue",
-            "body": "明确业务目标、成效口径与验收标准。",
-            "tag": "Why"
+            "body": "明确业务目标、成效口径与验收标准。"
           },
           {
             "title": "能力建设",
             "icon": "i-carbon:skill-level-advanced",
-            "tone": "emerald",
-            "body": "搭建数据、模型、流程三层能力。",
-            "tag": "What"
+            "tone": "green",
+            "body": "搭建数据、模型、流程三层能力。"
           },
           {
             "title": "推进机制",
             "icon": "i-carbon:workflow-automation",
             "tone": "amber",
-            "body": "建立跨团队协同与持续优化闭环。",
-            "tag": "How"
+            "body": "建立跨团队协同与持续优化闭环。"
           }
         ],
-        "kind": "section_intro",
-        "accent": " 强调 "
+        "kind": "section_intro"
       }
     },
     {
@@ -2470,7 +2159,7 @@
             "title": "智能内容生成",
             "subtitle": "缩短方案产出时间",
             "icon": "i-carbon:machine-learning-model",
-            "tone": "violet",
+            "tone": "blue",
             "body": "基于模板与上下文快速生成初稿，再由人工精修。",
             "conclusion": "适合标准化程度高的交付场景"
           },
@@ -2478,13 +2167,12 @@
             "title": "过程可追踪",
             "subtitle": "方便复盘与审计",
             "icon": "i-carbon:task-complete",
-            "tone": "emerald",
+            "tone": "green",
             "body": "保留版本、输入来源和关键决策记录。",
             "risk": "需提前定义记录粒度"
           }
         ],
-        "kind": "feature_grid",
-        "accent": " 强调 "
+        "kind": "feature_grid"
       }
     },
     {
@@ -2530,7 +2218,7 @@
             "title": "关键动作",
             "kind": "flow",
             "icon": "i-carbon:flow-stream",
-            "tone": "emerald",
+            "tone": "green",
             "items": [
               "梳理字段",
               "搭建评分模型",
@@ -2544,15 +2232,14 @@
             "kind": "steps",
             "icon": "i-carbon:chart-line",
             "tone": "amber",
-            "steps": [
+            "items": [
               "线索响应时效缩短 60%",
               "销售跟进更聚焦",
               "复盘数据可量化"
             ]
           }
         ],
-        "kind": "spotlight",
-        "accent": " 强调 "
+        "kind": "spotlight"
       }
     },
     {
@@ -2611,12 +2298,12 @@
           {
             "title": "流程编排",
             "meta": "任务流、审批流、智能触发器",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "模型与规则",
             "meta": "分类、评分、召回、推荐",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "数据底座",
@@ -2625,8 +2312,7 @@
           }
         ],
         "footer": "建议层数控制在 3-5 层，避免右侧过密。",
-        "kind": "split_layers",
-        "accent": " 强调 "
+        "kind": "split_layers"
       }
     },
     {
@@ -2676,8 +2362,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "accent": " 强调 "
+        "kind": "section_list"
       }
     },
     {
@@ -2709,19 +2394,16 @@
         "subtitle": "左边讲原则，右边给例子，便于理解抽象概念。",
         "points": [
           {
-            "step": "01",
             "title": "先给判断标准",
             "body": "说明什么情况下该采用这套方法。",
             "icon": "i-carbon:rule"
           },
           {
-            "step": "02",
             "title": "再讲落地动作",
             "body": "把动作拆成可执行的步骤。",
             "icon": "i-carbon:play-outline-filled"
           },
           {
-            "step": "03",
             "title": "最后展示效果",
             "body": "给出产出、收益或变化。",
             "icon": "i-carbon:result"
@@ -2747,8 +2429,7 @@
             "muted": true
           }
         ],
-        "kind": "focus_example",
-        "accent": " 强调 "
+        "kind": "focus_example"
       }
     },
     {
@@ -2778,32 +2459,28 @@
         "section": "07",
         "title": "阶段成果",
         "subtitle": "适合总结结果、结论、价值输出。",
-        "note": "可以把 `footer_tag`、`conclusion` 当作每个成果卡片的收束语。",
+        "note": "成果写在标题和正文中，标签用于简短分类或状态。",
         "cards": [
           {
             "title": "效率提升",
             "icon": "i-carbon:flash",
             "tone": "amber",
-            "body": "提案准备时间从 2 天缩短到 4 小时。",
-            "conclusion": "团队可把精力转向深度判断"
+            "body": "提案准备时间从 2 天缩短到 4 小时。"
           },
           {
             "title": "质量更稳",
             "icon": "i-carbon:checkmark-outline",
-            "tone": "emerald",
-            "body": "输出结构更统一，漏项明显减少。",
-            "footer_tag": "可复用"
+            "tone": "green",
+            "body": "输出结构更统一，漏项明显减少。"
           },
           {
             "title": "协作顺畅",
             "icon": "i-carbon:group",
             "tone": "blue",
-            "body": "销售、方案、交付之间共享同一套上下文。",
-            "footer_tone": "blue"
+            "body": "销售、方案、交付之间共享同一套上下文。"
           }
         ],
-        "kind": "outcome_grid",
-        "accent": " 强调 "
+        "kind": "outcome_grid"
       }
     },
     {
@@ -2844,13 +2521,13 @@
             "title": "机制",
             "desc": "再固化流程",
             "icon": "i-carbon:workflow-automation",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "数据",
             "desc": "持续反馈优化",
             "icon": "i-carbon:data-vis-4",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "组织",
@@ -2902,14 +2579,14 @@
             "date": "第 2-3 周",
             "title": "方案搭建",
             "body": "输出流程设计、页面原型和字段映射。",
-            "tone": "violet",
+            "tone": "blue",
             "icon": "i-carbon:build-tool"
           },
           {
             "date": "第 4-5 周",
             "title": "试点运行",
             "body": "接入真实业务，跟踪异常和效果。",
-            "tone": "emerald",
+            "tone": "green",
             "icon": "i-carbon:play-filled"
           },
           {
@@ -2921,8 +2598,7 @@
           }
         ],
         "footer": "时间点可写日期，也可写\"第 N 周 / 阶段名\"。",
-        "kind": "timeline",
-        "accent": " 强调 "
+        "kind": "timeline"
       }
     },
     {
@@ -2964,13 +2640,13 @@
             "title": "设计机制",
             "body": "定义流程、规则和人机协作方式。",
             "icon": "i-carbon:flow",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "接入系统",
             "body": "把能力挂到真实业务链路中。",
             "icon": "i-carbon:application-web",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "持续优化",
@@ -2980,8 +2656,7 @@
           }
         ],
         "footer": "如需竖排，可把 direction 改为 vertical。",
-        "kind": "step_flow",
-        "accent": " 强调 "
+        "kind": "step_flow"
       }
     },
     {
@@ -3033,7 +2708,7 @@
             "phase": "Phase 2",
             "title": "实施阶段",
             "icon": "i-carbon:play-outline",
-            "tone": "emerald",
+            "tone": "green",
             "steps": [
               {
                 "label": "搭建流程",
@@ -3063,8 +2738,7 @@
           }
         ],
         "footer": "每个阶段建议 2-4 个步骤，避免页面过满。",
-        "kind": "process",
-        "accent": " 强调 "
+        "kind": "process"
       }
     },
     {
@@ -3119,7 +2793,7 @@
           },
           "right": {
             "title": "方案 B：体系化建设",
-            "tone": "emerald",
+            "tone": "green",
             "icon": "i-carbon:enterprise",
             "items": [
               {
@@ -3140,8 +2814,7 @@
           }
         },
         "footer": "需要上下对比时，可调整 mode 字段。",
-        "kind": "compare",
-        "accent": " 强调 "
+        "kind": "compare"
       }
     },
     {
@@ -3208,8 +2881,7 @@
           }
         ],
         "footer": "适合 2-4 个纵向问题块，每块一句主判断 + 若干补充标签。",
-        "kind": "issue_stack",
-        "accent": " 强调 "
+        "kind": "issue_stack"
       }
     },
     {
@@ -3242,9 +2914,9 @@
         "swot_data": {
           "quadrants": [
             {
-              "key": "S",
+              "key": "strengths",
               "title": "优势 Strengths",
-              "tone": "emerald",
+              "tone": "green",
               "icon": "i-carbon:thumbs-up",
               "items": [
                 "已有行业案例积累",
@@ -3253,7 +2925,7 @@
               "summary": "内部基础较好"
             },
             {
-              "key": "W",
+              "key": "weaknesses",
               "title": "劣势 Weaknesses",
               "tone": "amber",
               "icon": "i-carbon:warning",
@@ -3264,7 +2936,7 @@
               "summary": "落地复杂度偏高"
             },
             {
-              "key": "O",
+              "key": "opportunities",
               "title": "机会 Opportunities",
               "tone": "blue",
               "icon": "i-carbon:growth",
@@ -3275,9 +2947,9 @@
               "summary": "外部窗口期明确"
             },
             {
-              "key": "T",
+              "key": "threats",
               "title": "威胁 Threats",
-              "tone": "rose",
+              "tone": "red",
               "icon": "i-carbon:storm-tracker",
               "items": [
                 "竞品推进速度快",
@@ -3288,8 +2960,7 @@
           ],
           "strategy": "建议采用\"试点先行 + 能力沉淀\"策略，先快速证明价值，再逐步扩展。"
         },
-        "kind": "swot",
-        "accent": " 强调 "
+        "kind": "swot"
       }
     },
     {
@@ -3321,17 +2992,14 @@
         "subtitle": "数据来自文档中的 ```chart 围栏块，正文负责解读而非复述。",
         "points": [
           {
-            "step": "01",
             "title": "趋势判断",
             "body": "说明指标的整体走向与阶段特征。"
           },
           {
-            "step": "02",
             "title": "关键拐点",
             "body": "指出变化最明显的时间点或分类并解释原因。"
           },
           {
-            "step": "03",
             "title": "行动建议",
             "body": "基于图表给出可执行的下一步建议。"
           }
@@ -3364,8 +3032,7 @@
           "source": "llm_generated"
         },
         "footer": "示例数据，仅用于版式预览；真实数据请在文档中以 ```chart 围栏块提供。",
-        "kind": "chart_focus",
-        "accent": " 强调 "
+        "kind": "chart_focus"
       }
     },
     {
@@ -3429,12 +3096,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "badges": [
-          "2026 Q2",
-          "内部汇报",
-          "30 分钟"
-        ]
+        "kind": "section_list"
       }
     },
     {
@@ -3457,8 +3119,7 @@
           "Q&A",
           "Follow-up"
         ],
-        "kind": "cover",
-        "note": "如需会后材料，可补充联系人、二维码或下一步安排。"
+        "kind": "cover"
       }
     },
     {
@@ -3498,12 +3159,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "note": "如需会后材料，可补充联系人、二维码或下一步安排。",
-        "badges": [
-          "Q&A",
-          "Follow-up"
-        ]
+        "kind": "section_list"
       }
     },
     {
@@ -3523,9 +3179,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "01",
-        "note": "建议保持 3-5 个模块，便于听众快速建立全局认知。"
+        "kind": "cover"
       }
     },
     {
@@ -3561,8 +3215,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "note": "建议保持 3-5 个模块，便于听众快速建立全局认知。"
+        "kind": "section_list"
       }
     },
     {
@@ -3584,10 +3237,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "02",
-        "badge": "章节导览",
-        "note": "卡片标题建议短，正文控制在一行到两行。"
+        "kind": "cover"
       }
     },
     {
@@ -3625,9 +3275,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "badge": "章节导览",
-        "note": "卡片标题建议短，正文控制在一行到两行。"
+        "kind": "section_list"
       }
     },
     {
@@ -3648,9 +3296,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "03",
-        "note": "可补充 `items`、`conclusion`、`risk` 等字段增强信息层次。"
+        "kind": "cover"
       }
     },
     {
@@ -3687,8 +3333,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "note": "可补充 `items`、`conclusion`、`risk` 等字段增强信息层次。"
+        "kind": "section_list"
       }
     },
     {
@@ -3712,11 +3357,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "label": "重点展示",
-        "label_tone": "blue",
-        "placeholder": "可填写 media:12、文件路径或图片 URL",
-        "side_width": "42%"
+        "kind": "cover"
       }
     },
     {
@@ -3756,11 +3397,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "label": "重点展示",
-        "label_tone": "blue",
-        "placeholder": "可填写 media:12、文件路径或图片 URL",
-        "side_width": "42%"
+        "kind": "section_list"
       }
     },
     {
@@ -3781,9 +3418,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "04",
-        "footer": "建议层数控制在 3-5 层，避免右侧过密。"
+        "kind": "cover"
       }
     },
     {
@@ -3820,8 +3455,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "footer": "建议层数控制在 3-5 层，避免右侧过密。"
+        "kind": "section_list"
       }
     },
     {
@@ -3841,8 +3475,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "05"
+        "kind": "cover"
       }
     },
     {
@@ -3898,8 +3531,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "06"
+        "kind": "cover"
       }
     },
     {
@@ -3956,9 +3588,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "07",
-        "note": "可以把 `footer_tag`、`conclusion` 当作每个成果卡片的收束语。"
+        "kind": "cover"
       }
     },
     {
@@ -3995,8 +3625,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "note": "可以把 `footer_tag`、`conclusion` 当作每个成果卡片的收束语。"
+        "kind": "section_list"
       }
     },
     {
@@ -4017,10 +3646,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "badge": "核心观点",
-        "accent": "统一口径、流程串联、数据闭环",
-        "footer": "中间标题适合放一句最重要的结论。"
+        "kind": "cover"
       }
     },
     {
@@ -4057,10 +3683,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "badge": "核心观点",
-        "accent": "统一口径、流程串联、数据闭环",
-        "footer": "中间标题适合放一句最重要的结论。"
+        "kind": "section_list"
       }
     },
     {
@@ -4081,9 +3704,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "08",
-        "footer": "时间点可写日期，也可写\"第 N 周 / 阶段名\"。"
+        "kind": "cover"
       }
     },
     {
@@ -4120,8 +3741,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "footer": "时间点可写日期，也可写\"第 N 周 / 阶段名\"。"
+        "kind": "section_list"
       }
     },
     {
@@ -4142,9 +3762,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "09",
-        "footer": "如需竖排，可把 direction 改为 vertical。"
+        "kind": "cover"
       }
     },
     {
@@ -4181,8 +3799,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "footer": "如需竖排，可把 direction 改为 vertical。"
+        "kind": "section_list"
       }
     },
     {
@@ -4203,9 +3820,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "10",
-        "footer": "每个阶段建议 2-4 个步骤，避免页面过满。"
+        "kind": "cover"
       }
     },
     {
@@ -4242,8 +3857,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "footer": "每个阶段建议 2-4 个步骤，避免页面过满。"
+        "kind": "section_list"
       }
     },
     {
@@ -4264,9 +3878,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "11",
-        "footer": "需要上下对比时，可调整 mode 字段。"
+        "kind": "cover"
       }
     },
     {
@@ -4303,8 +3915,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "footer": "需要上下对比时，可调整 mode 字段。"
+        "kind": "section_list"
       }
     },
     {
@@ -4325,9 +3936,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "12",
-        "footer": "适合 2-4 个纵向问题块，每块一句主判断 + 若干补充标签。"
+        "kind": "cover"
       }
     },
     {
@@ -4364,8 +3973,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "footer": "适合 2-4 个纵向问题块，每块一句主判断 + 若干补充标签。"
+        "kind": "section_list"
       }
     },
     {
@@ -4385,8 +3993,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "12"
+        "kind": "cover"
       }
     },
     {
@@ -4443,9 +4050,7 @@
           "内部汇报",
           "30 分钟"
         ],
-        "kind": "cover",
-        "section": "13",
-        "footer": "示例数据，仅用于版式预览；真实数据请在文档中以 ```chart 围栏块提供。"
+        "kind": "cover"
       }
     },
     {
@@ -4482,8 +4087,7 @@
             "icon": "i-carbon:chart-line-data"
           }
         ],
-        "kind": "section_list",
-        "footer": "示例数据，仅用于版式预览；真实数据请在文档中以 ```chart 围栏块提供。"
+        "kind": "section_list"
       }
     }
   ],
@@ -4505,7 +4109,8 @@
         "badges": [
           3
         ],
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4531,7 +4136,8 @@
         "badges": {
           "n": 4
         },
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4557,7 +4163,8 @@
         "overview_items": {
           "n": 4
         },
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4591,7 +4198,8 @@
         "cards": [
           6
         ],
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4619,7 +4227,8 @@
           "n": 4
         },
         "cards": "值 5",
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4661,7 +4270,8 @@
           "n": 7
         },
         "side_width": "值 8",
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4695,7 +4305,8 @@
         "footer": [
           6
         ],
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4721,7 +4332,8 @@
         "list_items": {
           "n": 4
         },
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4761,7 +4373,8 @@
         "ranking": {
           "n": 7
         },
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4789,7 +4402,8 @@
           "n": 4
         },
         "cards": "值 5",
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4817,7 +4431,8 @@
           "n": 4
         },
         "footer": "值 5",
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4845,7 +4460,8 @@
           "n": 4
         },
         "footer": "值 5",
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4879,7 +4495,8 @@
         "footer": [
           6
         ],
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4907,7 +4524,8 @@
           "n": 4
         },
         "footer": "值 5",
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4935,7 +4553,8 @@
           "n": 4
         },
         "footer": "值 5",
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4963,7 +4582,8 @@
           "n": 4
         },
         "footer": "值 5",
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -4989,7 +4609,8 @@
         "swot_data": {
           "n": 4
         },
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -5023,7 +4644,8 @@
         "footer": [
           6
         ],
-        "aspect_ratio": "ratio_32x9"
+        "aspect_ratio": "ratio_32x9",
+        "unlisted": "drop me"
       }
     },
     {
@@ -5591,7 +5213,10 @@
         "badges": [
           "a"
         ],
-        "aspect_ratio": "ratio_48x9"
+        "aspect_ratio": "ratio_48x9",
+        "cards": [],
+        "footer": "页脚",
+        "section": "01"
       }
     },
     {
@@ -11020,41 +10645,41 @@
             "section": "05"
           },
           {
-            "section": "05",
+            "kind": "feature_grid",
             "title": "核心特性",
-            "subtitle": "适合展示 3-6 个能力点，每个卡片一条主信息。",
-            "note": "可补充 `items`、`conclusion`、`risk` 等字段增强信息层次。",
+            "section": "05",
             "cards": [
               {
-                "title": "统一知识入口",
-                "subtitle": "降低信息查找成本",
-                "icon": "i-carbon:data-base",
-                "tone": "blue",
                 "body": "把分散文档、案例、规范集中到一个检索入口。",
+                "icon": "i-carbon:data-base",
                 "items": [
                   "支持语义搜索",
                   "权限可控",
                   "可接业务系统"
-                ]
+                ],
+                "subtitle": "降低信息查找成本",
+                "title": "统一知识入口",
+                "tone": "blue"
               },
               {
-                "title": "智能内容生成",
-                "subtitle": "缩短方案产出时间",
-                "icon": "i-carbon:machine-learning-model",
-                "tone": "violet",
                 "body": "基于模板与上下文快速生成初稿，再由人工精修。",
-                "conclusion": "适合标准化程度高的交付场景"
+                "conclusion": "适合标准化程度高的交付场景",
+                "icon": "i-carbon:machine-learning-model",
+                "subtitle": "缩短方案产出时间",
+                "title": "智能内容生成",
+                "tone": "blue"
               },
               {
-                "title": "过程可追踪",
-                "subtitle": "方便复盘与审计",
-                "icon": "i-carbon:task-complete",
-                "tone": "emerald",
                 "body": "保留版本、输入来源和关键决策记录。",
-                "risk": "需提前定义记录粒度"
+                "icon": "i-carbon:task-complete",
+                "risk": "需提前定义记录粒度",
+                "subtitle": "方便复盘与审计",
+                "title": "过程可追踪",
+                "tone": "green"
               }
             ],
-            "kind": "feature_grid"
+            "note": "可补充 `items`、`conclusion`、`risk` 等字段增强信息层次。",
+            "subtitle": "适合展示 3-6 个能力点，每个卡片一条主信息。"
           },
           {
             "kind": "process",
@@ -11127,14 +10752,14 @@
             "title": "内容页"
           },
           {
+            "kind": "cover",
             "title": "AI 战略规划报告",
-            "subtitle": "从业务机会到落地路径的完整说明",
             "badges": [
               "2026 Q2",
               "内部汇报",
               "30 分钟"
             ],
-            "kind": "cover"
+            "subtitle": "从业务机会到落地路径的完整说明"
           }
         ],
         "active": 5
@@ -11160,29 +10785,29 @@
             "title": "无章节"
           },
           {
+            "kind": "section_list",
             "title": "执行清单",
-            "subtitle": "适合罗列步骤、要点、任务项。",
             "list_items": [
               {
-                "step": "01",
-                "title": "明确目标",
                 "body": "先确认这页要回答的问题，避免只堆信息。",
-                "icon": "i-carbon:target"
+                "icon": "i-carbon:target",
+                "step": "01",
+                "title": "明确目标"
               },
               {
-                "step": "02",
-                "title": "列关键点",
                 "body": "每条聚焦一个结论，正文尽量不超过两行。",
-                "icon": "i-carbon:idea"
+                "icon": "i-carbon:idea",
+                "step": "02",
+                "title": "列关键点"
               },
               {
-                "step": "03",
-                "title": "补充证据",
                 "body": "必要时加入数据、案例或素材引用。",
-                "icon": "i-carbon:chart-line-data"
+                "icon": "i-carbon:chart-line-data",
+                "step": "03",
+                "title": "补充证据"
               }
             ],
-            "kind": "section_list"
+            "subtitle": "适合罗列步骤、要点、任务项。"
           }
         ],
         "active": 1
@@ -11239,9 +10864,9 @@
             "kind": "section_list"
           },
           {
-            "kind": "section_list",
+            "section": "04",
             "title": "内容页",
-            "section": "04"
+            "kind": "section_list"
           }
         ],
         "active": 1
@@ -11405,22 +11030,19 @@
                 "title": "目标定义",
                 "icon": "i-carbon:target",
                 "tone": "blue",
-                "body": "明确业务目标、成效口径与验收标准。",
-                "tag": "Why"
+                "body": "明确业务目标、成效口径与验收标准。"
               },
               {
                 "title": "能力建设",
                 "icon": "i-carbon:skill-level-advanced",
-                "tone": "emerald",
-                "body": "搭建数据、模型、流程三层能力。",
-                "tag": "What"
+                "tone": "green",
+                "body": "搭建数据、模型、流程三层能力。"
               },
               {
                 "title": "推进机制",
                 "icon": "i-carbon:workflow-automation",
                 "tone": "amber",
-                "body": "建立跨团队协同与持续优化闭环。",
-                "tag": "How"
+                "body": "建立跨团队协同与持续优化闭环。"
               }
             ],
             "kind": "section_intro"
@@ -12079,7 +11701,9 @@
         "kind": "step_flow",
         "direction": "horizontal"
       },
-      "errors": []
+      "errors": [
+        "title 不能为空"
+      ]
     },
     {
       "name": "valid: step_flow vertical",
@@ -12087,7 +11711,9 @@
         "kind": "step_flow",
         "direction": "vertical"
       },
-      "errors": []
+      "errors": [
+        "title 不能为空"
+      ]
     },
     {
       "name": "direction is not a string",
@@ -12095,7 +11721,10 @@
         "kind": "step_flow",
         "direction": 3
       },
-      "errors": []
+      "errors": [
+        "title 不能为空",
+        "direction 类型错误，应为 [\"string\",\"null\"]"
+      ]
     },
     {
       "name": "invalid direction",
@@ -12104,7 +11733,8 @@
         "direction": "diagonal"
       },
       "errors": [
-        "direction \"diagonal\" 无效，应为 horizontal 或 vertical"
+        "title 不能为空",
+        "direction 的值 \"diagonal\" 无效，应为 \"horizontal\" / \"vertical\" / null"
       ]
     },
     {
@@ -12114,7 +11744,8 @@
         "direction": ""
       },
       "errors": [
-        "direction \"\" 无效，应为 horizontal 或 vertical"
+        "title 不能为空",
+        "direction 的值 \"\" 无效，应为 \"horizontal\" / \"vertical\" / null"
       ]
     },
     {
@@ -12124,7 +11755,8 @@
         "tone": "nope"
       },
       "errors": [
-        "root.tone \"nope\" 无效"
+        "title 不能为空",
+        "tone 不受当前版式支持"
       ]
     },
     {
@@ -12135,8 +11767,7 @@
         "label_tone": "blue"
       },
       "errors": [
-        "root.tone \"bad\" 无效",
-        "root.footer_tone \"worse\" 无效"
+        "kind 必须是有效版式名称"
       ]
     },
     {
@@ -12154,7 +11785,8 @@
         ]
       },
       "errors": [
-        "cards[1].tone \"pink\" 无效"
+        "title 不能为空",
+        "cards[1].tone 的值 \"pink\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null"
       ]
     },
     {
@@ -12168,7 +11800,9 @@
         ]
       },
       "errors": [
-        "cards[0].footer_tone \"chartreuse\" 无效"
+        "title 不能为空",
+        "cards[0].title 不能为空",
+        "cards[0].footer_tone 不受当前版式支持"
       ]
     },
     {
@@ -12187,7 +11821,12 @@
         }
       },
       "errors": [
-        "compare_data.left.tone \"?\" 无效"
+        "title 不能为空",
+        "compare_data.right 不能为空",
+        "compare_data.left.title 不能为空",
+        "compare_data.left.items[0].label 不能为空",
+        "compare_data.left.items[0].tone 不受当前版式支持",
+        "compare_data.left.tone 的值 \"?\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null"
       ]
     },
     {
@@ -12207,7 +11846,9 @@
         ]
       },
       "errors": [
-        "phases[0].steps[0].tone \"?\" 无效"
+        "title 不能为空",
+        "phases[0].phase 不能为空",
+        "phases[0].steps[0].tone 不受当前版式支持"
       ]
     },
     {
@@ -12228,7 +11869,19 @@
         }
       },
       "errors": [
-        "swot_data.quadrants[1].tone \"nope\" 无效"
+        "title 不能为空",
+        "swot_data.quadrants[0].title 不能为空",
+        "swot_data.quadrants[0].items 不能为空",
+        "swot_data.quadrants[0].key 的值 \"S\" 无效，应为 \"strengths\" / \"weaknesses\" / \"opportunities\" / \"threats\"",
+        "swot_data.quadrants[0].tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "swot_data.quadrants[1].title 不能为空",
+        "swot_data.quadrants[1].items 不能为空",
+        "swot_data.quadrants[1].key 的值 \"W\" 无效，应为 \"strengths\" / \"weaknesses\" / \"opportunities\" / \"threats\"",
+        "swot_data.quadrants[1].tone 的值 \"nope\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "swot_data.quadrants 必须恰好包含一个 strengths",
+        "swot_data.quadrants 必须恰好包含一个 weaknesses",
+        "swot_data.quadrants 必须恰好包含一个 opportunities",
+        "swot_data.quadrants 必须恰好包含一个 threats"
       ]
     },
     {
@@ -12239,7 +11892,7 @@
         }
       },
       "errors": [
-        "2.tone \"x\" 无效"
+        "kind 必须是有效版式名称"
       ]
     },
     {
@@ -12263,7 +11916,16 @@
           }
         ]
       },
-      "errors": []
+      "errors": [
+        "title 不能为空",
+        "cards[0].title 不能为空",
+        "cards[0].tone 类型错误，应为 [\"string\",\"null\"]",
+        "cards[1].title 不能为空",
+        "cards[2].title 不能为空",
+        "cards[2].tone 类型错误，应为 [\"string\",\"null\"]",
+        "cards[3].title 不能为空",
+        "cards[3].tone 类型错误，应为 [\"string\",\"null\"]"
+      ]
     },
     {
       "name": "root array of cards",
@@ -12276,7 +11938,7 @@
         }
       ],
       "errors": [
-        "[0].tone \"x\" 无效"
+        "kind 必须是有效版式名称"
       ]
     },
     {
@@ -12353,37 +12015,53 @@
         "footer": "示例数据，仅用于版式预览；真实数据请在文档中以 ```chart 围栏块提供。",
         "kind": "chart_focus"
       },
-      "errors": []
+      "errors": [
+        "points[0].step 不受当前版式支持",
+        "points[1].step 不受当前版式支持",
+        "points[2].step 不受当前版式支持"
+      ]
     },
     {
       "name": "null draft",
       "slide": null,
-      "errors": []
+      "errors": [
+        "kind 必须是有效版式名称"
+      ]
     },
     {
       "name": "number draft",
       "slide": 5,
-      "errors": []
+      "errors": [
+        "kind 必须是有效版式名称"
+      ]
     },
     {
       "name": "string draft",
       "slide": "text",
-      "errors": []
+      "errors": [
+        "kind 必须是有效版式名称"
+      ]
     },
     {
       "name": "boolean draft",
       "slide": false,
-      "errors": []
+      "errors": [
+        "kind 必须是有效版式名称"
+      ]
     },
     {
       "name": "empty array draft",
       "slide": [],
-      "errors": []
+      "errors": [
+        "kind 必须是有效版式名称"
+      ]
     },
     {
       "name": "empty object draft",
       "slide": {},
-      "errors": []
+      "errors": [
+        "kind 必须是有效版式名称"
+      ]
     },
     {
       "name": "several errors at once",
@@ -12399,9 +12077,10 @@
         "chart": null
       },
       "errors": [
-        "direction \"sideways\" 无效，应为 horizontal 或 vertical",
-        "root.tone \"?\" 无效",
-        "cards[0].tone \"x\" 无效",
+        "title 不能为空",
+        "cards 不受当前版式支持",
+        "direction 不受当前版式支持",
+        "tone 不受当前版式支持",
         "chart_focus 页缺少 chart（图表数据）"
       ]
     },
@@ -12493,7 +12172,12 @@
         ],
         "kind": "section_intro"
       },
-      "errors": []
+      "errors": [
+        "cards[0].tag 不受当前版式支持",
+        "cards[1].tag 不受当前版式支持",
+        "cards[1].tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "cards[2].tag 不受当前版式支持"
+      ]
     },
     {
       "name": "feature_grid: real defaults",
@@ -12534,7 +12218,10 @@
         ],
         "kind": "feature_grid"
       },
-      "errors": []
+      "errors": [
+        "cards[1].tone 的值 \"violet\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "cards[2].tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null"
+      ]
     },
     {
       "name": "spotlight: real defaults",
@@ -12581,7 +12268,10 @@
         ],
         "kind": "spotlight"
       },
-      "errors": []
+      "errors": [
+        "panels[1].tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "panels[2].steps 不受当前版式支持"
+      ]
     },
     {
       "name": "split_layers: real defaults",
@@ -12634,7 +12324,10 @@
         "footer": "建议层数控制在 3-5 层，避免右侧过密。",
         "kind": "split_layers"
       },
-      "errors": []
+      "errors": [
+        "layers[1].tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "layers[2].tone 的值 \"violet\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null"
+      ]
     },
     {
       "name": "section_list: real defaults",
@@ -12714,7 +12407,11 @@
         ],
         "kind": "focus_example"
       },
-      "errors": []
+      "errors": [
+        "points[0].step 不受当前版式支持",
+        "points[1].step 不受当前版式支持",
+        "points[2].step 不受当前版式支持"
+      ]
     },
     {
       "name": "outcome_grid: real defaults",
@@ -12748,7 +12445,12 @@
         ],
         "kind": "outcome_grid"
       },
-      "errors": []
+      "errors": [
+        "cards[0].conclusion 不受当前版式支持",
+        "cards[1].footer_tag 不受当前版式支持",
+        "cards[1].tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "cards[2].footer_tone 不受当前版式支持"
+      ]
     },
     {
       "name": "center_grid: real defaults",
@@ -12785,7 +12487,10 @@
         "footer": "中间标题适合放一句最重要的结论。",
         "kind": "center_grid"
       },
-      "errors": []
+      "errors": [
+        "center_items[1].tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "center_items[2].tone 的值 \"violet\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null"
+      ]
     },
     {
       "name": "timeline: real defaults",
@@ -12826,7 +12531,10 @@
         "footer": "时间点可写日期，也可写\"第 N 周 / 阶段名\"。",
         "kind": "timeline"
       },
-      "errors": []
+      "errors": [
+        "timeline_events[1].tone 的值 \"violet\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "timeline_events[2].tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null"
+      ]
     },
     {
       "name": "step_flow: real defaults",
@@ -12864,7 +12572,10 @@
         "footer": "如需竖排，可把 direction 改为 vertical。",
         "kind": "step_flow"
       },
-      "errors": []
+      "errors": [
+        "steps[1].tone 的值 \"violet\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "steps[2].tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null"
+      ]
     },
     {
       "name": "process: real defaults",
@@ -12926,7 +12637,9 @@
         "footer": "每个阶段建议 2-4 个步骤，避免页面过满。",
         "kind": "process"
       },
-      "errors": []
+      "errors": [
+        "phases[1].tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null"
+      ]
     },
     {
       "name": "compare: real defaults",
@@ -12982,7 +12695,9 @@
         "footer": "需要上下对比时，可调整 mode 字段。",
         "kind": "compare"
       },
-      "errors": []
+      "errors": [
+        "compare_data.right.tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null"
+      ]
     },
     {
       "name": "issue_stack: real defaults",
@@ -13088,7 +12803,18 @@
         },
         "kind": "swot"
       },
-      "errors": []
+      "errors": [
+        "swot_data.quadrants[0].key 的值 \"S\" 无效，应为 \"strengths\" / \"weaknesses\" / \"opportunities\" / \"threats\"",
+        "swot_data.quadrants[0].tone 的值 \"emerald\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "swot_data.quadrants[1].key 的值 \"W\" 无效，应为 \"strengths\" / \"weaknesses\" / \"opportunities\" / \"threats\"",
+        "swot_data.quadrants[2].key 的值 \"O\" 无效，应为 \"strengths\" / \"weaknesses\" / \"opportunities\" / \"threats\"",
+        "swot_data.quadrants[3].key 的值 \"T\" 无效，应为 \"strengths\" / \"weaknesses\" / \"opportunities\" / \"threats\"",
+        "swot_data.quadrants[3].tone 的值 \"rose\" 无效，应为 \"amber\" / \"blue\" / \"green\" / \"red\" / null",
+        "swot_data.quadrants 必须恰好包含一个 strengths",
+        "swot_data.quadrants 必须恰好包含一个 weaknesses",
+        "swot_data.quadrants 必须恰好包含一个 opportunities",
+        "swot_data.quadrants 必须恰好包含一个 threats"
+      ]
     },
     {
       "name": "chart_focus: real defaults",
@@ -13143,7 +12869,11 @@
         "footer": "示例数据，仅用于版式预览；真实数据请在文档中以 ```chart 围栏块提供。",
         "kind": "chart_focus"
       },
-      "errors": []
+      "errors": [
+        "points[0].step 不受当前版式支持",
+        "points[1].step 不受当前版式支持",
+        "points[2].step 不受当前版式支持"
+      ]
     }
   ]
 }

@@ -103,22 +103,19 @@
             "title": "目标定义",
             "icon": "i-carbon:target",
             "tone": "blue",
-            "body": "明确业务目标、成效口径与验收标准。",
-            "tag": "Why"
+            "body": "明确业务目标、成效口径与验收标准。"
           },
           {
             "title": "能力建设",
             "icon": "i-carbon:skill-level-advanced",
-            "tone": "emerald",
-            "body": "搭建数据、模型、流程三层能力。",
-            "tag": "What"
+            "tone": "green",
+            "body": "搭建数据、模型、流程三层能力。"
           },
           {
             "title": "推进机制",
             "icon": "i-carbon:workflow-automation",
             "tone": "amber",
-            "body": "建立跨团队协同与持续优化闭环。",
-            "tag": "How"
+            "body": "建立跨团队协同与持续优化闭环。"
           }
         ]
       }
@@ -158,7 +155,7 @@
             "title": "智能内容生成",
             "subtitle": "缩短方案产出时间",
             "icon": "i-carbon:machine-learning-model",
-            "tone": "violet",
+            "tone": "blue",
             "body": "基于模板与上下文快速生成初稿，再由人工精修。",
             "conclusion": "适合标准化程度高的交付场景"
           },
@@ -166,7 +163,7 @@
             "title": "过程可追踪",
             "subtitle": "方便复盘与审计",
             "icon": "i-carbon:task-complete",
-            "tone": "emerald",
+            "tone": "green",
             "body": "保留版本、输入来源和关键决策记录。",
             "risk": "需提前定义记录粒度"
           }
@@ -209,7 +206,7 @@
             "title": "关键动作",
             "kind": "flow",
             "icon": "i-carbon:flow-stream",
-            "tone": "emerald",
+            "tone": "green",
             "items": [
               "梳理字段",
               "搭建评分模型",
@@ -223,7 +220,7 @@
             "kind": "steps",
             "icon": "i-carbon:chart-line",
             "tone": "amber",
-            "steps": [
+            "items": [
               "线索响应时效缩短 60%",
               "销售跟进更聚焦",
               "复盘数据可量化"
@@ -241,6 +238,7 @@
         "kind",
         "section",
         "title",
+        "layers_title",
         "subtitle",
         "left_items",
         "layers",
@@ -279,12 +277,12 @@
           {
             "title": "流程编排",
             "meta": "任务流、审批流、智能触发器",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "模型与规则",
             "meta": "分类、评分、召回、推荐",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "数据底座",
@@ -342,6 +340,7 @@
         "kind",
         "section",
         "title",
+        "ranking_title",
         "subtitle",
         "points",
         "example_title",
@@ -354,19 +353,16 @@
         "subtitle": "左边讲原则，右边给例子，便于理解抽象概念。",
         "points": [
           {
-            "step": "01",
             "title": "先给判断标准",
             "body": "说明什么情况下该采用这套方法。",
             "icon": "i-carbon:rule"
           },
           {
-            "step": "02",
             "title": "再讲落地动作",
             "body": "把动作拆成可执行的步骤。",
             "icon": "i-carbon:play-outline-filled"
           },
           {
-            "step": "03",
             "title": "最后展示效果",
             "body": "给出产出、收益或变化。",
             "icon": "i-carbon:result"
@@ -411,28 +407,25 @@
         "section": "07",
         "title": "阶段成果",
         "subtitle": "适合总结结果、结论、价值输出。",
-        "note": "可以把 `footer_tag`、`conclusion` 当作每个成果卡片的收束语。",
+        "note": "成果写在标题和正文中，标签用于简短分类或状态。",
         "cards": [
           {
             "title": "效率提升",
             "icon": "i-carbon:flash",
             "tone": "amber",
-            "body": "提案准备时间从 2 天缩短到 4 小时。",
-            "conclusion": "团队可把精力转向深度判断"
+            "body": "提案准备时间从 2 天缩短到 4 小时。"
           },
           {
             "title": "质量更稳",
             "icon": "i-carbon:checkmark-outline",
-            "tone": "emerald",
-            "body": "输出结构更统一，漏项明显减少。",
-            "footer_tag": "可复用"
+            "tone": "green",
+            "body": "输出结构更统一，漏项明显减少。"
           },
           {
             "title": "协作顺畅",
             "icon": "i-carbon:group",
             "tone": "blue",
-            "body": "销售、方案、交付之间共享同一套上下文。",
-            "footer_tone": "blue"
+            "body": "销售、方案、交付之间共享同一套上下文。"
           }
         ]
       }
@@ -465,13 +458,13 @@
             "title": "机制",
             "desc": "再固化流程",
             "icon": "i-carbon:workflow-automation",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "数据",
             "desc": "持续反馈优化",
             "icon": "i-carbon:data-vis-4",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "组织",
@@ -512,14 +505,14 @@
             "date": "第 2-3 周",
             "title": "方案搭建",
             "body": "输出流程设计、页面原型和字段映射。",
-            "tone": "violet",
+            "tone": "blue",
             "icon": "i-carbon:build-tool"
           },
           {
             "date": "第 4-5 周",
             "title": "试点运行",
             "body": "接入真实业务，跟踪异常和效果。",
-            "tone": "emerald",
+            "tone": "green",
             "icon": "i-carbon:play-filled"
           },
           {
@@ -563,13 +556,13 @@
             "title": "设计机制",
             "body": "定义流程、规则和人机协作方式。",
             "icon": "i-carbon:flow",
-            "tone": "violet"
+            "tone": "blue"
           },
           {
             "title": "接入系统",
             "body": "把能力挂到真实业务链路中。",
             "icon": "i-carbon:application-web",
-            "tone": "emerald"
+            "tone": "green"
           },
           {
             "title": "持续优化",
@@ -590,6 +583,7 @@
         "kind",
         "section",
         "title",
+        "summary",
         "subtitle",
         "phases",
         "footer"
@@ -620,7 +614,7 @@
             "phase": "Phase 2",
             "title": "实施阶段",
             "icon": "i-carbon:play-outline",
-            "tone": "emerald",
+            "tone": "green",
             "steps": [
               {
                 "label": "搭建流程",
@@ -694,7 +688,7 @@
           },
           "right": {
             "title": "方案 B：体系化建设",
-            "tone": "emerald",
+            "tone": "green",
             "icon": "i-carbon:enterprise",
             "items": [
               {
@@ -792,9 +786,9 @@
         "swot_data": {
           "quadrants": [
             {
-              "key": "S",
+              "key": "strengths",
               "title": "优势 Strengths",
-              "tone": "emerald",
+              "tone": "green",
               "icon": "i-carbon:thumbs-up",
               "items": [
                 "已有行业案例积累",
@@ -803,7 +797,7 @@
               "summary": "内部基础较好"
             },
             {
-              "key": "W",
+              "key": "weaknesses",
               "title": "劣势 Weaknesses",
               "tone": "amber",
               "icon": "i-carbon:warning",
@@ -814,7 +808,7 @@
               "summary": "落地复杂度偏高"
             },
             {
-              "key": "O",
+              "key": "opportunities",
               "title": "机会 Opportunities",
               "tone": "blue",
               "icon": "i-carbon:growth",
@@ -825,9 +819,9 @@
               "summary": "外部窗口期明确"
             },
             {
-              "key": "T",
+              "key": "threats",
               "title": "威胁 Threats",
-              "tone": "rose",
+              "tone": "red",
               "icon": "i-carbon:storm-tracker",
               "items": [
                 "竞品推进速度快",
@@ -860,17 +854,14 @@
         "subtitle": "数据来自文档中的 ```chart 围栏块，正文负责解读而非复述。",
         "points": [
           {
-            "step": "01",
             "title": "趋势判断",
             "body": "说明指标的整体走向与阶段特征。"
           },
           {
-            "step": "02",
             "title": "关键拐点",
             "body": "指出变化最明显的时间点或分类并解释原因。"
           },
           {
-            "step": "03",
             "title": "行动建议",
             "body": "基于图表给出可执行的下一步建议。"
           }
@@ -930,13 +921,9 @@
       "label": "标签颜色",
       "type": "select",
       "options": [
-        "blue",
-        "emerald",
-        "green",
-        "violet",
         "amber",
-        "rose",
-        "gray",
+        "blue",
+        "green",
         "red"
       ]
     },
@@ -1008,6 +995,21 @@
       "placeholder": "输入示例说明"
     },
     {
+      "key": "layers_title",
+      "label": "分层区域标题",
+      "type": "text"
+    },
+    {
+      "key": "summary",
+      "label": "流程摘要",
+      "type": "text"
+    },
+    {
+      "key": "ranking_title",
+      "label": "排序区域标题",
+      "type": "text"
+    },
+    {
       "key": "image",
       "label": "主图路径",
       "type": "text",
@@ -1055,8 +1057,7 @@
         "emptyText": "还没有导览卡片",
         "iconQueryKeys": [
           "title",
-          "body",
-          "tag"
+          "body"
         ],
         "fields": [
           {
@@ -1073,23 +1074,13 @@
             "placeholder": "卡片正文"
           },
           {
-            "key": "tag",
-            "label": "标签",
-            "type": "text",
-            "placeholder": "Why"
-          },
-          {
             "key": "tone",
             "label": "色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           },
@@ -1104,9 +1095,14 @@
           "title": "",
           "body": "",
           "tone": "blue",
-          "icon": "",
-          "tag": ""
-        }
+          "icon": ""
+        },
+        "stringLists": [
+          {
+            "key": "items",
+            "label": "要点"
+          }
+        ]
       }
     ],
     "feature_grid": [
@@ -1169,34 +1165,20 @@
             "label": "标签色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
-          },
-          {
-            "key": "tag",
-            "label": "卡片标签",
-            "type": "text",
-            "placeholder": "Why"
           },
           {
             "key": "tone",
             "label": "主色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           },
@@ -1232,11 +1214,6 @@
             "key": "items",
             "label": "要点列表",
             "placeholder": "梳理字段"
-          },
-          {
-            "key": "steps",
-            "label": "结果列表",
-            "placeholder": "线索响应时效缩短 60%"
           }
         ],
         "fields": [
@@ -1249,8 +1226,13 @@
           {
             "key": "kind",
             "label": "类型",
-            "type": "text",
-            "placeholder": "flow / text / steps"
+            "type": "select",
+            "options": [
+              "text",
+              "flow",
+              "matrix",
+              "steps"
+            ]
           },
           {
             "key": "body",
@@ -1270,13 +1252,9 @@
             "label": "色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           },
@@ -1293,8 +1271,7 @@
           "body": "",
           "tone": "blue",
           "icon": "",
-          "items": [],
-          "steps": []
+          "items": []
         }
       }
     ],
@@ -1364,13 +1341,9 @@
             "label": "色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           }
@@ -1437,12 +1410,6 @@
         ],
         "fields": [
           {
-            "key": "step",
-            "label": "编号",
-            "type": "text",
-            "placeholder": "01"
-          },
-          {
             "key": "title",
             "label": "标题",
             "type": "text",
@@ -1463,7 +1430,6 @@
           }
         ],
         "new_item": {
-          "step": "",
           "title": "",
           "body": "",
           "icon": ""
@@ -1515,9 +1481,15 @@
         "iconQueryKeys": [
           "title",
           "body",
-          "conclusion"
+          "tag"
         ],
         "fields": [
+          {
+            "key": "tag",
+            "label": "标签",
+            "type": "text",
+            "placeholder": "分类或状态"
+          },
           {
             "key": "title",
             "label": "标题",
@@ -1532,44 +1504,13 @@
             "placeholder": "成果说明"
           },
           {
-            "key": "conclusion",
-            "label": "结论",
-            "type": "text",
-            "placeholder": "团队可把精力转向深度判断"
-          },
-          {
-            "key": "footer_tag",
-            "label": "底部标签",
-            "type": "text",
-            "placeholder": "可复用"
-          },
-          {
-            "key": "footer_tone",
-            "label": "标签色调",
-            "type": "select",
-            "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
-              "amber",
-              "rose",
-              "gray",
-              "red"
-            ]
-          },
-          {
             "key": "tone",
             "label": "主色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           },
@@ -1615,13 +1556,9 @@
             "label": "色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           },
@@ -1675,13 +1612,9 @@
             "label": "色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           },
@@ -1729,13 +1662,9 @@
             "label": "色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           },
@@ -1791,6 +1720,11 @@
         ],
         "fields": [
           {
+            "key": "subtitle",
+            "label": "阶段说明",
+            "type": "text"
+          },
+          {
             "key": "phase",
             "label": "阶段名",
             "type": "text",
@@ -1813,13 +1747,9 @@
             "label": "色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           },
@@ -1875,13 +1805,9 @@
             "label": "色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           },
@@ -1912,12 +1838,6 @@
         ],
         "fields": [
           {
-            "key": "step",
-            "label": "编号",
-            "type": "text",
-            "placeholder": "01"
-          },
-          {
             "key": "title",
             "label": "标题",
             "type": "text",
@@ -1932,7 +1852,6 @@
           }
         ],
         "new_item": {
-          "step": "",
           "title": "",
           "body": ""
         }
@@ -1968,13 +1887,9 @@
             "label": "色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           },
@@ -2039,13 +1954,9 @@
             "label": "色调",
             "type": "select",
             "options": [
-              "blue",
-              "emerald",
-              "green",
-              "violet",
               "amber",
-              "rose",
-              "gray",
+              "blue",
+              "green",
               "red"
             ]
           },
@@ -2130,8 +2041,13 @@
               {
                 "key": "key",
                 "label": "象限标识",
-                "type": "text",
-                "placeholder": "S"
+                "type": "select",
+                "options": [
+                  "strengths",
+                  "weaknesses",
+                  "opportunities",
+                  "threats"
+                ]
               },
               {
                 "key": "title",
@@ -2150,13 +2066,9 @@
                 "label": "色调",
                 "type": "select",
                 "options": [
-                  "blue",
-                  "emerald",
-                  "green",
-                  "violet",
                   "amber",
-                  "rose",
-                  "gray",
+                  "blue",
+                  "green",
                   "red"
                 ]
               },
@@ -2195,13 +2107,9 @@
     ]
   },
   "tone_options": [
-    "blue",
-    "emerald",
-    "green",
-    "violet",
     "amber",
-    "rose",
-    "gray",
+    "blue",
+    "green",
     "red"
   ],
   "direction_options": [

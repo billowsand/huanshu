@@ -46,6 +46,15 @@ pub fn update_project_blueprints(
     id: i64,
     blueprints_json: String,
 ) -> Result<()> {
+    let slides: Vec<serde_json::Value> = serde_json::from_str(&blueprints_json)
+        .map_err(|error| format!("幻灯片 JSON 无效：{error}"))?;
+    let schema = crate::editor_schema::editor_schema();
+    for (i, slide) in slides.iter().enumerate() {
+        let errors = crate::slide_edit::semantic_errors(&schema, slide);
+        if !errors.is_empty() {
+            return Err(format!("第 {} 页：{}", i + 1, errors.join("；")));
+        }
+    }
     let st = state.lock().unwrap();
     let db = st.db.lock().unwrap();
     db::update_project_blueprints(&*db, id, &blueprints_json).map_err(|e| e.to_string())
@@ -191,6 +200,27 @@ pub fn set_step1_project_meta(state: &SharedState, id: i64, meta: &Step1ProjectM
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn invalid_slide_fields_cannot_replace_a_saved_deck_or_reach_export() {
+        let state = test_state();
+        let id = create_project(&state, "契约测试".into(), "# 标题".into()).unwrap();
+        let good = serde_json::json!([{"kind":"cover","title":"已保存"}]);
+        update_project_blueprints(&state, id, good.to_string()).unwrap();
+        let bad = serde_json::json!([{"kind":"cover","title":"错误草稿","image":"media:12"}]);
+        let error = update_project_blueprints(&state, id, bad.to_string()).unwrap_err();
+        assert!(error.contains("image"), "{error}");
+        let saved: serde_json::Value =
+            serde_json::from_str(&get_project(&state, id).unwrap().blueprints_json).unwrap();
+        assert_eq!(saved, good);
+        let result = crate::services::export::prepare_export_values(
+            &state,
+            Some(id),
+            Some(bad.as_array().unwrap().clone()),
+            None,
+        );
+        assert!(result.err().unwrap().contains("image"));
+    }
     use crate::state::AppState;
 
     /// 临时目录 + `db::open`（建好 schema）+ 最小状态，不碰真实数据目录。

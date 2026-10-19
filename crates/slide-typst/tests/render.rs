@@ -309,6 +309,67 @@ fn page_texts(document: &typst_layout::PagedDocument, page: usize) -> Vec<String
     runs.into_iter().map(|(text, _)| text).collect()
 }
 
+#[test]
+fn canonical_content_fields_appear_in_every_theme() {
+    let slides = vec![
+        json!({"kind":"outcome_grid","title":"成果","cards":[{"title":"交付","body":"成果说明锚点","tag":"成果标签锚点"}]}),
+        json!({"kind":"focus_example","title":"示例","points":[{"title":"关注","body":"关注说明锚点"}],
+            "example_title":"案例","example_body":"案例说明","ranking_title":"排序标题锚点",
+            "ranking":[{"index":"A","label":"排序内容锚点","meta":"说明"}]}),
+        json!({"kind":"split_layers","title":"架构","layers_title":"分层标题锚点",
+            "left_items":[{"title":"职责","body":"职责说明"}],"layers":[{"title":"服务层","meta":"模块"}]}),
+        json!({"kind":"process","title":"流程","summary":"流程摘要锚点",
+            "phases":[{"phase":"01","title":"准备","subtitle":"阶段说明锚点","steps":[{"label":"执行"}]}]}),
+        json!({"kind":"spotlight","title":"步骤","panels":[{"kind":"steps","title":"顺序","items":["首项步骤锚点","末项步骤锚点"]}]}),
+    ];
+    for theme in SUPPORTED_THEMES {
+        let options = ExportOptions {
+            theme: theme.to_string(),
+            ..Default::default()
+        };
+        let compiled = renderer().compile(&slides, &options).unwrap();
+        assert_eq!(compiled.document.pages().len(), slides.len());
+        for (i, expected) in [
+            vec!["成果说明锚点", "成果标签锚点"],
+            vec!["关注说明锚点", "排序标题锚点", "排序内容锚点"],
+            vec!["分层标题锚点"],
+            vec!["流程摘要锚点", "阶段说明锚点"],
+            vec!["首项步骤锚点", "末项步骤锚点"],
+        ]
+        .iter()
+        .enumerate()
+        {
+            let text = page_texts(&compiled.document, i).concat();
+            for needle in expected {
+                assert!(
+                    text.contains(needle),
+                    "{theme} page {i} lost {needle}: {text}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn swot_order_and_summary_placement_follow_keys_rather_than_input_order() {
+    let keys = ["threats", "opportunities", "weaknesses", "strengths"];
+    let quadrants: Vec<_> = keys.iter().map(|key| json!({"key":key,"title":key,"items":[format!("item-{key}")],"summary":format!("summary-{key}")})).collect();
+    let slides = [json!({"kind":"swot","title":"矩阵","swot_data":{"quadrants":quadrants}})];
+    let compiled = renderer()
+        .compile(&slides, &ExportOptions::default())
+        .unwrap();
+    let positions = text_positions(&compiled.document, 0);
+    let pos = |needle: &str| positions.iter().find(|(_, text)| text == needle).unwrap().0;
+    assert!(pos("strengths").x < pos("weaknesses").x);
+    assert!(pos("strengths").y < pos("opportunities").y);
+    for key in ["strengths", "weaknesses"] {
+        assert!(pos(&format!("summary-{key}")).y < pos(&format!("item-{key}")).y);
+    }
+    for key in ["opportunities", "threats"] {
+        assert!(pos(&format!("summary-{key}")).y > pos(&format!("item-{key}")).y);
+    }
+}
+
 /// The five chart types are drawn natively (lib/chart.typ) in every theme and
 /// aspect: one page each, nothing clipped, no assets involved.
 #[test]
@@ -542,6 +603,67 @@ fn spotlight_accepts_data_uris_and_dense_panels() {
         "{:?}",
         rendered.missing_assets
     );
+}
+
+/// The editor schema documents `side_width` as a percentage (`"42%"` is the
+/// spotlight default); before the percent branch existed that value silently
+/// fell back to `w-72`, so the panels rendered at the wrong width.
+#[test]
+fn spotlight_side_width_accepts_a_percentage() {
+    let slide = |side_width: &str| {
+        json!({ "kind": "spotlight", "title": "侧宽", "side_width": side_width,
+                "panels": [{ "title": "面板锚点", "body": "内容" }] })
+    };
+    let panel_title_x = |side_width: &str| {
+        let document = renderer()
+            .compile(&[slide(side_width)], &ExportOptions::default())
+            .unwrap()
+            .document;
+        text_positions(&document, 0)
+            .into_iter()
+            .find(|(_, text)| text == "面板锚点")
+            .map(|(pos, _)| pos.x)
+            .expect("the panel title is on the page")
+    };
+    // 42% of the 1196px content width is 502.32px, i.e. the same column as
+    // `w-[502px]`; the old fallback (w-72 = 288px) lands ~160pt further right.
+    let percent = panel_title_x("42%").to_pt();
+    let pixels = panel_title_x("w-[502px]").to_pt();
+    assert!(
+        (percent - pixels).abs() < 1.0,
+        "42% of the content width must equal w-[502px]: {percent} vs {pixels}"
+    );
+}
+
+/// Absolute positions of every text run on a page (group transforms applied).
+fn text_positions(
+    document: &typst_layout::PagedDocument,
+    page: usize,
+) -> Vec<(typst::layout::Point, String)> {
+    fn walk(
+        frame: &typst::layout::Frame,
+        origin: typst::layout::Point,
+        out: &mut Vec<(typst::layout::Point, String)>,
+    ) {
+        for (pos, item) in frame.items() {
+            let at = origin + *pos;
+            match item {
+                typst::layout::FrameItem::Group(group) => {
+                    let base = typst::layout::Point::zero().transform_inf(group.transform);
+                    walk(&group.frame, at + base, out);
+                }
+                typst::layout::FrameItem::Text(text) => out.push((at, text.text.to_string())),
+                _ => {}
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(
+        &document.pages()[page].frame,
+        typst::layout::Point::zero(),
+        &mut out,
+    );
+    out
 }
 
 /// Text runs of a page with their fill, for checks on how text is colored.

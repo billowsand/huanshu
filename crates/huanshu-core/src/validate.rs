@@ -16,7 +16,14 @@ pub fn validate_blueprints(
     asset_paths: &HashSet<String>,
 ) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
+    let schema = crate::editor_schema::editor_schema();
     for (idx, slide) in blueprints.iter().enumerate() {
+        if let Ok(value) = slide.contract_value() {
+            for message in crate::slide_contract::errors(&schema, &value, true) {
+                issues.push(issue(idx, message));
+            }
+        }
+
         // Scale card/item count limits by aspect ratio so wide-format slides can
         // hold more columns (8 for 32:9, 12 for 48:9) without failing validation.
         let cols_multiplier: usize = match slide.aspect_ratio {
@@ -112,24 +119,6 @@ pub fn validate_blueprints(
                     issues.push(issue(
                         idx,
                         format!("outcome grid card {} requires body", card_idx + 1),
-                    ));
-                }
-                if !has_text(card.icon.as_deref()) {
-                    issues.push(issue(
-                        idx,
-                        format!("outcome grid card {} requires icon", card_idx + 1),
-                    ));
-                }
-                if !has_text(card.tag.as_deref()) {
-                    issues.push(issue(
-                        idx,
-                        format!("outcome grid card {} requires tag", card_idx + 1),
-                    ));
-                }
-                if !has_text(card.top_bar_class.as_deref()) {
-                    issues.push(issue(
-                        idx,
-                        format!("outcome grid card {} requires top_bar_class", card_idx + 1),
                     ));
                 }
             }
@@ -273,10 +262,10 @@ pub fn validate_blueprints(
         }
         // Validate tone values across all tone-bearing fields
         for (field, tone) in collect_tones(slide) {
-            if !matches!(tone.as_str(), "amber" | "blue" | "green" | "red") {
+            if !crate::editor_schema::TONE_OPTIONS.contains(&tone.as_str()) {
                 issues.push(issue(
                     idx,
-                    format!("invalid tone '{tone}' in {field}; must be amber, blue, green, or red"),
+                    format!("invalid tone '{tone}' in {field}; must be a supported tone"),
                 ));
             }
         }

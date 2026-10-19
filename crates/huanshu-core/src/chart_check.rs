@@ -12,6 +12,7 @@ use serde_json::Value;
 /// 英文被 `input.rs` 的解析报错和 LLM 报错依赖，中文是编辑器直接显示给用户的文案。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChartProblem {
+    Contract(String),
     /// 整个 chart 不是对象。
     NotAnObject,
     /// `type` 不在支持列表里；参数是它在 JSON 里的原始文本。
@@ -41,6 +42,7 @@ pub enum ChartProblem {
 impl ChartProblem {
     pub fn message_en(&self) -> String {
         match self {
+            ChartProblem::Contract(message) => message.clone(),
             ChartProblem::NotAnObject => "chart must be an object".to_string(),
             ChartProblem::InvalidType(kind) => format!(
                 "chart type '{kind}' is invalid; must be one of {}",
@@ -71,6 +73,7 @@ impl ChartProblem {
     pub fn message_zh(&self) -> String {
         let types = crate::types::CHART_TYPES.join(" / ");
         match self {
+            ChartProblem::Contract(message) => message.clone(),
             ChartProblem::NotAnObject => "chart 必须是对象".to_string(),
             ChartProblem::InvalidType(kind) => format!("type \"{kind}\" 无效，应为 {types}"),
             ChartProblem::EmptyTitle => "title 不能为空".to_string(),
@@ -128,7 +131,10 @@ pub fn chart_problems_json(value: &Value) -> Vec<ChartProblem> {
         _ => return vec![ChartProblem::InvalidType(type_text(chart_type))],
     };
 
-    let mut out = Vec::new();
+    let mut out: Vec<ChartProblem> = crate::slide_contract::chart_errors(value)
+        .into_iter()
+        .map(ChartProblem::Contract)
+        .collect();
     if !present_str(spec.get("title")) {
         out.push(ChartProblem::EmptyTitle);
     }
@@ -208,7 +214,7 @@ mod tests {
 
     /// Every branch of the old TypeScript `chartProblems()`, with the output it produced.
     #[test]
-    fn the_chinese_branch_table_matches_the_old_typescript() {
+    fn chart_semantics_keep_their_chinese_messages() {
         let cases: Vec<(Value, Vec<&str>)> = vec![
             (json!(null), vec!["chart 必须是对象"]),
             (json!([1, 2]), vec!["chart 必须是对象"]),
@@ -265,13 +271,10 @@ mod tests {
         ];
         for (value, expected) in cases {
             let actual = chart_problems_json(&value);
-            assert_eq!(
-                actual
-                    .iter()
-                    .map(ChartProblem::message_zh)
-                    .collect::<Vec<_>>(),
-                expected,
-                "input: {value}"
+            let messages: Vec<_> = actual.iter().map(ChartProblem::message_zh).collect();
+            assert!(
+                messages.ends_with(&expected.iter().map(|s| s.to_string()).collect::<Vec<_>>()),
+                "input: {value}, errors: {messages:?}"
             );
         }
     }

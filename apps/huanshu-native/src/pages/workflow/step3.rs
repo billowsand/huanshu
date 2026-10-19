@@ -521,10 +521,11 @@ impl Step3 {
 
     /// 原版 `applyEditorChanges`：写回的是**高级 JSON 框里解析出来的那一页**（`JSON.parse(jsonText)`）。
     ///
-    /// 平时它就是过滤后的草稿（`json_text` 每次表单改动都由 [`Self::refresh_json_text`] 维护），
-    /// 用户在 JSON 里手加的字段会原样保存。有 JSON 错误时应用无效（原版按钮禁用、Ctrl+S 无效）。
+    /// 表单与 JSON 共用草稿；只有通过结构与语义校验的内容才能应用。
+    /// 非法输入保留供用户修正，按钮与 Ctrl+S 使用同一校验门槛。
     fn apply(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.json_error.is_empty()
+            || !self.semantic_errors().is_empty()
             || !self.has_unsaved
             || self.saving(cx)
             || self.editing_locked(cx)
@@ -1748,6 +1749,15 @@ impl Step3 {
             card = card.child(self.icon_box(&item_path, &keys, locked, cx));
         }
         for string_list in &def.string_lists {
+            // Text panels have no list slot; preserve and expose invalid non-empty lists so
+            // the user can clear them without silently losing content when changing kind.
+            if path == "panels"
+                && string_list.key == "items"
+                && slide_edit::string_value(draft, &format!("{item_path}.kind")) == "text"
+                && slide_edit::array_value(draft, &format!("{item_path}.items")).is_empty()
+            {
+                continue;
+            }
             let string_path = format!("{item_path}.{}", string_list.key);
             card = card.child(self.string_list(
                 draft,
@@ -2325,6 +2335,13 @@ impl Step3 {
             column = column.child(group);
         }
 
+        if !self.advanced_json {
+            let errors = self.semantic_errors();
+            if !errors.is_empty() {
+                column = column.child(semantic_errors_block(&errors, cx));
+            }
+        }
+
         // ⑩ 保存按钮不在这里：它在右栏底部的固定操作区（`render_actions`），不跟着表单滚。
         column.into_any_element()
     }
@@ -2354,7 +2371,13 @@ impl Step3 {
             widgets::primary_button("apply-changes", label)
                 .icon(carbon(icon))
                 .w_full()
-                .disabled(saving || !unsaved || locked || !self.json_error.is_empty())
+                .disabled(
+                    saving
+                        || !unsaved
+                        || locked
+                        || !self.json_error.is_empty()
+                        || !self.semantic_errors().is_empty(),
+                )
                 .on_click(cx.listener(|this, _event, window, cx| this.apply(window, cx))),
         );
         if locked {

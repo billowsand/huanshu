@@ -289,8 +289,6 @@ pub struct ChartEmphasis {
     /// 需要高亮的类目名（x 值或 donut 的 label 值）
     #[serde(default)]
     pub highlight: Vec<String>,
-    #[serde(default)]
-    pub trend: Option<String>,
 }
 
 pub const CHART_TYPES: &[&str] = &["line", "bar", "donut", "grouped_bar", "stacked_area"];
@@ -323,8 +321,36 @@ where
     Ok(serde_json::from_value(raw).unwrap_or(SlideKind::Cover))
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// The internal union stays convenient for generation. Its public JSON is projected through
+// the layout contract, so unused union fields never leak into stored decks or the editor.
+macro_rules! slide_blueprint {
+    ($(#[$meta:meta])* pub struct $name:ident { $($(#[$field_meta:meta])* pub $field:ident: $ty:ty,)* }) => {
+        $(#[$meta])* pub struct $name { $($(#[$field_meta])* pub $field: $ty,)* }
+        impl $name {
+            pub(crate) fn contract_value(&self) -> Result<Value, serde_json::Error> {
+                let mut map = serde_json::Map::new();
+                $(map.insert(stringify!($field).to_string(), serde_json::to_value(&self.$field)?);)*
+                Ok(Value::Object(map))
+            }
+        }
+        impl Serialize for $name {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                let value = self.contract_value().map_err(serde::ser::Error::custom)?;
+                crate::slide_contract::project(&crate::editor_schema::editor_schema(), &value).serialize(serializer)
+            }
+        }
+    };
+}
+
+slide_blueprint! {
+#[derive(Debug, Clone, Deserialize)]
 pub struct SlideBlueprint {
+    #[serde(default)]
+    pub layers_title: Option<String>,
+    #[serde(default)]
+    pub summary: Option<String>,
+    #[serde(default)]
+    pub ranking_title: Option<String>,
     #[serde(deserialize_with = "de_slide_kind")]
     pub kind: SlideKind,
     pub aspect_ratio: Option<AspectRatio>,
@@ -393,6 +419,8 @@ pub struct SlideBlueprint {
     pub chart: Option<ChartSpec>,
 }
 
+}
+
 impl SlideBlueprint {
     pub fn iter_icons(&self) -> impl Iterator<Item = &str> {
         self.cards
@@ -459,8 +487,6 @@ pub struct GridCard {
     #[serde(default)]
     pub footer_tone: Option<String>,
     #[serde(default)]
-    pub top_bar_class: Option<String>,
-    #[serde(default)]
     pub risk: Option<String>,
     #[serde(default)]
     pub tag: Option<String>,
@@ -479,8 +505,6 @@ pub struct SpotlightPanel {
     pub body: Option<String>,
     #[serde(default)]
     pub items: Vec<String>,
-    #[serde(default)]
-    pub steps: Vec<String>,
     #[serde(default)]
     pub highlight: Option<String>,
 }
@@ -552,6 +576,8 @@ pub struct PhaseStep {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhaseItem {
+    #[serde(default)]
+    pub subtitle: Option<String>,
     pub phase: String,
     pub title: String,
     #[serde(default)]

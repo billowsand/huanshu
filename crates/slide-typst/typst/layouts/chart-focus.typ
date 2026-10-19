@@ -34,7 +34,7 @@
 // opacity after `mt-1`, `gap-3` to the step number (`.cf-step`: card-title
 // size so it sits on the title line) or, without a step, an 8px square
 // (`.cf-dot`, `mt-2`). Same metrics as focus_example's point cards.
-#let point-row(ctx, point, f) = {
+#let point-row(ctx, point, index, f) = {
   let th = ctx.theme
   let body = {
     txt(ctx, "title", ctx.ty.card-title * f, 1.3, point.at("title", default: ""))
@@ -44,12 +44,7 @@
       txt(ctx, "body", ctx.ty.caption * f, 1.5, rich(desc), fill: th.ink.transparentize(30%))
     }
   }
-  let step = point.at("step", default: none)
-  let marker = if has(step) {
-    txt(ctx, "number", ctx.ty.card-title * f, 1.3, str(step), fill: th.primary)
-  } else {
-    pad(top: 8 * px * f, box(width: 8 * px * f, height: 8 * px * f, radius: 2 * px * f, fill: th.primary))
-  }
+  let marker = txt(ctx, "number", ctx.ty.card-title * f, 1.3, str(index + 1), fill: th.primary)
   grid(columns: (auto, 1fr), column-gutter: 12 * px * f, marker, body)
 }
 
@@ -137,7 +132,7 @@
   let right-w = width - gap * px - left-w
 
   let build(f) = {
-    let left = stack(spacing: 16 * px * f, ..points.map(p => point-row(ctx, p, f)))
+    let left = stack(spacing: 16 * px * f, ..points.enumerate().map(((i, p)) => point-row(ctx, p, i, f)))
     v(16 * px * f) // `mt-4`
     grid(
       columns: (left-w, right-w),
