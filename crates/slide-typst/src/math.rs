@@ -4,7 +4,7 @@
 //! spans that fail conversion keep their original text and render literally.
 //!
 //! The scanning rules mirror `splitMathSegments` in `src/utils/richText.ts`
-//! and the protection in `src-tauri/src/generator/utils.rs`:
+//! and the protection in `crates/huanshu-core/src/generator/utils.rs`:
 //! - `$$...$$` is display math and may span lines;
 //! - `$...$` is inline math, cannot cross a newline, and its content must not
 //!   start or end with whitespace (pandoc-style guard against `$5 and $10`);

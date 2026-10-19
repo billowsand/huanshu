@@ -29,7 +29,7 @@ impl ModelServiceSettings {
     }
 }
 
-/// LLM settings persisted to disk via tauri-plugin-store
+/// LLM settings persisted to disk in `settings.json`.
 #[derive(Debug, Clone, Serialize)]
 pub struct LlmSettings {
     pub llm: ModelServiceSettings,

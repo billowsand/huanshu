@@ -8,9 +8,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TAURI_ICONS = ROOT / "src-tauri" / "icons"
-BRAND_ASSETS = ROOT / "src" / "assets" / "brand"
-PUBLIC_DIR = ROOT / "public"
+APP_ICON = ROOT / "assets" / "app-icon"
+BRAND_ASSETS = ROOT / "assets" / "brand"
 
 
 Color = tuple[int, int, int, int]
@@ -425,7 +424,6 @@ def render_icon_bytes(size: int) -> bytes:
 
 def write_svg_sources() -> None:
     BRAND_ASSETS.mkdir(parents=True, exist_ok=True)
-    PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
 
     app_icon_svg = """<svg width="512" height="512" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -505,73 +503,26 @@ def write_svg_sources() -> None:
 
     (BRAND_ASSETS / "huanshu-app-icon.svg").write_text(app_icon_svg, encoding="utf-8")
     (BRAND_ASSETS / "huanshu-mark.svg").write_text(mark_svg, encoding="utf-8")
-    (PUBLIC_DIR / "favicon.svg").write_text(app_icon_svg, encoding="utf-8")
 
 
 def generate_all_assets() -> None:
     write_svg_sources()
 
     png_specs = {
-        TAURI_ICONS / "32x32.png": (32, True, False, 1.0),
-        TAURI_ICONS / "64x64.png": (64, True, False, 1.0),
-        TAURI_ICONS / "128x128.png": (128, True, False, 1.0),
-        TAURI_ICONS / "128x128@2x.png": (256, True, False, 1.0),
-        TAURI_ICONS / "icon.png": (512, True, False, 1.0),
-        TAURI_ICONS / "StoreLogo.png": (50, True, False, 1.0),
-        TAURI_ICONS / "Square30x30Logo.png": (30, True, False, 1.0),
-        TAURI_ICONS / "Square44x44Logo.png": (44, True, False, 1.0),
-        TAURI_ICONS / "Square71x71Logo.png": (71, True, False, 1.0),
-        TAURI_ICONS / "Square89x89Logo.png": (89, True, False, 1.0),
-        TAURI_ICONS / "Square107x107Logo.png": (107, True, False, 1.0),
-        TAURI_ICONS / "Square142x142Logo.png": (142, True, False, 1.0),
-        TAURI_ICONS / "Square150x150Logo.png": (150, True, False, 1.0),
-        TAURI_ICONS / "Square284x284Logo.png": (284, True, False, 1.0),
-        TAURI_ICONS / "Square310x310Logo.png": (310, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-20x20@1x.png": (20, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-20x20@2x.png": (40, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-20x20@2x-1.png": (40, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-20x20@3x.png": (60, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-29x29@1x.png": (29, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-29x29@2x.png": (58, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-29x29@2x-1.png": (58, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-29x29@3x.png": (87, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-40x40@1x.png": (40, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-40x40@2x.png": (80, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-40x40@2x-1.png": (80, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-40x40@3x.png": (120, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-60x60@2x.png": (120, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-60x60@3x.png": (180, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-76x76@1x.png": (76, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-76x76@2x.png": (152, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-83.5x83.5@2x.png": (167, True, False, 1.0),
-        TAURI_ICONS / "ios" / "AppIcon-512@2x.png": (1024, True, False, 1.0),
-        TAURI_ICONS / "android" / "mipmap-mdpi" / "ic_launcher.png": (48, True, False, 1.0),
-        TAURI_ICONS / "android" / "mipmap-hdpi" / "ic_launcher.png": (72, True, False, 1.0),
-        TAURI_ICONS / "android" / "mipmap-xhdpi" / "ic_launcher.png": (96, True, False, 1.0),
-        TAURI_ICONS / "android" / "mipmap-xxhdpi" / "ic_launcher.png": (144, True, False, 1.0),
-        TAURI_ICONS / "android" / "mipmap-xxxhdpi" / "ic_launcher.png": (192, True, False, 1.0),
-        TAURI_ICONS / "android" / "mipmap-mdpi" / "ic_launcher_round.png": (48, True, True, 1.0),
-        TAURI_ICONS / "android" / "mipmap-hdpi" / "ic_launcher_round.png": (72, True, True, 1.0),
-        TAURI_ICONS / "android" / "mipmap-xhdpi" / "ic_launcher_round.png": (96, True, True, 1.0),
-        TAURI_ICONS / "android" / "mipmap-xxhdpi" / "ic_launcher_round.png": (144, True, True, 1.0),
-        TAURI_ICONS / "android" / "mipmap-xxxhdpi" / "ic_launcher_round.png": (192, True, True, 1.0),
-        TAURI_ICONS / "android" / "mipmap-mdpi" / "ic_launcher_foreground.png": (108, False, False, 0.92),
-        TAURI_ICONS / "android" / "mipmap-hdpi" / "ic_launcher_foreground.png": (162, False, False, 0.92),
-        TAURI_ICONS / "android" / "mipmap-xhdpi" / "ic_launcher_foreground.png": (216, False, False, 0.92),
-        TAURI_ICONS / "android" / "mipmap-xxhdpi" / "ic_launcher_foreground.png": (324, False, False, 0.92),
-        TAURI_ICONS / "android" / "mipmap-xxxhdpi" / "ic_launcher_foreground.png": (432, False, False, 0.92),
+        APP_ICON / "32x32.png": (32, True, False, 1.0),
+        APP_ICON / "64x64.png": (64, True, False, 1.0),
+        APP_ICON / "128x128.png": (128, True, False, 1.0),
+        APP_ICON / "128x128@2x.png": (256, True, False, 1.0),
+        APP_ICON / "icon.png": (512, True, False, 1.0),
     }
 
     for path, (size, with_background, round_mask, scale) in png_specs.items():
         write_png(path, size, with_background=with_background, round_mask=round_mask, scale=scale)
 
-    (TAURI_ICONS / "android" / "values" / "ic_launcher_background.xml").write_text(
-        """<?xml version="1.0" encoding="utf-8"?>\n<resources>\n  <color name="ic_launcher_background">#101826</color>\n</resources>\n""",
-        encoding="utf-8",
-    )
-
-    build_ico(TAURI_ICONS / "icon.ico")
-    build_icns(TAURI_ICONS / "icon.icns")
+    # The ico goes into the exe via apps/huanshu-native/build.rs (winresource, id 1); the icns
+    # goes into the macOS .app bundle (scripts/package-native-macos.sh). Both read assets/app-icon.
+    build_ico(APP_ICON / "icon.ico")
+    build_icns(APP_ICON / "icon.icns")
 
 
 if __name__ == "__main__":

@@ -17,8 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # scripts/package-native.ps1 finds makensis in Program Files (x86)\NSIS first;
-      # the Tauri toolchain copy is only present on a developer machine.
       - name: Install NSIS
         run: choco install nsis -y --no-progress
 
@@ -27,8 +25,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # No bun here on purpose: the native build is pure Rust, it does not build src/.
-      # The script must stay ASCII-only and is invoked the same way it is locally.
+      # The build is pure Rust, so the script is invoked exactly the way it is locally.
+      # It must stay ASCII-only.
       - name: Package the native (GPUI) build
         shell: cmd
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package-native.ps1
@@ -57,15 +55,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      # The packaging script refuses to build without the Carbon icon set (blank icons otherwise).
-      - name: Install frontend dependencies
-        run: bun install
-
+      # No bun here on purpose: the build is pure Rust and the Carbon icon set is vendored
+      # in assets/carbon, so no frontend install is needed on any platform.
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:

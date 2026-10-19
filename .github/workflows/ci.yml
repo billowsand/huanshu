@@ -21,71 +21,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install frontend dependencies
-        # Required so build.rs can embed @iconify-json/carbon icons.json
-        run: bun install
-
+      # No bun / npm step: the Carbon icon set is vendored in assets/carbon and the build
+      # scripts embed it from there, so a Rust toolchain is the only build dependency.
       - name: Install Rust toolchain (stable)
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
-      - name: Cache cargo registry & build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "src-tauri"
+      - uses: Swatinem/rust-cache@v2
 
       - name: Check formatting
         run: cargo fmt --all -- --check
-        working-directory: src-tauri
 
       - name: Clippy
         # Prefer green CI while we clean up historical lints; correctness still checked by build/test.
-        run: cargo clippy --locked --all-targets
-        working-directory: src-tauri
+        run: cargo clippy --locked --workspace --all-targets
 
       - name: Build
-        run: cargo build --locked --all-targets
-        working-directory: src-tauri
+        run: cargo build --locked --workspace --all-targets
 
       - name: Test
-        run: cargo test --locked --all-targets
-        working-directory: src-tauri
-
-  # 原生 GPUI 版不在 default-members，上面的 test job 编不到它；这里在 macOS 与 Windows 上
-  # 各编一遍并跑它的单测（平台分支——菜单、文件对话框、字体——两边都要编得过）。
-  native:
-    name: native (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install frontend dependencies
-        # Carbon icons.json for the core/slide-typst build scripts
-        run: bun install
-
-      - name: Install Rust toolchain (stable)
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Test native (GPUI) build
-        run: cargo test --locked -p huanshu-native
-
-      - name: Test core fonts and defaults on this platform
-        run: cargo test --locked -p huanshu-core --lib -- fonts types
+        run: cargo test --locked --workspace --all-targets

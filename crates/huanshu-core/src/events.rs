@@ -1,9 +1,10 @@
 //! 生成流水线的事件抽象。
 //!
-//! core 不认识 `tauri::AppHandle`，因此进度、逐页状态与日志都以 [`CoreEvent`] 表达，
-//! 由界面层实现的 [`EventSink`] 转回各自的事件名与载荷。每个变体对应一个事件名，
-//! 载荷与 Tauri 版 `app.emit(name, payload)` 的线上 JSON 完全一致——
-//! `tests/fixtures/generation-events.json` 在 Tauri 版 `emit` 还在时生成，锁住了这份格式。
+//! core 不认识任何界面框架，因此进度、逐页状态与日志都以 [`CoreEvent`] 表达，
+//! 由界面层实现的 [`EventSink`] 转回各自的事件名与载荷。每个变体对应一个事件名。
+//! 载荷格式在 Tauri 版 `app.emit(name, payload)` 还在时定下，由
+//! `tests/fixtures/generation-events.json` 锁定（`tests/generation_events.rs` 逐字比对）——
+//! 原生界面经 `tasks::listen_events` 消费的是同一份载荷，不要随意改字段。
 
 use serde::Serialize;
 use serde_json::Value;

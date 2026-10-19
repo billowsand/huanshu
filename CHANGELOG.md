@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **删除 Tauri + Vue 版，工程变为纯 Rust**：原生 GPUI 界面功能已全部对齐（逐页清单见 `docs/native/parity.md`），
+  旧界面随之删除：`src-tauri/`（Tauri 外壳与命令层）、`src/`（Vue 3 + Pinia 前端）、`package.json` /
+  `bun.lock`、`vite.config.ts` / `uno.config.ts` / `tsconfig.json` / `iconify.ts` / `index.html` / `public/`，
+  以及 `scripts/package.ps1` 与五个 Playwright 版式校验脚本。**现在只需要 Rust 工具链**：
+  没有 Node.js / bun，没有 WebView2，`cargo run -p huanshu-native --release` 直接跑。
+  依赖树里 Tauri 归零（`cargo tree --workspace | grep -i tauri` 无输出）。
+- **图标资源入库**：Carbon 图标集（Apache-2.0）从 `node_modules/@iconify-json/carbon` 移到
+  `assets/carbon/icons.json`，两个 `build.rs` 从这里内嵌（缺文件直接编译失败，不再静默渲染空白图标）；
+  exe / `.app` 图标移到 `assets/app-icon/`。CI 与发版工作流不再需要 `bun install`。
+
+### Changed
+
+- **生成事件格式快照测试移入 core**：原先只在 `src-tauri` 单测里的 5 个事件线上格式用例
+  （`gen:progress` / `gen:slide_ready` / `gen:error` / `gen:page_status` / `gen:log`）迁到
+  `crates/huanshu-core/tests/generation_events.rs`，继续对 `tests/fixtures/generation-events.json` 逐字比对。
+- **`AppState.project_dir` 不再特殊处理 `src-tauri` 工作目录**：直接取进程当前目录。
+
 ## [0.6.1] - 2026-10-19
 
 ### Added

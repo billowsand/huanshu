@@ -52,23 +52,16 @@ cd "$REPO"
 BIN_NAME="huanshu-native"
 APP_DISPLAY="幻述"
 BUNDLE_ID="com.auto-slidev.studio.native"
-ICNS="$REPO/src-tauri/icons/icon.icns"
+ICNS="$REPO/assets/app-icon/icon.icns"
 MANIFEST="$REPO/apps/huanshu-native/Cargo.toml"
 OUT="$REPO/dist-package"
 
 # ── 1. 版本号与前置检查 ─────────────────────────────────────────────────────
 VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$MANIFEST" | head -n 1)"
 [[ -n "$VERSION" ]] || die "读不到 $MANIFEST 的 version"
-TAURI_VERSION="$(sed -n 's/.*"version":[[:space:]]*"\([^"]*\)".*/\1/p' "$REPO/src-tauri/tauri.conf.json" | head -n 1)"
-if [[ -n "$TAURI_VERSION" && "$TAURI_VERSION" != "$VERSION" ]]; then
-    echo "注意：Tauri 版是 $TAURI_VERSION，原生版是 $VERSION（发版时保持一致）"
-fi
 [[ -f "$ICNS" ]] || die "缺图标 $ICNS"
 command -v cargo >/dev/null || die "找不到 cargo"
 xcode-select -p >/dev/null 2>&1 || die "没装 Xcode Command Line Tools（xcode-select --install）"
-if [[ ! -f "$REPO/node_modules/@iconify-json/carbon/icons.json" ]]; then
-    die "缺 node_modules/@iconify-json/carbon（先在仓库根目录 bun install，否则图标全是空白）"
-fi
 # 运行中的副本不影响 cargo 覆盖（macOS 允许），但会让人误以为测的是新包：提示一下。
 if pgrep -x "$BIN_NAME" >/dev/null 2>&1; then
     echo "注意：$BIN_NAME 正在运行（pid $(pgrep -x "$BIN_NAME" | tr '\n' ' ')），验收前记得关掉重开"

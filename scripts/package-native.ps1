@@ -3,35 +3,36 @@
     Native (GPUI) packaging script: release build -> portable exe -> NSIS installer -> dist-package/
 
 .DESCRIPTION
-    This packages apps/huanshu-native (the GPUI build). The Tauri build is a different
-    artifact and a different script - see scripts/package.ps1.
+    This packages apps/huanshu-native, the only shipping application. It is pure Rust:
+    `cargo build` is the whole build, with no frontend step and no bun in front of it.
 
     Output names:
       - huanshu-native_windows_x64.exe            portable single-file exe, double-click to run
       - HuanshuNative_<version>_x64-setup.exe     NSIS installer (currentUser, silent /S)
 
-    The two installs are deliberately separate so installing the native build can never
-    overwrite or uninstall the Tauri build:
-      - Tauri build:  %LOCALAPPDATA%\Huanshu        uninstall key ...\Uninstall\Huanshu
-      - native build: %LOCALAPPDATA%\HuanshuNative  uninstall key ...\Uninstall\HuanshuNative
-    Both share the same application data directory on purpose: the native build is meant
-    to take over from the Tauri build, so the data must stay where it is. Nothing here
-    touches the data directory, and the NSIS script never touches %LOCALAPPDATA%\Huanshu.
+    The install directory, product key and uninstall entry are deliberately distinct from
+    the retired Tauri build (which used %LOCALAPPDATA%\Huanshu and the key ...\Uninstall\Huanshu),
+    so leftovers from an older install can never collide with this one. This installer also
+    never touches an existing %LOCALAPPDATA%\Huanshu.
+
+    The app data directory is shared with the Tauri build on purpose: the native build was
+    meant to take over from it, so projects must stay where they are. Nothing in this script
+    touches the data directory.
 
     Runtime dependencies (from `dumpbin /dependents target/release/huanshu-native.exe`):
       * No WebView2 and no bundled browser: the UI is drawn by GPUI on DirectX 11
         (d3d11/dxgi/dcomp/dwmapi) and text goes through DirectWrite, all of which ship
         with Windows 10 and later.
-      * Static CRT (since d4be460, mirroring tauri_build): the release exe does NOT
-        import VCRUNTIME140.dll, so nothing extra to install - the api-ms-win-crt-*
-        Universal CRT api sets it still imports are an OS component on Windows 10+.
-        Debug builds keep the dynamic CRT (libcmtd conflicts with prebuilt deps).
+      * Static CRT: the release exe does NOT import VCRUNTIME140.dll, so nothing extra to
+        install - the api-ms-win-crt-* Universal CRT api sets it still imports are an OS
+        component on Windows 10+. Debug builds keep the dynamic CRT (libcmtd conflicts with
+        prebuilt deps).
       * LM Studio is an external dependency and is not packaged: the generation pipeline
         needs a model configured in the app's settings.
 
     Hard-won facts (do not rediscover these):
       * Build output lives in <repo>/target (the workspace root), NOT apps/huanshu-native/target.
-      * makensis comes from the Tauri toolchain: %LOCALAPPDATA%\tauri\NSIS\makensis.exe (NSIS 3).
+      * makensis comes from the standalone NSIS install (Program Files (x86)\NSIS) or PATH.
         It is only needed for the installer; without it the portable exe is still produced.
       * The generated .nsi is ASCII-only and every non-ASCII value is passed with
         `makensis -D...`: the Windows command line is UTF-16, so makensis receives correct
@@ -70,9 +71,8 @@ $outDir    = Join-Path $repo 'dist-package'
 $workDir   = Join-Path $repo 'target/package-native'
 $exeName   = 'huanshu-native.exe'
 
-# Product identity. The install directory and the uninstall key are ASCII and distinct from
-# the Tauri build's "Huanshu"; the display name is Chinese and matches the version resource
-# that apps/huanshu-native/build.rs embeds into the exe.
+# Product identity. The install directory and the uninstall key are ASCII; the display name is
+# Chinese and matches the version resource that apps/huanshu-native/build.rs embeds into the exe.
 $productKey = 'HuanshuNative'
 # U+5E7B U+8FF0 U+FF08 U+539F U+751F U+7248 U+FF09 literally means "Huanshu (native version)".
 # Written as code points because this file has to stay ASCII-only.
@@ -90,14 +90,6 @@ if ($running.Count -gt 0) {
 $raw = Get-Content $manifest -Raw
 if ($raw -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "no package version in $manifest" }
 $version = $Matches[1]
-
-$tauriConf = Join-Path $repo 'src-tauri/tauri.conf.json'
-if (Test-Path $tauriConf) {
-    $tauriVersion = (Get-Content $tauriConf -Raw | ConvertFrom-Json).version
-    if ($tauriVersion -ne $version) {
-        Write-Host "note: Tauri build is at $tauriVersion, native build at $version (keep them in sync)" -ForegroundColor Yellow
-    }
-}
 
 # 2. build
 $cargoArgs = @('build', '-p', 'huanshu-native')
@@ -121,9 +113,8 @@ $setupTmp  = Join-Path $workDir $setupName
 if ($NoInstall) {
     Write-Host 'no-install: installer skipped' -ForegroundColor DarkGray
 } else {
-    # NSIS from the Tauri toolchain first, then a standalone install, then PATH.
+    # Standalone NSIS first (what CI installs with choco), then PATH.
     $makensis = @(
-        (Join-Path $env:LOCALAPPDATA 'tauri/NSIS/makensis.exe'),
         (Join-Path ${env:ProgramFiles(x86)} 'NSIS/makensis.exe'),
         (Join-Path $env:ProgramFiles 'NSIS/makensis.exe')
     ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
@@ -133,7 +124,7 @@ if ($NoInstall) {
     }
 
     if (-not $makensis) {
-        Write-Host 'makensis not found (looked in %LOCALAPPDATA%\tauri\NSIS, Program Files\NSIS, PATH).' -ForegroundColor Yellow
+        Write-Host 'makensis not found (looked in Program Files (x86)\NSIS, Program Files\NSIS, PATH).' -ForegroundColor Yellow
         Write-Host 'installer skipped - the portable exe above still runs as-is.' -ForegroundColor Yellow
     } else {
         Step "makensis $( & $makensis /VERSION ) - $([IO.Path]::GetFileName($makensis))"
@@ -200,8 +191,8 @@ SectionEnd
 
 ; A section named "Uninstall" is what the compiler puts into the uninstaller.
 Section "Uninstall"
-    ; Only our own shortcut and our own key - the Tauri build's Huanshu.lnk and
-    ; ...\Uninstall\Huanshu key belong to the other installer and are left alone.
+    ; Only our own shortcut and our own key - the retired Tauri build's Huanshu.lnk and
+    ; ...\Uninstall\Huanshu key belong to another installer and are left alone.
     Delete "$SMPROGRAMS\${PRODUCT_NAME}.lnk"
     Delete "$INSTDIR\${EXE_NAME}"
     Delete "$INSTDIR\uninstall.exe"

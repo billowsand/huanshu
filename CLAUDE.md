@@ -1,24 +1,30 @@
-# 代码结构：`huanshu-core` 与界面层
+# 代码结构：纯 Rust 工程
 
-业务逻辑都在 `crates/huanshu-core`（**不依赖 Tauri**，`cargo tree -p huanshu-core | grep -i tauri` 必须为空），
-界面层只做转发。界面正从 Tauri + Vue 逐页迁往原生 GPUI（`spikes/gpui-kit/`、`docs/spikes/gpui-kit.md`），两套界面共用 core。
+**幻述是纯 Rust 项目**：没有 Node.js / bun，没有 WebView2，没有 Vue。三个 crate，一个可执行程序。
+
+| Crate | 作用 |
+|---|---|
+| `crates/huanshu-core` | 业务内核：数据库、生成流水线、导入导出、设置（**不依赖任何界面框架**，`cargo tree -p huanshu-core \| grep -i tauri` 必须为空） |
+| `crates/slide-typst` | 进程内嵌的 Typst 编译器：屏幕位图、公式位图、PDF 全走它 |
+| `apps/huanshu-native` | 界面（GPUI Kit），唯一的可执行程序，只做转发 |
+
+Tauri + Vue 版已于 2026-10 删除（`src-tauri/`、`src/`、`package.json`、vite/uno/tsconfig 配置一并删掉）。
+迁移期的逐页功能对照表留在 `docs/native/parity.md`，截图在 `docs/native/reference/`（旧版）与
+`docs/native/shell/`（原生版）。
 
 - `huanshu_core::AppState`（`state.rs`）：设置、当前牌组、SQLite 连接与存储根；界面层用自己的锁包住它
-  （Tauri：`commands::Shared = Arc<Mutex<AppState>>`），服务函数只认 `&Mutex<AppState>`。
+  （原生版 `Mutex<AppState>`），服务函数只认 `&Mutex<AppState>`。
 - `services/`：`generation`（流水线、重试、图标）、`projects`、`storage`（`.keynn` 导入导出与加密）、`media`、
-  `settings`、`export`（PDF 与缩略图，包装 `slide-typst`）。错误类型是 `String`，命令层直接透传。
-- 事件：core 只认 `events::EventSink` / `CoreEvent`，`CoreEvent::wire()` 给出 `(事件名, 载荷)`；Tauri 的 `TauriEventSink`
-  转发给 `AppHandle::emit`。线上格式由 `tests/fixtures/generation-events.json` 锁定（`src-tauri` 的单测比对）。
-- 带 `async` 的服务函数要求调用方处于 tokio 运行时中；同步重活（PDF、缩略图、字体枚举）由命令层放进 `spawn_blocking`。
-- `src-tauri/src/commands/*.rs` 的每个命令只做「取参数 → 调 core → 转错误」，**不要**再把 SQL、文件读写或业务分支写回命令层。
-- 前端的「规则」也在 core：编辑器版式表 `editor_schema.rs`（`get_editor_schema`，前端缓存在 `stores/editorSchema.ts`）、
-  图表校验 `chart_check.rs`（`chart_problems`）。
-- 暂时允许的重复（Tauri 界面下线前，**改一边必须改另一边**）：缩略图调度 `preview.rs` ↔ `useTypstThumbnails.ts`、
-  主题清单 `themes.rs` ↔ `src/themes/catalog.ts`、第二步进度规则 `generation_progress.rs` ↔
-  `src/utils/generationProgress.ts` / `src/stores/generation.ts` / `Step2Generate.vue`（快照
-  `tests/fixtures/generation-progress.json` 由 `target/` 下一次性 bun 脚本从原版代码生成，`tests/generation_progress.rs` 比对）。
-  第三步编辑规则 `slide_edit.rs` ↔ `src/composables/useSlideEditor.ts` / `Step3Editor.vue`（快照 `tests/fixtures/slide-edit.json`，
-  `tests/slide_edit.rs` 比对；`filterSlideJson` 两边都额外保留 `aspect_ratio`，否则应用一次更改就丢掉页面比例）。
+  `settings`、`export`（PDF 与缩略图，包装 `slide-typst`）。错误类型是 `String`，界面直接透传。
+- 事件：core 只认 `events::EventSink` / `CoreEvent`，`CoreEvent::wire()` 给出 `(事件名, 载荷)`；
+  原生版经 `tasks::listen_events` 消费。线上格式由 `crates/huanshu-core/tests/fixtures/generation-events.json`
+  锁定（`crates/huanshu-core/tests/generation_events.rs` 比对）。
+- 带 `async` 的服务函数要求调用方处于 tokio 运行时中（`tasks::run_async`）；同步重活（PDF、缩略图、字体枚举）
+  走 `tasks::run_bg`。界面层只做「取参数 → 调 core → 转错误」，**不要**把 SQL、文件读写或业务分支写回界面。
+- 界面的「规则」也在 core：编辑器版式表 `editor_schema.rs`、图表校验 `chart_check.rs`、
+  第二步进度规则 `generation_progress.rs`、第三步编辑规则 `slide_edit.rs`——每份都有快照单测
+  （`crates/huanshu-core/tests/*.rs` 对 `tests/fixtures/*.json`）。快照是 Tauri 版还在时生成的，
+  界面层（原生版）已按它们渲染，改 Rust 侧规则时快照与界面要一起改。
 
 ## 隔离数据目录（真机验证必读）
 
@@ -33,7 +39,7 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
 
 `seed_demo` 建 9 个演示项目（全部版式 16:9 / 32:9 / 48:9、图表、图表边界、压力、图片，以及第二步用的
 「生成记录演示」——一次以 error 结束、第 3 页失败的运行——和 60 个内容页的「长牌组」），并标记首次向导已完成；
-拒绝以真实数据目录或 bootstrap 所在目录为目标。没有 LM Studio 时，生成与重试的成功路径只能人工验收。Tauri 版用 `.claude/launch.json` 的 `tauri-dev-sandbox`。
+拒绝以真实数据目录或 bootstrap 所在目录为目标。没有 LM Studio 时，生成与重试的成功路径只能人工验收。
 
 ## 原生界面（`apps/huanshu-native`，GPUI Kit）
 
@@ -42,7 +48,7 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
 这类表现层差异优先用 GPUI Kit 组件的原生做法，不算缺陷，不要为了像原版去模拟。
 框架与写页面的规矩见 `apps/huanshu-native/README.md`；功能清单与进度是 `docs/native/parity.md`（做完一项改一项）；
 原版截图 `docs/native/reference/`，原生截图 `docs/native/shell/`（`tools/shots.ps1`，同一份沙箱数据、同一主题）。
-在根 workspace 里但**不在 `default-members`**：`bunx tauri dev`、裸 `cargo build` 不编 GPUI，`cargo test --workspace` 与 `-p huanshu-native` 会编。
+三个 crate 都是 workspace 成员，裸 `cargo build` / `cargo test --workspace` 会编 GPUI（GPUI Kit 编译慢，调试时可用 `-p huanshu-core` 绕开）。
 
 - 外壳 `shell.rs`（标题栏 + 当前页 + 演示覆盖层），页面经 `ShellHandle` 换页、换主题、开演示；路由 `router.rs` 对应原版五条路由。
 - 配色只用 `cx.studio().colors`：`theme/tokens.rs` 是从运行中的旧应用读出的 `--studio-*` 计算值（改 CSS 时同步）。
@@ -76,7 +82,7 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
   不看 `active_project_id`。原生版 `WorkflowPage::editing_locked` 也因此只在本项目生成/重试时只读；
   Tauri 侧 store 生成结束取牌组走 `get_generation_deck`（发起生成的项目；`/new` 未落库时保留
   `get_blueprints`）；用户已打开别的项目时（`activeProjectId` 变了）结果不写进 store，`loadFromJson` 会
-  `stopListening`，`WorkflowView` 生成后不再自己存 `gen.blueprints`（core 已落库，再存会把别的项目的牌组写进来）。
+  `stopListening`，生成结束后界面不再自己存牌组（core 已落库，再存会把别的项目的牌组写进来）。
 - 演示是盖在当前页上的覆盖层（与原版一致），打开即全屏，全屏时外壳不画标题栏。Esc 照原版：先关全览；
   全屏时只退出全屏，非全屏时才退出演示。
 - `apps/huanshu-native/build.rs` 把 Windows 主线程栈调到 8 MiB：默认 1 MiB，debug 构建打开第三步表单就栈溢出（release 不会）。
@@ -108,12 +114,11 @@ cargo run -p huanshu-core --example seed_demo -- $env:HUANSHU_HOME   # 已有库
     中文笔画细而毛、深色底带彩边；原版 WebView2 也是灰度。笔画仍比 Chromium 略细，那是 GPUI 的 DirectWrite 光栅化
     （推荐渲染模式的网格对齐 + 着色器的 gamma），要再改只能 patch `gpui-pre-windows`。
 - macOS 构建：只需 Xcode Command Line Tools（GPUI Kit 开了 `runtime_shaders`，不用完整 Xcode 的 Metal 编译器），
-  先 `bun install`（Carbon 图标）。数据目录是 `~/Library/Application Support/auto-slidev-studio/`（数据与 `bootstrap.json`
+  数据目录是 `~/Library/Application Support/auto-slidev-studio/`（数据与 `bootstrap.json`
   同在这一个目录）。`.app` 从访达打开时不继承 `HUANSHU_HOME`，沙箱验证直接跑 `target/release/huanshu-native`。
 - 主题存在 `app_settings` 的 `app_theme` 键，与 Tauri 版（WebView localStorage）暂不同步。
 - 量内存要量**本进程**：PowerShell 里的 `$PID` 是 PowerShell 自己。只读查看器阶段实测（release，5 分钟每 100ms 翻一页）工作集稳定在 385–412 MiB。
-- **原版首次向导在沙箱里会指回真实目录**：`FirstRunWizard.vue` 用前端的 `localDataDir()` 拼默认目录，不认 `HUANSHU_HOME`。
-  在 `tauri-dev-sandbox` 里不要点向导的「进入 Studio」（用 `complete_first_run` 命令跳过）；原生版的向导取 core 的目录，没有这个问题。
+  原生版的向导取 core 的目录，没有原版「向导指向真实目录」的问题。
 
 # Auto-Slidev 模板扩展说明
 
@@ -144,7 +149,7 @@ Rust 生成侧只产出 blueprint，前端没有幻灯片组件）：
    编辑器的版式表（中文名、图标、说明、字段、默认内容）与表单定义（`list_sections` / `object_sections` 的字段、
    「新增一项」模板 `new_item`）。改完同步更新快照 `crates/huanshu-core/tests/fixtures/editor-schema.json`
    （单测逐字比对，并检查每个 kind 都有条目、字段名真实存在、默认值能反序列化）。前端经 `get_editor_schema` 读取，
-   **不要在 TypeScript 里另写字段表**；`src/components/types.ts` 只补类型。
+   **不要在界面层另写字段表**。
 9. 文档
    更新 `CLAUDE.md`，把版式用途、字段和新增流程记录下来。
 
@@ -172,7 +177,7 @@ Rust 生成侧只产出 blueprint，前端没有幻灯片组件）：
 Typst 与前端：
 1. `crates/slide-typst/typst/layouts/<kind>.typ` 删文件，去掉 `main.typ` 的 `layouts` 表、`lib.rs` 的 `TEMPLATES` /
    `SUPPORTED_KINDS` 中的项，以及 fixture 里该 kind 的页（2026-09 那次删的还是 Vue 模板；Vue 模板已于 2026-10 全部移除）
-2. `src/components/types.ts`：`SlideKind` 联合类型、`SlideBlueprint` 中该模板专属字段
+2. `crates/huanshu-core/src/types.rs`：`SlideKind` 变体与 `SlideBlueprint` 中该模板专属字段（与第 1 步同处）
 3. `crates/huanshu-core/src/editor_schema.rs`：该 kind 的条目与表单定义，并更新快照 `tests/fixtures/editor-schema.json`
 4. （编辑器字段表已全部在 Rust，前端无需再改）
 
@@ -186,7 +191,7 @@ Rust（变体与 `SlideBlueprint` 字段必须同时删干净，否则各处 str
 12. 文档：README 模板数、CHANGELOG（新增 `[Unreleased]`，不要改已发布版本号条目）
 
 必查两点：
-- `grep -rn "<模板名>" src src-tauri/src` 应 0 命中（仅剩迁移说明/测试里的字符串）
+- `grep -rn "<模板名>" crates apps` 应 0 命中（仅剩迁移说明/测试里的字符串）
 - **旧数据兼容**：`SlideKind` 是 `#[serde(rename_all = "snake_case")]` 外部标签枚举，删变体后 DB / `.keynn` 里带旧 kind 的牌组会**整体反序列化失败**，而 `services/projects.rs` 用的是 `unwrap_or_default()` → 项目静默变空。所以 `SlideBlueprint.kind` 挂了
   `#[serde(deserialize_with = "de_slide_kind")]`（未知 kind → `Cover`），并有回归测试 `legacy_infographic_kind_degrades_without_losing_slides`。
   Typst 侧对没有版式的 kind 渲染「Typst 版式尚未实现」占位页，不会丢页。
@@ -394,7 +399,7 @@ caption 只说图片「是什么」，说不出它「该放哪」。所以 `gene
 
 ## Typst 原生 PDF 导出（实验中，`crates/slide-typst`）
 
-独立的 workspace crate，由 `crates/huanshu-core/src/services/export.rs` 接入应用（命令外壳在 `src-tauri/src/commands/pdf.rs`）（见下方「应用接入」）。它在进程内嵌入 Typst 编译器，把 `SlideBlueprint`
+独立的 workspace crate，由 `crates/huanshu-core/src/services/export.rs` 接入应用，界面在 `apps/huanshu-native/src/export.rs` 显示进度与结果（见下方「应用接入」）。它在进程内嵌入 Typst 编译器，把 `SlideBlueprint`
 JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。它也是**唯一的幻灯片渲染器**（屏幕上的缩略图、演示、编辑器预览都是它
 光栅化的 PNG，见下方「Typst 缩略图」），Vue 模板已于 2026-10 删除。原先它是 Vue 模板之外的另一套
 版式实现。18 个模板（`SUPPORTED_KINDS`）与全部 6 个主题（`SUPPORTED_THEMES`：便签·稿纸、终端·纸/墨、报刊·钴蓝、暗·琥珀/星图）都已移植；
@@ -453,30 +458,21 @@ JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。它也是**�
   - 版式要超出内容区（如 `section_intro` 上下各外扩 4px）时，用 `place` 定位，不要放进文档流：
     哪怕在文档流里只多占 4px，也会被挤出一个新页面。
 - 应用接入：
-  - Tauri 命令 `export_pdf(project_id, slides?, path, theme)`：传了 `slides` 就导出它（编辑器传的是
-    **已应用**的牌组，与预览、演示一致）；不传就读数据库里保存的蓝图。字体取「设置 → 外观与字体」的
-    6 个角色。`Renderer` 用 `OnceLock` 在进程内只建一次，首次导出要扫描系统字体（约 0.5 秒），
-    渲染放在 `spawn_blocking` 里执行。
+  - `huanshu_core::services::export::export_pdf(state, project_id, slides?, path, theme)`：传了 `slides`
+    就导出它（编辑器传的是**已应用**的牌组，与预览、演示一致）；不传就读数据库里保存的蓝图。字体取
+    「设置 → 外观与字体」的 6 个角色。`Renderer` 用 `OnceLock` 在进程内只建一次，首次导出要扫描系统字体
+    （约 0.5 秒），渲染在界面侧经 `tasks::run_bg` 放后台线程。
   - 素材映射在 `export_assets`：项目文件来自 `assets::project_file_refs`，它和生成流程的校验集合
     `collect_assets` 共用同一份写法规则，素材库是 `media:<id>` → `<media_dir>/<storage_path>`。
     **不要另写一套引用规则**，否则生成时合法的图片可能在导出时找不到。
-  - 返回 `PdfExportReport`：占位页（模板还没有 PDF 版式）、溢出裁切页、缺失图片，由前端弹窗展示。
+  - 返回 `PdfExportReport`：占位页（模板还没有 PDF 版式）、溢出裁切页、缺失图片，由界面弹窗展示
+    （`apps/huanshu-native/src/export.rs::show_report`，进行中/成功/失败三框）。
     主题 id 不在 `SUPPORTED_THEMES` 时回落到便签，`theme_fallback` 字段记录请求的原 id。
-    另有 `reveal_exported_file` 命令，在文件管理器中选中导出的文件。
-  - 前端入口：编辑器预览栏的「导出 PDF」按钮（`Step3Editor` 的 `export-pdf` 事件），以及首页导出弹窗
-    （`ExportDialog`）里的「PDF 文档」选项。导出状态由 `composables/usePdfExport.ts` 全局共享，进度和结果
-    由 `components/PdfExportDialog.vue` 显示，它需要挂在用到导出的 view 里。
-  - 真机验证：用环境变量打开 WebView2 调试端口，再通过 CDP 驱动窗口（Node 22 自带 WebSocket，
-    不用装任何包）：
-
-    ```powershell
-    $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9223'; bunx tauri dev
-    ```
-
-    之后从 `http://127.0.0.1:9223/json` 拿到页面的 `webSocketDebuggerUrl`，就可以发
-    `Runtime.evaluate` / `Page.captureScreenshot`。
-    保存对话框是系统原生窗口，CDP 操作不到，需要人工点一下；在页面里覆盖 `__TAURI_INTERNALS__.invoke`
-    来跳过它的做法**实测无效**。
+    另有 `reveal_exported_file`，在文件管理器中选中导出的文件。
+  - 界面入口：编辑器预览栏的「导出 PDF」按钮（`workflow/step3.rs`），以及首页导出对话框
+    （`pages/home.rs`）里的「PDF 文档」选项；两边都走 `export.rs::begin_export` 的同一套三框。
+  - 真机验证：命令行开关不窗口直接导出（`--open <id> --export-pdf <路径>`，退出码 0/1），
+    或用 `apps/huanshu-native/tools/shots.ps1` 截图；保存对话框是系统原生窗口，需要人工点一下。
   - 完整 Typst 工程导出（原生版）：`Renderer::export_project(slides, options)`（`crates/slide-typst/src/lib.rs`）
     把牌组物化成独立工程的文件列表：`TEMPLATES` 里的全部模板（相对路径）、`deck.json`（数学公式已改写）、
     `assets/` 图片，以及本次编译**实际加载**的 `icons/<set>/<name>/<rrggbb[aa]>.svg`。图标是按颜色在编译期
@@ -559,9 +555,9 @@ cargo run -p slide-typst --example render_fixture -- --png
 ### Typst 缩略图（迁移第一步）
 
 迁移分五步完成：缩略图（Step2 看板、演示全览）→ 演示主画面 → Step3 编辑器预览与 Step2 详情 → 图表原生绘制 →
-删除 Vue 模板。现在屏幕上每一处幻灯片都是 `components/SlideFrame.vue` 里的一张 Typst PNG，没有别的渲染器兜底。
+现在屏幕上每一处幻灯片都是 `slides::slide_frame` 里的一张 Typst PNG，没有别的渲染器兜底。
 
-- 链路：`useTypstThumbnails` → `render_slide_thumbnails`（`commands/thumbnails.rs`）→
+- 链路：界面 `slides::SlideImages` → `services::export::render_slide_thumbnails` →
   `Renderer::render_png`（**整副编译**，按 `only` 光栅化，返回 `data:image/png` 给 `<img>`）。
   命令复用 `services/export.rs` 的 `renderer()` / `prepare_export()`，主题、比例、字体、素材映射与 PDF 导出一致；
   图表由 Typst 直接绘制，不经过 WebView。启动时 `.setup` 在后台预热字体扫描。
@@ -578,7 +574,7 @@ cargo run -p slide-typst --example render_fixture -- --png
 - Step2 的 `slideItems` 下标是**内容页序号**（牌组装配后前面有封面+目录、末尾有结尾页），缩略图直接用
   `slideItems` 的蓝图（含取自日志的蓝图），下标就是 `item.index`；不要再从 `props.blueprints` 切片加偏移。
 - 性能：release 下 560px 宽每页约 5ms（光栅化）+ 整副增量编译约 20ms。根 `Cargo.toml` 的
-  `[profile.dev.package."*"] opt-level = 2` 让依赖（Typst、光栅化）在 dev 构建里也优化：否则 `tauri dev` 下一页要等
+  `[profile.dev.package."*"] opt-level = 2` 让依赖（Typst、光栅化）在 dev 构建里也优化：否则调试构建下一页要等
   几秒，而现在屏幕上的幻灯片全靠它（加了之后编辑器换页约 0.3 秒、`slide-typst` 渲染测试 24–45 秒 → 7 秒）。
 - 位图宽度要按**显示的 CSS 宽度 × dpr** 给：Step2 卡片曾把实测的卡片宽再乘一次页面宽高比，16:9 下多渲 1.8 倍宽、
   48:9 下 5.3 倍，光栅化代价按像素数涨。
@@ -619,11 +615,11 @@ cargo run -p slide-typst --example render_fixture -- --png
 ### 编辑器实时预览与 Step2 详情（第三步）
 
 - 编辑器只发**当前这一页**（`slides: () => [editorPreviewSlide]`，图在 `thumbs[0]`）：版式只依赖本页数据，单页编译最快。
-- `useTypstThumbnails` 的 `serial`（同一时刻一个请求，期间变化合并成尾部请求）+ `progressive`（比画面新的过期图先落）
+- `PreviewOptions` 的 `serial`（同一时刻一个请求，期间变化合并成尾部请求）+ `progressive`（比画面新的过期图先落）
   让打字时预览每隔一次渲染更新一次、停手后落在最新内容；`resetKey: () => activeSlide` 换页时清空。
   换页作废在途响应靠 **generation 计数**（`resetAll` +1，响应带着发出时的值比较），不能靠键：
   换页后 `latestKeys` 要等下一次 `refresh` 才更新，旧页响应的键此刻仍然「相等」，会把上一页的图落到新页上。
-- 没有图时一律显示 `SlideFrame` 的加载框，不放裸的空白（这条规则在有 Vue 兜底的三轮里被违反过两次）。
+- 没有图时一律显示 `slide_frame` 的加载框，不放裸的空白。
 - 位图一律放在舞台层、铺满舞台，**不要**放进带 `transform: scale()` 的画布：Step2 详情曾把按舞台尺寸写的
   `<img>` 放进 `scale(舞台宽/1280)` 的画布，图被缩两次，只剩左上角四分之一。
 - 内容缩到 `fit-min` 仍放不下时，`Thumbnail.overflow` 为真，编辑器在预览下方提示「超出部分被裁切」。
@@ -644,21 +640,21 @@ cargo run -p slide-typst --example render_fixture -- --png
 | `crates/huanshu-core/src/types.rs` | 新增 `AspectRatio` 枚举和辅助方法，`SlideBlueprint` 增加 `aspect_ratio` 字段 |
 | `crates/huanshu-core/src/config.rs` | `GenerationConfig` 增加 `aspect_ratio` 字段 |
 | `crates/huanshu-core/src/db.rs` | `Project` 增加 `aspect_ratio` 字段，projects 表增加 `aspect_ratio TEXT` 列 |
-| `src-tauri/src/commands/projects.rs` | 新增 `update_project_aspect_ratio` 和 `get_project_aspect_ratio` 命令 |
-| `src-tauri/src/commands/generate.rs` | `generate_slides` 接受 `aspect_ratio` 参数，传递给 Generator |
+| `crates/huanshu-core/src/services/projects.rs` | `update_project_aspect_ratio` / `get_project_aspect_ratio` |
+| `crates/huanshu-core/src/services/generation.rs` | `generate_slides` 接受 `aspect_ratio` 参数，传递给 Generator |
 | `crates/huanshu-core/src/generator/planning.rs` | 布局规划提示词增加比例相关的布局规则（32:9 用 6-8 列，48:9 用 8-12 列等） |
 | `crates/huanshu-core/src/generator/normalize.rs` | `apply_component_defaults` 根据比例调整 `cards.truncate` 等数量限制 |
 
 #### 前端 (TypeScript/Vue)
 | 文件 | 改动 |
 |------|------|
-| `src/components/types.ts` | 新增 `AspectRatio` 类型和 `ASPECT_DIMENSIONS` 常量表 |
-| `src/stores/generation.ts` | `generate` 函数接受 `aspectRatio` 参数 |
-| `src/views/steps/Step1Prepare.vue` | 新增比例选择器 UI（16:9 / 32:9 / 48:9 Segmented Control） |
-| `src/views/PresentationOverlay.vue` | 拉伸到全屏播放：Typst 位图按舞台尺寸非等比铺满 |
-| `src/views/steps/Step2Generate.vue` | 卡片与详情按页面比例定框 |
-| `src/composables/useSlideEditor.ts` | 编辑器预览根据实际比例计算尺寸 |
-| `src/views/steps/Step3Editor.vue` | 编辑器预览舞台按页面比例定尺寸（`editorStageW/H`） |
+| `crates/huanshu-core/src/types.rs` | `AspectRatio` 枚举与 `SlideBlueprint.aspect_ratio` |
+| `crates/huanshu-core/src/db.rs` | `Project.aspect_ratio` + `projects` 表列 |
+| `crates/huanshu-core/src/services/projects.rs` | `update_project_aspect_ratio` / `get_project_aspect_ratio` |
+| `apps/huanshu-native/src/pages/workflow/step1.rs` | 比例选择器（16:9 / 32:9 / 48:9） |
+| `apps/huanshu-native/src/present.rs` | 拉伸到全屏：Typst 位图按舞台尺寸非等比铺满 |
+| `apps/huanshu-native/src/pages/workflow/step2.rs` | 卡片与详情按页面比例定框 |
+| `apps/huanshu-native/src/pages/workflow/step3.rs` | 编辑器预览舞台按页面比例定尺寸 |
 | `src/style.css` | `.pres-slide, .slidev-slide` 的 width/height 改为 CSS 变量 |
 
 ### 实现要点
@@ -695,15 +691,14 @@ payload.bin (加密的原始 ZIP 内容)
 |------|------|
 | `crates/huanshu-core/Cargo.toml` | 新增 `aes-gcm`, `argon2`, `rand`, `base64` 依赖 |
 | `crates/huanshu-core/src/crypto.rs` | 新增加密解密模块 `CryptoService` |
-| `src-tauri/src/commands/storage.rs` | `export_project` 增加 `encrypted` 和 `password` 参数，`import_project` 增加 `password` 参数 |
-| `src-tauri/src/lib.rs` | 注册 `is_encrypted_file` 命令（`crypto` 模块现在在 core） |
+| `crates/huanshu-core/src/services/storage.rs` | `export_project(encrypted, password)`、`import_project(password)` |
+| `crates/huanshu-core/src/crypto.rs` | `is_encrypted_file` |
 
 #### 前端 (TypeScript/Vue)
 | 文件 | 改动 |
 |------|------|
-| `src/components/PasswordDialog.vue` | 新增密码输入对话框组件（支持加密/解密模式、密码强度指示器） |
-| `src/views/HomeView.vue` | 导出按钮增加加密选项弹出层，导入时自动检测加密状态 |
-| `src/stores/projects.ts` | 无需改动（密码参数直接透传给 Tauri 命令） |
+| `apps/huanshu-native/src/password_dialog.rs` | 密码对话框（加密/解密两种模式、密码强度指示器） |
+| `apps/huanshu-native/src/pages/home.rs` | 导出对话框的加密选项；导入时自动检测加密状态 |
 
 ### 实现要点
 1. **加密时**：先创建标准 .keynn ZIP，然后用 Argon2id 从密码派生 32 字节密钥，再用 AES-256-GCM 加密
@@ -711,75 +706,7 @@ payload.bin (加密的原始 ZIP 内容)
 3. **自动检测**：导入时调用 `is_encrypted_file` 判断是否需要密码
 4. **密码强度**：必须包含大小写字母和数字，最少 8 字符
 
-## 打包与发布（Tauri）
-
-### 一键打包（推荐）
-
-```bash
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1
-```
-
-脚本做的事：`bun install` → `bun run build`（前端 → `src-tauri/dist-studio`）→ `bunx tauri build --bundles nsis` → 把两个产物汇总复制到 `dist-package/`（命名与 CI release 一致）：
-
-| 产物 | 路径 | 用途 |
-|---|---|---|
-| `Huanshu_<version>_x64-setup.exe` | `dist-package/` | NSIS 安装包，currentUser 安装，静默 `/S`，卸载 `/S` |
-| `auto-slidev-studio_windows_x64.exe` | `dist-package/` | 免安装单文件，双击即跑 |
-
-参数：`-SkipFrontend`（只改了 Rust，复用已有 dist-studio）、`-NoInstall`（只出 exe）、`-DebugProfile`（debug 编译，编译快、冒烟用）。
-
-### 手动等价命令
-
-```bash
-bun run build                                  # 或 bunx vite build（跳过类型检查）
-bunx tauri build --bundles nsis                # 自动先跑 beforeBuildCommand
-# 产物：target/release/bundle/nsis/Huanshu_<version>_x64-setup.exe
-#       target/release/auto-slidev-studio.exe（免安装）
-```
-
-### 必须记住的坑
-
-1. **没有 `cargo-tauri`**：`cargo tauri build` 会直接报 `no such command: tauri`。Tauri CLI 走 devDependency，统一用 `bunx tauri`。
-2. **构建目录是 `<repo>/target`**：根 `Cargo.toml` 是 workspace（members = src-tauri），不是 `src-tauri/target`。README/SETUP 早期写的 `src-tauri/target/.../bundle/msi/` 是错的，且本项目没有 msi target。
-3. **前端产物目录固定为 `src-tauri/dist-studio`**：由 `vite.config.ts` 的 `build.outDir` 决定，与 `tauri.conf.json` 的 `build.frontendDist` 对应。改了 vite outDir 就必须同步改 tauri.conf.json。
-4. **Windows 只能出 nsis**：`bundle.targets` 里的 `appimage`/`deb` 需要 Linux 宿主，本机构建要显式 `--bundles nsis`。Linux/发布产物交给 `.github/workflows/release.yml`（tag `v*` 触发，tauri-action）。
-5. **`beforeBuildCommand` 是 `bun run build`**：不是 `bun build`（`bun build` 是 Bun 自带 bundler，不会跑 vue-tsc + vite）。前端类型错误会直接让 tauri build 失败。
-6. **PowerShell 脚本必须 ASCII-only**：Windows PowerShell 5.1 把无 BOM 的 .ps1 按 ANSI(GBK) 读，中文注释会变成乱码并引发 parse error。中文只写进 `.md` 文档。
-7. **打包前必须关掉正在运行的 幻述**：Windows 上运行中的 exe 是活映像，cargo 覆盖时直接失败：
-   `error: failed to remove file ... target\release\auto-slidev-studio.exe` + `拒绝访问。 (os error 5)`。
-   （注意：Windows 允许重命名运行中的 exe，所以“文件能改名”不代表可以重建——别看错现象。）
-   `scripts/package.ps1` 已内置前置检查，会直接报出占用进程 pid，不会白等一趟完整编译。
-   优雅关闭：`(Get-Process auto-slidev-studio).CloseMainWindow()`（`decorations:false` 的窗口同样响应 WM_CLOSE），不行再 `Stop-Process -Force`。
-8. **`src-tauri/Cargo.toml` 的 `[features] custom-protocol` 不能删**：Tauri v2 靠这个 feature 决定内嵌前端资源还是走 `devUrl`。删掉后 `cargo build --release` 照样编得过，但产物是 **dev 模式**（前端资源不内嵌，运行时去连 `http://localhost:5173`），双击只有 `ERR_CONNECTION_REFUSED`。用 `bunx tauri build` 就不会踩到。
-   构建后自检：`grep -c "rustc-cfg=dev" target/release/build/auto-slidev-studio-*/output` 应全为 `0`，出现 `1` 说明这次是 dev 构建。
-
-### 打包后必须验证（各步骤实测命令）
-
-```powershell
-# 1) 冒烟：直接跑未安装二进制，看窗口是否真的起来
-$p = Start-Process D:\huanshu\target\release\auto-slidev-studio.exe -PassThru
-Start-Sleep 12; $p.Refresh()
-if ($p.HasExited) { "EXITED $($p.ExitCode)" } else { "RUNNING $($p.MainWindowTitle)" }
-
-# 2) 安装包静默安装 + 校验落盘
-Start-Process dist-package\Huanshu_0.1.0_x64-setup.exe -ArgumentList '/S' -Wait   # 落到 %LOCALAPPDATA%\Huanshu
-Start-Process "$env:LOCALAPPDATA\Huanshu\auto-slidev-studio.exe" -PassThru       # 再跑一次
-
-# 3) 卸载清理（避免留残留影响下次验证）
-Start-Process "$env:LOCALAPPDATA\Huanshu\uninstall.exe" -ArgumentList '/S' -Wait
-```
-
-预期：`MainWindowTitle` 为 `幻述`。窗口 `decorations: false`，标题来自 `tauri.conf.json` 的 `app.windows[0].title`。
-
-### 运行前置与分发注意
-
-- 运行时依赖本机 **WebView2 运行时**（Win10+ 一般已预装；可用 `reg query "HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" /v pv` 查版本）。
-- `webviewInstallMode` 当前是 `downloadBootstrapper`：目标机缺 WebView2 时需联网下载。要纯离线装机改成 `embedBootstrapper` 或 `offlineInstaller`（体积显著增大）。
-- 安装包未签名，首次安装会有 SmartScreen 提示。
-- LM Studio 是外部依赖，不打包；装完需在应用「设置」里填模型名，否则生成流程不可用。
-- `build.rs` 依赖 `node_modules/@iconify-json/carbon`，所以打包前必须 `bun install`。
-
-## 打包与发布（原生版，`apps/huanshu-native`）
+## 打包与发布（`apps/huanshu-native`，唯一的发布产物）
 
 ### 一键打包
 
@@ -794,15 +721,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-native.ps1
 | `huanshu-native_windows_x64.exe` | 免安装单文件，双击即跑 |
 | `HuanshuNative_<version>_x64-setup.exe` | NSIS 安装包（currentUser 静默 `/S`，卸载 `uninstall.exe /S`） |
 
-找不到 makensis（本机 Tauri 自带 `%LOCALAPPDATA%\tauri\NSIS`）时只出免安装版并提示，不失败。
+找不到 makensis（查 `Program Files (x86)\NSIS` 与 PATH）时只出免安装版并提示，不失败。
 
 ### 随 tag 发布
 
-`.github/workflows/release.yml` 的 `native-windows` job 在 `windows-latest` 上跑同一个脚本，
-产物追加到同一个 Release：`needs: release`（tauri-action 负责创建 Release，两个 job 同时创建会撞车），
-先 `choco install nsis`——**CI 上没有 Tauri 自带的那份 NSIS，不装就只能出免安装 exe**。
-发布说明由 tauri-action 先写一遍（只有 Tauri 产物），native job 再用 `.github/release-notes.md`
-重写一遍；说明文字放文件而不是内联，`.ps1` 里内联中文会被 ANSI 读成乱码。Linux 暂时只发 Tauri 版。
+`.github/workflows/release.yml` 的 `native-windows` job 在 `windows-latest` 上跑同一个脚本
+（先 `choco install nsis`，否则只能出免安装 exe），`native-macos` job `needs: native-windows`，
+两个 job 串行避免重复创建 Release。发布说明读 `.github/release-notes.md`——**说明文字放文件而不是内联，
+`.ps1` 里内联中文会被 ANSI 读成乱码**。两个 job 都不再需要 bun：构建是纯 Rust，Carbon 图标集已内嵌在
+`assets/carbon/`。
 
 ### macOS 打包（`scripts/package-native-macos.sh`）
 
@@ -811,7 +738,7 @@ scripts/package-native-macos.sh               # 本机架构；--universal 合�
 ```
 
 `cargo build --release -p huanshu-native` → 组装 `dist-package/幻述.app`（`Info.plist` 由脚本生成，图标用
-`src-tauri/icons/icon.icns`，Bundle ID `com.auto-slidev.studio.native`）→ 签名 → `huanshu-native_macos_<arch>.zip`（ditto）
+`assets/app-icon/icon.icns`，Bundle ID `com.auto-slidev.studio.native`）→ 签名 → `huanshu-native_macos_<arch>.zip`（ditto）
 与 `HuanshuNative_<version>_macos_<arch>.dmg`（hdiutil，带「应用程序」快捷方式）。
 
 - **签名**：默认 ad-hoc（`codesign -s -`；Apple 芯片不跑无签名的二进制，改过 Info.plist 必须整体重签）。
@@ -820,30 +747,29 @@ scripts/package-native-macos.sh               # 本机架构；--universal 合�
   脚本会公证并 `stapler staple` 到 DMG。
 - `CFBundleName` 决定菜单栏第一项的名字（裸跑 `target/release/huanshu-native` 时是二进制名）；
   `CFBundleDevelopmentRegion = zh_CN`，系统自动加的菜单项才是中文。
-- 缺 `node_modules/@iconify-json/carbon` 时脚本直接失败（否则图标全空白），先 `bun install`。
 - 随 tag 发布：`release.yml` 的 `native-macos` job（`macos-14`，`--universal`），同样 `needs: release`，
-  产物追加到同一个 Release，并用 `.github/release-notes.md` 重写说明。CI 的 `native` job 在 macOS 与 Windows 上
-  `cargo test -p huanshu-native`（default-members 不含它，原来的 test job 编不到）。
-- 版本号仍只有一个来源（`apps/huanshu-native/Cargo.toml`），脚本读它写进 `CFBundleShortVersionString`。
+  产物追加到同一个 Release。
+- 版本号只有一个来源：`apps/huanshu-native/Cargo.toml`（`CARGO_PKG_VERSION` → exe 版本资源与
+  `CFBundleShortVersionString`，`package-native.ps1` 的安装包文件名也读它）。
 
-### 与 Tauri 版的关系
+### 与被删除的 Tauri 版的关系
 
-- 安装目录 `%LOCALAPPDATA%\HuanshuNative`、产品/卸载项「幻述（原生版）」，与 Tauri 版
-  （`%LOCALAPPDATA%\Huanshu`、「幻述」）**完全分开**，不会互相覆盖或卸载。
-- 两版**共用同一个数据目录**（不设 `HUANSHU_HOME` 时的真实数据路径），这是有意的：原生版要接替 Tauri 版。
-- 版本号三处一致：`apps/huanshu-native/Cargo.toml`（`CARGO_PKG_VERSION` → exe 版本资源）、
-  `src-tauri/tauri.conf.json`、`scripts/package-native.ps1` 打的安装包文件名。 bump 版本时一起改。
+- 安装目录 `%LOCALAPPDATA%\HuanshuNative`、产品/卸载项「幻述（原生版）」，与旧 Tauri 版
+  （`%LOCALAPPDATA%\Huanshu`、「幻述」）**完全分开**：装着旧版的用户升级后两个互不干扰，
+  卸载本版也不会删掉旧版的数据。
+- **数据目录共用**（不设 `HUANSHU_HOME` 时的真实数据路径），这是有意的：原生版是接替 Tauri 版的，
+  项目必须留在原处。
 
 ### 必须记住的坑
 
 1. **release 不弹控制台**：`main.rs` 的 `#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]`。
    Windows 子系统进程在父进程重定向句柄时 stderr 仍可读——`tools/drive.ps1` 依赖的
    `[coldstart]` 行（`Start-Process -RedirectStandardError`）与 `--export` 都不受影响（已实测）。
-2. **exe 图标与版本资源在 `build.rs`**（winresource）：ico 是 `src-tauri/icons/icon.ico`，
+2. **exe 图标与版本资源在 `build.rs`**（winresource）：ico 是 `assets/app-icon/icon.ico`，
    多分辨率原样嵌入（id 1）；GPUI 的 Windows 后端从 `MAKEINTRESOURCE(1)` 读窗口/任务栏图标，
    没有 per-window 图标 API。中文产品名能正确进资源：winresource 写的 .rc 是 UTF-8 且带
    `#pragma code_page(65001)`，MSVC `rc.exe` 认。
-3. **静态 CRT**：release 下 `/DEFAULTLIB:libcmt.lib` 等三条 link-arg（对齐 tauri_build 的做法），
+3. **静态 CRT**：release 下 `/DEFAULTLIB:libcmt.lib` 等三条 link-arg，
    免安装版在干净机器上不需要 VC++ Redistributable；debug 保留动态 CRT（libcmtd 与预编译依赖冲突）。
 4. **NSIS 脚本 ASCII-only**：PowerShell 5.1 与 makensis 都按 ANSI 读脚本。中文产品名「幻述（原生版）」
    在 `package-native.ps1` 里用码点构造、经 makensis 命令行 `-D` 传入（Windows 命令行是 UTF-16）。

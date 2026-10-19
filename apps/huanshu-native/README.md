@@ -1,7 +1,7 @@
-# 幻述原生界面（GPUI Kit）
+# 幻述（GPUI Kit）
 
-逐页复刻 Tauri + Vue 版的原生界面。**目标是完整替代原版**：可以按 GPUI 的特点调整细节，但关键功能一项都不能丢。
-功能清单与进度见 [`docs/native/parity.md`](../../docs/native/parity.md)，原版截图在 `docs/native/reference/`。
+整个应用就是这一个 Rust 程序。界面逐页对照已删除的 Tauri + Vue 版复刻而成，功能已全部对齐，
+迁移清单见 [`docs/native/parity.md`](../../docs/native/parity.md)，旧版截图在 `docs/native/reference/`。
 
 ## 运行（一律在沙箱里）
 
@@ -45,7 +45,7 @@ macOS：`scripts/package-native-macos.sh [--universal] [--no-dmg]` → `dist-pac
 
 Windows 产物（`dist-package/`）：免安装 `huanshu-native_windows_x64.exe` + NSIS 安装包
 `HuanshuNative_<version>_x64-setup.exe`（安装目录 `%LOCALAPPDATA%\HuanshuNative`、
-卸载项「幻述（原生版）」，与 Tauri 版分开；两版共用同一个真实数据目录，这是有意的）。
+卸载项「幻述（原生版）」，与已删除的 Tauri 版分开；数据目录共用，这是有意的）。
 release 不弹控制台、静态 CRT（免装 VC++ Redist）、exe 带图标与版本资源。
 细节与坑全在根 `CLAUDE.md` 的「打包与发布（原生版）」一节；**验收只在沙箱**，
 安装版一轮「静默装 → 带 `HUANSHU_HOME` 启动 → 静默卸 → 查残留」。
@@ -76,14 +76,14 @@ src/
 
 ### 写页面的规矩
 
-1. **对照原版写**：先看 `docs/native/reference/` 的截图和对应的 `.vue` 文件，文案逐字一致，尺寸按原版 CSS 的逻辑像素。
-   不确定的交互以原版代码为准，不要凭感觉。
+1. **对照原版写**：`docs/native/reference/` 是旧 Tauri + Vue 版的截图，文案逐字一致，尺寸按原版 CSS 的逻辑像素。
+   旧版源码在 git 历史里（`git show <commit>:src/views/...`）；拿不准的交互以历史代码为准，不要凭感觉。
 2. **颜色只用 `cx.studio().colors`**，部件先找 `widgets.rs`；没有就加进 `widgets.rs`，不要在页面里写第二份样式。
 3. **数据只经 `huanshu_core::services`**，本工程不碰 SQLite。耗时操作走 `tasks::run_bg` / `run_async`，UI 线程不阻塞。
 4. **异步结果回来时，页面、项目、主题都可能已经变了**：需要时带上发起时的身份比对（页码、项目 id），迟到的结果作废。
 5. **幻灯片位图只用 `slides::SlideImages`**；页面离开时调 `release`（GPUI 不会回收图集）。失败不自动重试。
 6. **按键**：页面内的快捷键用 `track_focus` + `on_key_down`；不要用 `observe_keystrokes`（它是全应用的）。
-7. 没做完的区域用 `widgets::todo_block` 占位（写清对照的 Vue 位置与要做的事），代码里的小缺口写 `TODO(parity): …`。
+7. 没做完的区域用 `widgets::todo_block` 占位（写清对照的原版位置与要做的事），代码里的小缺口写 `TODO(parity): …`。
    做完一项就删掉占位，并更新 `docs/native/parity.md`。
 8. 真机验证只在沙箱里做（`HUANSHU_HOME`），**绝不碰** `%LOCALAPPDATA%\auto-slidev-studio`。
 9. **表单输入框是实体，不能每帧新建**（会丢焦点、丢光标、漏内存）：按**完整路径**（`cards[2].title`）

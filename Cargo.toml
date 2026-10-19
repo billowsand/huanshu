@@ -1,22 +1,13 @@
 [workspace]
 members = [
-    "src-tauri",
     "crates/huanshu-core",
     "crates/slide-typst",
     "apps/huanshu-native",
 ]
-# `huanshu-native` pulls in GPUI Kit, which is slow to build. Plain `cargo build` and
-# `cargo test` cover the three crates that ship with the Tauri app; `cargo test --workspace`
-# and an explicit `-p huanshu-native` still build the native UI.
-default-members = [
-    "src-tauri",
-    "crates/huanshu-core",
-    "crates/slide-typst",
-]
 resolver = "2"
 
-# Dependencies (Typst, its rasterizer, Tauri…) are optimized even in dev builds. Every slide on
-# screen is a Typst raster now, and unoptimized Typst made `tauri dev` and the render tests slow
-# enough to wait seconds per page. Workspace crates stay at opt-level 0 for fast rebuilds.
+# Dependencies (Typst, its rasterizer, GPUI…) are optimized even in dev builds. Every slide on
+# screen is a Typst raster now, and unoptimized Typst made the native dev loop slow enough to
+# wait seconds per page. Workspace crates stay at opt-level 0 for fast rebuilds.
 [profile.dev.package."*"]
 opt-level = 2

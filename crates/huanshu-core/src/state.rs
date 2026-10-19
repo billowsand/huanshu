@@ -287,14 +287,10 @@ impl AppState {
             }
         });
 
-        let project_dir = {
-            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            if cwd.file_name().and_then(|n| n.to_str()) == Some("src-tauri") {
-                cwd.parent().map(|p| p.to_path_buf()).unwrap_or(cwd)
-            } else {
-                cwd
-            }
-        };
+        // New projects are created relative to the process working directory. The shipped app
+        // is launched from its install directory, which is where project folders should land;
+        // packaged builds run with HUANSHU_HOME pointed at a sandbox during verification.
+        let project_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
         Self {
             settings,

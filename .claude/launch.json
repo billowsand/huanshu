@@ -2,27 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "vite",
-      "runtimeExecutable": "bunx",
-      "runtimeArgs": ["vite"],
-      "port": 5173
+      "name": "native",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["run", "-p", "huanshu-native"],
+      "env": { "HUANSHU_HOME": "E:\\huanshu\\target\\sandbox-home" }
     },
     {
-      "name": "tauri-dev",
-      "runtimeExecutable": "bunx",
-      "runtimeArgs": ["tauri", "dev"],
-      "env": { "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": "--remote-debugging-port=9223" },
-      "port": 5173
-    },
-    {
-      "name": "tauri-dev-sandbox",
-      "runtimeExecutable": "bunx",
-      "runtimeArgs": ["tauri", "dev"],
-      "env": {
-        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": "--remote-debugging-port=9223",
-        "HUANSHU_HOME": "E:\\huanshu\\target\\sandbox-home"
-      },
-      "port": 5173
+      "name": "native-release",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["run", "-p", "huanshu-native", "--release"],
+      "env": { "HUANSHU_HOME": "E:\\huanshu\\target\\sandbox-home" }
     }
   ]
 }

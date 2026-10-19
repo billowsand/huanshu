@@ -2,8 +2,7 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/billowsand/huanshu/ci.yml?style=flat-square&logo=github)](https://github.com/billowsand/huanshu/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
-[![Rust](https://img.shields.io/badge/Rust-1.77+-orange?style=flat-square&logo=rust)](https://www.rust-lang.org)
-[![Vue](https://img.shields.io/badge/Vue-3.5-blue?style=flat-square&logo=vuedotjs)](https://vuejs.org)
+[![Rust](https://img.shields.io/badge/Rust-1.85+-orange?style=flat-square&logo=rust)](https://www.rust-lang.org)
 [![Typst](https://img.shields.io/badge/render-Typst-in--process-239dad?style=flat-square&logo=typst)](https://typst.app)
 [![GPUI](https://img.shields.io/badge/native-GPUI-455a64?style=flat-square)](https://github.com/zed-industries/zed)
 
@@ -15,14 +14,11 @@
 
 ## 30 秒上手
 
-仓库里有两套界面，共用同一份业务内核 `huanshu-core`：Tauri + Vue 版与原生 GPUI 版。
+纯 Rust 项目：不需要 Node.js / bun，也不需要 WebView2，只要有 Rust 工具链。
 
 ```bash
-# Tauri + Vue 版
-bun install
-bunx tauri dev
-
-# 原生 GPUI 版（不需要 bun，直接 cargo 跑）
+git clone https://github.com/billowsand/huanshu.git
+cd huanshu
 cargo run -p huanshu-native --release
 ```
 
@@ -43,7 +39,7 @@ cargo run -p huanshu-native --release
 - **实时预览**：生成过程实时展示，进度一目了然
 - **一个渲染器**：屏幕上的幻灯片、编辑器预览和 PDF 都是同一份 Typst 排版结果，屏幕上看到的就是导出的
 - **原生 PDF 导出**：内嵌 Typst 直接把蓝图排版成矢量 PDF（18 种模板 × 6 套主题），不需要浏览器或外部 CLI；导出结果会列出占位页、被裁切的页与缺失的图片
-- **原生界面**：Rust / GPUI 重写的界面（`apps/huanshu-native`），逐页复刻功能并用上 GPUI 组件，与 Tauri 版共用数据目录
+- **原生界面**：整个应用就是这一个 Rust 程序（`apps/huanshu-native`，GPUI 绘制），无需浏览器与 WebView2
 - **主题与图表**：6 套主题（便签·稿纸、终端·纸、终端·墨、报刊·钴蓝、暗·琥珀、暗·星图）；`chart` 围栏块生成数据图表页（折线 / 柱状 / 环形 / 分组柱状 / 堆叠面积），`$...$` / `$$...$$` 数学公式同样由 Typst 排版
 - **图文配对**：素材库图片连同文稿大纲交给多模态模型，判断每张图该放在哪一页、起什么作用
 - **加密导出**：AES-256-GCM 加密的项目文件导出与导入
@@ -88,46 +84,30 @@ cargo run -p huanshu-native --release
 | 工具 | 版本 | 说明 |
 |------|------|------|
 | [LM Studio](https://lmstudio.ai/) | 任意 | 需加载聊天模型和 Embedding 模型 |
-| Node.js | 18+ | 前端构建 |
-| Rust | 1.77+ | 后端编译 |
-| Bun | 1.0+ | 包管理器 |
+| Rust | 1.85+ | 编译整个应用（纯 Rust，不需要 Node.js / bun） |
 
 ## 安装运行
 
-想直接用：到 [Releases](https://github.com/billowsand/huanshu/releases) 下载——Windows 上有两版可选
-（推荐原生版），Linux 目前只有 Tauri 版：
+想直接用：到 [Releases](https://github.com/billowsand/huanshu/releases) 下载——Windows 与 macOS 都有：
 
 | 产物 | 说明 |
 |---|---|
-| `HuanshuNative_*_x64-setup.exe` | 原生 GPUI 版安装包（currentUser 静默 `/S`，卸载 `uninstall.exe /S`） |
-| `huanshu-native_windows_x64.exe` | 原生 GPUI 版免安装单文件，不需要 WebView2 与 VC++ 运行库 |
-| `Huanshu_*_x64-setup.exe` / `.AppImage` / `.deb` | Tauri + Vue 版 |
-| `auto-slidev-studio_windows_x64.exe` | Tauri 版免安装单文件 |
+| `HuanshuNative_*_x64-setup.exe` | Windows 安装包（currentUser 静默 `/S`，卸载 `uninstall.exe /S`） |
+| `huanshu-native_windows_x64.exe` | Windows 免安装单文件，不需要 WebView2 与 VC++ 运行库 |
+| `HuanshuNative_*_macos_*.dmg` / `huanshu-native_macos_*.zip` | macOS 版（`.app`，Apple 芯片与 Intel 通用） |
 
-原生版也可以在本机出包：
+本机出包：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-native.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-native.ps1   # Windows
+scripts/package-native-macos.sh --universal                                    # macOS
 ```
 
 从源码运行：
 
 ```bash
-# Tauri + Vue 版：开发模式（推荐）
-bunx tauri dev
-
-# 生产构建（自动先跑前端 `bun run build`，产物 targets 见 src-tauri/tauri.conf.json）
-bunx tauri build --bundles nsis
-# 安装包：target/release/bundle/nsis/Huanshu_<version>_x64-setup.exe
-# 免安装单文件：target/release/auto-slidev-studio.exe
-
-# 原生 GPUI 版
 cargo run -p huanshu-native --release
 ```
-
-> ⚠️ **不要用 `cargo build --release` 或 `cargo tauri build`** 去构建 Tauri 版。缺少 `custom-protocol` feature 时
-> Tauri 会把二进制约成 dev 模式（前端资源不内嵌，运行时去连 `localhost:5173`），
-> 双击只会看到 `ERR_CONNECTION_REFUSED`。详见 [SETUP.md](SETUP.md)。
 
 ## 使用步骤
 
@@ -360,7 +340,8 @@ Markdown 正文中可以用 ` ```chart ` 围栏块直接携带图表数据，归
 
 ## 项目结构
 
-业务逻辑全在 `crates/huanshu-core`（不依赖任何界面框架），两套界面都只做转发：
+纯 Rust workspace：业务逻辑全在 `crates/huanshu-core`（不依赖任何界面框架），
+`apps/huanshu-native` 是唯一的界面，只做转发：
 
 ```
 huanshu/
@@ -389,15 +370,14 @@ huanshu/
 │           ├── layouts/          #     18 个版式，一个文件一个
 │           └── themes/           #     6 套主题 token 与页面背景
 ├── apps/
-│   └── huanshu-native/           # 原生界面（Rust + GPUI Kit）
+│   └── huanshu-native/           # 界面（Rust + GPUI Kit），唯一的可执行程序
 │       └── src/                  #   shell / router / theme / pages
-├── src/                          # Tauri 版界面（Vue 3 + Pinia）
-│   ├── views/                    #   HomeView / WorkflowView / PresentationOverlay …
-│   ├── stores/                   #   generation / projects / appSettings
-│   └── themes/                   #   主题 token 与幻灯片外壳样式
-├── src-tauri/                    # Tauri 命令外壳（只做「取参数 → 调 core → 转错误」）
+├── assets/
+│   ├── carbon/                   #   内嵌的 Carbon 图标集（Apache-2.0，构建脚本读它）
+│   └── app-icon/                 #   exe / .app 图标（由 scripts/generate_brand_assets.py 生成）
+├── fixtures/                     # 牌组 fixture（版式回归用）
 ├── docs/                         # 设计文档、原生界面对照表、截图
-└── scripts/                      # 打包脚本（Tauri 版 / 原生版）
+└── scripts/                      # 打包脚本（Windows / macOS）与品牌素材生成
 ```
 
 ## 配置说明
@@ -442,12 +422,12 @@ huanshu/
 
 🚧 **Beta** — 功能已基本完整，但仍在积极开发中，可能存在 breaking change。
 
-两套界面（Tauri + Vue、原生 GPUI）共用同一个内核和同一份数据目录，功能基本对齐；
-原生界面对照表见 [`docs/native/parity.md`](docs/native/parity.md)。
+界面就是原生 GPUI 版（Tauri + Vue 版已删除）；迁移期的逐页功能对照表见
+[`docs/native/parity.md`](docs/native/parity.md)。
 
 路线图：
 - [x] 云端 OpenAI 兼容服务（可走 SOCKS5 代理）
-- [ ] 原生界面完全取代 Tauri 版，Tauri 版进入维护状态
+- [x] 原生界面完全取代 Tauri 版（纯 Rust 工程，无需 Node.js / WebView2）
 - [ ] 支持更多输入格式（Word、PDF）
 - [ ] 更多幻灯片模板
 - [ ] 插件系统
