@@ -537,7 +537,9 @@ fn seconds(elapsed_ms: u128) -> String {
 
 /// 路径的最后一段（结果框只显示文件名；`/` 与反斜杠都算分隔符，两个平台一致）。
 fn last_segment(path: &str) -> &str {
-    path.rsplit(|ch: char| ch == '/' || std::path::is_separator(ch))
+    // Both separators on every platform: the report path comes from the host, but
+    // the helper is also exercised with Windows-style paths in its unit test.
+    path.rsplit(|ch: char| ch == '/' || ch == '\\')
         .find(|part| !part.is_empty())
         .unwrap_or(path)
 }
