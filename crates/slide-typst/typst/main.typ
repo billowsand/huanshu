@@ -1,4 +1,6 @@
-// Entry point. The Rust world serves `/deck.json`:
+// Entry point. Paths are relative to this file so the exported project can be
+// compiled from any working directory without `--root`; the in-process Rust world
+// resolves the same relative paths to its virtual `/deck.json`.
 //   { theme, aspect_ratio, fonts: { title: [..], subtitle, body, caption, number, code },
 //     assets: { "<image reference>": (path, width, height, vector) }, slides: [SlideBlueprint] }
 
@@ -29,7 +31,7 @@
 #import "layouts/center-grid.typ" as center-grid
 #import "layouts/chart-focus.typ" as chart-focus
 
-#let deck = json("/deck.json")
+#let deck = json("deck.json")
 
 // 便签·稿纸, the terminal themes, 报刊·钴蓝 and the dark glass themes are
 // ported; every other theme id falls back to light-notes.

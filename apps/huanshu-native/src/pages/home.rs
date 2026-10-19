@@ -2,8 +2,8 @@
 //!
 //! 已实现：操作栏（项目 · 主题浮层 · 导入 · 设置 · 新建演示）、标题区、加载骨架、空状态、
 //! 项目卡片（名称、比例徽章、页数、更新时间、导出、删除）、删除确认、导出对话框
-//! （普通 `.keynn`、加密 `.keynn` 与 PDF）、导入 `.keynn`（加密文件弹密码对话框，
-//! 密码错误不关闭可重试，照原版 `handlePasswordSubmit`）。
+//! （普通 `.keynn`、加密 `.keynn`、PDF 与完整 Typst 工程 zip）、导入 `.keynn`
+//! （加密文件弹密码对话框，密码错误不关闭可重试，照原版 `handlePasswordSubmit`）。
 
 use gpui_kit::base::InteractiveElementExt as _;
 use gpui_kit::component::button::ButtonVariant;
@@ -80,6 +80,8 @@ pub struct HomePage {
     exporting: Option<i64>,
     /// PDF 导出互斥（原版 `usePdfExport.ts` 的全局 `exporting`：同一时刻只跑一次）。
     pdf_exporting: bool,
+    /// Typst 工程导出互斥，与 `pdf_exporting` 一起保证同一时刻只跑一个导出。
+    typst_exporting: bool,
     importing: bool,
     /// 加密导入：已读入内存、等待密码的 `.keynn` 字节（原版 `pendingImportData`）。
     pending_import: Option<Vec<u8>>,
@@ -98,6 +100,7 @@ impl HomePage {
             terminal_selected: None,
             exporting: None,
             pdf_exporting: false,
+            typst_exporting: false,
             importing: false,
             pending_import: None,
             password_dialog: None,
@@ -172,7 +175,7 @@ impl HomePage {
         );
     }
 
-    /// 导出对话框（原版 `ExportDialog.vue`）：普通导出 / 加密导出 / PDF 文档。
+    /// 导出对话框（原版 `ExportDialog.vue`）：普通导出 / 加密导出 / PDF 文档 / Typst 工程。
     fn open_export(
         &mut self,
         project: ProjectSummary,
@@ -206,9 +209,14 @@ impl HomePage {
                                 .child(div().text_size(px(12.0)).text_color(c.muted).child(desc)),
                         )
                 };
-            let (plain_page, pdf_page, encrypted_page) = (page.clone(), page.clone(), page.clone());
-            let (plain_project, pdf_project, encrypted_project) =
-                (project.clone(), project.clone(), project.clone());
+            let (plain_page, pdf_page, encrypted_page, typst_page) =
+                (page.clone(), page.clone(), page.clone(), page.clone());
+            let (plain_project, pdf_project, encrypted_project, typst_project) = (
+                project.clone(),
+                project.clone(),
+                project.clone(),
+                project.clone(),
+            );
             dialog
                 .title("导出演示文稿")
                 .child(
@@ -261,6 +269,20 @@ impl HomePage {
                                 window.close_dialog(cx);
                                 let _ = pdf_page.update(cx, |page, cx| {
                                     page.export_pdf(pdf_project.clone(), window, cx)
+                                });
+                            }),
+                        )
+                        .child(
+                            option(
+                                "export-typst",
+                                "code",
+                                "Typst 工程",
+                                "完整 Typst 源码与素材，打包为 zip",
+                            )
+                            .on_click(move |_event, window, cx| {
+                                window.close_dialog(cx);
+                                let _ = typst_page.update(cx, |page, cx| {
+                                    page.export_typst(typst_project.clone(), window, cx)
                                 });
                             }),
                         ),
@@ -362,8 +384,9 @@ impl HomePage {
 
     fn export_pdf(&mut self, project: ProjectSummary, window: &mut Window, cx: &mut Context<Self>) {
         // 原版 `usePdfExport.exportPdf` 开头就是 `if (exporting.value) return;`：同一时刻
-        // 只跑一次 PDF 导出，第二次静默忽略（连保存对话框都不弹）。
-        if self.pdf_exporting {
+        // 只跑一次导出，第二次静默忽略（连保存对话框都不弹）。PDF 与 Typst 工程互斥，
+        // 谁在跑都算「正在导出」。
+        if self.pdf_exporting || self.typst_exporting {
             return;
         }
         let default_name = format!("{}.pdf", safe_file_name(&project.name));
@@ -385,8 +408,8 @@ impl HomePage {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        // macOS 的保存面板是异步的：面板开着时可能又点了一次导出，这里再拦一次。
-        if self.pdf_exporting {
+        // 保存面板是异步的（`platform::save_path`）：面板开着时可能又点了一次导出，这里再拦一次。
+        if self.pdf_exporting || self.typst_exporting {
             return;
         }
         self.pdf_exporting = true;
@@ -405,6 +428,60 @@ impl HomePage {
                 page.pdf_exporting = false;
                 page.exporting = None;
                 export::show_report(result, None, window, cx);
+                cx.notify();
+            },
+        );
+    }
+
+    fn export_typst(
+        &mut self,
+        project: ProjectSummary,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // 与 PDF 导出共用一次导出：任一在跑就静默忽略（原版只有 PDF，一条全局 `exporting`）。
+        if self.typst_exporting || self.pdf_exporting {
+            return;
+        }
+        let default_name = format!("{}-typst.zip", safe_file_name(&project.name));
+        platform::save_path(
+            self,
+            &default_name,
+            platform::TYPST_PROJECT,
+            window,
+            cx,
+            move |page, path, window, cx| page.write_typst(project, path, window, cx),
+        );
+    }
+
+    /// 保存路径定下之后的 Typst 工程导出（[`Self::export_typst`] 的后半段）。
+    fn write_typst(
+        &mut self,
+        project: ProjectSummary,
+        path: std::path::PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // 保存面板是异步的（`platform::save_path`）：面板开着时可能又点了别的导出，这里再拦一次。
+        if self.typst_exporting || self.pdf_exporting {
+            return;
+        }
+        self.typst_exporting = true;
+        self.exporting = Some(project.id);
+        cx.notify();
+        // 「正在打包 Typst 工程…」（要收集模板 / 素材 / 图标，首次还要扫系统字体）。
+        // 结果 / 失败对话框由 `show_project_report` 接着开，它顺手收起这个框。
+        export::begin_typst_export(window, cx);
+        let shared = self.handle.shared().clone();
+        let theme = cx.studio().theme.id.to_string();
+        run_bg(
+            window,
+            cx,
+            move || crate::app::export_typst_project(&shared, project.id, None, path, theme),
+            |page: &mut Self, result, window, cx| {
+                page.typst_exporting = false;
+                page.exporting = None;
+                export::show_project_report(result, None, window, cx);
                 cx.notify();
             },
         );

@@ -470,6 +470,31 @@ JSON 直接排版成矢量 PDF，不依赖浏览器和 typst CLI。它也是**�
     `Runtime.evaluate` / `Page.captureScreenshot`。
     保存对话框是系统原生窗口，CDP 操作不到，需要人工点一下；在页面里覆盖 `__TAURI_INTERNALS__.invoke`
     来跳过它的做法**实测无效**。
+  - 完整 Typst 工程导出（原生版）：`Renderer::export_project(slides, options)`（`crates/slide-typst/src/lib.rs`）
+    把牌组物化成独立工程的文件列表：`TEMPLATES` 里的全部模板（相对路径）、`deck.json`（数学公式已改写）、
+    `assets/` 图片，以及本次编译**实际加载**的 `icons/<set>/<name>/<rrggbb[aa]>.svg`。图标是按颜色在编译期
+    现生成的，不能从牌组静态枚举：`SlideWorld.recorded` 在 `file()` 里记录 `/icons/…` 与 `/assets/…` 请求，
+    导出前用同一份 deck.json 编译一次（同时验证工程自包含、收集 `overflows`）。
+    模板**只用相对路径**（`json("deck.json")`、`import "../vendor/…"`、`image("../icons/…")`、
+    assets 用 `../assets/…`），在进程内 world 里仍解析成虚拟绝对路径；导出的工程因此不依赖 Typst 的
+    `--root`/当前目录，避免 Windows 上 `typst compile main.typ` 把 `/vendor/…` 解析到 `C:\vendor\…`
+    （用户实测过）。回归测试 `the_project_compiles_when_the_typst_root_is_not_the_project_directory`。
+    - 字体**不过滤**：PDF 的 `compile()` 会丢掉本机没装的字族（避免 Typst 对每个回退项告警），工程导出保留
+      完整配置链（`project_font_roles` + `standalone_math_fonts`），因为工程可能在装有这些字体的系统上编译；
+      缺失字族只让 Typst 回落（有警告、不会失败），清单进 `TypstProject.unavailable_fonts`。
+      `project_font_choices` 给出每个角色的首选字族与「本机未安装」列表，用于导出报告与 README。
+    - `huanshu_core::services::export::export_typst_project(state, project_id, slides?, path, theme)` 写 zip：
+      一个顶层目录（输出文件名的 stem）、`README.md`（编译命令、字体回退链与未安装字体、目录结构、图标重新
+      导出说明）和一个空的 `fonts/` 目录；返回 `TypstProjectReport`（pages / files / fonts / missing_fonts /
+      placeholder_slides / overflow_slides / missing_assets / theme_fallback）。zip 打包与 README 只在 core，
+      界面不复制任何字体或素材规则。
+    - 原生入口：首页导出对话框第四项「Typst 工程」（`pages/home.rs`，`platform::TYPST_PROJECT` 的 zip 过滤器），
+      进行中/结果/失败框在 `apps/huanshu-native/src/export.rs`（`begin_typst_export` / `show_project_report`）；
+      脚本开关 `--open <id> --export-typst <path>`（`cli.rs` / `main.rs`，配合 `HUANSHU_HOME` 沙箱验证）。
+    - 测试：`crates/slide-typst/tests/project.rs` 用**真实目录**的 Typst World（`/x` → `<root>/x`）编译导出的
+      文件列表，证明解包后不依赖应用即可编译；其中的 ignored 用例读 `TYPST_PROJECT_DIR`，可对真机导出的 zip
+      做同样检查。core 的 `project_archive_contains_sources_readme_and_fonts` 检查 zip 结构、README 与未安装
+      字体报告。
 - 新增一个版式：写 `layouts/<kind>.typ`，在 `main.typ` 的 `layouts` 表登记，在 `lib.rs` 的 `TEMPLATES` 和
   `SUPPORTED_KINDS` 里各加一项，并确保 `fixtures/all-layout-blueprints.json` 里有该 kind 的页面（有单测检查）。
 - 新增一个主题：写 `themes/<id>.typ`（theme 字典 + `background(w, h)`，键集合照抄现有主题，`family` 填它

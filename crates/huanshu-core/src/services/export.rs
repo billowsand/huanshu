@@ -4,6 +4,7 @@
 //! 因此缩略图不可能与导出页在「这张图片/这个主题指向什么」上不一致。
 //! 渲染是同步的重活（编译 + 光栅化），调用方（命令层或将来的 GPUI 线程）负责放到后台线程。
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::time::Instant;
@@ -11,6 +12,8 @@ use std::time::Instant;
 use base64::Engine;
 use serde::Serialize;
 use slide_typst::{Assets, ExportOptions, FontRoles, Renderer};
+use zip::write::SimpleFileOptions;
+use zip::ZipWriter;
 
 use crate::assets;
 use crate::db::{self, MediaAsset};
@@ -45,6 +48,29 @@ pub struct PdfExportReport {
     pub missing_assets: Vec<slide_typst::MissingAsset>,
     /// The requested theme id when it has no PDF layout; the export fell back
     /// to [`FALLBACK_THEME`]. `None` when the requested theme rendered as-is.
+    pub theme_fallback: Option<String>,
+    pub elapsed_ms: u128,
+}
+
+/// Report of a complete Typst project export (a zip the user can compile with
+/// `typst compile main.typ`).
+#[derive(Debug, Serialize)]
+pub struct TypstProjectReport {
+    pub path: String,
+    pub pages: usize,
+    /// Entries in the archive (sources, `deck.json`, assets, icons, README).
+    pub files: usize,
+    /// Font families the project asks Typst for, in role order, unique.
+    pub fonts: Vec<String>,
+    /// Entries of `fonts` that are not installed on this machine. They are kept
+    /// in the project: a system that has them renders it like the app, and a
+    /// system without them only makes Typst fall back (with a warning).
+    pub missing_fonts: Vec<String>,
+    /// Slides whose template has no Typst layout (rendered as placeholder pages).
+    pub placeholder_slides: Vec<PlaceholderSlide>,
+    /// Slides whose content was clipped because it did not fit even when shrunk.
+    pub overflow_slides: Vec<usize>,
+    pub missing_assets: Vec<slide_typst::MissingAsset>,
     pub theme_fallback: Option<String>,
     pub elapsed_ms: u128,
 }
@@ -204,20 +230,8 @@ fn render_to_file(
         .map_err(|e| e.to_string())?;
     std::fs::write(path, &rendered.pdf)
         .map_err(|e| format!("写入 {} 失败：{e}", path.display()))?;
-    let placeholder_slides = slides
-        .iter()
-        .enumerate()
-        .filter_map(|(index, slide)| {
-            let kind = slide.get("kind")?.as_str()?;
-            (!slide_typst::SUPPORTED_KINDS.contains(&kind)).then(|| PlaceholderSlide {
-                index,
-                kind: kind.to_string(),
-            })
-        })
-        .collect();
-    let mut overflow_slides: Vec<usize> =
-        rendered.overflows.iter().filter_map(|o| o.slide).collect();
-    overflow_slides.dedup();
+    let placeholder_slides = placeholder_slides(slides);
+    let overflow_slides = overflow_slides(&rendered.overflows);
     Ok(PdfExportReport {
         path: path.display().to_string(),
         pages: rendered.pages,
@@ -229,7 +243,261 @@ fn render_to_file(
     })
 }
 
-/// Rasterizes `slides` (the deck currently on screen) into PNG thumbnails.
+/// Slides whose template has no Typst layout; they render as visible placeholder
+/// pages in both the PDF and the exported project.
+fn placeholder_slides(slides: &[serde_json::Value]) -> Vec<PlaceholderSlide> {
+    slides
+        .iter()
+        .enumerate()
+        .filter_map(|(index, slide)| {
+            let kind = slide.get("kind")?.as_str()?;
+            (!slide_typst::SUPPORTED_KINDS.contains(&kind)).then(|| PlaceholderSlide {
+                index,
+                kind: kind.to_string(),
+            })
+        })
+        .collect()
+}
+
+/// One-based page indices of the slides clipped by the fit search, deduplicated.
+fn overflow_slides(overflows: &[slide_typst::Overflow]) -> Vec<usize> {
+    let mut slides: Vec<usize> = overflows
+        .iter()
+        .filter_map(|overflow| overflow.slide)
+        .collect();
+    slides.dedup();
+    slides
+}
+
+/// Exports the deck as a complete, standalone Typst project in a zip: the same
+/// theme, aspect ratio, fonts and images as [`export_pdf`], but as editable
+/// sources instead of a rendered PDF.
+///
+/// Slides (the editor's current deck) are used when present; otherwise the
+/// project's saved blueprints are read. The archive unpacks to one directory and
+/// is compiled with "typst compile main.typ deck.pdf" (see its README.md).
+pub fn export_typst_project(
+    state: &SharedState,
+    project_id: Option<i64>,
+    slides: Option<Vec<serde_json::Value>>,
+    path: String,
+    theme: Option<String>,
+) -> Result<TypstProjectReport> {
+    let (slides, options, theme_fallback) =
+        prepare_export_values(state, project_id, slides, theme)?;
+    write_project_archive(&slides, &options, Path::new(&path), theme_fallback)
+}
+
+/// Writes the project archive. Split from [`export_typst_project`] so tests can
+/// give it a deck and options without a database.
+pub(crate) fn write_project_archive(
+    slides: &[serde_json::Value],
+    options: &ExportOptions,
+    path: &Path,
+    theme_fallback: Option<String>,
+) -> Result<TypstProjectReport> {
+    let started = Instant::now();
+    let project = renderer()
+        .export_project(slides, options)
+        .map_err(|error| error.to_string())?;
+    let readme = project_readme(options, &project, theme_fallback.as_deref());
+    let root = archive_root(path);
+
+    let file = std::fs::File::create(path)
+        .map_err(|error| format!("创建 {} 失败：{error}", path.display()))?;
+    let mut zip = ZipWriter::new(file);
+    let entry = SimpleFileOptions::default().unix_permissions(0o644);
+    // A visible directory for optional font files (see README).
+    zip.add_directory(format!("{root}/fonts/"), entry)
+        .map_err(|error| format!("写入 {} 失败：{error}", path.display()))?;
+    let mut files = 0usize;
+    for project_file in &project.files {
+        let name = format!("{root}/{}", project_file.path);
+        zip.start_file(&name, entry)
+            .map_err(|error| format!("写入 {name} 失败：{error}"))?;
+        zip.write_all(&project_file.bytes)
+            .map_err(|error| format!("写入 {name} 失败：{error}"))?;
+        files += 1;
+    }
+    let readme_name = format!("{root}/README.md");
+    zip.start_file(&readme_name, entry)
+        .map_err(|error| format!("写入 {readme_name} 失败：{error}"))?;
+    zip.write_all(readme.as_bytes())
+        .map_err(|error| format!("写入 {readme_name} 失败：{error}"))?;
+    files += 1;
+    zip.finish()
+        .map_err(|error| format!("完成 {} 失败：{error}", path.display()))?;
+
+    Ok(TypstProjectReport {
+        path: path.display().to_string(),
+        pages: project.pages,
+        files,
+        fonts: project.fonts,
+        missing_fonts: project.unavailable_fonts,
+        placeholder_slides: placeholder_slides(slides),
+        overflow_slides: overflow_slides(&project.overflows),
+        missing_assets: project.missing_assets,
+        theme_fallback,
+        elapsed_ms: started.elapsed().as_millis(),
+    })
+}
+
+/// The zip's single top-level directory, named after the chosen file
+/// (deck.zip becomes deck/). Extraction then never spills files into the folder.
+fn archive_root(path: &Path) -> String {
+    let stem = path
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().trim().to_string())
+        .unwrap_or_default();
+    let clean: String = stem
+        .chars()
+        .filter(|ch| !matches!(ch, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+        .collect();
+    if clean.is_empty() {
+        "typst-project".to_string()
+    } else {
+        clean
+    }
+}
+
+/// ratio_16x9 becomes 16:9, for the README.
+fn aspect_label(value: &str) -> &'static str {
+    match value {
+        "ratio_32x9" => "32:9",
+        "ratio_48x9" => "48:9",
+        _ => "16:9",
+    }
+}
+
+/// The README shipped inside the archive: how to compile it, which fonts it
+/// expects, and what each directory holds. Fonts are the one thing the archive
+/// cannot carry (licensing and size), so it names the whole fallback chain and
+/// the optional fonts/ directory.
+fn project_readme(
+    options: &ExportOptions,
+    project: &slide_typst::TypstProject,
+    theme_fallback: Option<&str>,
+) -> String {
+    let title = options.title.as_deref().unwrap_or("演示文稿");
+    let theme = crate::themes::theme_name(&options.theme);
+    let mut out = String::new();
+    out.push_str(&format!("# {title} · Typst 工程\n\n"));
+    out.push_str(
+        r#"由幻述（huanshu）导出的完整 Typst 工程：`main.typ`、全部版式与主题、幻灯片数据、图片素材，以及按当前牌组用到的图标与颜色预先着色的 SVG。排版结果与应用内的 PDF 导出一致。
+
+## 编译
+
+需要 Typst **0.15.x**（本工程按 0.15.1 的模板语法编写）。在本目录下执行：
+
+```bash
+typst compile main.typ deck.pdf
+```
+
+模板内部全部使用相对路径（`deck.json`、`../vendor/…`、`../icons/…`、`../assets/…`），因此在任何目录执行 `typst compile <路径>/main.typ` 都可以，不需要 `--root`。
+
+"#,
+    );
+    out.push_str(&format!(
+        "画布比例：{}；主题：{}。\n\n## 字体\n\n",
+        aspect_label(&options.aspect_ratio),
+        theme
+    ));
+    out.push_str(
+        r#"工程按「设置 → 外观与字体」的字体设置排版。`deck.json` 的 `fonts` 保存每个角色的完整回退链（同一角色的字族依次尝试），数学公式的候选字族在 `math_fonts` 里：
+
+| 用途 | 字体（按回退顺序） |
+| --- | --- |
+"#,
+    );
+    // The math chain is deck.json's `math_fonts`: the configured family plus every
+    // known OpenType MATH family, so the README says what Typst actually tries.
+    let mut math_chain: Vec<String> = Vec::new();
+    for family in options
+        .fonts
+        .math
+        .iter()
+        .map(String::as_str)
+        .chain(slide_typst::MATH_FONTS.iter().copied())
+    {
+        let family = family.trim();
+        if !family.is_empty()
+            && !math_chain
+                .iter()
+                .any(|known| known.eq_ignore_ascii_case(family))
+        {
+            math_chain.push(family.to_string());
+        }
+    }
+    for (label, list) in [
+        ("标题", &options.fonts.title),
+        ("副标题", &options.fonts.subtitle),
+        ("正文", &options.fonts.body),
+        ("注释与标签", &options.fonts.caption),
+        ("数字与序号", &options.fonts.number),
+        ("代码", &options.fonts.code),
+        ("数学公式", &math_chain),
+    ] {
+        let chain = list
+            .iter()
+            .map(|family| format!("`{family}`"))
+            .collect::<Vec<_>>()
+            .join(" → ");
+        out.push_str(&format!("| {label} | {chain} |\n"));
+    }
+    out.push_str("\n");
+    if project.unavailable_fonts.is_empty() {
+        out.push_str(
+            "这些字体在导出所用的这台机器上都能找到。编译本工程的目标系统也需要安装同样的字体（Typst 会自动扫描系统字体）。\n\n",
+        );
+    } else {
+        let missing = project
+            .unavailable_fonts
+            .iter()
+            .map(|family| format!("`{family}`"))
+            .collect::<Vec<_>>()
+            .join("、");
+        out.push_str(&format!(
+            "导出所用的这台机器上未安装：{missing}。目标系统如果安装了这些字体，就会按上面的设置排版；缺失的字体不会导致编译失败（Typst 会回落到默认字体），但字形与换行可能与应用内预览不同。\n\n",
+        ));
+    }
+    out.push_str(
+        "（编译时若出现 unknown font family 警告，那是回退链里本机没装的备选字体；Typst 会继续尝试后面的字体，不影响编译。）\n\n",
+    );
+    out.push_str(
+        r#"字体文件不在系统字体目录时，也可以把它们放进本目录的 `fonts/` 再指定路径：
+
+```bash
+typst compile --font-path fonts main.typ deck.pdf
+```
+
+## 目录结构
+
+- `main.typ`：入口（分发版式、设置页面尺寸与字体）
+- `deck.json`：幻灯片数据（主题、比例、字体、素材映射与每页内容）
+- `lib/`：公共组件、图表与自适应缩放
+- `themes/`：主题 token 与页面背景
+- `layouts/`：每种版式一个文件
+- `vendor/mitex/`：数学公式（LaTeX → Typst）规则
+- `assets/`：图片素材（spotlight 版式按相对 `layouts/` 的 `../assets/<n>.<ext>` 引用）
+- `icons/`：按当前牌组用到的图标与颜色生成的 SVG
+- `fonts/`：可选的字体目录（见上）
+
+## 说明
+
+- 图标按导出时的牌组与主题预先着色；改了 `deck.json` 里的图标名、颜色或主题后，重新导出一次工程即可。
+- 修改 `deck.json` 的 `aspect_ratio`（`ratio_16x9` / `ratio_32x9` / `ratio_48x9`）即可换画布比例。
+- 未知图标回落到 `circle-dash`；缺失的图片显示占位框，都不会让编译失败。
+"#,
+    );
+    if let Some(requested) = theme_fallback {
+        out.push_str(&format!(
+            "\n> 注意：请求的主题 `{requested}` 还没有 Typst 版式，本工程已回落到「{theme}」。\n"
+        ));
+    }
+    out
+}
+
+/// Rasterizes [`slides`] (the deck currently on screen) into PNG thumbnails.
 ///
 /// `only` limits the rasterized pages; positions refer to `slides`.
 pub fn render_slide_thumbnails(
@@ -568,6 +836,90 @@ mod tests {
         assert_eq!(batch.pages.len(), 1);
         assert_eq!(batch.pages[0].index, 1);
         assert!(!batch.pages[0].overflow);
+    }
+
+    /// The project archive is a self-contained Typst project: sources,
+    /// deck.json, the fonts it expects (unfiltered), a README and the optional
+    /// fonts/ directory, all under one top-level folder.
+    #[test]
+    fn project_archive_contains_sources_readme_and_fonts() {
+        use std::io::Read;
+
+        let root = std::env::temp_dir().join(format!("typst-project-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("deck.zip");
+        let slides = vec![
+            serde_json::json!({ "kind": "cover", "title": "封面" }),
+            serde_json::json!({
+                "kind": "feature_grid",
+                "title": "功能",
+                "cards": [{ "title": "一", "body": "正文", "icon": "i-carbon:data-base", "tone": "blue" }],
+            }),
+            serde_json::json!({ "kind": "closing", "title": "结束" }),
+        ];
+        let options = ExportOptions {
+            title: Some("归档测试".to_string()),
+            // A family no machine has: it must be kept in deck.json and reported,
+            // not dropped like the in-process PDF compile drops it.
+            fonts: FontRoles::uniform("No Such Font For Project Test"),
+            ..Default::default()
+        };
+        let report = write_project_archive(&slides, &options, &path, None).unwrap();
+        assert_eq!(report.pages, 3);
+        assert!(report.files > 20, "only {} files", report.files);
+        assert!(report
+            .fonts
+            .contains(&"No Such Font For Project Test".to_string()));
+        assert!(report
+            .missing_fonts
+            .contains(&"No Such Font For Project Test".to_string()));
+        assert!(report.missing_assets.is_empty());
+        assert!(report.placeholder_slides.is_empty());
+
+        let mut archive = zip::ZipArchive::new(std::fs::File::open(&path).unwrap()).unwrap();
+        let names: Vec<String> = (0..archive.len())
+            .map(|index| archive.by_index(index).unwrap().name().to_string())
+            .collect();
+        for expected in ["main.typ", "deck.json", "README.md", "fonts/"] {
+            let name = format!("deck/{expected}");
+            assert!(
+                names.iter().any(|entry| entry == &name),
+                "missing {name}: {names:?}"
+            );
+        }
+        assert!(
+            names
+                .iter()
+                .any(|name| name.starts_with("deck/icons/carbon/")),
+            "no tinted icons: {names:?}"
+        );
+        assert!(
+            names.iter().all(|name| name.starts_with("deck/")),
+            "archive must keep one top-level folder: {names:?}"
+        );
+
+        let mut readme = String::new();
+        archive
+            .by_name("deck/README.md")
+            .unwrap()
+            .read_to_string(&mut readme)
+            .unwrap();
+        assert!(
+            readme.contains("typst compile main.typ deck.pdf"),
+            "{readme}"
+        );
+        assert!(readme.contains("No Such Font For Project Test"), "{readme}");
+        assert!(readme.contains("未安装"), "{readme}");
+        assert!(readme.contains("归档测试"), "{readme}");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn archive_root_is_the_file_stem_and_never_escapes_the_folder() {
+        assert_eq!(archive_root(Path::new("C:/tmp/演示.zip")), "演示");
+        assert_eq!(archive_root(Path::new("deck.zip")), "deck");
+        // A stem made only of characters a zip entry cannot hold falls back.
+        assert_eq!(archive_root(Path::new("C:/tmp/???.zip")), "typst-project");
     }
 }
 

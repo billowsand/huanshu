@@ -113,6 +113,11 @@ pub const KEYNN: FileFilter = FileFilter {
     name: "幻述项目",
     extensions: &["keynn"],
 };
+/// 完整 Typst 工程（zip：源码 + 素材 + 图标 + README，解压后可直接编译）。
+pub const TYPST_PROJECT: FileFilter = FileFilter {
+    name: "Typst 工程",
+    extensions: &["zip"],
+};
 pub const MARKDOWN: FileFilter = FileFilter {
     name: "Markdown",
     extensions: &["md", "txt"],

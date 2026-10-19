@@ -84,6 +84,26 @@ pub fn export_pdf(
     )
 }
 
+/// 导出完整 Typst 工程（zip，可解压后用 `typst compile main.typ deck.pdf` 编译），
+/// 返回页数、文件数、字体等报告要点。**只能在后台线程上调用。**
+/// `slides` 为 `None` 时用项目里保存的牌组；第三步要导出**内存里的牌组**
+/// （含还没落库的新建页）就把牌组传进来。
+pub fn export_typst_project(
+    shared: &AppShared,
+    project_id: i64,
+    slides: Option<Vec<serde_json::Value>>,
+    path: std::path::PathBuf,
+    theme: String,
+) -> Result<export::TypstProjectReport, String> {
+    export::export_typst_project(
+        shared,
+        Some(project_id),
+        slides,
+        path.to_string_lossy().into(),
+        Some(theme),
+    )
+}
+
 /// 工作集内存（MiB）。内存测量脚本用（看板/演示翻页的长跑），平时没有调用方。
 #[allow(dead_code)]
 pub fn working_set_mib() -> f64 {

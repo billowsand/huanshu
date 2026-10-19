@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-19
+
+### Added
+
+- **导出完整 Typst 工程（原生版）**：首页导出对话框新增第四项「Typst 工程」，把当前项目导出为 **zip** 包；
+  解包后是一个完整、自包含的 Typst 工程，可直接 `typst compile main.typ deck.pdf`（Typst 0.15.x）。包内包含
+  全部模板/主题/版式、`deck.json`、图片素材、按当前牌组用到的图标与颜色预生成的 SVG，以及说明编译命令、
+  字体回退链与目录结构的 README。字体沿用「设置 → 外观与字体」的完整回退链（不做本机已安装字体过滤），
+  装在目标系统的字体能够还原应用内排版；缺失字体只会让 Typst 回落并写入结果对话框，不会导致编译失败。
+  命令行开关 `--open <id> --export-typst <path>` 便于脚本化验证。
+
+### Fixed
+
+- **导出的 Typst 工程改用相对路径**：模板不再使用 `/deck.json`、`/vendor/…`、`/icons/…`、`/assets/…`
+  这类项目绝对路径（图片素材相对 `layouts/` 写作 `../assets/…`）。此前在 Typst CLI 的项目根不是解压目录
+  （Windows 上实测 `/vendor` 被解析到 `C:\vendor`）时，编译会报 `file not found at C:\vendor\mitex\specs\mod.typ`；
+  现在从任意目录执行 `typst compile main.typ deck.pdf` 都能编译，不需要 `--root`。回归测试
+  `the_project_compiles_when_the_typst_root_is_not_the_project_directory`。
+
 ## [0.6.0] - 2026-10-17
 
 ### Added

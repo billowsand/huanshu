@@ -29,6 +29,7 @@ cargo run -p huanshu-native --release
 | `--theme <主题 id>` | 启动主题（并写入设置） |
 | `--quit-after <秒>` | 到点退出 |
 | `--open <id> --export-pdf <路径>` | 不开窗口，直接导出 PDF，退出码 0/1 |
+| `--open <id> --export-typst <路径>` | 不开窗口，直接导出完整 Typst 工程 zip（含源码、素材、图标与 README），退出码 0/1 |
 
 截图：`powershell -NoProfile -ExecutionPolicy Bypass -File apps/huanshu-native/tools/shots.ps1 [-Only home,project-step3]`
 → `docs/native/shell/`，与 `docs/native/reference/` 同名对照。

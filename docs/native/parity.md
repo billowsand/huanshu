@@ -35,6 +35,7 @@
 | 删除确认（文案一致）并删除 | ✅ | `AlertDialog` → `services::projects::delete_project` |
 | 导出对话框：普通 `.keynn` | ✅ | `services::storage::export_project` + 保存对话框 |
 | 导出对话框：PDF 文档 + 结果对话框 | ✅ | `export::show_report` 现在是**三框**（进行中 / 成功 / 失败）：导出前开「正在生成 PDF…」+「首次导出需要扫描系统字体，会稍慢一些。」（首页与第三步都经 `begin_export`），成功后换成结果框（两态标题「PDF 已导出」/「…有几处需要留意」、摘要「文件名 · N 页 · x.x 秒」、占位页按版式中文名分组、裁切页解释、缺图一处一条列页码/引用/原因、主题回落用主题名、无回落时的常驻提示「PDF 版式跟随当前主题。」、按钮「在文件夹中显示」+「完成」），失败换成失败框（错误全文可滚动）；core 与原生共 8 个新单测；剩余差异：`导出中不可关` 与「在文件夹中显示」失败仍用 Kit 轻提示（后者记 ➖）；见 `audit-home.md` 第 4 节 |
+| 导出对话框：完整 Typst 工程（zip） | ✅ | 第四项「Typst 工程」（`i-carbon:code`）：`services::export::export_typst_project` 在后台写 zip（模板 + deck.json + 素材 + 预着色图标 + README + 空 `fonts/`），`platform::TYPST_PROJECT` 提供 zip 过滤器。复用 `export.rs` 的三框：进行中「正在打包 Typst 工程…」、成功结果框（摘要「文件名 · N 页 · M 个文件 · x.x 秒」，未安装字体提示、占位页按版式中文名分组、裁切页、缺图一处一条、主题回落、常驻 `typst compile main.typ deck.pdf` 提示）、失败框错误全文；命令行 `--open <id> --export-typst <path>`。core 单测 `project_archive_contains_sources_readme_and_fonts`、slide-typst 集成测试 `tests/project.rs`（解包后用真实目录的 Typst World 编译） |
 | 导出对话框：加密导出（密码 + 强度提示） | ✅ | `password_dialog.rs::PasswordDialog`（encrypt 模式，强度条/确认密码/门槛照原版）、`export_project(encrypted, password)`；单测 `encrypt_gate_agrees_with_core_password_validation` 等；审计补齐：面板补「密码至少 8 位，需包含大写字母、小写字母和数字。」提示、两个输入框回车提交、Kit 自带 ✕ 去重 |
 | 导入未加密 `.keynn` | ✅ | `services::storage::import_project` |
 | 导入加密 `.keynn`（输入密码、错误重试） | ✅ | `PasswordDialog`（decrypt 模式）：`is_encrypted_file` 为真弹密码框，密码错误不关闭、`set_external_error` 重试 |

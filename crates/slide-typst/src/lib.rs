@@ -20,7 +20,7 @@ pub use assets::{AssetData, Assets, MissingAsset};
 /// (the native shell renders the editor's Carbon icon names with it).
 pub use icons::render_svg as render_icon_svg;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
 use std::sync::Mutex;
 
@@ -379,6 +379,35 @@ pub struct Rendered {
     pub missing_assets: Vec<MissingAsset>,
 }
 
+/// One file of a standalone Typst project; `path` is relative to the project
+/// root and uses `/` separators.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectFile {
+    pub path: String,
+    pub bytes: Vec<u8>,
+}
+
+/// A self-contained Typst project that renders the same deck as the PDF export
+/// (`typst compile main.typ`), for users who want to edit or archive the
+/// sources. See [`Renderer::export_project`].
+#[derive(Debug)]
+pub struct TypstProject {
+    /// Every file of the project, sorted by `path`.
+    pub files: Vec<ProjectFile>,
+    /// Number of slides (pages) the deck lays out.
+    pub pages: usize,
+    /// Slides whose content was clipped at the smallest fit factor.
+    pub overflows: Vec<Overflow>,
+    /// Image references that render as placeholders, with the reason.
+    pub missing_assets: Vec<MissingAsset>,
+    /// Font families the project asks Typst for, in role order, unique.
+    pub fonts: Vec<String>,
+    /// Entries of `fonts` that are not installed on this machine. They are kept
+    /// in the project on purpose: it may be compiled on a system that has them,
+    /// and a missing family only makes Typst fall back (with a warning).
+    pub unavailable_fonts: Vec<String>,
+}
+
 /// One rasterized deck page (the app shows these as thumbnails).
 #[derive(Debug)]
 pub struct RenderedPng {
@@ -634,6 +663,7 @@ impl Renderer {
             images: HashMap::new(),
             sources: Mutex::new(HashMap::new()),
             missing_icons: Mutex::new(HashSet::new()),
+            recorded: None,
         };
         let result = typst::compile::<PagedDocument>(&world);
         // Same process-wide layout cache as `compile()`; see the note there.
@@ -730,19 +760,7 @@ impl Renderer {
                 missing.slide, missing.reference, missing.reason
             );
         }
-        // Convert LaTeX math spans to sentinel-wrapped Typst math before the
-        // deck is serialized; `rich()` in lib/base.typ evals the spans. Typst
-        // cannot catch an eval error, so one formula that mitex converts but
-        // Typst rejects (`\frac{1}`, `\ref{x}` …) would fail the whole export:
-        // such spans are found up front and kept as literal text instead.
-        let mut rewritten = slides.to_vec();
-        let spans = math::rewrite_deck(&mut rewritten, &HashSet::new());
-        let rejected = self.failing_math(&spans);
-        if !rejected.is_empty() {
-            rewritten = slides.to_vec();
-            math::rewrite_deck(&mut rewritten, &rejected);
-        }
-        let slides = rewritten;
+        let slides = self.rewrite_math(slides);
         let deck = serde_json::to_vec(&DeckInput {
             theme: &options.theme,
             aspect_ratio: &options.aspect_ratio,
@@ -767,6 +785,7 @@ impl Renderer {
                 .collect(),
             sources: Mutex::new(HashMap::new()),
             missing_icons: Mutex::new(HashSet::new()),
+            recorded: None,
         };
         let result = typst::compile::<PagedDocument>(&world);
         // Typst memoizes layout in a process-wide cache that only grows unless it is evicted.
@@ -798,6 +817,129 @@ impl Renderer {
         })
     }
 
+    /// Materializes the deck as a **standalone Typst project** instead of a PDF:
+    /// the template sources under `typst/`, a `deck.json` with the rewritten
+    /// slides, the images the deck shows, and every tinted icon the layouts ask
+    /// for. The project is compiled once here to prove it is self-contained and
+    /// to learn exactly which icon files are needed (icons are generated per
+    /// color at compile time, so they cannot be enumerated from the deck alone).
+    ///
+    /// Fonts are written **unfiltered**: unlike [`Renderer::render_pdf`], which
+    /// drops families this machine does not have (to avoid Typst warnings), the
+    /// project keeps the whole configured chain. It is meant to be compiled
+    /// elsewhere, and a system that has those fonts then renders it exactly like
+    /// the app. Families this machine lacks are reported in
+    /// [`TypstProject::unavailable_fonts`] for the caller's note.
+    pub fn export_project(
+        &self,
+        slides: &[serde_json::Value],
+        options: &ExportOptions,
+    ) -> Result<TypstProject, RenderError> {
+        let prepared = assets::prepare(slides, &options.assets);
+        let slides = self.rewrite_math(slides);
+        // Empty roles cannot be set in Typst (`set text(font: ())` is invalid);
+        // fall back to the platform default chain instead of failing the compile.
+        let fonts = self.project_font_roles(&options.fonts);
+        let math_fonts = self.standalone_math_fonts(&fonts.math);
+        let deck = serde_json::to_vec(&DeckInput {
+            theme: &options.theme,
+            aspect_ratio: &options.aspect_ratio,
+            title: options.title.as_deref(),
+            fonts: &fonts,
+            math_fonts,
+            assets: &prepared.paths,
+            slides: &slides,
+        })
+        .map_err(|err| RenderError {
+            diagnostics: vec![format!("serialize deck: {err}")],
+        })?;
+
+        // Compile the exact project before writing it: a broken deck must fail the
+        // export here (same diagnostics as the PDF) instead of producing an archive
+        // that only fails later on the user's machine. The recording world notes
+        // every `/icons/…` file the layouts load.
+        let images: HashMap<String, Bytes> = prepared
+            .files
+            .iter()
+            .map(|(path, bytes)| (path.clone(), Bytes::new(bytes.clone())))
+            .collect();
+        let recorded = Mutex::new(BTreeSet::new());
+        let world = SlideWorld {
+            renderer: self,
+            main: file_id("/main.typ"),
+            deck: Bytes::new(deck.clone()),
+            images,
+            sources: Mutex::new(HashMap::new()),
+            missing_icons: Mutex::new(HashSet::new()),
+            recorded: Some(&recorded),
+        };
+        let result = typst::compile::<PagedDocument>(&world);
+        // Same process-wide layout cache as [`Renderer::compile`]; see the note there.
+        typst::comemo::evict(50);
+        for warning in &result.warnings {
+            eprintln!("[slide-typst] warning: {}", world.describe(warning));
+        }
+        let document = result.output.map_err(|errors| RenderError {
+            diagnostics: errors.iter().map(|d| world.describe(d)).collect(),
+        })?;
+        let overflows = query_markers(&document, "slide-overflow");
+
+        let mut files: Vec<ProjectFile> = TEMPLATES
+            .iter()
+            .map(|(path, text)| ProjectFile {
+                path: path.trim_start_matches('/').to_string(),
+                bytes: text.as_bytes().to_vec(),
+            })
+            .collect();
+        files.push(ProjectFile {
+            path: "deck.json".to_string(),
+            bytes: deck,
+        });
+        for (path, bytes) in prepared.files {
+            files.push(ProjectFile {
+                path: path.trim_start_matches('/').to_string(),
+                bytes,
+            });
+        }
+        for path in recorded.into_inner().unwrap() {
+            // The compile also records /assets/...; those bytes are already in
+            // `prepared.files`, so only the generated /icons/... files are added
+            // here. A path that does not parse would have failed the compile above.
+            if let Some((svg, _)) = icon_svg(&path) {
+                files.push(ProjectFile {
+                    path: path.trim_start_matches('/').to_string(),
+                    bytes: svg.into_bytes(),
+                });
+            }
+        }
+        files.sort_by(|left, right| left.path.cmp(&right.path));
+
+        let (fonts, unavailable_fonts) = self.project_font_choices(&fonts);
+        Ok(TypstProject {
+            files,
+            pages: slides.len(),
+            overflows,
+            missing_assets: prepared.missing,
+            fonts,
+            unavailable_fonts,
+        })
+    }
+
+    /// Deck JSON with LaTeX math spans converted to sentinel-wrapped Typst math.
+    /// Typst cannot catch an `eval` error, so one formula that mitex converts but
+    /// Typst rejects (`\frac{1}`, `\ref{x}` …) would fail the whole compile:
+    /// such spans are found up front and kept as literal text instead.
+    fn rewrite_math(&self, slides: &[serde_json::Value]) -> Vec<serde_json::Value> {
+        let mut rewritten = slides.to_vec();
+        let spans = math::rewrite_deck(&mut rewritten, &HashSet::new());
+        let rejected = self.failing_math(&spans);
+        if !rejected.is_empty() {
+            rewritten = slides.to_vec();
+            math::rewrite_deck(&mut rewritten, &rejected);
+        }
+        rewritten
+    }
+
     /// Converted math spans that fail to compile on their own. The common case
     /// (every span fine) costs one small compile; only when that fails is each
     /// span checked separately.
@@ -816,6 +958,7 @@ impl Renderer {
                 images: HashMap::new(),
                 sources: Mutex::new(HashMap::new()),
                 missing_icons: Mutex::new(HashSet::new()),
+                recorded: None,
             };
             typst::compile::<PagedDocument>(&world)
                 .output
@@ -856,6 +999,7 @@ impl Renderer {
             images: HashMap::new(),
             sources: Mutex::new(HashMap::new()),
             missing_icons: Mutex::new(HashSet::new()),
+            recorded: None,
         };
         typst::compile::<PagedDocument>(&world)
             .output
@@ -912,6 +1056,83 @@ impl Renderer {
             math: self.installed_math_fonts(&roles.math),
         }
     }
+
+    /// The font roles written into a standalone project: exactly the configured
+    /// chain (no installed-font filtering), except that an empty role falls back
+    /// to the platform default chain so Typst always has a family to set.
+    fn project_font_roles(&self, roles: &FontRoles) -> FontRoles {
+        let fallback = || FontRoles::with_fallbacks(DEFAULT_FONT);
+        let fix = |list: &Vec<String>| {
+            if list.iter().all(|family| family.trim().is_empty()) {
+                fallback()
+            } else {
+                list.clone()
+            }
+        };
+        FontRoles {
+            title: fix(&roles.title),
+            subtitle: fix(&roles.subtitle),
+            body: fix(&roles.body),
+            caption: fix(&roles.caption),
+            number: fix(&roles.number),
+            code: fix(&roles.code),
+            math: if roles.math.iter().all(|family| family.trim().is_empty()) {
+                MATH_FONTS.iter().map(|f| f.to_string()).collect()
+            } else {
+                roles.math.clone()
+            },
+        }
+    }
+
+    /// Math families a standalone project asks Typst for: the configured list
+    /// plus every known OpenType MATH family, **unfiltered**. The exporting
+    /// machine's installed set is irrelevant here — the project is compiled
+    /// elsewhere, and a missing family only makes Typst fall back (with a
+    /// warning), which is also what keeps it compiling on systems without them.
+    fn standalone_math_fonts(&self, preferred: &[String]) -> Vec<String> {
+        let mut names: Vec<String> = Vec::new();
+        for name in preferred
+            .iter()
+            .map(String::as_str)
+            .chain(MATH_FONTS.iter().copied())
+        {
+            let name = name.trim();
+            if !name.is_empty() && !names.iter().any(|known| known.eq_ignore_ascii_case(name)) {
+                names.push(name.to_string());
+            }
+        }
+        names
+    }
+
+    /// The configured first-choice family of every role, unique, in role order,
+    /// plus which of them are missing on this machine (for the export report and
+    /// the project README).
+    fn project_font_choices(&self, roles: &FontRoles) -> (Vec<String>, Vec<String>) {
+        let book = self.fonts.book();
+        let mut fonts: Vec<String> = Vec::new();
+        for family in [
+            roles.title.first(),
+            roles.subtitle.first(),
+            roles.body.first(),
+            roles.caption.first(),
+            roles.number.first(),
+            roles.code.first(),
+            roles.math.first(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if !fonts.iter().any(|known| known.eq_ignore_ascii_case(family)) {
+                fonts.push(family.clone());
+            }
+        }
+        let unavailable = fonts
+            .iter()
+            .filter(|family| !book.contains_family(&family.to_lowercase()))
+            .cloned()
+            .collect();
+        (fonts, unavailable)
+    }
 }
 
 /// Undoes the premultiplied alpha of a `tiny_skia::Pixmap`, which is what the
@@ -961,6 +1182,22 @@ fn file_id(path: &str) -> FileId {
     .intern()
 }
 
+/// Splits `/icons/<set>/<name>/<rrggbb[aa]>.svg` into its three parts.
+fn icon_parts(path: &str) -> Option<(&str, &str, &str)> {
+    let rest = path.strip_prefix("/icons/")?;
+    let parts: Vec<&str> = rest.split('/').collect();
+    let [set, name, file] = parts.as_slice() else {
+        return None;
+    };
+    Some((*set, *name, file.strip_suffix(".svg")?))
+}
+
+/// The tinted SVG for an `/icons/…` path, or `None` when the path is not one.
+fn icon_svg(path: &str) -> Option<(String, bool)> {
+    let (set, name, hex) = icon_parts(path)?;
+    Some(icons::render_svg(set, name, hex))
+}
+
 struct SlideWorld<'a> {
     renderer: &'a Renderer,
     main: FileId,
@@ -969,6 +1206,9 @@ struct SlideWorld<'a> {
     images: HashMap<String, Bytes>,
     sources: Mutex<HashMap<FileId, Source>>,
     missing_icons: Mutex<HashSet<String>>,
+    /// Every `/icons/…` path loaded during this compile, when the renderer is
+    /// collecting a project export (see [`Renderer::export_project`]).
+    recorded: Option<&'a Mutex<BTreeSet<String>>>,
 }
 
 impl SlideWorld<'_> {
@@ -981,6 +1221,13 @@ impl SlideWorld<'_> {
             )));
         }
         Ok(rooted.vpath().get_with_slash())
+    }
+
+    /// Notes a virtual image path the layouts loaded (project export only).
+    fn record(&self, path: &str) {
+        if let Some(recorded) = self.recorded {
+            recorded.lock().unwrap().insert(path.to_string());
+        }
     }
 
     fn describe(&self, diag: &SourceDiagnostic) -> String {
@@ -1046,28 +1293,25 @@ impl World for SlideWorld<'_> {
             return Ok(self.deck.clone());
         }
         if let Some(bytes) = self.images.get(path) {
+            self.record(path);
             return Ok(bytes.clone());
         }
-        if let Some(rest) = path.strip_prefix("/icons/") {
-            // `/icons/<set>/<name>/<rrggbb[aa]>.svg`
-            let parts: Vec<&str> = rest.split('/').collect();
-            if let [set, name, file] = parts.as_slice() {
-                let hex = file.trim_end_matches(".svg");
-                let (svg, fallback) = icons::render_svg(set, name, hex);
-                if fallback
-                    && self
-                        .missing_icons
-                        .lock()
-                        .unwrap()
-                        .insert(format!("{set}:{name}"))
-                {
-                    eprintln!(
-                        "[slide-typst] unknown icon {set}:{name}, using {}",
-                        icons::FALLBACK_ICON
-                    );
-                }
-                return Ok(Bytes::from_string(svg));
+        if let Some((set, name, hex)) = icon_parts(path) {
+            let (svg, fallback) = icons::render_svg(set, name, hex);
+            if fallback
+                && self
+                    .missing_icons
+                    .lock()
+                    .unwrap()
+                    .insert(format!("{set}:{name}"))
+            {
+                eprintln!(
+                    "[slide-typst] unknown icon {set}:{name}, using {}",
+                    icons::FALLBACK_ICON
+                );
             }
+            self.record(path);
+            return Ok(Bytes::from_string(svg));
         }
         self.source(id)
             .map(|source| Bytes::from_string(source.text().to_string()))

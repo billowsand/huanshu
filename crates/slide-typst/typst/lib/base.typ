@@ -27,7 +27,7 @@
 // math source by Rust (see src/math.rs), wrapped as `\u{1}I…\u{2}` (inline) or
 // `\u{1}D…\u{2}` (display) spans; each span is eval'd in the vendored mitex
 // scope. Spans whose LaTeX failed conversion keep their literal `$` text.
-#import "/vendor/mitex/specs/mod.typ": mitex-scope
+#import "../vendor/mitex/specs/mod.typ": mitex-scope
 
 #let math-span = regex("(?s)\u{1}([ID])(.*?)\u{2}")
 
@@ -171,7 +171,9 @@
   }
   // `rrggbb` or `rrggbbaa`; the alpha becomes the icon's opacity.
   let hex = fill.to-hex().trim("#", at: start)
-  box(image("/icons/" + set-name + "/" + icon-name + "/" + hex + ".svg", width: size, height: size))
+  // Relative to this file (`lib/`), so the same template works in the app world
+  // and when a user compiles the exported project anywhere.
+  box(image("../icons/" + set-name + "/" + icon-name + "/" + hex + ".svg", width: size, height: size))
 }
 
 // ── Boxes ─────────────────────────────────────────────────────────────────────

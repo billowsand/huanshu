@@ -18,6 +18,9 @@ pub struct Cli {
     pub theme: Option<String>,
     /// 跳过窗口直接导出到这个路径；导出完以退出码 0/1 结束。需要 `--open`。
     pub export_pdf: Option<PathBuf>,
+    /// 跳过窗口直接导出完整 Typst 工程（zip）到这个路径；导出完以退出码 0/1 结束。
+    /// 需要 `--open`。
+    pub export_typst: Option<PathBuf>,
     /// 到点自动退出（秒）。
     pub quit_after: Option<u64>,
 }
@@ -42,6 +45,7 @@ impl Cli {
                 "--open" => cli.open = args.next().and_then(|value| value.parse().ok()),
                 "--theme" => cli.theme = args.next(),
                 "--export-pdf" => cli.export_pdf = args.next().map(PathBuf::from),
+                "--export-typst" => cli.export_typst = args.next().map(PathBuf::from),
                 "--quit-after" => cli.quit_after = args.next().and_then(|value| value.parse().ok()),
                 other => eprintln!("[native] 忽略未知参数 {other}"),
             }
@@ -84,11 +88,14 @@ mod tests {
             "4",
             "--export-pdf",
             "a.pdf",
+            "--export-typst",
+            "deck.zip",
             "--route",
             "settings:storage",
         ]);
         assert_eq!(cli.open, Some(4));
         assert_eq!(cli.export_pdf, Some(PathBuf::from("a.pdf")));
+        assert_eq!(cli.export_typst, Some(PathBuf::from("deck.zip")));
         assert_eq!(cli.route, Some(Route::Settings(SettingsTab::Storage)));
     }
 
@@ -96,6 +103,6 @@ mod tests {
     fn no_switches_leave_everything_off() {
         let cli = parse(&[]);
         assert!(cli.route.is_none() && cli.open.is_none() && cli.theme.is_none());
-        assert!(cli.quit_after.is_none() && cli.export_pdf.is_none());
+        assert!(cli.quit_after.is_none() && cli.export_pdf.is_none() && cli.export_typst.is_none());
     }
 }

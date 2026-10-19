@@ -8,9 +8,9 @@
 // preview and the slides typeset the same way. An eval error cannot be caught:
 // a formula Typst rejects fails this compile, and the caller falls back to the
 // LaTeX source (never to a broken export).
-#import "/vendor/mitex/specs/mod.typ": mitex-scope
+#import "vendor/mitex/specs/mod.typ": mitex-scope
 
-#let spec = json("/deck.json")
+#let spec = json("deck.json")
 
 // `auto` page and `fill: none`: the page hugs the formula plus the 1pt margin
 // around it, and the raster comes out with a transparent background.

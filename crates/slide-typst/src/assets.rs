@@ -94,7 +94,10 @@ pub struct MissingAsset {
 /// What the templates learn about one usable image (sent in `/deck.json`).
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ImageInfo {
-    /// Virtual path served by the world.
+    /// Path the templates pass to `image()`, relative to `layouts/` (where the
+    /// spotlight layout calls it). Typst resolves it to the world's
+    /// `/assets/<n>.<ext>`, and to `<project>/assets/...` in an exported project.
+    /// A relative path keeps the exported project compilable from any directory.
     pub path: String,
     /// Intrinsic size in pixels. Raster images are not upscaled past it, like
     /// the browser's `object-contain max-w-full max-h-full`; SVGs scale freely.
@@ -181,10 +184,13 @@ pub(crate) fn prepare(slides: &[serde_json::Value], assets: &Assets) -> Prepared
                 Some(reason) => reason.clone(),
                 None => match assets.load(&reference).and_then(normalize_image) {
                     Ok(image) => {
-                        let path = format!("/assets/{}.{}", prepared.files.len(), image.ext);
-                        prepared.files.insert(path.clone(), image.bytes);
+                        let index = prepared.files.len();
+                        // The world serves absolute virtual paths; the templates
+                        // reference the asset relatively (see `ImageInfo::path`).
+                        let virtual_path = format!("/assets/{index}.{}", image.ext);
+                        prepared.files.insert(virtual_path, image.bytes);
                         let info = ImageInfo {
-                            path,
+                            path: format!("../assets/{index}.{}", image.ext),
                             width: image.width,
                             height: image.height,
                             vector: image.ext == "svg",

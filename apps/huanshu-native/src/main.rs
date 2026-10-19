@@ -36,9 +36,12 @@ fn main() {
     let _ = PROCESS_START.set(std::time::Instant::now());
     let cli = cli::Cli::parse();
 
-    // `--export-pdf` 是纯脚本路径：不建窗口，导完按退出码结束。
+    // `--export-pdf` / `--export-typst` 是纯脚本路径：不建窗口，导完按退出码结束。
     if let (Some(project_id), Some(path)) = (cli.open, cli.export_pdf.clone()) {
         std::process::exit(export_only(project_id, path, cli.theme.as_deref()));
+    }
+    if let (Some(project_id), Some(path)) = (cli.open, cli.export_typst.clone()) {
+        std::process::exit(export_typst_only(project_id, path, cli.theme.as_deref()));
     }
 
     gpui_kit::application()
@@ -112,6 +115,22 @@ pub fn note_first_frame() {
             "[coldstart] first-frame {:.1} ms",
             start.elapsed().as_secs_f64() * 1000.0
         );
+    }
+}
+
+/// 没有窗口的 Typst 工程导出：只打印一行摘要，退出码 0/1。
+fn export_typst_only(project_id: i64, path: std::path::PathBuf, theme: Option<&str>) -> i32 {
+    let (shared, current, _) = app::load();
+    let theme = theme.unwrap_or(current.id).to_string();
+    match app::export_typst_project(&shared, project_id, None, path, theme) {
+        Ok(report) => {
+            eprintln!("[export] {}", export::summarize_project(&report));
+            0
+        }
+        Err(error) => {
+            eprintln!("[export] 失败：{error}");
+            1
+        }
     }
 }
 
