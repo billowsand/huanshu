@@ -1,4 +1,5 @@
 pub mod candidate_parsing;
+pub mod chart_facts;
 pub mod icons;
 #[cfg(test)]
 mod layout_probe;

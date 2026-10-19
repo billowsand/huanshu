@@ -13,6 +13,7 @@ name = "huanshu_core"
 path = "src/lib.rs"
 
 [dev-dependencies]
+futures-util = "0.3"
 # 只在单测里用来把 PNG 解码，与 `render_pixels` 的原始像素逐点比对。
 image = "0.25"
 

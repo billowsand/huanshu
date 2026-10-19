@@ -3545,6 +3545,7 @@ dependencies = [
  "bincode",
  "dirs 5.0.1",
  "fontdb",
+ "futures-util",
  "image",
  "rand 0.8.5",
  "regex",

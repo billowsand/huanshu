@@ -484,6 +484,7 @@ pub async fn repair_slide(
     .await
     .map_err(|e| e.to_string())?;
     // Feedback repair rewrites content, not the slide's place in the deck: keep its chapter number.
+    repaired.aspect_ratio = Some(aspect_ratio);
     if blueprint.section.is_some() {
         repaired.section = blueprint.section.clone();
     }

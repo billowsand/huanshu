@@ -149,7 +149,7 @@ impl SettingsPage {
         });
         let concurrency_input = cx.new(|cx| {
             InputState::new(window, cx)
-                .placeholder("1–8")
+                .placeholder("1–32")
                 .default_value(llm.concurrency.to_string())
         });
         let forms = [
@@ -473,9 +473,10 @@ impl SettingsPage {
         if self.saving || !self.ready() || !self.dirty(cx) {
             return;
         }
-        // 原版保存前的校验：repair 0–10 整数、concurrency 1–8 整数，失败跳到生成设置分区。
+        // 保存前校验：repair 0–10 整数、concurrency 1–32 整数，失败跳到生成设置分区。
         if !generation::generation_valid(self.repair_rounds, self.concurrency, self.gen_invalid) {
-            self.save_error = Some("修复轮数需为 0–10 的整数，并发数需为 1–8 的整数。".to_string());
+            self.save_error =
+                Some("修复轮数需为 0–10 的整数，并发数需为 1–32 的整数。".to_string());
             self.tab = SettingsTab::Generation;
             cx.notify();
             return;

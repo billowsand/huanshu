@@ -60,9 +60,9 @@ async fn generate_one_slide_inner(
     let asset_section = assets
         .prompt_section_for(&page.page_id)
         .unwrap_or_else(|| "Available image assets: none for this project.".to_string());
-    let system = "You generate a single Slidev slide blueprint as strict JSON. Follow the chosen component kind exactly. Keep text compact and presentation-ready. Copy image references verbatim from the available image assets list; never invent an image path, media id, or icon name. Faithfully express the content using the assigned component kind; do not substitute or simplify it into a different layout.";
+    let system = "You generate a single Huanshu slide blueprint as strict JSON. Return a content instance matching the supplied JSON Schema, never the schema itself. Follow the chosen component kind exactly. Keep text compact and presentation-ready. Copy image references verbatim from the available image assets list; never invent an image path, media id, or icon name. Faithfully express the content using the assigned component kind; do not substitute or simplify it into a different layout.";
     let user = format!(
-        "Document title: {}\n\nPage plan:\n{}\n\nLayout plan:\n{}\n\n{}\n\nIcon candidates:\n{}\n\nSchema:\nReturn {{\"slide\": SlideBlueprint}}.\nComponent-specific schema:\n{}\nRules:\n- `slide.kind` must equal the chosen layout kind.\n- Follow the schema exactly; do not add extra top-level objects copied from page plan or layout plan.\n- Use only fields shown in the component-specific schema for this kind.\n- Never use unsupported fields such as `layout`, `content_shape`, `layout_intent`, `visual_need`, `object_count`, `argument_mode`, `density`, `section_label`, `description`, `content`, or `color`.\n- Use the same language as the source page. This document is Chinese, so all user-facing text must be Chinese.\n- Labels, panel titles, notes, and placeholders must also be Chinese when present.\n- All text fields are plain text rendered verbatim: never use Markdown or HTML syntax such as **bold**, *italic*, `code`, # headings, [links](url), leading list markers like '- ' / '* ' / '1. ', or line breaks inside a field. Put each list entry into its own array item instead. The only exception is LaTeX math: wrap inline formulas in $...$ and standalone formulas in $$...$$ when the source content contains formulas; apart from math, fields must stay free of Markdown and HTML.\n- Do not output `section`: the chapter number is filled in by the system from the document structure.\n- Use only tones amber, blue, green, red.\n- Use only icon names from the candidates list.\n- Only spotlight supports image/images. Copy image references verbatim from the available image assets list; never output preferred_assets in a slide.\n- If an image is provided, placeholder may be omitted; do not output an empty placeholder string.\n- Fill all required fields for the assigned component kind as shown in the schema.\n- For section_intro: produce 2-6 concise preview cards for the upcoming sub-topics. This is a chapter-opening overview, not a closing summary.\n- For feature_grid: produce 2-4 balanced cards, each with its own title and concise body/items.\n- For section_list: produce 2-4 ordered list_items with step numbers.\n- For focus_example: produce 2-4 points plus a meaningful example_title and example_body.\n- For outcome_grid: produce 2-4 result cards with title, body, and an optional tag.\n- For split_layers: produce both left_items and layers.\n- For split_layers: left_items must explain responsibilities, value, constraints, interfaces, or operating principles. Do not make them mere repeats of the layer names.\n- For split_layers: layers must describe the actual architecture stack or module structure on the right side, using wording that complements rather than duplicates left_items.\n- For step_flow: produce 2-5 steps, each with title, body, icon, and tone. Steps should represent a clear linear process.\n- For process: produce 2-4 phases, each with phase label, title, icon, tone, and 2-4 steps. Include a highlight conclusion for each phase.\n- For compare: produce left and right panels, each with title, tone, icon, items, and conclusion. Items should have label, desc, and highlight flag. Set mode to 'side-by-side', 'pros-cons', or 'versus'.\n- For issue_stack: produce 2-4 stacked problem cards. Each card needs title, tone, icon, one concise body sentence, and 2-4 short items capturing pains, obstacles, or failure modes.\n- For swot: produce exactly 4 quadrants in this order: strengths, weaknesses, opportunities, threats.\n- For swot: quadrant titles must be short Chinese labels suitable for in-card flags, for example '优势', '劣势', '机会', '威胁'. Do not include English in quadrant titles.\n- For swot: each quadrant needs tone, icon, 2-4 short items, and a one-line summary. Also provide a short strategy sentence that synthesizes the matrix.\n- Do not collapse structured content into a plain list.\n- For chart_focus: the page plan carries a `chart` object from the document's ```chart block. Read it to write the interpretation, but do NOT output `chart`: the system attaches the document's chart data itself.\n- For chart_focus: produce 2-4 `points` that interpret the chart (key takeaways, trends, outliers), not a restatement of the data table. Only cite numbers that appear in the chart data. Every `points` entry is a complete object {{\"title\", \"body\"}}; never put a bare string such as \"02\" into the array.\nReturn only JSON.",
+        "Document title: {}\n\nPage plan:\n{}\n\nLayout plan:\n{}\n\n{}\n\nIcon candidates:\n{}\n\nSchema:\nReturn {{\"slide\": SlideBlueprint}}.\nComponent-specific schema:\n{}\nRules:\n- `slide.kind` must equal the chosen layout kind.\n- Follow the schema exactly; do not add extra top-level objects copied from page plan or layout plan.\n- Use only fields shown in the component-specific schema for this kind.\n- Never use unsupported fields such as `layout`, `content_shape`, `layout_intent`, `visual_need`, `object_count`, `argument_mode`, `density`, `section_label`, `description`, `content`, or `color`.\n- Use the same language as the source page. This document is Chinese, so all user-facing text must be Chinese.\n- Labels, panel titles, notes, and placeholders must also be Chinese when present.\n- All text fields are plain text rendered verbatim: never use Markdown or HTML syntax such as **bold**, *italic*, `code`, # headings, [links](url), leading list markers like '- ' / '* ' / '1. ', or line breaks inside a field. Put each list entry into its own array item instead. The only exception is LaTeX math: wrap inline formulas in $...$ and standalone formulas in $$...$$ when the source content contains formulas; apart from math, fields must stay free of Markdown and HTML.\n- Do not output `section`: the chapter number is filled in by the system from the document structure.\n- Use only tones amber, blue, green, red.\n- Use only icon names from the candidates list.\n- Only spotlight supports image/images. Copy image references verbatim from the available image assets list; never output preferred_assets in a slide.\n- If an image is provided, placeholder may be omitted; do not output an empty placeholder string.\n- Fill all required fields for the assigned component kind as shown in the schema.\n- For section_intro: produce 2-6 concise preview cards for the upcoming sub-topics. This is a chapter-opening overview, not a closing summary.\n- For feature_grid: produce 2-4 balanced cards, each with its own title and concise body/items.\n- For section_list: produce 2-4 ordered list_items with step numbers.\n- For focus_example: produce 2-4 points plus a meaningful example_title and example_body.\n- For outcome_grid: produce 2-4 result cards with title, body, and an optional tag.\n- For split_layers: produce both left_items and layers.\n- For split_layers: left_items must explain responsibilities, value, constraints, interfaces, or operating principles. Do not make them mere repeats of the layer names.\n- For split_layers: layers must describe the actual architecture stack or module structure on the right side, using wording that complements rather than duplicates left_items.\n- For step_flow: produce 2-5 steps, each with title, body, icon, and tone. Steps should represent a clear linear process.\n- For process: produce 2-4 phases, each with phase label, title, icon, tone, and 2-4 steps. Include a highlight conclusion for each phase.\n- For compare: produce left and right panels, each with title, tone, icon, items, and conclusion. Items should have label, desc, and highlight flag. Set mode to 'side-by-side', 'pros-cons', or 'versus'.\n- For issue_stack: produce 2-4 stacked problem cards. Each card needs title, tone, icon, one concise body sentence, and 2-4 short items capturing pains, obstacles, or failure modes.\n- For swot: produce exactly 4 quadrants in this order: strengths, weaknesses, opportunities, threats.\n- For swot: quadrant titles must be short Chinese labels suitable for in-card flags, for example '优势', '劣势', '机会', '威胁'. Do not include English in quadrant titles.\n- For swot: each quadrant needs tone, icon, 2-4 short items, and a one-line summary. Also provide a short strategy sentence that synthesizes the matrix.\n- Do not collapse structured content into a plain list.\n- For chart_focus: the page plan carries a `chart` object from the document's ```chart block. Read it to write the interpretation, but do NOT output `chart`: the system attaches the document's chart data itself.\n- For chart_focus: produce 2-4 `points` that interpret the chart (key takeaways, trends, outliers), not a restatement of the data table. Only cite source values or clearly identified, correctly computed differences/percentages. Distinguish the largest value from the largest increase. Compare period-to-period differences before claiming acceleration or deceleration; equal absolute increments mean steady absolute growth. Every `points` entry is a complete object {{\"title\", \"body\"}}; never put a bare string such as \"02\" into the array.\nReturn only JSON.",
         doc_title,
         serde_json::to_string_pretty(&page).unwrap_or_default(),
         serde_json::to_string_pretty(&layout).unwrap_or_default(),
@@ -75,26 +75,98 @@ async fn generate_one_slide_inner(
     } else {
         format!("{user}\n\nIMPORTANT CONTEXT FOR THIS REGENERATION:\n{extra_context}")
     };
-    write_debug(&debug_dir, &format!("{prefix}.system.txt"), system)?;
-    write_debug(&debug_dir, &format!("{prefix}.user.txt"), &user)?;
-    let raw = client
-        .generate_text(&model, system, &user)
-        .await
-        .with_context(|| format!("failed generating slide {}", slide_idx + 1))?;
-    write_debug(&debug_dir, &format!("{prefix}.raw.txt"), &raw)?;
-    let resp = crate::generator::utils::parse_blueprint_with_repair(&raw, &layout.kind)
-        .with_context(|| {
-            format!(
-                "failed to parse blueprint for page {} (kind={:?}); check {prefix}.raw.txt for the raw model output",
-                page.page_id, layout.kind
-            )
-        })?;
-    write_debug(
-        &debug_dir,
-        &format!("{prefix}.parsed.json"),
-        &serde_json::to_string_pretty(&resp)?,
-    )?;
+    let user = match &page.chart {
+        Some(chart) => user + &crate::generator::chart_facts::prompt(chart),
+        None => user,
+    };
+    let resp = request_blueprint(
+        &client,
+        &model,
+        system,
+        &user,
+        &layout.kind,
+        Some((&debug_dir, &prefix)),
+    )
+    .await
+    .with_context(|| {
+        format!(
+            "failed generating slide {} (page {}, kind={:?})",
+            slide_idx + 1,
+            page.page_id,
+            layout.kind
+        )
+    })?;
     Ok(resp.slide)
+}
+
+/// Invalid JSON/structure cannot enter the later typed repair loop. Ask the model to
+/// correct its full response while preserving the assigned kind. Never discard invalid
+/// content or pretend a fallback page was a successful generation. Keep every attempt.
+async fn request_blueprint(
+    client: &LmStudioClient,
+    model: &str,
+    system: &str,
+    user: &str,
+    kind: &SlideKind,
+    debug: Option<(&Path, &str)>,
+) -> Result<BlueprintWrapper> {
+    let mut correction = String::new();
+    for attempt in 0..3 {
+        let request = if correction.is_empty() {
+            user.to_string()
+        } else {
+            format!("{user}\n\nCORRECT THE PREVIOUS RESPONSE:\n{correction}")
+        };
+        let prefix = debug.map(|(_, prefix)| {
+            if attempt == 0 {
+                prefix.to_string()
+            } else {
+                format!("{prefix}-contract-retry-{attempt}")
+            }
+        });
+        if let (Some((dir, _)), Some(prefix)) = (debug, &prefix) {
+            write_debug(dir, &format!("{prefix}.system.txt"), system)?;
+            write_debug(dir, &format!("{prefix}.user.txt"), &request)?;
+        }
+        // Transport/authentication failures are not malformed model output: propagate them.
+        let raw = client.generate_text(model, system, &request).await?;
+        if let (Some((dir, _)), Some(prefix)) = (debug, &prefix) {
+            write_debug(dir, &format!("{prefix}.raw.txt"), &raw)?;
+        }
+        match crate::generator::utils::parse_blueprint_with_repair(&raw, kind) {
+            Ok(response) => {
+                if let (Some((dir, _)), Some(prefix)) = (debug, &prefix) {
+                    write_debug(
+                        dir,
+                        &format!("{prefix}.parsed.json"),
+                        &serde_json::to_string_pretty(&response)?,
+                    )?;
+                }
+                return Ok(response);
+            }
+            Err(error) => {
+                if let (Some((dir, _)), Some(prefix)) = (debug, &prefix) {
+                    write_debug(dir, &format!("{prefix}.error.txt"), &format!("{error:#}"))?;
+                }
+                if attempt == 2 {
+                    return Err(error.context("blueprint contract still invalid after 3 attempts"));
+                }
+                eprintln!(
+                    "blueprint contract retry {} for {}: {error:#}",
+                    attempt + 1,
+                    kind.as_str()
+                );
+                correction = format!(
+                    "Validation failed: {error:#}\nReturn a complete corrected JSON instance, not a JSON Schema. \
+                    Keep slide.kind='{}'. Do not change the layout, drop source content, or insert strings \
+                    into arrays whose items must be objects. Follow the supplied schema's field names, types and enums. \
+                    Optional fields may be omitted.\nPrevious response:\n{}",
+                    kind.as_str(), raw.chars().take(12_000).collect::<String>()
+                );
+            }
+        }
+    }
+    unreachable!("bounded attempts return on success or final error")
 }
 
 /// Repair a single slide given free-form user feedback.
@@ -139,15 +211,30 @@ pub async fn repair_single_slide(
         asset_section,
     );
 
-    let raw = client
-        .generate_text(&config.llm.model, system, &user)
-        .await
-        .context("failed to repair slide")?;
+    let prefix = format!("repair-{}", uuid::Uuid::new_v4());
+    let user = match &blueprint.chart {
+        Some(chart) => user + &crate::generator::chart_facts::prompt(chart),
+        None => user,
+    };
+    let resp = request_blueprint(
+        &client,
+        &config.llm.model,
+        system,
+        &user,
+        &blueprint.kind,
+        Some((&config.debug_dir, &prefix)),
+    )
+    .await
+    .context("failed to repair slide")?;
 
-    let resp = crate::generator::utils::parse_blueprint_with_repair(&raw, &blueprint.kind)
-        .context("failed to parse repaired blueprint")?;
-
-    Ok(resp.slide)
+    let mut repaired = resp.slide;
+    // Chapter/aspect are application state; source chart data is never model-authored.
+    repaired.aspect_ratio = blueprint.aspect_ratio;
+    repaired.section = blueprint.section.clone();
+    if blueprint.kind == SlideKind::ChartFocus {
+        repaired.chart = blueprint.chart.clone();
+    }
+    Ok(repaired)
 }
 
 /// Re-generate specific slides from scratch using the full content-generation prompt.

@@ -1079,8 +1079,6 @@ pub async fn repair_one_slide(
     debug_dir: &Path,
     slide_idx: usize,
 ) -> Result<SlideBlueprint> {
-    use crate::generator::utils::blueprint_schema_hint;
-
     let max_rounds = config.repair_rounds.max(3);
 
     for round in 0..max_rounds {
@@ -1133,44 +1131,27 @@ pub async fn repair_one_slide(
                 ),
             }
         } else {
-            // Standard LLM repair round
-            let schema = blueprint_schema_hint(&slide.kind);
-            let failing_items = vec![serde_json::json!({
-                "slide_index": 1,
-                "page_plan": page_plan,
-                "layout_plan": layout_plan,
-                "page_id": page_plan.page_id,
-                "current_slide": slide.clone(),
-                "component_schema": schema,
-            })];
-
-            let system = "You repair an invalid Slidev slide blueprint. Fix only what is necessary to satisfy validation while preserving the content intent. Return strict JSON. IMPORTANT: all icon fields must use the i-carbon: prefix (e.g. \"i-carbon:chart-line\"). Never use i-mdi:, i-fa:, or any other prefix. All text fields are plain text: never use Markdown or HTML syntax (**bold**, list markers, # headings, `code`, links) or line breaks inside a field. The only exception is LaTeX math: keep any $...$ inline formulas and $$...$$ display formulas intact; apart from math, fields must stay free of Markdown and HTML.";
-            let user = format!(
-                "Document title: {}\n\nFailing slide with its plan and schema:\n{}\n\nValidation issues:\n{}\n\nReturn ONLY the corrected slide as JSON: {{\"slides\": [<corrected blueprint>]}}.",
-                doc.title,
-                serde_json::to_string_pretty(&failing_items).unwrap_or_default(),
-                format_issue_block("issues", &issues),
+            // Content repairs must use the same pre-deserialization contract gate as
+            // initial generation and user-feedback repair, rather than a permissive DTO.
+            let feedback = format!(
+                "Document title: {}\nPage plan: {}\nLayout plan: {}\nValidation issues:\n{}\nKeep the assigned kind '{}'. Return only the slide, not the page plan or layout metadata.",
+                doc.title, serde_json::to_string(page_plan)?, serde_json::to_string(layout_plan)?,
+                format_issue_block("issues", &issues), slide.kind.as_str(),
             );
-            let debug_prefix = format!("04-repair-slide{}-r{}", slide_idx + 1, round + 1);
-            let _ = write_debug(debug_dir, &format!("{debug_prefix}.system.txt"), system);
-            let _ = write_debug(debug_dir, &format!("{debug_prefix}.user.txt"), &user);
-
-            match llm_client
-                .generate_text(&config.llm.model, system, &user)
-                .await
+            let mut repair_config = config.clone();
+            repair_config.debug_dir = debug_dir.to_path_buf();
+            match crate::generator::slides::repair_single_slide(
+                &repair_config,
+                &slide,
+                &feedback,
+                Some(icon_index),
+                Some(assets),
+            )
+            .await
             {
-                Ok(raw) => {
-                    let _ = write_debug(debug_dir, &format!("{debug_prefix}.raw.txt"), &raw);
-                    if let Ok(resp) =
-                        crate::generator::utils::parse_json_with_extraction::<RepairResponse>(&raw)
-                    {
-                        if let Some(repaired) = resp.slides.into_iter().next() {
-                            slide = repaired;
-                        }
-                    }
-                }
-                Err(e) => eprintln!(
-                    "repair_one_slide LLM failed for slide {}: {e}",
+                Ok(repaired) => slide = repaired,
+                Err(error) => eprintln!(
+                    "repair_one_slide LLM failed for slide {}: {error:#}",
                     slide_idx + 1
                 ),
             }
@@ -1196,6 +1177,16 @@ pub async fn repair_one_slide(
             "repair_one_slide: slide {} still invalid after {} rounds; using fallback",
             slide_idx + 1,
             max_rounds
+        );
+        let _ = write_debug(
+            debug_dir,
+            &format!("04-slide{}-fallback.json", slide_idx + 1),
+            &serde_json::to_string_pretty(&serde_json::json!({
+                "page_id": page_plan.page_id,
+                "assigned_kind": layout_plan.kind,
+                "validation_issues": issues.iter().map(|issue| &issue.message).collect::<Vec<_>>(),
+                "outcome": "deterministic_fallback",
+            }))?,
         );
         slide = make_fallback_slide(page_plan, Some(layout_plan), config.aspect_ratio);
         apply_component_defaults(&mut slide);

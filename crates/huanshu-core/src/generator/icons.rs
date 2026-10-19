@@ -163,8 +163,10 @@ pub async fn fix_invalid_icons(
         for (i, it) in slide.list_items.iter().enumerate() {
             check(it.icon.as_deref(), &it.title, format!("list:{i}"));
         }
-        for (i, it) in slide.points.iter().enumerate() {
-            check(it.icon.as_deref(), &it.title, format!("point:{i}"));
+        if points_support_icons(slide) {
+            for (i, it) in slide.points.iter().enumerate() {
+                check(it.icon.as_deref(), &it.title, format!("point:{i}"));
+            }
         }
         for (i, it) in slide.center_items.iter().enumerate() {
             check(it.icon.as_deref(), &it.title, format!("center:{i}"));
@@ -304,9 +306,13 @@ fn fill_default_icons(slide: &mut SlideBlueprint) {
         .left_items
         .iter_mut()
         .chain(slide.list_items.iter_mut())
-        .chain(slide.points.iter_mut())
     {
         item.icon.get_or_insert_with(|| default.to_string());
+    }
+    if points_support_icons(slide) {
+        for item in &mut slide.points {
+            item.icon.get_or_insert_with(|| default.to_string());
+        }
     }
     for item in &mut slide.center_items {
         item.icon.get_or_insert_with(|| default.to_string());
@@ -315,6 +321,56 @@ fn fill_default_icons(slide: &mut SlideBlueprint) {
         for q in &mut swot.quadrants {
             q.icon.get_or_insert_with(|| default.to_string());
         }
+    }
+}
+
+fn points_support_icons(slide: &SlideBlueprint) -> bool {
+    crate::editor_schema::editor_schema()
+        .list_sections(slide.kind.as_str())
+        .iter()
+        .any(|section| {
+            section.key == "points" && section.fields.iter().any(|field| field.key == "icon")
+        })
+}
+
+#[cfg(test)]
+mod contract_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn chart_interpretations_never_acquire_an_invisible_icon() {
+        let mut slide: SlideBlueprint = serde_json::from_value(json!({
+            "kind":"chart_focus","title":"图表","points":[{"title":"解读","body":"增长稳定"}]
+        }))
+        .unwrap();
+        let client = LmStudioClient::from_service(&crate::config::ModelServiceSettings::new(
+            "http://127.0.0.1:1",
+            "",
+            "unused",
+        ))
+        .unwrap();
+        let index = IconIndex::load(std::path::Path::new(".")).unwrap();
+        // A chart has no icon slots, so this succeeds without contacting an embedding server.
+        fix_invalid_icons(std::slice::from_mut(&mut slide), &client, "unused", &index)
+            .await
+            .unwrap();
+        assert!(slide.points[0].icon.is_none());
+        fill_default_icons(&mut slide);
+        assert!(slide.points[0].icon.is_none());
+    }
+
+    #[test]
+    fn focus_example_keeps_its_visible_point_icon_slot() {
+        let mut slide: SlideBlueprint = serde_json::from_value(json!({
+            "kind":"focus_example","title":"案例","points":[{"title":"要点","body":"说明"}]
+        }))
+        .unwrap();
+        fill_default_icons(&mut slide);
+        assert_eq!(
+            slide.points[0].icon.as_deref(),
+            Some("i-carbon:circle-dash")
+        );
     }
 }
 

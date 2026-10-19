@@ -1,5 +1,5 @@
 //! 「生成设置」分区（原版 `SettingsView.vue` 453–475 行，文案逐字）：
-//! 自动修复轮数（0–10）、生成并发数（1–8）与负载提示。
+//! 自动修复轮数（0–10）、生成并发数（1–32）与负载提示。
 
 use gpui_kit::component::input::Input;
 use gpui_kit::prelude::*;
@@ -10,10 +10,10 @@ use crate::icons::carbon;
 use crate::theme::StudioExt as _;
 use crate::widgets;
 
-/// 保存前的校验（原版 `save()` 里的规则）：repair 0–10 整数、concurrency 1–8 整数。
+/// 保存前校验：repair 0–10 整数、concurrency 1–32 整数。
 /// `invalid` 表示输入框里有解析不了的文本。
 pub fn generation_valid(repair_rounds: usize, concurrency: usize, invalid: bool) -> bool {
-    !invalid && repair_rounds <= 10 && (1..=8).contains(&concurrency)
+    !invalid && repair_rounds <= 10 && (1..=32).contains(&concurrency)
 }
 
 impl SettingsPage {
@@ -71,7 +71,7 @@ impl SettingsPage {
             .child(setting_row(
                 "生成并发数",
                 "同时生成的幻灯片数量，按模型服务的处理能力调整。",
-                "本地模型建议 1，最多 8",
+                "本地模型建议 1；云端可设 8–12，最多 32",
                 number_input(
                     div()
                         .child(Input::new(&self.concurrency_input))
@@ -105,13 +105,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn generation_ranges_match_the_original_rules() {
+    fn generation_ranges_allow_cloud_concurrency() {
         assert!(generation_valid(0, 1, false));
         assert!(generation_valid(10, 8, false));
         assert!(generation_valid(4, 4, false));
         assert!(!generation_valid(11, 4, false));
         assert!(!generation_valid(4, 0, false));
-        assert!(!generation_valid(4, 9, false));
+        assert!(generation_valid(4, 12, false));
+        assert!(generation_valid(4, 32, false));
+        assert!(!generation_valid(4, 33, false));
         // 输入框里有解析不了的文本时不允许保存。
         assert!(!generation_valid(4, 4, true));
     }
