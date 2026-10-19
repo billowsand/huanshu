@@ -287,9 +287,8 @@ impl AppState {
             }
         });
 
-        // New projects are created relative to the process working directory. The shipped app
-        // is launched from its install directory, which is where project folders should land;
-        // packaged builds run with HUANSHU_HOME pointed at a sandbox during verification.
+        // Resource lookup may use the working directory, but generated files must go to
+        // the writable data directory: Finder can launch the macOS app with a read-only cwd.
         let project_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
         Self {
@@ -337,6 +336,14 @@ impl AppState {
                 Ok(self.settings.clone())
             }
         }
+    }
+
+    /// Generation logs belong beside the active settings/database, never in the app's cwd.
+    pub(crate) fn generation_debug_dir(&self) -> PathBuf {
+        self.settings_path
+            .parent()
+            .expect("settings path has a parent")
+            .join(".slidev-gen-debug")
     }
 
     pub fn persist_settings(&mut self) -> Result<()> {
@@ -414,6 +421,23 @@ mod tests {
             storage_paths(None),
             "an empty HUANSHU_HOME is treated as unset"
         );
+    }
+
+    #[test]
+    fn generation_logs_follow_active_storage_instead_of_the_working_directory() {
+        let root =
+            std::env::temp_dir().join(format!("huanshu-debug-path-{}", uuid::Uuid::new_v4()));
+        let mut state = AppState::for_tests(Connection::open_in_memory().unwrap());
+        // Finder may launch with `/` as cwd. No generated file may be written there.
+        state.project_dir = PathBuf::from("/");
+        for data_dir in [root.join("sandbox/data"), root.join("moved-data")] {
+            state.settings_path = data_dir.join("settings.json");
+            let debug_dir = state.generation_debug_dir();
+            assert_eq!(debug_dir, data_dir.join(".slidev-gen-debug"));
+            std::fs::create_dir_all(&debug_dir).unwrap();
+            std::fs::write(debug_dir.join("test.log"), "generation output").unwrap();
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     /// 文件不存在 = 第一次运行（不算失败）；文件在但坏了 = 失败，且必须留下原因：

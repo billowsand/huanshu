@@ -35,12 +35,17 @@ fn strip_markdown_fences(raw: &str) -> String {
 }
 
 fn reset_debug_dir(path: &Path) -> anyhow::Result<()> {
+    use anyhow::Context;
+
     match std::fs::remove_dir_all(path) {
         Ok(()) => {}
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-        Err(err) => return Err(err.into()),
+        Err(err) => {
+            return Err(err).with_context(|| format!("清理生成日志目录失败：{}", path.display()))
+        }
     }
-    std::fs::create_dir_all(path)?;
+    std::fs::create_dir_all(path)
+        .with_context(|| format!("创建生成日志目录失败：{}", path.display()))?;
     Ok(())
 }
 
@@ -212,11 +217,12 @@ pub async fn generate_slides(
     let resolved_aspect_ratio = aspect_ratio.unwrap_or(crate::types::AspectRatio::Ratio16x9);
 
     // Get config from state
-    let (settings, project_dir, active_project_id, db) = {
+    let (settings, project_dir, debug_dir, active_project_id, db) = {
         let st = state.lock().unwrap();
         (
             st.settings.clone(),
             st.project_dir.clone(),
+            st.generation_debug_dir(),
             st.active_project_id,
             std::sync::Arc::clone(&st.db),
         )
@@ -241,6 +247,7 @@ pub async fn generate_slides(
     };
 
     let mut config = GenerationConfig::from_settings(&settings, project_dir, resolved_aspect_ratio);
+    config.debug_dir = debug_dir;
     config.frontmatter_title = frontmatter_title;
     config.granularity = resolved_granularity;
     let run_id = {
@@ -326,7 +333,7 @@ pub async fn generate_slides(
             Ok(count)
         }
         Err(e) => {
-            let msg = e.to_string();
+            let msg = format!("{e:#}");
             {
                 let mut st = state.lock().unwrap();
                 st.generation_running = false;
@@ -434,11 +441,12 @@ pub async fn repair_slide(
     index: usize,
     feedback: String,
 ) -> Result<SlideBlueprint> {
-    let (settings, project_dir, blueprints, active_project_id, db) = {
+    let (settings, project_dir, debug_dir, blueprints, active_project_id, db) = {
         let st = state.lock().unwrap();
         (
             st.settings.clone(),
             st.project_dir.clone(),
+            st.generation_debug_dir(),
             st.blueprints.clone(),
             st.active_project_id,
             std::sync::Arc::clone(&st.db),
@@ -457,7 +465,8 @@ pub async fn repair_slide(
         })
         .or_else(|| blueprints.get(index).and_then(|bp| bp.aspect_ratio))
         .unwrap_or(crate::types::AspectRatio::Ratio16x9);
-    let config = GenerationConfig::from_settings(&settings, project_dir.clone(), aspect_ratio);
+    let mut config = GenerationConfig::from_settings(&settings, project_dir.clone(), aspect_ratio);
+    config.debug_dir = debug_dir;
     let blueprint = blueprints
         .get(index)
         .ok_or_else(|| format!("slide index {index} out of range"))?
@@ -595,7 +604,7 @@ pub async fn retry_generation_page(
     page_index: usize,
     layout_kind: Option<crate::types::SlideKind>,
 ) -> Result<RetryPageResult> {
-    let (settings, project_dir, project_id, db, run, plan) = {
+    let (settings, project_dir, debug_dir, project_id, db, run, plan) = {
         let mut st = state.lock().unwrap();
         if st.generation_running {
             return Err("请等待当前生成或重试完成".into());
@@ -623,6 +632,7 @@ pub async fn retry_generation_page(
         (
             st.settings.clone(),
             st.project_dir.clone(),
+            st.generation_debug_dir(),
             run.project_id,
             db,
             run,
@@ -638,7 +648,8 @@ pub async fn retry_generation_page(
     let result: anyhow::Result<RetryPageResult> = async {
         let mut config = GenerationConfig::from_settings(&settings, project_dir.clone(), ratio);
         config.frontmatter_title = run.frontmatter_title.clone();
-        config.debug_dir = std::path::PathBuf::from(&run.debug_dir).join(format!(
+        // Old runs may contain a cwd-based path on a read-only volume.
+        config.debug_dir = debug_dir.join(format!(
             "retry-page-{}-{}",
             page_index + 1,
             std::time::SystemTime::now()

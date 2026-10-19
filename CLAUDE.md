@@ -297,7 +297,9 @@ LLM 没给出可用候选、repair 最后一轮换模板、生成兜底页时，
 
 ### 观测与真机探针
 
-每次生成在调试目录（项目的 `.slidev-gen-debug/`）写出：
+每次生成在调试目录（当前应用数据目录下的 `.slidev-gen-debug/`，与 `settings.json` 同级）写出；
+单页重试也使用当前数据目录，不沿用旧记录中的启动目录路径。程序启动目录只用于资源查找，
+不能作为写入目录（macOS 从访达启动时可能位于只读文件系统）。写出内容：
 - `02-layout-NN.parsed.json`：该页解析出的候选与 `dropped`（解析不了的条目及原因）
 - `02-layout-assignment.json`：`stats.assigned` 与 `stats.llm_top_choice`（逐页取 LLM 首选时的
   牌组）的对比——相邻/隔页重复次数、kind 分布、最大占比（`section_intro` 不计）；
