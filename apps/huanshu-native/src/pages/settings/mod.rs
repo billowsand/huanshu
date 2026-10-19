@@ -440,6 +440,9 @@ impl SettingsPage {
     }
 
     fn revert(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.initializing_embeddings {
+            return;
+        }
         let baseline = self.baseline.clone();
         for (form, draft) in [
             (&self.forms[0], &baseline.llm),
@@ -470,7 +473,7 @@ impl SettingsPage {
     /// 读失败过的一页不许保存（原版 `save()` 开头的 `!ready.value` 就 return）：草稿里是默认值，
     /// 写回去会把用户原来的配置覆盖掉。按钮那边也禁用了，这里是第二道。
     fn save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.saving || !self.ready() || !self.dirty(cx) {
+        if self.initializing_embeddings || self.saving || !self.ready() || !self.dirty(cx) {
             return;
         }
         // 保存前校验：repair 0–10 整数、concurrency 1–32 整数，失败跳到生成设置分区。
@@ -550,6 +553,9 @@ impl SettingsPage {
     ///
     /// 回的是进设置之前那条路由（原版 `goBack()`）；没读到设置时没有可保存的东西，直接走。
     fn leave(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.initializing_embeddings {
+            return;
+        }
         if !self.ready() || !self.dirty(cx) {
             self.handle.leave_settings(window, cx);
             return;
@@ -679,6 +685,9 @@ impl Render for SettingsPage {
                     })
                     .child(tab.label())
                     .on_click(cx.listener(move |page, _event, _window, cx| {
+                        if page.initializing_embeddings {
+                            return;
+                        }
                         page.tab = tab;
                         cx.notify();
                     }))

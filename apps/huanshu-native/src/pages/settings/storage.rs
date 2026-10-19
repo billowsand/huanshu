@@ -1,9 +1,10 @@
 //! 「存储与缓存」分区（原版 `SettingsView.vue` 477–507 行，文案逐字）：
 //! 文件位置（只读）+ 图标向量缓存（状态、初始化）。
 
-use gpui_kit::component::Disableable as _;
+use gpui_kit::component::progress::Progress;
+use gpui_kit::component::{Disableable as _, WindowExt as _};
 use gpui_kit::prelude::*;
-use gpui_kit::{div, px, Context, Window};
+use gpui_kit::{div, px, Context, Render, Window};
 use huanshu_core::services::{generation, storage};
 
 use super::service_form::ModelTarget;
@@ -11,6 +12,55 @@ use super::SettingsPage;
 use crate::tasks::run_async;
 use crate::theme::StudioExt as _;
 use crate::widgets;
+
+/// A blocking dialog keeps the settings page alive until initialization finishes.
+struct EmbeddingInitDialog {
+    running: bool,
+    failed: bool,
+    message: String,
+}
+
+impl Render for EmbeddingInitDialog {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let c = cx.studio().colors;
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(14.0))
+            .child(
+                Progress::new("embedding-init-progress")
+                    .loading(self.running)
+                    .value(if self.running || self.failed {
+                        0.0
+                    } else {
+                        100.0
+                    })
+                    .color(if self.failed { c.error } else { c.primary })
+                    .accessibility_label("图标向量缓存初始化进度"),
+            )
+            .child(
+                div()
+                    .text_size(px(13.0))
+                    .text_color(if self.failed { c.error } else { c.text })
+                    .child(self.message.clone()),
+            )
+            .when(self.running, |body| {
+                body.child(
+                    div().text_size(px(12.0)).text_color(c.muted).child(
+                        "首次初始化可能需要几分钟，请保持应用打开。完成前暂时无法操作设置。",
+                    ),
+                )
+            })
+            .when(!self.running, |body| {
+                body.child(
+                    div().flex().justify_end().child(
+                        widgets::ghost_button("close-embedding-init", "关闭")
+                            .on_click(|_event, window, cx| window.close_dialog(cx)),
+                    ),
+                )
+            })
+    }
+}
 
 impl SettingsPage {
     /// 向量缓存「已初始化」：embeddings_ready 且草稿里的向量模型与已初始化的模型一致
@@ -41,19 +91,44 @@ impl SettingsPage {
 
     /// 原版 `initEmbeddings()`：`ensure_icon_embeddings`（async → `tasks::run_async`）。
     fn init_embeddings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.initializing_embeddings || self.config_dirty(cx) {
+        if self.initializing_embeddings || self.saving || self.config_dirty(cx) || !self.ready() {
             return;
         }
         self.initializing_embeddings = true;
         self.embedding_message = "正在初始化图标向量缓存…".to_string();
+        let progress = cx.new(|_cx| EmbeddingInitDialog {
+            running: true,
+            failed: false,
+            message: self.embedding_message.clone(),
+        });
+        let content = progress.clone();
+        window.open_dialog(cx, move |dialog, _window, _cx| {
+            dialog
+                .title("初始化图标向量缓存")
+                .w(px(440.0))
+                .overlay(true)
+                .overlay_closable(false)
+                .keyboard(false)
+                .close_button(false)
+                .on_cancel(|_event, _window, _cx| false)
+                .on_ok(|_event, _window, _cx| false)
+                .child(content.clone())
+        });
         cx.notify();
         let shared = self.handle.shared().clone();
         run_async(
             window,
             cx,
-            async move { generation::ensure_icon_embeddings(&shared).await },
-            |page: &mut Self, result, _window, cx| {
+            async move {
+                // Convert task panics into a failure too, so the modal never stays locked.
+                crate::tasks::tokio()
+                    .spawn(async move { generation::ensure_icon_embeddings(&shared).await })
+                    .await
+                    .unwrap_or_else(|error| Err(format!("初始化任务异常，请重试：{error}")))
+            },
+            move |page: &mut Self, result, _window, cx| {
                 page.initializing_embeddings = false;
+                let failed = result.is_err();
                 match result {
                     Ok(()) => {
                         // 成功后重新读 app_settings 刷新状态（原版 appSettings.load()）。
@@ -62,8 +137,14 @@ impl SettingsPage {
                         }
                         page.embedding_message = "向量缓存初始化完成。".to_string();
                     }
-                    Err(error) => page.embedding_message = error,
+                    Err(error) => page.embedding_message = format!("初始化失败：{error}"),
                 }
+                progress.update(cx, |dialog, cx| {
+                    dialog.running = false;
+                    dialog.failed = failed;
+                    dialog.message = page.embedding_message.clone();
+                    cx.notify();
+                });
                 cx.notify();
             },
         );
@@ -228,7 +309,7 @@ impl SettingsPage {
                             .gap(px(10.0))
                             .child(
                                 widgets::ghost_button("init-embeddings", button_label)
-                                    .disabled(initializing || ready || config_dirty)
+                                    .disabled(initializing || self.saving || ready || config_dirty)
                                     .on_click(cx.listener(|page, _event, window, cx| {
                                         page.init_embeddings(window, cx)
                                     })),

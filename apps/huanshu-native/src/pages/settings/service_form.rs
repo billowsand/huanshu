@@ -9,7 +9,7 @@
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::select::{Select, SelectEvent, SelectState};
+use gpui_kit::component::select::{SearchableVec, Select, SelectEvent, SelectState};
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{Disableable as _, Sizable as _};
 use gpui_kit::prelude::*;
@@ -217,7 +217,7 @@ pub struct ServiceForm {
     api_key: Entity<InputState>,
     /// 手动输入模型 ID 的输入框。
     model_manual: Entity<InputState>,
-    model_select: Entity<SelectState<Vec<String>>>,
+    model_select: Entity<SelectState<SearchableVec<String>>>,
     proxy_url: Entity<InputState>,
     proxy_user: Entity<InputState>,
     proxy_pass: Entity<InputState>,
@@ -278,7 +278,10 @@ impl ServiceForm {
                 })
                 .default_value(draft.model.clone())
         });
-        let model_select = cx.new(|cx| SelectState::new(Vec::<String>::new(), None, window, cx));
+        let model_select = cx.new(|cx| {
+            SelectState::new(SearchableVec::new(Vec::<String>::new()), None, window, cx)
+                .searchable(true)
+        });
         let proxy_url = cx.new(|cx| {
             InputState::new(window, cx)
                 .placeholder("socks5://127.0.0.1:1080")
@@ -326,7 +329,7 @@ impl ServiceForm {
             }),
             cx.subscribe(
                 &model_select,
-                |this: &mut Self, _state, event: &SelectEvent<Vec<String>>, cx| {
+                |this: &mut Self, _state, event: &SelectEvent<SearchableVec<String>>, cx| {
                     if let SelectEvent::Confirm(Some(value)) = event {
                         this.draft.model = value.clone();
                         cx.notify();
@@ -394,7 +397,7 @@ impl ServiceForm {
             .then_some(model)
             .filter(|model| options.contains(model));
         self.model_select.update(cx, |state, cx| {
-            state.set_items(options, window, cx);
+            state.set_items(SearchableVec::new(options), window, cx);
             match selected {
                 Some(model) => state.set_selected_value(&model, window, cx),
                 None => state.set_selected_index(None, window, cx),
@@ -653,7 +656,15 @@ impl Render for ServiceForm {
                     div().flex_1().child(
                         Select::new(&self.model_select)
                             .w_full()
-                            .placeholder("请选择模型"),
+                            .placeholder("请选择模型")
+                            .search_placeholder("搜索模型名称或 ID…")
+                            .empty(|_window, cx| {
+                                div()
+                                    .p(px(12.0))
+                                    .text_size(px(12.0))
+                                    .text_color(cx.studio().colors.muted)
+                                    .child("暂无匹配模型，请调整关键词或获取模型列表。")
+                            }),
                     ),
                 )
                 .child(fetch)
